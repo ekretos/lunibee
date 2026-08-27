@@ -1,0 +1,17 @@
+{
+  "name": "@lunibee/cli",
+  "version": "0.1.0",
+  "description": "Lunibee workspace and release CLI.",
+  "type": "module",
+  "bin": {
+    "lunibee": "./src/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src"],
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "license": "MIT"
+}
