@@ -12,7 +12,10 @@ export class Shard {
 
     public constructor(options: ShardOptions, dispatch: (shardId: number, payload: GatewayPayload) => void) {
         this.id = options.shardId;
-        this.#manager = new GatewayManager(options, payload => dispatch(this.id, payload));
+        this.#manager = new GatewayManager(options, payload => dispatch(this.id, payload), {
+            shardId: options.shardId,
+            shardCount: options.shardCount
+        });
     }
 
     public connect(): Promise<void> { return this.#manager.connect(); }
