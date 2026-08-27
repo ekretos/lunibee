@@ -6,9 +6,17 @@
   "type": "module",
   "workspaces": ["packages/*"],
   "scripts": {
-    "test": "bun test",
-    "typecheck": "bunx tsc --noEmit"
+    "format": "bunx --bun prettier --write .",
+    "format:check": "bunx --bun prettier --check .",
+    "typecheck": "bunx --bun tsc --noEmit",
+    "test": "bun test"
   },
-  "engines": { "bun": ">=1.2.0" },
-  "license": "MIT"
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2"
+  }
 }
