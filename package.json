@@ -9,7 +9,9 @@
     "format": "bunx --bun prettier --write .",
     "format:check": "bunx --bun prettier --check .",
     "typecheck": "bunx --bun tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "publish": "bun packages/cli/src/index.ts publish",
+    "publish:status": "bun packages/cli/src/index.ts status"
   },
   "engines": {
     "bun": ">=1.2.0"
