@@ -3,6 +3,8 @@ export interface ClientOptions {
     intents: number;
     gateway?: GatewayOptions;
     rest?: RESTOptions;
+    shards?: number;
+    maxConcurrency?: number;
 }
 
 export interface GatewayOptions {
