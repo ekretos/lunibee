@@ -10,6 +10,8 @@ export interface ShardManagerOptions {
     shardCount?: number | "auto";
     /** Gateway reconnect behavior. */
     reconnect?: boolean;
+    /** Delay between shard starts in milliseconds. @default 5500 */
+    spawnDelay?: number;
 }
 
 /** Manages independent Discord Gateway shards. */
@@ -29,15 +31,23 @@ export class ShardManager {
         }
     }
 
+    /** Retrieves Discord's recommended shard count. */
+    public async fetchRecommendedShardCount(): Promise<number> {
+        const response = await fetch("https://discord.com/api/v10/gateway/bot", { headers: { Authorization: `Bot ${this.#options.token}` } });
+        if (!response.ok) throw new Error(`Gateway discovery failed with status ${response.status}`);
+        return (await response.json() as { shards: number }).shards;
+    }
+
     /** Connects all shards sequentially. */
     public async connect(): Promise<void> {
-        for (const shard of this.shards.values()) await shard.connect();
+        for (const [id, shard] of this.shards) {
+            await shard.connect();
+            if (id + 1 < this.shardCount && this.#options.spawnDelay) await Bun.sleep(this.#options.spawnDelay);
+        }
     }
 
     /** Closes every shard. */
-    public destroy(): void {
-        for (const shard of this.shards.values()) shard.close();
-    }
+    public destroy(): void { for (const shard of this.shards.values()) shard.close(); }
 
     /** Gets a shard by ID. */
     public get(id: number): Gateway | undefined { return this.shards.get(id); }
