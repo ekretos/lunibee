@@ -91,10 +91,7 @@ export class Client extends EventEmitter<ClientEvents> implements InteractionCli
         super();
         this.rest = new REST({ token: options.token, ...options.rest });
         this.#gateway = new Gateway({ token: options.token, intents: options.intents, ...options.gateway });
-        this.#gateway.on("open", () => {
-            this.state.transition("connecting");
-            this.emit("connecting");
-        });
+        this.#gateway.on("open", () => this.emit("connecting"));
         this.#gateway.on("READY", data => {
             this.user = data as ClientUser;
             this.state.transition("ready");
@@ -129,8 +126,7 @@ export class Client extends EventEmitter<ClientEvents> implements InteractionCli
 
     /** Logs the client into Discord. */
     public async login(): Promise<void> {
-        if (this.state.status === "ready") return;
-        if (this.state.status === "connecting") return;
+        if (this.state.status === "ready" || this.state.status === "connecting") return;
         this.state.transition("connecting");
         try {
             this.user = await this.rest.get<ClientUser>(Routes.user());
@@ -167,7 +163,7 @@ export class Client extends EventEmitter<ClientEvents> implements InteractionCli
 
 export { ClientState } from "./client-state.js";
 export { Collection } from "@lunibee/collection";
-export { REST, RESTError, Routes } from "@lunibee/rest";
+export { AuthenticationError, RateLimitError, REST, RESTError, Routes } from "@lunibee/rest";
 export { Gateway, GatewayError, GatewayOpcodes } from "@lunibee/ws";
 export { User, Guild, Channel, Message } from "@lunibee/structures";
 export { EmbedBuilder, ButtonBuilder, ActionRowBuilder, StringSelectBuilder, SlashCommandBuilder, StringOptionBuilder } from "@lunibee/builders";
