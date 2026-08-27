@@ -1,0 +1,1 @@
+CI validation for the Lunibee repository is intentionally kept outside published packages.
