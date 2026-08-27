@@ -1,7 +1,8 @@
 import { RESTError } from "./errors.js";
 import type { RESTOptions } from "./types.js";
 
-const BASE_URL = "https://discord.com/api/v10";
+/** Discord's versioned REST API base URL. */
+export const REST_BASE_URL = "https://discord.com/api/v10";
 
 type Bucket = {
     remaining: number;
@@ -9,6 +10,12 @@ type Bucket = {
     queue: Promise<void>;
 };
 
+/**
+ * Performs authenticated requests against Discord's REST API.
+ *
+ * The client maintains per-route request queues, handles global and route
+ * rate limits, retries idempotent server failures, and aborts timed-out calls.
+ */
 export class REST {
     readonly #timeout: number;
     readonly #retries: number;
@@ -16,16 +23,41 @@ export class REST {
     #globalResetAt = 0;
     readonly #buckets = new Map<string, Bucket>();
 
+    /**
+     * Creates a REST client.
+     *
+     * @param token - Discord bot token used for authentication.
+     * @param options - Request timeout and retry configuration.
+     */
     public constructor(token?: string, options: RESTOptions = {}) {
         this.#token = token;
         this.#timeout = options.timeout ?? 15_000;
         this.#retries = Math.max(0, options.retries ?? 2);
     }
 
+    /**
+     * Replaces the token used for future requests.
+     *
+     * @param token - Discord bot token.
+     */
     public setToken(token: string): void {
         this.#token = token;
     }
 
+    /**
+     * Sends a request to Discord.
+     *
+     * @typeParam T - Expected response type.
+     * @param method - HTTP method.
+     * @param path - API path relative to Discord's v10 API.
+     * @param body - Optional JSON request body.
+     * @returns The decoded Discord response.
+     * @throws {@link RESTError} When Discord returns an unsuccessful response.
+     * @example
+     * ```ts
+     * const user = await rest.request<User>("GET", "/users/@me");
+     * ```
+     */
     public async request<T>(method: string, path: string, body?: unknown): Promise<T> {
         const route = this.#route(method, path);
         const bucket = this.#buckets.get(route) ?? { remaining: 1, resetAt: 0, queue: Promise.resolve() };
@@ -41,11 +73,63 @@ export class REST {
         }
     }
 
-    public get<T>(path: string): Promise<T> { return this.request<T>("GET", path); }
-    public post<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("POST", path, body); }
-    public patch<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("PATCH", path, body); }
-    public put<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("PUT", path, body); }
-    public delete<T>(path: string): Promise<T> { return this.request<T>("DELETE", path); }
+    /**
+     * Sends a GET request.
+     *
+     * @typeParam T - Expected response type.
+     * @param path - API path.
+     * @returns The decoded response.
+     */
+    public get<T>(path: string): Promise<T> {
+        return this.request<T>("GET", path);
+    }
+
+    /**
+     * Sends a POST request.
+     *
+     * @typeParam T - Expected response type.
+     * @param path - API path.
+     * @param body - Optional JSON request body.
+     * @returns The decoded response.
+     */
+    public post<T>(path: string, body?: unknown): Promise<T> {
+        return this.request<T>("POST", path, body);
+    }
+
+    /**
+     * Sends a PATCH request.
+     *
+     * @typeParam T - Expected response type.
+     * @param path - API path.
+     * @param body - Optional JSON request body.
+     * @returns The decoded response.
+     */
+    public patch<T>(path: string, body?: unknown): Promise<T> {
+        return this.request<T>("PATCH", path, body);
+    }
+
+    /**
+     * Sends a PUT request.
+     *
+     * @typeParam T - Expected response type.
+     * @param path - API path.
+     * @param body - Optional JSON request body.
+     * @returns The decoded response.
+     */
+    public put<T>(path: string, body?: unknown): Promise<T> {
+        return this.request<T>("PUT", path, body);
+    }
+
+    /**
+     * Sends a DELETE request.
+     *
+     * @typeParam T - Expected response type.
+     * @param path - API path.
+     * @returns The decoded response.
+     */
+    public delete<T>(path: string): Promise<T> {
+        return this.request<T>("DELETE", path);
+    }
 
     async #execute<T>(method: string, path: string, body: unknown, bucket: Bucket): Promise<T> {
         for (let attempt = 0; attempt <= this.#retries; attempt++) {
@@ -53,7 +137,7 @@ export class REST {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), this.#timeout);
             try {
-                const response = await fetch(`${BASE_URL}${path}`, {
+                const response = await fetch(`${REST_BASE_URL}${path}`, {
                     method,
                     headers: {
                         Authorization: `Bot ${this.#token}`,
