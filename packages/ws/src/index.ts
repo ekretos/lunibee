@@ -20,6 +20,19 @@ export const GatewayOpcodes = {
     HeartbeatAck: 11
 } as const;
 
+/** Gateway connection failure. */
+export class GatewayError extends Error {
+    /** WebSocket close code associated with the error. */
+    public readonly code?: number;
+
+    /** Creates a Gateway error. */
+    public constructor(message: string, code?: number) {
+        super(message);
+        this.name = "GatewayError";
+        this.code = code;
+    }
+}
+
 /** Options for a Gateway connection. */
 export interface GatewayOptions {
     /** Discord bot token. */
@@ -34,7 +47,12 @@ export interface GatewayOptions {
     reconnect?: boolean;
     /** Maximum reconnect attempts. @default Infinity */
     maxReconnectAttempts?: number;
+    /** Maximum random reconnect jitter in milliseconds. @default 250 */
+    reconnectJitter?: number;
 }
+
+const fatalCloseCodes = new Set([4004, 4010, 4011, 4012, 4013, 4014]);
+const resetSessionCloseCodes = new Set([4007, 4009]);
 
 /** A lightweight Discord Gateway connection. */
 export class Gateway {
@@ -44,6 +62,7 @@ export class Gateway {
     #sessionId?: string;
     #resumeURL?: string;
     #heartbeatTimer?: ReturnType<typeof setInterval>;
+    #heartbeatTimeout?: ReturnType<typeof setTimeout>;
     #heartbeatACK = true;
     #closed = false;
     #attempt = 0;
@@ -57,6 +76,7 @@ export class Gateway {
             shardCount: 1,
             reconnect: true,
             maxReconnectAttempts: Infinity,
+            reconnectJitter: 250,
             ...options
         };
     }
@@ -64,14 +84,15 @@ export class Gateway {
     /** Connects to Discord's Gateway. */
     public async connect(url = "wss://gateway.discord.gg/?v=10&encoding=json"): Promise<void> {
         this.#closed = false;
+        this.#clearReconnectTimer();
         this.#open(url);
     }
 
     /** Permanently closes the Gateway connection and clears timers. */
     public close(): void {
         this.#closed = true;
-        if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
-        if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
+        this.#clearReconnectTimer();
+        this.#clearHeartbeat();
         this.#ws?.close(1000);
         this.#ws = undefined;
     }
@@ -95,15 +116,23 @@ export class Gateway {
     #open(url: string): void {
         const ws = new WebSocket(url);
         this.#ws = ws;
+        ws.addEventListener("open", () => this.#emit("open", undefined));
         ws.addEventListener("message", event => this.#message(ws, String(event.data)));
-        ws.addEventListener("close", event => this.#close(event.code));
-        ws.addEventListener("error", () => this.#emit("error", new Error("Gateway WebSocket error")));
+        ws.addEventListener("close", event => this.#close(ws, event.code));
+        ws.addEventListener("error", () => this.#emit("error", new GatewayError("Gateway WebSocket error")));
     }
 
     #message(ws: WebSocket, raw: string): void {
         let payload: GatewayPayload;
-        try { payload = JSON.parse(raw) as GatewayPayload; } catch { ws.close(1002); return; }
+        try {
+            payload = JSON.parse(raw) as GatewayPayload;
+        } catch {
+            ws.close(1002);
+            return;
+        }
+
         if (typeof payload.s === "number") this.#sequence = payload.s;
+
         switch (payload.op) {
             case GatewayOpcodes.Dispatch:
                 if (payload.t === "READY") {
@@ -123,6 +152,8 @@ export class Gateway {
                 break;
             case GatewayOpcodes.HeartbeatAck:
                 this.#heartbeatACK = true;
+                if (this.#heartbeatTimeout) clearTimeout(this.#heartbeatTimeout);
+                this.#heartbeatTimeout = undefined;
                 break;
             case GatewayOpcodes.Reconnect:
                 ws.close(1001);
@@ -137,18 +168,40 @@ export class Gateway {
 
     #identifyOrResume(): void {
         if (this.#sessionId && this.#sequence !== null && this.#resumeURL) {
-            this.send({ op: GatewayOpcodes.Resume, d: { token: this.#options.token, session_id: this.#sessionId, seq: this.#sequence }, s: null, t: null });
+            this.send({
+                op: GatewayOpcodes.Resume,
+                d: { token: this.#options.token, session_id: this.#sessionId, seq: this.#sequence },
+                s: null,
+                t: null
+            });
             return;
         }
-        this.send({ op: GatewayOpcodes.Identify, d: { token: this.#options.token, intents: this.#options.intents, properties: { os: "linux", browser: "lunibee", device: "lunibee" }, shard: [this.#options.shardId, this.#options.shardCount] }, s: null, t: null });
+
+        this.send({
+            op: GatewayOpcodes.Identify,
+            d: {
+                token: this.#options.token,
+                intents: this.#options.intents,
+                properties: { os: "linux", browser: "lunibee", device: "lunibee" },
+                shard: [this.#options.shardId, this.#options.shardCount]
+            },
+            s: null,
+            t: null
+        });
     }
 
     #startHeartbeat(interval: number): void {
-        if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
+        this.#clearHeartbeat();
         this.#heartbeatACK = true;
-        setTimeout(() => this.#heartbeat(), Math.random() * interval);
+        setTimeout(() => {
+            if (!this.#closed) this.#heartbeat();
+        }, Math.random() * interval);
         this.#heartbeatTimer = setInterval(() => {
-            if (!this.#heartbeatACK) { this.#ws?.close(1001); return; }
+            if (!this.#heartbeatACK) {
+                this.#emit("error", new GatewayError("Gateway heartbeat was not acknowledged"));
+                this.#ws?.close(1001);
+                return;
+            }
             this.#heartbeat();
         }, interval);
     }
@@ -156,18 +209,54 @@ export class Gateway {
     #heartbeat(): void {
         this.#heartbeatACK = false;
         this.send({ op: GatewayOpcodes.Heartbeat, d: this.#sequence, s: null, t: null });
+        if (this.#heartbeatTimeout) clearTimeout(this.#heartbeatTimeout);
+        this.#heartbeatTimeout = setTimeout(() => {
+            if (!this.#heartbeatACK && !this.#closed) {
+                this.#emit("error", new GatewayError("Gateway heartbeat acknowledgement timed out"));
+                this.#ws?.close(1001);
+            }
+        }, 15_000);
     }
 
-    #close(code: number): void {
-        if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
-        if (this.#closed || !this.#options.reconnect || [4004, 4010, 4011, 4012, 4013, 4014].includes(code)) return;
-        if (code === 4007 || code === 4009) { this.#sequence = null; this.#sessionId = undefined; }
+    #close(ws: WebSocket, code: number): void {
+        if (this.#ws !== ws) return;
+        this.#clearHeartbeat();
+        this.#ws = undefined;
+        this.#emit("close", code);
+
+        if (this.#closed || !this.#options.reconnect || fatalCloseCodes.has(code)) return;
+        if (resetSessionCloseCodes.has(code)) {
+            this.#sequence = null;
+            this.#sessionId = undefined;
+        }
         if (this.#attempt >= this.#options.maxReconnectAttempts) return;
-        const delay = Math.min(30_000, 1_000 * 2 ** this.#attempt++) + Math.random() * 250;
-        this.#reconnectTimer = setTimeout(() => { this.#reconnectTimer = undefined; void this.connect(this.#resumeURL ?? undefined); }, delay);
+
+        const delay = Math.min(30_000, 1_000 * 2 ** this.#attempt++) + Math.random() * this.#options.reconnectJitter;
+        this.#reconnectTimer = setTimeout(() => {
+            this.#reconnectTimer = undefined;
+            void this.connect(this.#resumeURL ?? undefined);
+        }, delay);
+    }
+
+    #clearHeartbeat(): void {
+        if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
+        if (this.#heartbeatTimeout) clearTimeout(this.#heartbeatTimeout);
+        this.#heartbeatTimer = undefined;
+        this.#heartbeatTimeout = undefined;
+    }
+
+    #clearReconnectTimer(): void {
+        if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
+        this.#reconnectTimer = undefined;
     }
 
     #emit(event: string, data: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? []) void listener(data);
+        for (const listener of this.#listeners.get(event) ?? []) {
+            try {
+                void listener(data);
+            } catch (error) {
+                if (event !== "error") this.#emit("error", error instanceof Error ? error : new Error(String(error)));
+            }
+        }
     }
 }
