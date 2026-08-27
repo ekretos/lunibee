@@ -1,4 +1,4 @@
-import { GatewayManager } from "./gateway/manager.js";
+import { ShardManager } from "./gateway/sharding.js";
 import { REST } from "./rest.js";
 import type { ClientOptions, ClientUser, GatewayPayload } from "./types.js";
 
@@ -6,18 +6,21 @@ type Listener = (...args: any[]) => unknown;
 
 export class Client {
     public readonly rest: REST;
-    readonly #gateway: GatewayManager;
+    readonly #gateway: ShardManager;
     readonly #listeners = new Map<string, Set<Listener>>();
     #user?: ClientUser;
 
     public constructor(public readonly options: ClientOptions) {
         this.rest = new REST(options.token, options.rest);
-        this.#gateway = new GatewayManager(options, payload => this.#handleGateway(payload));
+        this.#gateway = new ShardManager(options, (shardId, payload) => this.#handleGateway(shardId, payload), {
+            count: options.shards,
+            maxConcurrency: options.maxConcurrency
+        });
     }
 
-    public get user(): ClientUser | undefined {
-        return this.#user;
-    }
+    public get user(): ClientUser | undefined { return this.#user; }
+
+    public get shards(): ReadonlyMap<number, import("./gateway/shard.js").Shard> { return this.#gateway.shards; }
 
     public on(event: string, listener: Listener): this {
         let listeners = this.#listeners.get(event);
@@ -30,10 +33,7 @@ export class Client {
     }
 
     public once(event: string, listener: Listener): this {
-        const wrapped = (...args: any[]) => {
-            this.off(event, wrapped);
-            return listener(...args);
-        };
+        const wrapped = (...args: any[]) => { this.off(event, wrapped); return listener(...args); };
         return this.on(event, wrapped);
     }
 
@@ -47,15 +47,13 @@ export class Client {
         await this.#gateway.connect();
     }
 
-    public destroy(): void {
-        this.#gateway.close();
-    }
+    public destroy(): void { this.#gateway.close(); }
 
-    #handleGateway(payload: GatewayPayload): void {
+    #handleGateway(shardId: number, payload: GatewayPayload): void {
         if (!payload.t) return;
         const event = payload.t.charAt(0) + payload.t.slice(1).toLowerCase();
         const listeners = this.#listeners.get(event) ?? this.#listeners.get(payload.t);
         if (!listeners) return;
-        for (const listener of listeners) void listener(payload.d);
+        for (const listener of listeners) void listener(payload.d, shardId);
     }
 }
