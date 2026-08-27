@@ -6,6 +6,8 @@
   "type": "module",
   "workspaces": ["packages/*"],
   "scripts": {
+    "format": "bunx prettier --write .",
+    "format:check": "bunx prettier --check .",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit"
   },
