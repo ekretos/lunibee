@@ -1,16 +1,39 @@
 import { ShardManager } from "./gateway/sharding.js";
 import { REST } from "./rest.js";
+import { EventEmitter } from "./events.js";
 import type { ClientOptions, ClientUser, GatewayPayload } from "./types.js";
+import type { Shard } from "./gateway/shard.js";
 
-type Listener = (...args: any[]) => unknown;
+/** Events emitted by {@link Client}. */
+export interface ClientEvents {
+    /** Emitted when the bot receives a Discord `READY` dispatch. */
+    ready: [user: ClientUser, shardId: number];
+    /** Emitted for every Discord Gateway dispatch. */
+    raw: [payload: GatewayPayload, shardId: number];
+    /** Emitted when Discord sends a dispatch event. */
+    [event: string]: unknown[];
+}
 
-export class Client {
+/**
+ * The main Lunibee client.
+ *
+ * The client combines the REST API, Gateway connections, sharding, and typed
+ * event dispatch into a small Bun-first interface.
+ */
+export class Client extends EventEmitter<ClientEvents> {
+    /** The REST client used for Discord HTTP requests. */
     public readonly rest: REST;
+
     readonly #gateway: ShardManager;
-    readonly #listeners = new Map<string, Set<Listener>>();
     #user?: ClientUser;
 
+    /**
+     * Creates a Lunibee client.
+     *
+     * @param options - Client, Gateway, REST, and sharding configuration.
+     */
     public constructor(public readonly options: ClientOptions) {
+        super();
         this.rest = new REST(options.token, options.rest);
         this.#gateway = new ShardManager(options, (shardId, payload) => this.#handleGateway(shardId, payload), {
             count: options.shards,
@@ -18,42 +41,45 @@ export class Client {
         });
     }
 
-    public get user(): ClientUser | undefined { return this.#user; }
-
-    public get shards(): ReadonlyMap<number, import("./gateway/shard.js").Shard> { return this.#gateway.shards; }
-
-    public on(event: string, listener: Listener): this {
-        let listeners = this.#listeners.get(event);
-        if (!listeners) {
-            listeners = new Set();
-            this.#listeners.set(event, listeners);
-        }
-        listeners.add(listener);
-        return this;
+    /** The bot user returned by Discord after login. */
+    public get user(): ClientUser | undefined {
+        return this.#user;
     }
 
-    public once(event: string, listener: Listener): this {
-        const wrapped = (...args: any[]) => { this.off(event, wrapped); return listener(...args); };
-        return this.on(event, wrapped);
+    /** All currently created Gateway shards. */
+    public get shards(): ReadonlyMap<number, Shard> {
+        return this.#gateway.shards;
     }
 
-    public off(event: string, listener: Listener): this {
-        this.#listeners.get(event)?.delete(listener);
-        return this;
-    }
-
+    /**
+     * Logs the client into Discord.
+     *
+     * @returns A promise that resolves after the Gateway connection process starts.
+     * @throws {@link RESTError} When the bot token cannot retrieve the current user.
+     * @throws {@link GatewayError} When Gateway information cannot be retrieved.
+     * @example
+     * ```ts
+     * await client.login();
+     * ```
+     */
     public async login(): Promise<void> {
         this.#user = await this.rest.get<ClientUser>("/users/@me");
         await this.#gateway.connect();
     }
 
-    public destroy(): void { this.#gateway.close(); }
+    /**
+     * Closes all Gateway connections and stops reconnect attempts.
+     */
+    public destroy(): void {
+        this.#gateway.close();
+    }
 
     #handleGateway(shardId: number, payload: GatewayPayload): void {
+        this.emit("raw", payload, shardId);
         if (!payload.t) return;
-        const event = payload.t.charAt(0) + payload.t.slice(1).toLowerCase();
-        const listeners = this.#listeners.get(event) ?? this.#listeners.get(payload.t);
-        if (!listeners) return;
-        for (const listener of listeners) void listener(payload.d, shardId);
+
+        const event = payload.t.charAt(0).toLowerCase() + payload.t.slice(1);
+        if (event === "ready" && this.#user) this.emit("ready", this.#user, shardId);
+        this.emit(event, payload.d, shardId);
     }
 }
