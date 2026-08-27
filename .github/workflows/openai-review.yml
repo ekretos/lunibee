@@ -32,26 +32,19 @@ jobs:
           git diff --no-ext-diff --unified=80 "$BASE_SHA" "$HEAD_SHA" > /tmp/pr.diff
           python3 - <<'PY'
           import json, os, urllib.request
-          with open('/tmp/pr.diff', encoding='utf-8', errors='replace') as f:
-              diff = f.read()
+          diff = open('/tmp/pr.diff', encoding='utf-8', errors='replace').read()
           prompt = '''Review this Lunibee pull request. Lunibee is a lightweight, Bun-first TypeScript Discord wrapper. Find only actionable correctness, Discord REST/Gateway protocol, TypeScript, Bun compatibility, reliability, security, API-design, unnecessary-complexity, and missing-test issues. Do not praise the code. Keep findings concise and include file/line when possible.\n\n''' + diff
-          request = urllib.request.Request(
-              'https://api.openai.com/v1/responses',
-              data=json.dumps({'model': 'gpt-5.6', 'input': prompt, 'max_output_tokens': 3000}).encode(),
-              headers={'Authorization': 'Bearer ' + os.environ['OPENAI_API_KEY'], 'Content-Type': 'application/json'},
-              method='POST')
-          with urllib.request.urlopen(request, timeout=120) as response:
+          req = urllib.request.Request('https://api.openai.com/v1/responses', data=json.dumps({'model': 'gpt-5.6', 'input': prompt, 'max_output_tokens': 3000}).encode(), headers={'Authorization': 'Bearer ' + os.environ['OPENAI_API_KEY'], 'Content-Type': 'application/json'}, method='POST')
+          with urllib.request.urlopen(req, timeout=120) as response:
               result = json.load(response)
-          text = ''.join(item.get('text', '') for item in result.get('output', []) if item.get('type') == 'message' for item in item.get('content', []) if item.get('type') == 'output_text').strip()
-          if not text:
-              text = 'OpenAI review completed without actionable findings.'
+          text = ''.join(c.get('text', '') for o in result.get('output', []) if o.get('type') == 'message' for c in o.get('content', []) if c.get('type') == 'output_text').strip() or 'OpenAI review completed without actionable findings.'
           payload = json.dumps({'body': '## OpenAI Code Review\n\n' + text[:60000]}).encode()
           url = f"https://api.github.com/repos/{os.environ['REPOSITORY']}/issues/{os.environ['PR_NUMBER']}/comments"
-          request = urllib.request.Request(url, data=payload, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28'}, method='POST')
-          with urllib.request.urlopen(request, timeout=30) as response:
+          req = urllib.request.Request(url, data=payload, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28'}, method='POST')
+          with urllib.request.urlopen(req, timeout=30) as response:
               response.read()
           PY
 
       - name: Explain skipped review
         if: ${{ secrets.OPENAI_API_KEY == '' }}
-        run: echo "OPENAI_API_KEY is not configured; OpenAI review is skipped. GitHub CI checks remain independent of an OpenAI API key."
+        run: echo "OPENAI_API_KEY is not configured; OpenAI review is optional and was skipped."
