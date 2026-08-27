@@ -1,5 +1,7 @@
 # Lunibee 🐝
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/ekretos/lunibee?utm_source=oss&utm_medium=github&utm_campaign=ekretos%2Flunibee&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 A lightweight, Bun-first Discord API library for TypeScript.
 
 ## Goals
