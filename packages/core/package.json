@@ -11,6 +11,7 @@
     "@lunibee/ws": "file:../ws",
     "@lunibee/collection": "file:../collection",
     "@lunibee/structures": "file:../structures",
-    "@lunibee/managers": "file:../managers"
+    "@lunibee/managers": "file:../managers",
+    "@lunibee/builders": "file:../builders"
   }
 }
