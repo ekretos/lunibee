@@ -24,7 +24,7 @@ export interface ClientEvents {
     /** Channel deleted. @param payload Deleted channel payload. */ channelDelete: [APIChannel];
     /** Thread created. @param channel Hydrated thread structure. */ threadCreate: [Channel];
     /** Thread updated. @param channel Hydrated thread structure. */ threadUpdate: [Channel];
-    /** Thread deleted. @param payload Deleted thread payload. */ threadDelete: [APIThreadEvent];
+    /** Thread deleted. @param channel Deleted thread payload. */ threadDelete: [APIThreadEvent];
     /** Guild member added. @param member Guild member payload. */ guildMemberAdd: [APIGuildMember];
     /** Guild member updated. @param member Guild member payload. */ guildMemberUpdate: [APIGuildMember];
     /** Guild member removed. @param member Removed member payload. */ guildMemberRemove: [APIGuildMember];
@@ -39,7 +39,7 @@ export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
 type Listener<T extends unknown[]> = (...args: T) => unknown;
 
 /** Minimal typed event emitter used by the client. */
-class EventEmitter<Events extends Record<string, unknown[]>> {
+class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
     readonly #listeners = new Map<keyof Events, Set<Listener<any>>>();
     /** Registers a listener. @param event Event name. @param listener Listener callback. @returns This emitter. @throws {TypeError} If listener is not callable. */
     public on<K extends keyof Events>(event: K, listener: Listener<Events[K]>): this { if (typeof listener !== "function") throw new TypeError("Event listener must be a function."); let listeners = this.#listeners.get(event); if (!listeners) this.#listeners.set(event, listeners = new Set()); listeners.add(listener); return this; }
@@ -111,11 +111,13 @@ export class Client extends EventEmitter<ClientEvents> implements InteractionCli
     /** Closes the gateway and destroys cached resources. @returns Nothing. */
     public destroy(): void { if (this.state === "destroyed") return; this.#gateway.close(); this.users.clear(); this.guilds.clear(); this.channels.clear(); this.state = "destroyed"; this.readyAt = undefined; this.user = undefined; }
     /** Posts an interaction callback through REST. @param id Interaction identifier. @param token Interaction token. @param response Interaction response. @returns REST response. @throws {Error} If REST rejects the request. */
-    public postInteractionResponse(id: string, token: string, response: import("@lunibee/structures").InteractionResponse): Promise<unknown> { return this.rest.post(`/interactions/${id}/${token}/callback`, response.toJSON()); }
+    public postInteractionResponse(id: string, token: string, response: import("@lunibee/structures").InteractionResponse): Promise<unknown> { return this.rest.post(Routes.interactionCallback(id, token), response.toJSON()); }
     /** Edits the original interaction response. @param token Interaction token. @param data Reply payload. @returns REST response. @throws {Error} If the authenticated client user is unavailable. */
-    public editInteractionReply(token: string, data: import("@lunibee/structures").InteractionReplyOptions): Promise<unknown> { if (!this.user?.id) throw new Error("Client user is unavailable; login is required."); return this.rest.patch(`/webhooks/${this.user.id}/${token}/messages/@original`, data); }
+    public editInteractionReply(token: string, data: import("@lunibee/structures").InteractionReplyOptions): Promise<unknown> { if (!this.user?.id) throw new Error("Client user is unavailable; login is required."); return this.rest.patch(Routes.interactionOriginalResponse(this.user.id, token), data); }
     /** Deletes the original interaction response. @param token Interaction token. @returns Nothing. @throws {Error} If the authenticated client user is unavailable or REST rejects the request. */
-    public async deleteInteractionReply(token: string): Promise<void> { if (!this.user?.id) throw new Error("Client user is unavailable; login is required."); await this.rest.delete(`/webhooks/${this.user.id}/${token}/messages/@original`); }
+    public async deleteInteractionReply(token: string): Promise<void> { if (!this.user?.id) throw new Error("Client user is unavailable; login is required."); await this.rest.delete(Routes.interactionOriginalResponse(this.user.id, token)); }
+    /** Sends a follow-up interaction webhook message. @param token Interaction token. @param data Follow-up message payload. @returns REST response. @throws {Error} If the authenticated client user is unavailable or REST rejects the request. */
+    public followUpInteraction(token: string, data: import("@lunibee/structures").InteractionReplyOptions): Promise<unknown> { if (!this.user?.id) throw new Error("Client user is unavailable; login is required."); return this.rest.post(Routes.webhook(this.user.id, token), data); }
 }
 
 export { Collection } from "@lunibee/collection";
