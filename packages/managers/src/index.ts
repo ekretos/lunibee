@@ -2,6 +2,7 @@ import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
 import { Channel, Message, User, Guild, type ResourceContext } from "@lunibee/structures";
 import { MessageManager } from "./message.js";
+import { ThreadManager } from "./thread.js";
 
 /** Stores Discord resources by stable identifier. */
 export class Manager<K, V> {
@@ -28,23 +29,20 @@ export class ResourceManager<K, V> extends Manager<K, V> {
     /** Fetches several resources. @param ids Resource identifiers. @returns Resources in input order. @throws {Error} If any fetch fails. */ public async fetchMany(ids: Iterable<K>): Promise<V[]> { return Promise.all([...ids].map(id => this.fetch(id))); }
     /** Inserts or replaces a resource using its intrinsic identifier. @param value Resource instance. @returns This manager. */ public update(value: V): this { this.set(this.#key(value), value); return this; }
 }
-
 /** Manages users with cache and REST synchronization. */
-export class UserManager extends ResourceManager<string, User> { /** Creates a user manager. @param rest REST transport. */ public constructor(rest: REST) { super(async id => new User(await rest.get<ConstructorParameters<typeof User>[0]>(Routes.userById(id))), user => user.id); } }
+export class UserManager extends ResourceManager<string, User> { /** Creates a user manager. @param rest REST transport. @returns A user manager. @throws {Error} If REST is invalid. */ public constructor(rest: REST) { super(async id => new User(await rest.get<ConstructorParameters<typeof User>[0]>(Routes.userById(id))), user => user.id); } }
 /** Manages guilds with cache and REST synchronization. */
-export class GuildManager extends ResourceManager<string, Guild> { /** Creates a guild manager. @param rest REST transport. */ public constructor(rest: REST) { super(async id => new Guild(await rest.get<ConstructorParameters<typeof Guild>[0]>(Routes.guild(id))), guild => guild.id); } }
+export class GuildManager extends ResourceManager<string, Guild> { /** Creates a guild manager. @param rest REST transport. @returns A guild manager. @throws {Error} If REST is invalid. */ public constructor(rest: REST) { super(async id => new Guild(await rest.get<ConstructorParameters<typeof Guild>[0]>(Routes.guild(id))), guild => guild.id); } }
 /** Payload accepted by Discord's Create Message endpoint. */ export interface MessageCreateOptions { /** Message content. */ content?: string; }
 /** Payload accepted by Discord's Edit Message endpoint. */ export interface MessageEditOptions { /** Replacement message content. */ content?: string; }
-/** Query parameters accepted by Discord's Get Channel Messages endpoint. */ export interface MessageFetchOptions { /** Messages before this ID. */ before?: string; /** Messages after this ID. */ after?: string; /** Messages around this ID. */ around?: string; /** Maximum number of messages. */ limit?: number; }
-/** Options for creating a thread from a message. */ export interface MessageThreadOptions { /** Thread name. */ name: string; /** Auto-archive duration. */ autoArchiveDuration?: 60 | 1440 | 4320 | 10080; /** Per-user slowmode in seconds. */ rateLimitPerUser?: number; }
-/** Options for retrieving message reactions. */ export interface ReactionFetchOptions { /** Users after this ID. */ after?: string; /** Maximum users. */ limit?: number; }
 
-/** Manages channels and composes dedicated message resources. */
+/** Manages channels and composes dedicated message and thread resources. */
 export class ChannelManager extends Manager<string, Channel> {
     readonly #rest: REST; readonly #context: ResourceContext;
-    /** Creates a channel manager. @param rest REST transport. */
+    /** Creates a channel manager. @param rest REST transport. @returns A channel manager. @throws {Error} If REST is invalid. */
     public constructor(rest: REST) { super(); this.#rest = rest; this.#context = { sendMessage: (channelId, options) => this.send(channelId, options), editMessage: (channelId, messageId, options) => this.editMessage(channelId, messageId, options), deleteMessage: (channelId, messageId) => this.deleteMessage(channelId, messageId), crosspostMessage: (channelId, messageId) => this.crosspostMessage(channelId, messageId) }; }
     /** Returns the dedicated message manager for a channel. @param channelId Channel identifier. @returns Message manager. @throws {TypeError} If channelId is empty. */ public messages(channelId: string): MessageManager { return new MessageManager(this.#rest, this.#context, channelId); }
+    /** Returns the dedicated thread manager for a channel. @param channelId Channel identifier. @returns Thread manager. @throws {TypeError} If channelId is empty. */ public threads(channelId: string): ThreadManager { return new ThreadManager(this.#rest, this.#context, channelId); }
     /** Fetches a channel and updates its cache. @param channelId Channel identifier. @returns Hydrated channel. @throws {Error} If REST rejects the request. */ public async fetch(channelId: string): Promise<Channel> { const data = await this.#rest.get<ConstructorParameters<typeof Channel>[0]>(Routes.channel(channelId)); const channel = new Channel(data, this.#context); this.update(channel); return channel; }
     /** Resolves a channel from cache or REST. @param channelId Channel identifier. @returns Cached or fetched channel. @throws {Error} If REST rejects the request. */ public async resolve(channelId: string): Promise<Channel> { return this.get(channelId) ?? this.fetch(channelId); }
     /** Inserts a channel into cache. @param channel Channel resource. @returns This manager. */ public update(channel: Channel): this { return this.set(channel.id, channel); }
@@ -53,5 +51,9 @@ export class ChannelManager extends Manager<string, Channel> {
     /** Fetches one message. @param channelId Channel identifier. @param messageId Message identifier. @returns Hydrated message. @throws {Error} If REST rejects the request. */ public fetchMessage(channelId: string, messageId: string): Promise<Message> { return this.messages(channelId).fetch(messageId); }
     /** Edits one message. @param channelId Channel identifier. @param messageId Message identifier. @param options Edit payload. @returns Updated message. @throws {Error} If REST rejects the request. */ public async editMessage(channelId: string, messageId: string, options: MessageEditOptions): Promise<Message> { const data = await this.#rest.patch<ConstructorParameters<typeof Message>[0]>(Routes.message(channelId, messageId), options); return new Message(data, this.#context); }
     /** Deletes one message. @param channelId Channel identifier. @param messageId Message identifier. @returns Nothing. @throws {Error} If REST rejects the request. */ public deleteMessage(channelId: string, messageId: string): Promise<void> { return this.messages(channelId).delete(messageId); }
+    /** Creates a thread from a message. @param channelId Channel identifier. @param messageId Message identifier. @param options Thread options. @returns Created thread. @throws {Error} If REST rejects the request. */ public createThreadFromMessage(channelId: string, messageId: string, options: { name: string; autoArchiveDuration?: 60 | 1440 | 4320 | 10080; rateLimitPerUser?: number }): Promise<Channel> { return this.threads(channelId).createFromMessage(messageId, options); }
 }
 /** Backward-compatible alias for create-message options. */ export type CreateMessageOptions = MessageCreateOptions;
+
+export { MessageManager } from "./message.js";
+export { ThreadManager } from "./thread.js";
