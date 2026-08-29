@@ -17,9 +17,11 @@ export class SlashCommandBuilder {
     public addStringOption(configure: (option: StringOptionBuilder) => StringOptionBuilder): this {
         const option = configure(new StringOptionBuilder());
         if (!(option instanceof StringOptionBuilder)) throw new TypeError("String option configurator must return its builder.");
-        const options = (this.#data.options as unknown[] | undefined) ?? [];
+        const options = (this.#data.options as Array<Record<string, unknown>> | undefined) ?? [];
         if (options.length >= 25) throw new RangeError("An application command cannot contain more than 25 options.");
-        options.push(option.toJSON());
+        const payload = option.toJSON();
+        validateOptionForAppend(options, payload);
+        options.push(payload);
         this.#data.options = options;
         return this;
     }
@@ -55,8 +57,20 @@ export class StringOptionBuilder {
     public toJSON(): Record<string, unknown> { return structuredClone(this.#data); }
 }
 
+function validateOptionForAppend(options: Array<Record<string, unknown>>, option: Record<string, unknown>): void {
+    const name = option.name;
+    if (typeof name !== "string" || !name) throw new RangeError("Option name is required.");
+    if (options.some(existing => existing.name === name)) throw new RangeError(`Duplicate option name: ${name}.`);
+    const required = option.required === true;
+    if (required && options.some(existing => existing.required !== true)) {
+        throw new RangeError("Required application command options must be placed before optional options.");
+    }
+}
+
 function validateName(value: string, field: string): void {
-    if (!/^[\p{L}\p{N}_-]{1,32}$/u.test(value)) throw new RangeError(`${field} must contain 1-32 letters, numbers, underscores, or hyphens.`);
+    if (!/^[-_\p{L}\p{N}\p{sc=Deva}\p{sc=Thai}]{1,32}$/u.test(value) || value !== value.toLowerCase()) {
+        throw new RangeError(`${field} must contain 1-32 lowercase letters, numbers, underscores, or hyphens.`);
+    }
 }
 
 function validateText(value: string, field: string, max: number): void {
