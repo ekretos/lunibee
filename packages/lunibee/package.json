@@ -6,9 +6,23 @@
   "module": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
   },
+  "files": ["src"],
   "dependencies": {
-    "@lunibee/core": "file:../core"
+    "@lunibee/builders": "file:../builders",
+    "@lunibee/collection": "file:../collection",
+    "@lunibee/core": "file:../core",
+    "@lunibee/formatters": "file:../formatters",
+    "@lunibee/managers": "file:../managers",
+    "@lunibee/rest": "file:../rest",
+    "@lunibee/structures": "file:../structures",
+    "@lunibee/types": "file:../types",
+    "@lunibee/utils": "file:../utils",
+    "@lunibee/voice": "file:../voice",
+    "@lunibee/ws": "file:../ws"
   }
 }
