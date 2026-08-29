@@ -8,8 +8,16 @@
   "exports": {
     ".": "./packages/lunibee/src/index.ts"
   },
+  "workspaces": [
+    "packages/*",
+    "!packages/lunibee"
+  ],
   "dependencies": {
     "@lunibee/core": "file:./packages/core"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "bun": ">=1.2.0"
