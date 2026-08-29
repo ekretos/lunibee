@@ -23,11 +23,7 @@ export class RESTError extends Error {
     }
 }
 
-type Bucket = {
-    remaining: number;
-    resetAt: number;
-    queue: Promise<void>;
-};
+type Bucket = { remaining: number; resetAt: number; queue: Promise<void> };
 
 /** A Bun-native Discord REST transport with route, global-limit and retry handling. */
 export class REST {
@@ -41,9 +37,9 @@ export class REST {
     /** Creates a REST client. */
     public constructor(options: { token?: string; timeout?: number; retries?: number; baseURL?: string } = {}) {
         this.#token = options.token;
-        this.#timeout = options.timeout ?? 15_000;
+        this.#timeout = Math.max(1, options.timeout ?? 15_000);
         this.#retries = Math.max(0, options.retries ?? 2);
-        this.#baseURL = options.baseURL ?? "https://discord.com/api/v10";
+        this.#baseURL = (options.baseURL ?? "https://discord.com/api/v10").replace(/\/$/, "");
     }
 
     /** Updates the bot token used by future requests. */
@@ -61,7 +57,6 @@ export class REST {
         const route = `${normalizedMethod}:${this.#normalizeRoute(path)}`;
         const bucket = this.#buckets.get(route) ?? { remaining: 1, resetAt: 0, queue: Promise.resolve() };
         this.#buckets.set(route, bucket);
-
         const previous = bucket.queue;
         let release!: () => void;
         bucket.queue = new Promise(resolve => { release = resolve; });
@@ -70,11 +65,7 @@ export class REST {
         try {
             for (let attempt = 0; attempt <= this.#retries; attempt++) {
                 await this.#wait(bucket);
-
-                if (this.#globalResetAt > Date.now()) {
-                    await Bun.sleep(this.#globalResetAt - Date.now());
-                }
-
+                await this.#waitGlobal();
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), this.#timeout);
 
@@ -89,50 +80,37 @@ export class REST {
                         body: body === undefined ? undefined : JSON.stringify(body),
                         signal: controller.signal
                     });
-
                     this.#update(response, bucket);
                     const payload = await this.#readPayload(response);
 
-                    if (response.ok) {
-                        return (response.status === 204 ? undefined : payload) as T;
-                    }
+                    if (response.ok) return (response.status === 204 ? undefined : payload) as T;
 
                     const data = this.#errorData(payload);
-
                     if (response.status === 429) {
                         const retryAfter = this.#retryAfter(response, data);
                         if (data.global) this.#globalResetAt = Date.now() + retryAfter * 1000;
-
                         if (attempt < this.#retries) {
                             await Bun.sleep(retryAfter * 1000);
                             continue;
                         }
                     }
 
-                    const retryableStatus = response.status >= 500 && response.status <= 599;
-                    const retryableMethod = ["GET", "HEAD", "PUT", "DELETE"].includes(normalizedMethod);
-                    if (retryableStatus && retryableMethod && attempt < this.#retries) {
-                        await Bun.sleep(Math.min(10_000, 500 * 2 ** attempt) + Math.random() * 250);
+                    const retryable = response.status >= 500 && response.status <= 599 && ["GET", "HEAD", "PUT", "DELETE"].includes(normalizedMethod);
+                    if (retryable && attempt < this.#retries) {
+                        await Bun.sleep(this.#backoff(attempt));
                         continue;
                     }
 
-                    throw new RESTError(
-                        data.message ?? response.statusText || `Discord REST request failed with status ${response.status}`,
-                        response.status,
-                        data.code,
-                        payload,
-                        { method: normalizedMethod, path }
-                    );
+                    const message = data.message ?? response.statusText ?? `Discord REST request failed with status ${response.status}`;
+                    throw new RESTError(message || `Discord REST request failed with status ${response.status}`, response.status, data.code, payload, { method: normalizedMethod, path });
                 } catch (error) {
                     if (error instanceof RESTError) throw error;
-
-                    const isAbort = error instanceof DOMException && error.name === "AbortError";
-                    const retryableMethod = ["GET", "HEAD", "PUT", "DELETE"].includes(normalizedMethod);
-                    if (retryableMethod && attempt < this.#retries) {
-                        await Bun.sleep(Math.min(10_000, 500 * 2 ** attempt) + Math.random() * 250);
+                    const retryable = ["GET", "HEAD", "PUT", "DELETE"].includes(normalizedMethod);
+                    if (retryable && attempt < this.#retries) {
+                        await Bun.sleep(this.#backoff(attempt));
                         continue;
                     }
-
+                    const isAbort = error instanceof DOMException && error.name === "AbortError";
                     throw new RESTError(
                         isAbort ? `Discord REST request timed out after ${this.#timeout}ms` : "Discord REST request failed",
                         0,
@@ -145,10 +123,7 @@ export class REST {
                 }
             }
 
-            throw new RESTError("Discord REST request exhausted its retry attempts", 0, undefined, undefined, {
-                method: normalizedMethod,
-                path
-            });
+            throw new RESTError("Discord REST request exhausted its retry attempts", 0, undefined, undefined, { method: normalizedMethod, path });
         } finally {
             release();
         }
@@ -167,8 +142,12 @@ export class REST {
 
     async #wait(bucket: Bucket): Promise<void> {
         const delay = bucket.resetAt - Date.now();
-        if (bucket.remaining > 0 || delay <= 0) return;
-        await Bun.sleep(delay);
+        if (bucket.remaining <= 0 && delay > 0) await Bun.sleep(delay);
+    }
+
+    async #waitGlobal(): Promise<void> {
+        const delay = this.#globalResetAt - Date.now();
+        if (delay > 0) await Bun.sleep(delay);
     }
 
     async #readPayload(response: Response): Promise<unknown> {
@@ -195,6 +174,10 @@ export class REST {
         return Math.max(0, retryAfter);
     }
 
+    #backoff(attempt: number): number {
+        return Math.min(10_000, 500 * 2 ** attempt) + Math.random() * 250;
+    }
+
     #normalizeRoute(path: string): string {
         const queryIndex = path.indexOf("?");
         const routePath = queryIndex === -1 ? path : path.slice(0, queryIndex);
@@ -206,5 +189,10 @@ export class REST {
         const resetAfter = Number(response.headers.get("X-RateLimit-Reset-After"));
         if (Number.isFinite(remaining)) bucket.remaining = remaining;
         if (Number.isFinite(resetAfter)) bucket.resetAt = Date.now() + resetAfter * 1000;
+        const global = response.headers.get("X-RateLimit-Global");
+        if (global === "true") {
+            const retryAfter = Number(response.headers.get("Retry-After"));
+            if (Number.isFinite(retryAfter)) this.#globalResetAt = Date.now() + retryAfter * 1000;
+        }
     }
 }
