@@ -22,14 +22,20 @@
     "./ws": "./packages/ws/src/index.ts"
   },
   "workspaces": ["packages/*"],
-  "scripts": {
-    "format": "bunx --bun prettier --write .",
-    "format:check": "bunx --bun prettier --check .",
-    "typecheck": "bunx --bun tsc --noEmit",
-    "test": "bun test",
-    "audit:api": "bun scripts/api-audit.ts",
-    "publish": "bun packages/cli/src/index.ts publish",
-    "publish:status": "bun packages/cli/src/index.ts status"
+  "dependencies": {
+    "@lunibee/core": "file:packages/core",
+    "@lunibee/builders": "file:packages/builders",
+    "@lunibee/collection": "file:packages/collection",
+    "@lunibee/formatters": "file:packages/formatters",
+    "@lunibee/handlers": "file:packages/handlers",
+    "@lunibee/managers": "file:packages/managers",
+    "@lunibee/rest": "file:packages/rest",
+    "@lunibee/sharding": "file:packages/sharding",
+    "@lunibee/structures": "file:packages/structures",
+    "@lunibee/types": "file:packages/types",
+    "@lunibee/utils": "file:packages/utils",
+    "@lunibee/voice": "file:packages/voice",
+    "@lunibee/ws": "file:packages/ws"
   },
   "engines": { "bun": ">=1.2.0" },
   "license": "MIT",
