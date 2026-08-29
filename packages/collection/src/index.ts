@@ -1,4 +1,4 @@
-/** A lightweight keyed collection compatible with common Discord.js collection patterns. */
+/** A lightweight keyed collection for Lunibee resource and application state. */
 export class Collection<K, V> extends Map<K, V> {
     /** Returns the first stored value. */
     public first(): V | undefined {
@@ -14,7 +14,7 @@ export class Collection<K, V> extends Map<K, V> {
     public last(): V | undefined {
         let value: V | undefined;
         for (value of this.values()) {
-            // Map iteration preserves insertion order; the final value is the last entry.
+            // Map iteration preserves insertion order.
         }
         return value;
     }
@@ -23,7 +23,7 @@ export class Collection<K, V> extends Map<K, V> {
     public lastKey(): K | undefined {
         let key: K | undefined;
         for (key of this.keys()) {
-            // Map iteration preserves insertion order; the final key is the last entry.
+            // Map iteration preserves insertion order.
         }
         return key;
     }
@@ -94,7 +94,7 @@ export class Collection<K, V> extends Map<K, V> {
         return new Collection(this);
     }
 
-    /** Returns whether the collection contains a value by identity. */
+    /** Returns whether all supplied keys are present. */
     public hasAll(...keys: K[]): boolean {
         return keys.every(key => this.has(key));
     }
