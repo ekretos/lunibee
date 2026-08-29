@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  typecheck:
+    name: Bun typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck every workspace package
+        shell: bash
+        run: |
+          set -euo pipefail
+          for package in packages/*; do
+            if [ -f "$package/package.json" ] && [ -d "$package/src" ]; then
+              echo "==> Typechecking $package"
+              mapfile -t sources < <(find "$package/src" -type f -name '*.ts' -print)
+              if [ "${#sources[@]}" -gt 0 ]; then
+                bunx tsc --noEmit \
+                  --target ESNext \
+                  --module ESNext \
+                  --moduleResolution Bundler \
+                  --strict \
+                  --skipLibCheck \
+                  "${sources[@]}"
+              fi
+            fi
+          done
+
+      - name: Typecheck root entrypoint
+        run: bunx tsc --noEmit --project tsconfig.json
