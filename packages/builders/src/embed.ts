@@ -13,12 +13,41 @@ export class EmbedBuilder {
     /** Sets the embed author. */ public setAuthor(value: { name: string; url?: string; icon_url?: string }): this { this.#data.author = { name: validate(value.name, 256, "Author name"), ...(value.url ? { url: url(value.url, "Author URL") } : {}), ...(value.icon_url ? { icon_url: url(value.icon_url, "Author icon URL") } : {}) }; return this; }
     /** Sets the thumbnail URL. */ public setThumbnail(value: { url: string } | string): this { const valueURL = typeof value === "string" ? value : value.url; this.#data.thumbnail = { url: url(valueURL, "Thumbnail URL") }; return this; }
     /** Sets the image URL. */ public setImage(value: { url: string } | string): this { const valueURL = typeof value === "string" ? value : value.url; this.#data.image = { url: url(valueURL, "Image URL") }; return this; }
-    /** Adds embed fields. */ public addFields(...fields: EmbedField[]): this { const current = (this.#data.fields as EmbedField[] | undefined) ?? []; if (current.length + fields.length > 25) throw new RangeError("An embed cannot contain more than 25 fields."); for (const field of fields) { validate(field.name, 256, "Field name"); validate(field.value, 1024, "Field value"); } this.#data.fields = [...current, ...fields.map(field => ({ ...field }))]; return this; }
-    /** Replaces an existing field. */ public spliceFields(index: number, deleteCount: number, ...fields: EmbedField[]): this { const current = [...((this.#data.fields as EmbedField[] | undefined) ?? [])]; if (!Number.isInteger(index) || !Number.isInteger(deleteCount) || index < 0 || deleteCount < 0) throw new RangeError("Field index and delete count must be non-negative integers."); current.splice(index, deleteCount, ...fields); if (current.length > 25) throw new RangeError("An embed cannot contain more than 25 fields."); this.#data.fields = current; return this; }
+    /** Adds embed fields. */ public addFields(...fields: EmbedField[]): this {
+        const current = (this.#data.fields as EmbedField[] | undefined) ?? [];
+        if (current.length + fields.length > 25) throw new RangeError("An embed cannot contain more than 25 fields.");
+        for (const field of fields) { validate(field.name, 256, "Field name"); validate(field.value, 1024, "Field value"); }
+        const next = [...current, ...fields.map(field => ({ ...field }))];
+        validateAggregate({ ...this.#data, fields: next });
+        this.#data.fields = next;
+        return this;
+    }
+    /** Replaces an existing field. */ public spliceFields(index: number, deleteCount: number, ...fields: EmbedField[]): this {
+        const current = [...((this.#data.fields as EmbedField[] | undefined) ?? [])];
+        if (!Number.isInteger(index) || !Number.isInteger(deleteCount) || index < 0 || deleteCount < 0) throw new RangeError("Field index and delete count must be non-negative integers.");
+        for (const field of fields) { validate(field.name, 256, "Field name"); validate(field.value, 1024, "Field value"); }
+        current.splice(index, deleteCount, ...fields.map(field => ({ ...field })));
+        if (current.length > 25) throw new RangeError("An embed cannot contain more than 25 fields.");
+        validateAggregate({ ...this.#data, fields: current });
+        this.#data.fields = current;
+        return this;
+    }
     /** Removes all embed fields. */ public clearFields(): this { delete this.#data.fields; return this; }
     /** Removes the embed title. */ public clearTitle(): this { delete this.#data.title; return this; }
     /** Removes the embed description. */ public clearDescription(): this { delete this.#data.description; return this; }
-    /** Serializes the embed payload. */ public toJSON(): Record<string, unknown> { return structuredClone(this.#data); }
+    /** Serializes the embed payload. */ public toJSON(): Record<string, unknown> { validateAggregate(this.#data); return structuredClone(this.#data); }
+}
+
+function validateAggregate(data: Record<string, unknown>): void {
+    const fields = (data.fields as EmbedField[] | undefined) ?? [];
+    const footer = data.footer as { text?: unknown } | undefined;
+    const author = data.author as { name?: unknown } | undefined;
+    const total = (typeof data.title === "string" ? data.title.length : 0)
+        + (typeof data.description === "string" ? data.description.length : 0)
+        + fields.reduce((sum, field) => sum + field.name.length + field.value.length, 0)
+        + (typeof footer?.text === "string" ? footer.text.length : 0)
+        + (typeof author?.name === "string" ? author.name.length : 0);
+    if (total > 6000) throw new RangeError("Embed text content cannot exceed 6000 characters.");
 }
 
 function validate(value: string, max: number, field: string): string { if (typeof value !== "string" || value.length === 0 || value.length > max) throw new RangeError(`${field} must contain 1-${max} characters.`); return value; }
