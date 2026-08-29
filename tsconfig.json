@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": ["bun"]
   },
-  "include": ["packages/lunibee/src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }
