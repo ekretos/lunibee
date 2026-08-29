@@ -9,5 +9,6 @@ client.on("error", error => console.error(error));
 
 await client.login();
 
-process.once("SIGINT", () => client.destroy());
-process.once("SIGTERM", () => client.destroy());
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => client.destroy());
+}
