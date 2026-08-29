@@ -1,5 +1,5 @@
 import { BaseStructure, Channel, User } from "./index.js";
-import { PermissionsBitField } from "@lunibee/core";
+import { PermissionsBitField } from "./permissions.js";
 
 /** A Discord guild member. */
 export class GuildMember {
