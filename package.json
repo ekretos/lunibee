@@ -6,14 +6,30 @@
   "module": "./packages/lunibee/src/index.ts",
   "types": "./packages/lunibee/src/index.ts",
   "exports": {
-    ".": "./packages/lunibee/src/index.ts"
+    ".": {
+      "types": "./packages/lunibee/src/index.ts",
+      "import": "./packages/lunibee/src/index.ts"
+    }
   },
+  "files": [
+    "packages"
+  ],
   "workspaces": [
     "packages/*",
     "!packages/lunibee"
   ],
   "dependencies": {
-    "@lunibee/core": "file:./packages/core"
+    "@lunibee/builders": "file:./packages/builders",
+    "@lunibee/collection": "file:./packages/collection",
+    "@lunibee/core": "file:./packages/core",
+    "@lunibee/formatters": "file:./packages/formatters",
+    "@lunibee/managers": "file:./packages/managers",
+    "@lunibee/rest": "file:./packages/rest",
+    "@lunibee/structures": "file:./packages/structures",
+    "@lunibee/types": "file:./packages/types",
+    "@lunibee/utils": "file:./packages/utils",
+    "@lunibee/voice": "file:./packages/voice",
+    "@lunibee/ws": "file:./packages/ws"
   },
   "devDependencies": {
     "@types/bun": "latest",
