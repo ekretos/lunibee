@@ -8,15 +8,15 @@
   "exports": {
     ".": {
       "types": "./packages/lunibee/src/index.ts",
-      "import": "./packages/lunibee/src/index.ts"
+      "import": "./packages/lunibee/src/index.ts",
+      "default": "./packages/lunibee/src/index.ts"
     }
   },
   "files": [
     "packages"
   ],
   "workspaces": [
-    "packages/*",
-    "!packages/lunibee"
+    "packages/*"
   ],
   "scripts": {
     "check:deps": "bun scripts/check-dependency-graph.ts",
@@ -26,19 +26,6 @@
     "ci:typecheck": "bun run typecheck",
     "ci:test": "bun test --coverage",
     "ci": "bun run ci:deps && bun run ci:typecheck && bun run ci:test"
-  },
-  "dependencies": {
-    "@lunibee/builders": "file:./packages/builders",
-    "@lunibee/collection": "file:./packages/collection",
-    "@lunibee/core": "file:./packages/core",
-    "@lunibee/formatters": "file:./packages/formatters",
-    "@lunibee/managers": "file:./packages/managers",
-    "@lunibee/rest": "file:./packages/rest",
-    "@lunibee/structures": "file:./packages/structures",
-    "@lunibee/types": "file:./packages/types",
-    "@lunibee/utils": "file:./packages/utils",
-    "@lunibee/voice": "file:./packages/voice",
-    "@lunibee/ws": "file:./packages/ws"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
