@@ -11,4 +11,18 @@ export {
     TextInputBuilder,
     TextInputStyle
 } from "./components.js";
-export { SlashCommandBuilder, StringOptionBuilder } from "./commands.js";
+export {
+    SlashCommandBuilder,
+    StringOptionBuilder,
+    IntegerOptionBuilder,
+    NumberOptionBuilder,
+    BooleanOptionBuilder,
+    UserOptionBuilder,
+    ChannelOptionBuilder,
+    RoleOptionBuilder,
+    MentionableOptionBuilder,
+    AttachmentOptionBuilder,
+    SubcommandBuilder,
+    SubcommandGroupBuilder,
+    ApplicationCommandOptionType
+} from "./commands.js";
