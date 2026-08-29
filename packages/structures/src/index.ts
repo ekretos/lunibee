@@ -1,3 +1,11 @@
+/** Operations exposed to Discord resource structures by the owning client. */
+export interface ResourceContext {
+    sendMessage(channelId: string, options: { content?: string }): Promise<Message>;
+    editMessage(channelId: string, messageId: string, options: { content?: string }): Promise<Message>;
+    deleteMessage(channelId: string, messageId: string): Promise<void>;
+    crosspostMessage(channelId: string, messageId: string): Promise<Message>;
+}
+
 /** Common Discord snowflake-backed structure. */
 export class BaseStructure {
     /** Discord resource ID. */ public readonly id: string;
@@ -36,8 +44,11 @@ export class Channel extends BaseStructure {
     /** Discord channel type. */ public type: number;
     /** Channel name. */ public name?: string;
     /** Guild containing the channel. */ public guildId?: string;
+    readonly #context?: ResourceContext;
     /** Creates a channel from Discord data. */
-    public constructor(data: { id: string; type: number; name?: string; guild_id?: string }) { super(data.id); if (!Number.isInteger(data.type) || data.type < 0) throw new RangeError("A Discord channel requires a valid channel type."); this.type = data.type; this.name = data.name; this.guildId = data.guild_id; }
+    public constructor(data: { id: string; type: number; name?: string; guild_id?: string }, context?: ResourceContext) { super(data.id); if (!Number.isInteger(data.type) || data.type < 0) throw new RangeError("A Discord channel requires a valid channel type."); this.type = data.type; this.name = data.name; this.guildId = data.guild_id; this.#context = context; }
+    /** Sends a message to this channel. */
+    public sendMessage(options: { content?: string }): Promise<Message> { if (!this.#context) throw new Error("This channel is not attached to a client."); return this.#context.sendMessage(this.id, options); }
 }
 
 /** Represents a Discord message. */
@@ -45,12 +56,18 @@ export class Message extends BaseStructure {
     /** Message content. */ public content: string;
     /** Message author. */ public author: User;
     /** Channel containing the message. */ public channelId: string;
+    /** Channel containing the message. */ public readonly channel: Channel;
     /** Guild containing the message. */ public guildId?: string;
     /** Message flags. */ public flags: number;
     /** Message creation time derived from its snowflake. */ public readonly createdAt: Date;
+    readonly #context?: ResourceContext;
     /** Creates a message from Discord data. */
-    public constructor(data: { id: string; content?: string; author: User | { id: string; username: string; global_name?: string | null; avatar?: string | null; bot?: boolean; system?: boolean; public_flags?: number }; channel_id: string; guild_id?: string; flags?: number }) { super(data.id); this.content = data.content ?? ""; this.author = data.author instanceof User ? data.author : new User(data.author); if (!/^\d{1,20}$/.test(data.channel_id)) throw new TypeError("Message channel_id must be a valid snowflake."); this.channelId = data.channel_id; this.guildId = data.guild_id; this.flags = data.flags ?? 0; this.createdAt = new Date(Number((BigInt(this.id) >> 22n) + 1420070400000n)); }
+    public constructor(data: { id: string; content?: string; author: User | { id: string; username: string; global_name?: string | null; avatar?: string | null; bot?: boolean; system?: boolean; public_flags?: number }; channel_id: string; guild_id?: string; flags?: number }, context?: ResourceContext) { super(data.id); this.content = data.content ?? ""; this.author = data.author instanceof User ? data.author : new User(data.author); if (!/^\d{1,20}$/.test(data.channel_id)) throw new TypeError("Message channel_id must be a valid snowflake."); this.channelId = data.channel_id; this.guildId = data.guild_id; this.flags = data.flags ?? 0; this.createdAt = new Date(Number((BigInt(this.id) >> 22n) + 1420070400000n)); this.#context = context; this.channel = new Channel({ id: data.channel_id, type: 0, guild_id: data.guild_id }, context); }
     /** Whether the message has embeds suppressed. */ public get embedsSuppressed(): boolean { return (this.flags & 4) !== 0; }
+    /** Edits this message. */ public edit(options: { content?: string }): Promise<Message> { if (!this.#context) throw new Error("This message is not attached to a client."); return this.#context.editMessage(this.channelId, this.id, options); }
+    /** Deletes this message. */ public delete(): Promise<void> { if (!this.#context) throw new Error("This message is not attached to a client."); return this.#context.deleteMessage(this.channelId, this.id); }
+    /** Crossposts this message. */ public crosspost(): Promise<Message> { if (!this.#context) throw new Error("This message is not attached to a client."); return this.#context.crosspostMessage(this.channelId, this.id); }
+    /** Replies to this message in its channel. */ public reply(options: string | { content?: string }): Promise<Message> { if (!this.#context) throw new Error("This message is not attached to a client."); return this.#context.sendMessage(this.channelId, typeof options === "string" ? { content: options } : options); }
 }
 
 export { GuildMember, Role, TextChannel } from "./resources.js";
