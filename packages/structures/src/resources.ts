@@ -1,4 +1,4 @@
-import { BaseStructure, Channel, User } from "./index.js";
+import { BaseStructure, Channel, User } from "./base.js";
 import { PermissionsBitField } from "./permissions.js";
 
 /** A Discord guild member. */
