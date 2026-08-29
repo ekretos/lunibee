@@ -59,42 +59,49 @@ for (const name of packages) {
         fail(`package ${name} exposes a non-public export subpath`);
     }
 
-    const dependencies = {
-        ...manifest.dependencies,
-        ...manifest.devDependencies,
-        ...manifest.peerDependencies
-    };
+    const dependencies = { ...manifest.dependencies, ...manifest.devDependencies, ...manifest.peerDependencies };
     for (const dependency of Object.keys(dependencies)) {
         if (dependency.startsWith("@lunibee/") && dependency !== `@lunibee/${name}` && dependencies[dependency] !== "workspace:*") {
             fail(`package ${name} must use workspace:* for local dependency ${dependency}`);
         }
     }
 
-    if (/from\s+["'](?:\.\.?\/)+packages\//.test(source)) {
-        fail(`package ${name} public entrypoint reaches across packages/ directly`);
-    }
+    if (/from\s+["'](?:\.\.?\/)+packages\//.test(source)) fail(`package ${name} public entrypoint reaches across packages/ directly`);
 }
 
 const tempDir = await mkdtemp(join(tmpdir(), "lunibee-api-audit-"));
 try {
-    const tsc = Bun.spawnSync([
-        "bunx",
-        "--bun",
-        "tsc",
-        "--declaration",
-        "--emitDeclarationOnly",
-        "--noEmitOnError",
-        "false",
-        "--outDir",
-        tempDir
-    ], { cwd: root.pathname, stdout: "pipe", stderr: "pipe" });
+    const auditConfig = join(tempDir, "tsconfig.json");
+    await Bun.write(auditConfig, JSON.stringify({
+        compilerOptions: {
+            target: "ES2022",
+            module: "NodeNext",
+            moduleResolution: "NodeNext",
+            declaration: true,
+            emitDeclarationOnly: true,
+            noEmitOnError: false,
+            rootDir: root.pathname,
+            outDir: tempDir,
+            strict: true,
+            skipLibCheck: true,
+            allowImportingTsExtensions: false
+        },
+        include: packages.map(name => `packages/${name}/src/index.ts`)
+    }, null, 2));
+
+    const tsc = Bun.spawnSync(["bunx", "--bun", "tsc", "--project", auditConfig], {
+        cwd: root.pathname,
+        stdout: "pipe",
+        stderr: "pipe"
+    });
 
     if (tsc.exitCode !== 0) {
+        const stdout = new TextDecoder().decode(tsc.stdout).trim();
         const stderr = new TextDecoder().decode(tsc.stderr).trim();
-        fail(`declaration generation failed${stderr ? `: ${stderr}` : ""}`);
+        fail(`declaration generation failed${stdout || stderr ? `: ${stdout || stderr}` : ""}`);
     } else {
         for (const name of packages) {
-            if (!(await Bun.file(join(tempDir, `packages/${name}/src/index.d.ts`)).exists())) {
+            if (!(await Bun.file(join(tempDir, "packages", name, "src", "index.d.ts")).exists())) {
                 fail(`package ${name} did not produce a public declaration entrypoint`);
             }
         }
