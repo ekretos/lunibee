@@ -18,6 +18,14 @@ export interface GatewayOptions { reconnect?: boolean; maxReconnectAttempts?: nu
 export interface RESTOptions { timeout?: number; retries?: number; baseURL?: string; }
 /** Discord user object. */
 export interface UserData { id: Snowflake; username: string; discriminator?: string; global_name?: string | null; avatar?: string | null; bot?: boolean; system?: boolean; public_flags?: number; }
+/** Discord API channel object. */
+export interface APIChannel { id: Snowflake; type: number; name?: string | null; guild_id?: Snowflake; position?: number; topic?: string | null; last_message_id?: Snowflake | null; parent_id?: Snowflake | null; permission_overwrites?: unknown[]; nsfw?: boolean; rate_limit_per_user?: number; }
+/** Discord API attachment object. */
+export interface APIAttachment { id: Snowflake; filename: string; description?: string | null; content_type?: string; size: number; url: string; proxy_url: string; height?: number | null; width?: number | null; ephemeral?: boolean; duration_secs?: number; waveform?: string; }
+/** Discord API embed object. */
+export interface APIEmbed { title?: string; type?: string; description?: string; url?: string; timestamp?: string; color?: number; footer?: Record<string, unknown>; image?: Record<string, unknown>; thumbnail?: Record<string, unknown>; video?: Record<string, unknown>; provider?: Record<string, unknown>; author?: Record<string, unknown>; fields?: Array<Record<string, unknown>>; }
+/** Discord API message object. */
+export interface APIMessage { id: Snowflake; channel_id: Snowflake; author: UserData; content: string; timestamp?: string; edited_timestamp?: string | null; tts?: boolean; mention_everyone?: boolean; mentions?: UserData[]; mention_roles?: Snowflake[]; attachments?: APIAttachment[]; embeds?: APIEmbed[]; reactions?: unknown[]; nonce?: string | number | null; pinned?: boolean; webhook_id?: Snowflake; type?: number; activity?: unknown; application?: unknown; application_id?: Snowflake; message_reference?: Record<string, unknown>; flags?: number; referenced_message?: APIMessage | null; interaction_metadata?: Record<string, unknown>; thread?: APIChannel; components?: unknown[]; sticker_items?: unknown[]; stickers?: unknown[]; position?: number; role_subscription_data?: Record<string, unknown>; purchase_notification?: Record<string, unknown>; poll?: unknown; call?: unknown; }
 /** Current authenticated bot user. */
 export type ClientUser = UserData;
 /** Discord Gateway payload envelope. */
