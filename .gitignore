@@ -1,0 +1,21 @@
+node_modules/
+.bun/
+dist/
+build/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+
+# Local development
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.lock

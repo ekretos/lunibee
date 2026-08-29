@@ -6,13 +6,35 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "../..", "..");
 const packagesDir = join(root, "packages");
 
-interface PackageManifest {
-    name: string;
-    version: string;
-    private?: boolean;
-    publishConfig?: { access?: string; registry?: string };
+/** Publishing configuration for a workspace package. */
+interface PublishConfig {
+    /** npm package access level. */
+    access?: string;
+    /** Optional package registry URL. */
+    registry?: string;
 }
 
+/** Minimal package manifest fields required by the release CLI. */
+interface PackageManifest {
+    /** Package name. */
+    name: string;
+    /** Package version. */
+    version: string;
+    /** Whether the package is excluded from publishing. */
+    private?: boolean;
+    /** Optional npm publishing configuration. */
+    publishConfig?: PublishConfig;
+}
+
+/** A publishable package and its filesystem location. */
+interface PublishablePackage {
+    /** Absolute package directory. */
+    directory: string;
+    /** Parsed package manifest. */
+    manifest: PackageManifest;
+}
+
+/** Reads a package manifest when it exists and is valid JSON. @param directory Package directory. @returns Parsed manifest, or null when unavailable. */
 async function readManifest(directory: string): Promise<PackageManifest | null> {
     try {
         const file = Bun.file(join(directory, "package.json"));
@@ -23,9 +45,10 @@ async function readManifest(directory: string): Promise<PackageManifest | null> 
     }
 }
 
-async function getPublishablePackages(): Promise<Array<{ directory: string; manifest: PackageManifest }>> {
+/** Finds all non-private workspace packages that can be published. @returns Publishable packages sorted by package name. */
+async function getPublishablePackages(): Promise<PublishablePackage[]> {
     const entries = await readdir(packagesDir, { withFileTypes: true });
-    const result: Array<{ directory: string; manifest: PackageManifest }> = [];
+    const result: PublishablePackage[] = [];
 
     for (const entry of entries) {
         if (!entry.isDirectory()) continue;
@@ -38,18 +61,20 @@ async function getPublishablePackages(): Promise<Array<{ directory: string; mani
     return result.sort((a, b) => a.manifest.name.localeCompare(b.manifest.name));
 }
 
+/** Runs a child process and forwards its standard streams. @param command Executable and arguments. @param cwd Working directory. @returns A promise fulfilled when the command exits successfully. @throws {Error} If the command exits with a non-zero status. */
 async function run(command: string[], cwd: string): Promise<void> {
-    const process = Bun.spawn(command, {
+    const childProcess = Bun.spawn(command, {
         cwd,
         stdin: "inherit",
         stdout: "inherit",
         stderr: "inherit",
-        env: process.env,
+        env: globalThis.process.env,
     });
-    const exitCode = await process.exited;
+    const exitCode = await childProcess.exited;
     if (exitCode !== 0) throw new Error(`Command failed (${exitCode}): ${command.join(" ")}`);
 }
 
+/** Publishes every public workspace package in deterministic order. @returns A promise fulfilled after publishing completes. @throws {Error} If any package publication fails. */
 async function publish(): Promise<void> {
     const packages = await getPublishablePackages();
     if (packages.length === 0) {
@@ -67,6 +92,7 @@ async function publish(): Promise<void> {
     console.log("\n✓ Lunibee packages published successfully.");
 }
 
+/** Prints the names and versions of all publishable packages. @returns A promise fulfilled after status output is written. */
 async function status(): Promise<void> {
     const packages = await getPublishablePackages();
     for (const { manifest } of packages) console.log(`${manifest.name}@${manifest.version}`);
@@ -89,9 +115,9 @@ try {
             break;
         default:
             console.error(`Unknown command: ${command}`);
-            process.exit(1);
+            globalThis.process.exit(1);
     }
 } catch (error) {
     console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
+    globalThis.process.exit(1);
 }
