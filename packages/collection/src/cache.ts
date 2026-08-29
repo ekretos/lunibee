@@ -23,7 +23,7 @@ export class Cache<K, V> {
     public constructor(options: CacheOptions = {}) {
         this.#maxSize = options.maxSize ?? Infinity;
         this.#ttl = options.ttl ?? 0;
-        if (!Number.isInteger(this.#maxSize) && this.#maxSize !== Infinity || this.#maxSize < 1) throw new RangeError("Cache maxSize must be a positive integer.");
+        if ((!Number.isInteger(this.#maxSize) && this.#maxSize !== Infinity) || this.#maxSize < 1) throw new RangeError("Cache maxSize must be a positive integer.");
         if (!Number.isFinite(this.#ttl) || this.#ttl < 0) throw new RangeError("Cache ttl must be a non-negative finite number.");
         if (this.#ttl > 0) {
             const interval = options.sweepInterval ?? Math.min(this.#ttl, 60_000);
@@ -33,7 +33,7 @@ export class Cache<K, V> {
     }
 
     /** Number of currently live entries. */
-    public get size(): number { this.sweepExpired(); return this.#entries.size; }
+    public get size(): number { this.#sweepExpired(); return this.#entries.size; }
     /** Reads a live entry. */
     public get(key: K): V | undefined { const entry = this.#entries.get(key); if (!entry) return undefined; if (this.#expired(entry)) { this.#entries.delete(key); return undefined; } return entry.value; }
     /** Returns whether a live entry exists. */
@@ -51,9 +51,9 @@ export class Cache<K, V> {
     /** Stops the background sweeper and releases its timer. */
     public dispose(): void { if (this.#timer) clearInterval(this.#timer); this.#timer = undefined; }
     /** Returns live cached values. */
-    public values(): V[] { this.sweepExpired(); return this.#entries.map(entry => entry.value); }
+    public values(): V[] { this.#sweepExpired(); return this.#entries.map(entry => entry.value); }
     /** Returns live cached entries. */
-    public entries(): [K, V][] { this.sweepExpired(); return this.#entries.map((entry, key) => [key, entry.value]); }
+    public entries(): [K, V][] { this.#sweepExpired(); return this.#entries.map((entry, key) => [key, entry.value]); }
     #expired(entry: Entry<V>): boolean { return entry.expiresAt > 0 && entry.expiresAt <= Date.now(); }
     #sweepExpired(): void { if (this.#ttl > 0) this.sweep(); }
 }
