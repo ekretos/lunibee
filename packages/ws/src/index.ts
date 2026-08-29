@@ -36,6 +36,8 @@ export interface GatewayOptions {
     maxReconnectAttempts?: number;
 }
 
+type GatewayListener = (data: unknown) => unknown;
+
 /** A lightweight Discord Gateway connection. */
 export class Gateway {
     #options: Required<GatewayOptions>;
@@ -48,7 +50,7 @@ export class Gateway {
     #closed = false;
     #attempt = 0;
     #reconnectTimer?: ReturnType<typeof setTimeout>;
-    readonly #listeners = new Map<string, Set<(data: unknown) => void>>();
+    readonly #listeners = new Map<string, Set<GatewayListener>>();
 
     /** Creates a Gateway connection manager. */
     public constructor(options: GatewayOptions) {
@@ -70,14 +72,13 @@ export class Gateway {
     /** Permanently closes the Gateway connection and clears timers. */
     public close(): void {
         this.#closed = true;
-        if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
-        if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
+        this.#clearTimers();
         this.#ws?.close(1000);
         this.#ws = undefined;
     }
 
     /** Registers a Gateway event listener. */
-    public on(event: string, listener: (data: unknown) => void): this {
+    public on(event: string, listener: GatewayListener): this {
         let listeners = this.#listeners.get(event);
         if (!listeners) {
             listeners = new Set();
@@ -87,36 +88,53 @@ export class Gateway {
         return this;
     }
 
-    /** Sends a raw Gateway payload. */
-    public send(payload: GatewayPayload): void {
-        if (this.#ws?.readyState === WebSocket.OPEN) this.#ws.send(JSON.stringify(payload));
+    /** Sends a raw Gateway payload when the socket is open. */
+    public send(payload: GatewayPayload): boolean {
+        if (this.#ws?.readyState !== WebSocket.OPEN) return false;
+        this.#ws.send(JSON.stringify(payload));
+        return true;
     }
 
     #open(url: string): void {
-        const ws = new WebSocket(url);
+        let ws: WebSocket;
+        try {
+            ws = new WebSocket(url);
+        } catch (error) {
+            this.#emitError(error);
+            this.#scheduleReconnect();
+            return;
+        }
+
         this.#ws = ws;
         ws.addEventListener("message", event => this.#message(ws, String(event.data)));
-        ws.addEventListener("close", event => this.#close(event.code));
-        ws.addEventListener("error", () => this.#emit("error", new Error("Gateway WebSocket error")));
+        ws.addEventListener("close", event => this.#close(ws, event.code));
+        ws.addEventListener("error", () => this.#emitError(new Error("Gateway WebSocket error")));
     }
 
     #message(ws: WebSocket, raw: string): void {
         let payload: GatewayPayload;
-        try { payload = JSON.parse(raw) as GatewayPayload; } catch { ws.close(1002); return; }
+        try {
+            payload = JSON.parse(raw) as GatewayPayload;
+        } catch (error) {
+            this.#emitError(new Error("Gateway returned invalid JSON", { cause: error }));
+            ws.close(1002, "Invalid JSON");
+            return;
+        }
+
+        if (!payload || typeof payload.op !== "number") {
+            this.#emitError(new Error("Gateway returned an invalid payload"));
+            ws.close(1002, "Invalid payload");
+            return;
+        }
+
         if (typeof payload.s === "number") this.#sequence = payload.s;
+
         switch (payload.op) {
             case GatewayOpcodes.Dispatch:
-                if (payload.t === "READY") {
-                    const data = payload.d as { session_id: string; resume_gateway_url: string };
-                    this.#sessionId = data.session_id;
-                    this.#resumeURL = data.resume_gateway_url;
-                    this.#attempt = 0;
-                }
-                this.#emit(payload.t ?? "dispatch", payload.d);
+                this.#handleDispatch(payload.t, payload.d);
                 break;
             case GatewayOpcodes.Hello:
-                this.#startHeartbeat((payload.d as { heartbeat_interval: number }).heartbeat_interval);
-                this.#identifyOrResume();
+                this.#handleHello(payload.d);
                 break;
             case GatewayOpcodes.Heartbeat:
                 this.#heartbeat();
@@ -125,14 +143,39 @@ export class Gateway {
                 this.#heartbeatACK = true;
                 break;
             case GatewayOpcodes.Reconnect:
-                ws.close(1001);
+                ws.close(1001, "Server requested reconnect");
                 break;
             case GatewayOpcodes.InvalidSession:
                 this.#sessionId = undefined;
                 this.#sequence = null;
-                ws.close(1000);
+                ws.close(1000, "Invalid session");
                 break;
         }
+    }
+
+    #handleDispatch(event: string | null, data: unknown): void {
+        if (event === "READY") {
+            const ready = data as { session_id?: unknown; resume_gateway_url?: unknown };
+            if (typeof ready?.session_id !== "string" || typeof ready?.resume_gateway_url !== "string") {
+                this.#emitError(new Error("Gateway READY payload is missing session information"));
+                return;
+            }
+            this.#sessionId = ready.session_id;
+            this.#resumeURL = ready.resume_gateway_url;
+            this.#attempt = 0;
+        }
+        this.#emit(event ?? "dispatch", data);
+    }
+
+    #handleHello(data: unknown): void {
+        const interval = (data as { heartbeat_interval?: unknown })?.heartbeat_interval;
+        if (typeof interval !== "number" || !Number.isFinite(interval) || interval <= 0) {
+            this.#emitError(new Error("Gateway HELLO payload contains an invalid heartbeat interval"));
+            this.#ws?.close(1002, "Invalid heartbeat interval");
+            return;
+        }
+        this.#startHeartbeat(interval);
+        this.#identifyOrResume();
     }
 
     #identifyOrResume(): void {
@@ -148,26 +191,70 @@ export class Gateway {
         this.#heartbeatACK = true;
         setTimeout(() => this.#heartbeat(), Math.random() * interval);
         this.#heartbeatTimer = setInterval(() => {
-            if (!this.#heartbeatACK) { this.#ws?.close(1001); return; }
+            if (!this.#heartbeatACK) {
+                this.#ws?.close(1001, "Heartbeat timeout");
+                return;
+            }
             this.#heartbeat();
         }, interval);
     }
 
     #heartbeat(): void {
         this.#heartbeatACK = false;
-        this.send({ op: GatewayOpcodes.Heartbeat, d: this.#sequence, s: null, t: null });
+        if (!this.send({ op: GatewayOpcodes.Heartbeat, d: this.#sequence, s: null, t: null })) {
+            this.#emitError(new Error("Unable to send Gateway heartbeat because the WebSocket is not open"));
+        }
     }
 
-    #close(code: number): void {
+    #close(ws: WebSocket, code: number): void {
+        if (this.#ws !== ws) return;
+        this.#ws = undefined;
         if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
+        this.#heartbeatTimer = undefined;
         if (this.#closed || !this.#options.reconnect || [4004, 4010, 4011, 4012, 4013, 4014].includes(code)) return;
-        if (code === 4007 || code === 4009) { this.#sequence = null; this.#sessionId = undefined; }
-        if (this.#attempt >= this.#options.maxReconnectAttempts) return;
+        if (code === 4007 || code === 4009) {
+            this.#sequence = null;
+            this.#sessionId = undefined;
+        }
+        this.#scheduleReconnect();
+    }
+
+    #scheduleReconnect(): void {
+        if (this.#closed || !this.#options.reconnect || this.#reconnectTimer || this.#attempt >= this.#options.maxReconnectAttempts) return;
         const delay = Math.min(30_000, 1_000 * 2 ** this.#attempt++) + Math.random() * 250;
-        this.#reconnectTimer = setTimeout(() => { this.#reconnectTimer = undefined; void this.connect(this.#resumeURL ?? undefined); }, delay);
+        this.#reconnectTimer = setTimeout(() => {
+            this.#reconnectTimer = undefined;
+            try {
+                this.#open(this.#resumeURL ?? "wss://gateway.discord.gg/?v=10&encoding=json");
+            } catch (error) {
+                this.#emitError(error);
+                this.#scheduleReconnect();
+            }
+        }, delay);
+    }
+
+    #clearTimers(): void {
+        if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
+        if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
+        this.#reconnectTimer = undefined;
+        this.#heartbeatTimer = undefined;
+    }
+
+    #emitError(error: unknown): void {
+        const normalized = error instanceof Error ? error : new Error(String(error));
+        this.#emit("error", normalized);
     }
 
     #emit(event: string, data: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? []) void listener(data);
+        for (const listener of this.#listeners.get(event) ?? []) {
+            try {
+                const result = listener(data);
+                if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+                    void Promise.resolve(result).catch(error => this.#emitError(error));
+                }
+            } catch (error) {
+                this.#emitError(error);
+            }
+        }
     }
 }
