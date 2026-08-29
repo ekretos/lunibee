@@ -1,7 +1,7 @@
 import { Collection } from "@lunibee/collection";
 import { ChannelManager, Manager } from "@lunibee/managers";
 import { REST, Routes } from "@lunibee/rest";
-import { User, Guild, Channel, Message, Interaction, createInteraction, type InteractionClient } from "@lunibee/structures";
+import { User, Guild, Channel, Message, Interaction, createInteraction, type InteractionClient, type ResourceContext } from "@lunibee/structures";
 import { Gateway } from "@lunibee/ws";
 import type { ClientOptions, ClientUser } from "@lunibee/types";
 
@@ -33,24 +33,31 @@ export class Client extends EventEmitter<ClientEvents> implements InteractionCli
     public readyAt?: Date;
     public state: ClientState = "idle";
     readonly #gateway: Gateway;
+    readonly #resourceContext: ResourceContext;
 
     public constructor(public readonly options: ClientOptions) {
         super();
         if (!options.token?.trim()) throw new TypeError("Client token is required.");
         this.rest = new REST({ token: options.token, ...options.rest });
         this.channels = new ChannelManager(this.rest);
+        this.#resourceContext = {
+            sendMessage: (channelId, options) => this.channels.send(channelId, options),
+            editMessage: (channelId, messageId, options) => this.channels.editMessage(channelId, messageId, options),
+            deleteMessage: (channelId, messageId) => this.channels.deleteMessage(channelId, messageId),
+            crosspostMessage: (channelId, messageId) => this.channels.crosspostMessage(channelId, messageId),
+        };
         this.#gateway = new Gateway({ token: options.token, intents: options.intents, ...options.gateway });
         this.#gateway.on("READY", data => { this.user = data as ClientUser; this.readyAt = new Date(); this.state = "ready"; this.emit("ready", this.user); });
         this.#gateway.on("open", () => this.emit("open"));
         this.#gateway.on("close", data => { if (this.state !== "destroyed") this.state = "idle"; this.emit("close", data as { code: number; action: string }); });
-        this.#gateway.on("MESSAGE_CREATE", data => this.emit("messageCreate", new Message(data as any)));
-        this.#gateway.on("MESSAGE_UPDATE", data => this.emit("messageUpdate", new Message(data as any)));
+        this.#gateway.on("MESSAGE_CREATE", data => this.emit("messageCreate", new Message(data as any, this.#resourceContext)));
+        this.#gateway.on("MESSAGE_UPDATE", data => this.emit("messageUpdate", new Message(data as any, this.#resourceContext)));
         this.#gateway.on("MESSAGE_DELETE", data => this.emit("messageDelete", data));
         this.#gateway.on("GUILD_CREATE", data => this.emit("guildCreate", new Guild(data as any)));
         this.#gateway.on("GUILD_UPDATE", data => this.emit("guildUpdate", new Guild(data as any)));
         this.#gateway.on("GUILD_DELETE", data => this.emit("guildDelete", data));
-        this.#gateway.on("CHANNEL_CREATE", data => this.emit("channelCreate", new Channel(data as any)));
-        this.#gateway.on("CHANNEL_UPDATE", data => this.emit("channelUpdate", new Channel(data as any)));
+        this.#gateway.on("CHANNEL_CREATE", data => this.emit("channelCreate", new Channel(data as any, this.#resourceContext)));
+        this.#gateway.on("CHANNEL_UPDATE", data => this.emit("channelUpdate", new Channel(data as any, this.#resourceContext)));
         this.#gateway.on("CHANNEL_DELETE", data => this.emit("channelDelete", data));
         this.#gateway.on("INTERACTION_CREATE", data => this.emit("interactionCreate", createInteraction(this, data as any)));
         this.#gateway.on("error", data => this.emit("error", data as Error));
@@ -68,7 +75,7 @@ export class Client extends EventEmitter<ClientEvents> implements InteractionCli
 export { Collection } from "@lunibee/collection";
 export { REST, RESTError, Routes } from "@lunibee/rest";
 export { Gateway, GatewayError, GatewayOpcodes } from "@lunibee/ws";
-export { User, Guild, Channel, Message } from "@lunibee/structures";
+export { User, Guild, Channel, Message, type ResourceContext } from "@lunibee/structures";
 export { EmbedBuilder, ButtonBuilder, ActionRowBuilder, StringSelectBuilder, SlashCommandBuilder, StringOptionBuilder } from "@lunibee/builders";
 export * from "@lunibee/types";
 export { Manager, ResourceManager, ChannelManager, MessageCreateOptions, MessageEditOptions, MessageFetchOptions, MessageThreadOptions, ReactionFetchOptions } from "@lunibee/managers";
