@@ -1,4 +1,5 @@
 import { BaseStructure, Channel, User } from "./base.js";
+import type { ResourceContext } from "./base.js";
 
 /** Common Discord structure exports. */
 export { BaseStructure, Channel, Guild, User } from "./base.js";
