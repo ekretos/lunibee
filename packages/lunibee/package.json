@@ -13,16 +13,16 @@
   },
   "files": ["src"],
   "dependencies": {
-    "@lunibee/builders": "file:../builders",
-    "@lunibee/collection": "file:../collection",
-    "@lunibee/core": "file:../core",
-    "@lunibee/formatters": "file:../formatters",
-    "@lunibee/managers": "file:../managers",
-    "@lunibee/rest": "file:../rest",
-    "@lunibee/structures": "file:../structures",
-    "@lunibee/types": "file:../types",
-    "@lunibee/utils": "file:../utils",
-    "@lunibee/voice": "file:../voice",
-    "@lunibee/ws": "file:../ws"
+    "@lunibee/builders": "workspace:*",
+    "@lunibee/collection": "workspace:*",
+    "@lunibee/core": "workspace:*",
+    "@lunibee/formatters": "workspace:*",
+    "@lunibee/managers": "workspace:*",
+    "@lunibee/rest": "workspace:*",
+    "@lunibee/structures": "workspace:*",
+    "@lunibee/types": "workspace:*",
+    "@lunibee/utils": "workspace:*",
+    "@lunibee/voice": "workspace:*",
+    "@lunibee/ws": "workspace:*"
   }
 }
