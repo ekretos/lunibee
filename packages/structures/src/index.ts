@@ -1,4 +1,6 @@
-/** Structure-level actions without coupling resource models to HTTP. */
+import { BaseStructure, Channel, User } from "./base.js";
+
+/** Common Discord structure exports. */
 export { BaseStructure, Channel, Guild, User } from "./base.js";
 export type { ResourceContext } from "./base.js";
 
