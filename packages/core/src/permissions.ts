@@ -20,63 +20,21 @@ export type PermissionName = keyof typeof Permissions;
 
 /** Immutable permission bitfield. */
 export class PermissionSet {
-    /** Permission bitfield. */
-    public readonly bitfield: bigint;
-
+    /** Permission bitfield. */ public readonly bitfield: bigint;
     /** Creates a permission set. @param value Initial permission bitfield. @throws {RangeError} If the value is negative. @throws {TypeError} If the value is not a valid integer. */
-    public constructor(value: bigint | number | string = 0n) {
-        try {
-            const bitfield = BigInt(value);
-            if (bitfield < 0n) throw new RangeError("Permission bitfield cannot be negative.");
-            this.bitfield = bitfield;
-        } catch (error) {
-            if (error instanceof RangeError) throw error;
-            throw new TypeError("Permission bitfield must be a valid non-negative integer.", { cause: error });
-        }
-    }
+    public constructor(value: bigint | number | string = 0n) { try { const bitfield = BigInt(value); if (bitfield < 0n) throw new RangeError("Permission bitfield cannot be negative."); this.bitfield = bitfield; } catch (error) { if (error instanceof RangeError) throw error; throw new TypeError("Permission bitfield must be a valid non-negative integer.", { cause: error }); } }
+    /** Checks whether all supplied permissions are present. @param permissions Permission names or raw bits. @returns True when every requested permission is present. */ public has(...permissions: (bigint | PermissionName)[]): boolean { return permissions.every(permission => { const bit = this.#resolve(permission); return (this.bitfield & bit) === bit; }); }
+    /** Checks whether any supplied permission is present. @param permissions Permission names or raw bits. @returns True when at least one requested permission is present. */ public any(...permissions: (bigint | PermissionName)[]): boolean { return permissions.some(permission => (this.bitfield & this.#resolve(permission)) !== 0n); }
+    /** Returns a new set with permissions added. @param permissions Permission names or raw bits. @returns A new permission set. */ public add(...permissions: (bigint | PermissionName)[]): PermissionSet { let bitfield = this.bitfield; for (const permission of permissions) bitfield |= this.#resolve(permission); return new PermissionSet(bitfield); }
+    /** Returns a new set with permissions removed. @param permissions Permission names or raw bits. @returns A new permission set. */ public remove(...permissions: (bigint | PermissionName)[]): PermissionSet { let bitfield = this.bitfield; for (const permission of permissions) bitfield &= ~this.#resolve(permission); return new PermissionSet(bitfield); }
+    /** Checks equality with another permission set or raw bitfield. @param other Permission set or raw bitfield. @returns True when both values are equal. */ public equals(other: PermissionSet | bigint | number | string): boolean { return this.bitfield === (other instanceof PermissionSet ? other.bitfield : new PermissionSet(other).bitfield); }
+    /** Returns the decimal permission representation. @returns Decimal permission bitfield. */ public toString(): string { return this.bitfield.toString(); }
+    /** Returns known permission names contained in this set. @returns Names of all enabled known permissions. */ public toArray(): PermissionName[] { return (Object.keys(Permissions) as PermissionName[]).filter(permission => this.has(permission)); }
+    /** Resolves a named permission or raw bit. @param permission Permission name or raw bit. @returns Numeric permission bit. */ #resolve(permission: bigint | PermissionName): bigint { return typeof permission === "bigint" ? permission : Permissions[permission] as bigint; }
+}
 
-    /** Checks whether all supplied permissions are present. @param permissions Permission names or raw bits. @returns True when every requested permission is present. */
-    public has(...permissions: (bigint | PermissionName)[]): boolean {
-        return permissions.every(permission => {
-            const bit = this.#resolve(permission);
-            return (this.bitfield & bit) === bit;
-        });
-    }
-
-    /** Checks whether any supplied permission is present. @param permissions Permission names or raw bits. @returns True when at least one requested permission is present. */
-    public any(...permissions: (bigint | PermissionName)[]): boolean {
-        return permissions.some(permission => (this.bitfield & this.#resolve(permission)) !== 0n);
-    }
-
-    /** Returns a new set with permissions added. @param permissions Permission names or raw bits. @returns A new permission set. */
-    public add(...permissions: (bigint | PermissionName)[]): PermissionSet {
-        let bitfield = this.bitfield;
-        for (const permission of permissions) bitfield |= this.#resolve(permission);
-        return new PermissionSet(bitfield);
-    }
-
-    /** Returns a new set with permissions removed. @param permissions Permission names or raw bits. @returns A new permission set. */
-    public remove(...permissions: (bigint | PermissionName)[]): PermissionSet {
-        let bitfield = this.bitfield;
-        for (const permission of permissions) bitfield &= ~this.#resolve(permission);
-        return new PermissionSet(bitfield);
-    }
-
-    /** Checks equality with another permission set or raw bitfield. @param other Permission set or raw bitfield. @returns True when both values are equal. */
-    public equals(other: PermissionSet | bigint | number | string): boolean {
-        return this.bitfield === (other instanceof PermissionSet ? other.bitfield : new PermissionSet(other).bitfield);
-    }
-
-    /** Returns the decimal permission representation. @returns Decimal permission bitfield. */
-    public toString(): string { return this.bitfield.toString(); }
-
-    /** Returns known permission names contained in this set. @returns Names of all enabled known permissions. */
-    public toArray(): PermissionName[] {
-        return (Object.keys(Permissions) as PermissionName[]).filter(permission => this.has(permission));
-    }
-
-    /** Resolves a named permission or raw bit. @param permission Permission name or raw bit. @returns Numeric permission bit. */
-    #resolve(permission: bigint | PermissionName): bigint {
-        return typeof permission === "bigint" ? permission : Permissions[permission] as bigint;
-    }
+/** Discord.js-compatible name for the immutable permission bitfield. */
+export class PermissionsBitField extends PermissionSet {
+    /** Creates a permissions bitfield. @param value Initial permission bitfield. */
+    public constructor(value: bigint | number | string = 0n) { super(value); }
 }
