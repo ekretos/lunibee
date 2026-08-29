@@ -18,6 +18,8 @@ export class MessageManager {
     public async send(options: { content?: string }): Promise<Message> { const data = await this.#rest.post<ConstructorParameters<typeof Message>[0]>(Routes.channelMessages(this.#channelId), options); return this.upsert(data); }
     /** Fetches a message and inserts it into the canonical cache. @param messageId Message identifier. @returns Canonical fetched message. @throws {Error} If REST rejects the request. */
     public async fetch(messageId: string): Promise<Message> { const data = await this.#rest.get<ConstructorParameters<typeof Message>[0]>(Routes.message(this.#channelId, messageId)); return this.upsert(data); }
+    /** Fetches several messages through the same canonical hydration path. @param messageIds Message identifiers. @returns Canonical messages in input order. @throws {Error} If any REST request fails. */
+    public fetchMany(messageIds: Iterable<string>): Promise<Message[]> { return Promise.all([...messageIds].map(messageId => this.fetch(messageId))); }
     /** Inserts or updates a message through the shared hydration path. @param data Discord message payload. @returns Canonical message instance. */
     public upsert(data: ConstructorParameters<typeof Message>[0]): Message { const existing = this.cache.get(data.id); const message = new Message(data, this.#context); if (existing) { Object.assign(existing, message); return existing; } this.cache.set(message.id, message); return message; }
     /** Removes a message from the canonical cache. @param messageId Message identifier. @returns True when a cached message was removed. */
