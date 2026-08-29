@@ -11,7 +11,7 @@ export class RESTError extends Error {
     /** API path used for the failed request. */
     public readonly path?: string;
 
-    /** Creates a REST error. */
+    /** Creates a REST error with request context. */
     public constructor(message: string, status: number, code?: number, errors?: unknown, options: { method?: string; path?: string; cause?: unknown } = {}) {
         super(message, options.cause === undefined ? undefined : { cause: options.cause });
         this.name = "RESTError";
@@ -25,7 +25,7 @@ export class RESTError extends Error {
 
 type Bucket = { remaining: number; resetAt: number; queue: Promise<void> };
 
-/** A Bun-native Discord REST transport with route, global-limit and retry handling. */
+/** Bun-native REST transport with route and global rate-limit coordination. */
 export class REST {
     readonly #baseURL: string;
     readonly #timeout: number;
@@ -34,7 +34,7 @@ export class REST {
     #globalResetAt = 0;
     readonly #buckets = new Map<string, Bucket>();
 
-    /** Creates a REST client. */
+    /** Creates a REST transport. */
     public constructor(options: { token?: string; timeout?: number; retries?: number; baseURL?: string } = {}) {
         this.#token = options.token;
         this.#timeout = Math.max(1, options.timeout ?? 15_000);
@@ -42,13 +42,13 @@ export class REST {
         this.#baseURL = (options.baseURL ?? "https://discord.com/api/v10").replace(/\/$/, "");
     }
 
-    /** Updates the bot token used by future requests. */
+    /** Sets the authentication token. */
     public setToken(token: string): void {
         if (!token.trim()) throw new TypeError("A Discord bot token is required.");
         this.#token = token;
     }
 
-    /** Sends a request to Discord. */
+    /** Executes an HTTP request with rate-limit and retry handling. */
     public async request<T>(method: string, path: string, body?: unknown): Promise<T> {
         const normalizedMethod = method.toUpperCase();
         if (!normalizedMethod) throw new TypeError("REST method is required.");
@@ -82,7 +82,6 @@ export class REST {
                     });
                     this.#update(response, bucket);
                     const payload = await this.#readPayload(response);
-
                     if (response.ok) return (response.status === 204 ? undefined : payload) as T;
 
                     const data = this.#errorData(payload);
@@ -101,8 +100,13 @@ export class REST {
                         continue;
                     }
 
-                    const message = data.message ?? response.statusText ?? `Discord REST request failed with status ${response.status}`;
-                    throw new RESTError(message || `Discord REST request failed with status ${response.status}`, response.status, data.code, payload, { method: normalizedMethod, path });
+                    throw new RESTError(
+                        data.message ?? response.statusText ?? `Discord REST request failed with status ${response.status}`,
+                        response.status,
+                        data.code,
+                        payload,
+                        { method: normalizedMethod, path }
+                    );
                 } catch (error) {
                     if (error instanceof RESTError) throw error;
                     const retryable = ["GET", "HEAD", "PUT", "DELETE"].includes(normalizedMethod);
@@ -122,7 +126,6 @@ export class REST {
                     clearTimeout(timer);
                 }
             }
-
             throw new RESTError("Discord REST request exhausted its retry attempts", 0, undefined, undefined, { method: normalizedMethod, path });
         } finally {
             release();
@@ -189,8 +192,7 @@ export class REST {
         const resetAfter = Number(response.headers.get("X-RateLimit-Reset-After"));
         if (Number.isFinite(remaining)) bucket.remaining = remaining;
         if (Number.isFinite(resetAfter)) bucket.resetAt = Date.now() + resetAfter * 1000;
-        const global = response.headers.get("X-RateLimit-Global");
-        if (global === "true") {
+        if (response.headers.get("X-RateLimit-Global") === "true") {
             const retryAfter = Number(response.headers.get("Retry-After"));
             if (Number.isFinite(retryAfter)) this.#globalResetAt = Date.now() + retryAfter * 1000;
         }
