@@ -18,6 +18,10 @@
     "packages/*",
     "!packages/lunibee"
   ],
+  "scripts": {
+    "check:deps": "bun scripts/check-dependency-graph.ts",
+    "typecheck": "bunx tsc --noEmit --project tsconfig.json"
+  },
   "dependencies": {
     "@lunibee/builders": "file:./packages/builders",
     "@lunibee/collection": "file:./packages/collection",
