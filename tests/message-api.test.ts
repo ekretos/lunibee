@@ -4,12 +4,8 @@ import { ChannelManager } from "../packages/managers/src/index.js";
 const channelId = "123456789012345680";
 const messageId = "123456789012345681";
 const userId = "123456789012345682";
-const message = {
-    id: messageId,
-    content: "hello",
-    author: { id: userId, username: "bot" },
-    channel_id: channelId,
-};
+const message = { id: messageId, content: "hello", author: { id: userId, username: "bot" }, channel_id: channelId };
+const thread = { id: "123456789012345683", type: 11, name: "discussion", guild_id: "123456789012345684" };
 
 function manager() {
     const calls: Array<{ method: string; path: string; body?: unknown }> = [];
@@ -20,20 +16,14 @@ function manager() {
         },
         post: async <T>(path: string, body?: unknown): Promise<T> => {
             calls.push({ method: "POST", path, body });
-            return (path.endsWith("/messages") || path.includes("/crosspost") ? message : undefined) as T;
+            return (path.endsWith("/messages") || path.includes("/crosspost") ? message : thread) as T;
         },
         patch: async <T>(path: string, body?: unknown): Promise<T> => {
             calls.push({ method: "PATCH", path, body });
             return message as T;
         },
-        put: async <T>(path: string): Promise<T> => {
-            calls.push({ method: "PUT", path });
-            return undefined as T;
-        },
-        delete: async <T>(path: string): Promise<T> => {
-            calls.push({ method: "DELETE", path });
-            return undefined as T;
-        },
+        put: async <T>(path: string): Promise<T> => { calls.push({ method: "PUT", path }); return undefined as T; },
+        delete: async <T>(path: string): Promise<T> => { calls.push({ method: "DELETE", path }); return undefined as T; },
     };
     return { channels: new ChannelManager(rest as never), calls };
 }
@@ -63,10 +53,10 @@ test("fetches, edits, and deletes a message", async () => {
 test("supports crosspost and bulk delete", async () => {
     const { channels, calls } = manager();
     await channels.crosspostMessage(channelId, messageId);
-    await channels.bulkDeleteMessages(channelId, [messageId, "123456789012345683"]);
+    await channels.bulkDeleteMessages(channelId, [messageId, "123456789012345685"]);
     expect(calls[0]?.path).toBe(`/channels/${channelId}/messages/${messageId}/crosspost`);
     expect(calls[1]?.path).toBe(`/channels/${channelId}/messages/bulk-delete`);
-    expect(calls[1]?.body).toEqual({ messages: [messageId, "123456789012345683"] });
+    expect(calls[1]?.body).toEqual({ messages: [messageId, "123456789012345685"] });
 });
 
 test("supports reaction endpoints", async () => {
@@ -86,7 +76,8 @@ test("supports pins and message threads", async () => {
     await channels.fetchPinnedMessages(channelId);
     await channels.pinMessage(channelId, messageId);
     await channels.unpinMessage(channelId, messageId);
-    await channels.createThreadFromMessage(channelId, messageId, { name: "discussion" });
+    const result = await channels.createThreadFromMessage(channelId, messageId, { name: "discussion" });
+    expect(result.id).toBe(thread.id);
     expect(calls[0]?.path).toBe(`/channels/${channelId}/pins`);
     expect(calls[1]?.path).toBe(`/channels/${channelId}/messages/${messageId}/pins`);
     expect(calls[2]?.path).toBe(`/channels/${channelId}/messages/${messageId}/pins`);
