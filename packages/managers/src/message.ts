@@ -1,17 +1,25 @@
+import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
 import { Message, type ResourceContext } from "@lunibee/structures";
 
-/** Manages message resources belonging to a single channel. */
+/** Manages message resources belonging to a single channel with canonical identity. */
 export class MessageManager {
+    /** Canonical message cache for this channel. */
+    public readonly cache = new Collection<string, Message>();
     readonly #rest: REST;
     readonly #context: ResourceContext;
     readonly #channelId: string;
+
     /** Creates a message manager. @param rest REST transport. @param context Structure resource context. @param channelId Channel identifier. @throws {TypeError} If channelId is empty. */
     public constructor(rest: REST, context: ResourceContext, channelId: string) { if (!channelId) throw new TypeError("Channel ID is required."); this.#rest = rest; this.#context = context; this.#channelId = channelId; }
-    /** Sends a message in the managed channel. @param options Message creation payload. @returns Created message. @throws {Error} If REST rejects the request. */
-    public async send(options: { content?: string }): Promise<Message> { const data = await this.#rest.post<ConstructorParameters<typeof Message>[0]>(Routes.channelMessages(this.#channelId), options); return new Message(data, this.#context); }
-    /** Fetches a message by ID. @param messageId Message identifier. @returns Hydrated message. @throws {Error} If REST rejects the request. */
-    public async fetch(messageId: string): Promise<Message> { const data = await this.#rest.get<ConstructorParameters<typeof Message>[0]>(Routes.message(this.#channelId, messageId)); return new Message(data, this.#context); }
-    /** Deletes a message by ID. @param messageId Message identifier. @returns Promise fulfilled after deletion. @throws {Error} If REST rejects the request. */
-    public async delete(messageId: string): Promise<void> { await this.#rest.delete(Routes.message(this.#channelId, messageId)); }
+    /** Resolves a message from the canonical cache or REST. @param messageId Message identifier. @returns Canonical message instance. @throws {Error} If REST rejects the request. */
+    public async resolve(messageId: string): Promise<Message> { return this.cache.get(messageId) ?? this.fetch(messageId); }
+    /** Sends a message and inserts the response into the canonical cache. @param options Message creation payload. @returns Canonical created message. @throws {Error} If REST rejects the request. */
+    public async send(options: { content?: string }): Promise<Message> { const data = await this.#rest.post<ConstructorParameters<typeof Message>[0]>(Routes.channelMessages(this.#channelId), options); return this.upsert(data); }
+    /** Fetches a message and inserts it into the canonical cache. @param messageId Message identifier. @returns Canonical fetched message. @throws {Error} If REST rejects the request. */
+    public async fetch(messageId: string): Promise<Message> { const data = await this.#rest.get<ConstructorParameters<typeof Message>[0]>(Routes.message(this.#channelId, messageId)); return this.upsert(data); }
+    /** Inserts or updates a message through the shared hydration path. @param data Discord message payload. @returns Canonical message instance. */
+    public upsert(data: ConstructorParameters<typeof Message>[0]): Message { const existing = this.cache.get(data.id); const message = new Message(data, this.#context); if (existing) { Object.assign(existing, message); return existing; } this.cache.set(message.id, message); return message; }
+    /** Removes a message from the canonical cache. @param messageId Message identifier. @returns True when a cached message was removed. */
+    public delete(messageId: string): boolean { return this.cache.delete(messageId); }
 }
