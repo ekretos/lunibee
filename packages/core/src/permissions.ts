@@ -51,18 +51,65 @@ export const Permissions = {
     UseExternalApps: 1n << 50n
 } as const;
 
-/** Immutable permission bitfield with fluent checks and mutations. */
+/** Permission names accepted by {@link PermissionSet}. */
+export type PermissionName = keyof typeof Permissions;
+
+/** Immutable Discord permission bitfield with fluent checks and mutations. */
 export class PermissionSet {
-    /** Numeric permission bitfield. */
+    /** Permission bitfield. */
     public readonly bitfield: bigint;
-    /** Creates a permission set. */
-    public constructor(value: bigint | number | string = 0n) { this.bitfield = BigInt(value); }
+
+    /** Creates a permission set from a bigint, number, or decimal string. */
+    public constructor(value: bigint | number | string = 0n) {
+        try {
+            const bitfield = BigInt(value);
+            if (bitfield < 0n) throw new RangeError("Permission bitfield cannot be negative.");
+            this.bitfield = bitfield;
+        } catch (error) {
+            if (error instanceof RangeError) throw error;
+            throw new TypeError("Permission bitfield must be a valid non-negative integer.", { cause: error });
+        }
+    }
+
     /** Checks whether every supplied permission is present. */
-    public has(...permissions: bigint[]): boolean { return permissions.every(permission => (this.bitfield & permission) === permission); }
+    public has(...permissions: (bigint | PermissionName)[]): boolean {
+        const bits = permissions.map(permission => this.#resolve(permission));
+        return bits.every(permission => (this.bitfield & permission) === permission);
+    }
+
     /** Checks whether at least one supplied permission is present. */
-    public any(...permissions: bigint[]): boolean { return permissions.some(permission => (this.bitfield & permission) === permission); }
+    public any(...permissions: (bigint | PermissionName)[]): boolean {
+        const bits = permissions.map(permission => this.#resolve(permission));
+        return bits.some(permission => (this.bitfield & permission) === permission);
+    }
+
     /** Returns a new permission set with permissions added. */
-    public add(...permissions: bigint[]): PermissionSet { return new PermissionSet(permissions.reduce((value, permission) => value | permission, this.bitfield)); }
+    public add(...permissions: (bigint | PermissionName)[]): PermissionSet {
+        return new PermissionSet(permissions.reduce((value, permission) => value | this.#resolve(permission), this.bitfield));
+    }
+
     /** Returns a new permission set with permissions removed. */
-    public remove(...permissions: bigint[]): PermissionSet { return new PermissionSet(permissions.reduce((value, permission) => value & ~permission, this.bitfield)); }
+    public remove(...permissions: (bigint | PermissionName)[]): PermissionSet {
+        return new PermissionSet(permissions.reduce((value, permission) => value & ~this.#resolve(permission), this.bitfield));
+    }
+
+    /** Checks whether this permission set has exactly the supplied bitfield. */
+    public equals(other: PermissionSet | bigint | number | string): boolean {
+        return this.bitfield === (other instanceof PermissionSet ? other.bitfield : new PermissionSet(other).bitfield);
+    }
+
+    /** Returns the decimal representation used by Discord permission fields. */
+    public toString(): string {
+        return this.bitfield.toString();
+    }
+
+    /** Returns the names of all known permissions present in this set. */
+    public toArray(): PermissionName[] {
+        return (Object.keys(Permissions) as PermissionName[]).filter(permission => this.has(permission));
+    }
+
+    /** Resolves a public permission name or raw bit. */
+    #resolve(permission: bigint | PermissionName): bigint {
+        return typeof permission === "bigint" ? permission : Permissions[permission];
+    }
 }
