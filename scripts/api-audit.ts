@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 const root = new URL("../", import.meta.url);
 const packages = ["core", "rest", "ws", "structures", "builders", "collection", "managers", "sharding", "voice", "types"];
 const failures: string[] = [];
@@ -71,39 +75,33 @@ for (const name of packages) {
     }
 }
 
-const tempDir = new URL("../.api-audit-dts/", import.meta.url);
-await new Bun.Glob("**/*").scan({ cwd: tempDir.pathname }).catch(() => []);
-await Bun.write(new URL(".gitkeep", tempDir), "");
+const tempDir = await mkdtemp(join(tmpdir(), "lunibee-api-audit-"));
+try {
+    const tsc = Bun.spawnSync([
+        "bunx",
+        "--bun",
+        "tsc",
+        "--declaration",
+        "--emitDeclarationOnly",
+        "--noEmitOnError",
+        "false",
+        "--outDir",
+        tempDir
+    ], { cwd: root.pathname, stdout: "pipe", stderr: "pipe" });
 
-const tsc = Bun.spawnSync([
-    "bunx",
-    "--bun",
-    "tsc",
-    "--declaration",
-    "--emitDeclarationOnly",
-    "--noEmitOnError",
-    "false",
-    "--outDir",
-    tempDir.pathname
-], { cwd: root.pathname, stdout: "pipe", stderr: "pipe" });
-
-if (tsc.exitCode !== 0) {
-    const stderr = new TextDecoder().decode(tsc.stderr).trim();
-    fail(`declaration generation failed${stderr ? `: ${stderr}` : ""}`);
-} else {
-    for (const name of packages) {
-        if (!(await Bun.file(new URL(`packages/${name}/src/index.d.ts`, tempDir)).exists())) {
-            fail(`package ${name} did not produce a public declaration entrypoint`);
+    if (tsc.exitCode !== 0) {
+        const stderr = new TextDecoder().decode(tsc.stderr).trim();
+        fail(`declaration generation failed${stderr ? `: ${stderr}` : ""}`);
+    } else {
+        for (const name of packages) {
+            if (!(await Bun.file(join(tempDir, `packages/${name}/src/index.d.ts`)).exists())) {
+                fail(`package ${name} did not produce a public declaration entrypoint`);
+            }
         }
     }
+} finally {
+    await rm(tempDir, { recursive: true, force: true });
 }
-
-await new Bun.Glob("**/*").scan({ cwd: tempDir.pathname }).then(async entries => {
-    for (const entry of entries) {
-        const path = new URL(entry, tempDir);
-        if (entry !== ".gitkeep") await Bun.write(path, "");
-    }
-});
 
 if (failures.length) {
     console.error("Public API audit failed:");
