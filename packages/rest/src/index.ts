@@ -53,7 +53,6 @@ export class REST {
         const normalizedMethod = method.toUpperCase();
         if (!normalizedMethod) throw new TypeError("REST method is required.");
         if (!path.startsWith("/")) throw new TypeError("REST paths must start with '/'.");
-
         const route = `${normalizedMethod}:${this.#normalizeRoute(path)}`;
         const bucket = this.#buckets.get(route) ?? { remaining: 1, resetAt: 0, queue: Promise.resolve() };
         this.#buckets.set(route, bucket);
@@ -61,14 +60,12 @@ export class REST {
         let release!: () => void;
         bucket.queue = new Promise(resolve => { release = resolve; });
         await previous;
-
         try {
             for (let attempt = 0; attempt <= this.#retries; attempt++) {
                 await this.#wait(bucket);
                 await this.#waitGlobal();
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), this.#timeout);
-
                 try {
                     const response = await fetch(`${this.#baseURL}${path}`, {
                         method: normalizedMethod,
@@ -83,118 +80,41 @@ export class REST {
                     this.#update(response, bucket);
                     const payload = await this.#readPayload(response);
                     if (response.ok) return (response.status === 204 ? undefined : payload) as T;
-
                     const data = this.#errorData(payload);
                     if (response.status === 429) {
                         const retryAfter = this.#retryAfter(response, data);
                         if (data.global) this.#globalResetAt = Date.now() + retryAfter * 1000;
-                        if (attempt < this.#retries) {
-                            await Bun.sleep(retryAfter * 1000);
-                            continue;
-                        }
+                        if (attempt < this.#retries) { await Bun.sleep(retryAfter * 1000); continue; }
                     }
-
                     const retryable = response.status >= 500 && response.status <= 599 && ["GET", "HEAD", "PUT", "DELETE"].includes(normalizedMethod);
-                    if (retryable && attempt < this.#retries) {
-                        await Bun.sleep(this.#backoff(attempt));
-                        continue;
-                    }
-
-                    throw new RESTError(
-                        data.message ?? response.statusText ?? `Discord REST request failed with status ${response.status}`,
-                        response.status,
-                        data.code,
-                        payload,
-                        { method: normalizedMethod, path }
-                    );
+                    if (retryable && attempt < this.#retries) { await Bun.sleep(this.#backoff(attempt)); continue; }
+                    throw new RESTError(data.message ?? response.statusText ?? `Discord REST request failed with status ${response.status}`, response.status, data.code, payload, { method: normalizedMethod, path });
                 } catch (error) {
                     if (error instanceof RESTError) throw error;
                     const retryable = ["GET", "HEAD", "PUT", "DELETE"].includes(normalizedMethod);
-                    if (retryable && attempt < this.#retries) {
-                        await Bun.sleep(this.#backoff(attempt));
-                        continue;
-                    }
+                    if (retryable && attempt < this.#retries) { await Bun.sleep(this.#backoff(attempt)); continue; }
                     const isAbort = error instanceof DOMException && error.name === "AbortError";
-                    throw new RESTError(
-                        isAbort ? `Discord REST request timed out after ${this.#timeout}ms` : "Discord REST request failed",
-                        0,
-                        undefined,
-                        undefined,
-                        { method: normalizedMethod, path, cause: error }
-                    );
-                } finally {
-                    clearTimeout(timer);
-                }
+                    throw new RESTError(isAbort ? `Discord REST request timed out after ${this.#timeout}ms` : "Discord REST request failed", 0, undefined, undefined, { method: normalizedMethod, path, cause: error });
+                } finally { clearTimeout(timer); }
             }
             throw new RESTError("Discord REST request exhausted its retry attempts", 0, undefined, undefined, { method: normalizedMethod, path });
-        } finally {
-            release();
-        }
+        } finally { release(); }
     }
 
-    /** Sends a GET request. */
-    public get<T>(path: string): Promise<T> { return this.request<T>("GET", path); }
-    /** Sends a POST request. */
-    public post<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("POST", path, body); }
-    /** Sends a PATCH request. */
-    public patch<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("PATCH", path, body); }
-    /** Sends a PUT request. */
-    public put<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("PUT", path, body); }
-    /** Sends a DELETE request. */
-    public delete<T>(path: string): Promise<T> { return this.request<T>("DELETE", path); }
+    /** Sends a GET request. */ public get<T>(path: string): Promise<T> { return this.request<T>("GET", path); }
+    /** Sends a POST request. */ public post<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("POST", path, body); }
+    /** Sends a PATCH request. */ public patch<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("PATCH", path, body); }
+    /** Sends a PUT request. */ public put<T>(path: string, body?: unknown): Promise<T> { return this.request<T>("PUT", path, body); }
+    /** Sends a DELETE request. */ public delete<T>(path: string): Promise<T> { return this.request<T>("DELETE", path); }
 
-    async #wait(bucket: Bucket): Promise<void> {
-        const delay = bucket.resetAt - Date.now();
-        if (bucket.remaining <= 0 && delay > 0) await Bun.sleep(delay);
-    }
-
-    async #waitGlobal(): Promise<void> {
-        const delay = this.#globalResetAt - Date.now();
-        if (delay > 0) await Bun.sleep(delay);
-    }
-
-    async #readPayload(response: Response): Promise<unknown> {
-        if (response.status === 204) return undefined;
-        const contentType = response.headers.get("content-type") ?? "";
-        if (contentType.includes("application/json")) return response.json().catch(() => undefined);
-        return response.text().catch(() => undefined);
-    }
-
-    #errorData(payload: unknown): { message?: string; code?: number; retry_after?: number; global?: boolean } {
-        if (!payload || typeof payload !== "object") return {};
-        const data = payload as Record<string, unknown>;
-        return {
-            message: typeof data.message === "string" ? data.message : undefined,
-            code: typeof data.code === "number" ? data.code : undefined,
-            retry_after: typeof data.retry_after === "number" ? data.retry_after : undefined,
-            global: data.global === true
-        };
-    }
-
-    #retryAfter(response: Response, data: { retry_after?: number }): number {
-        const header = Number(response.headers.get("Retry-After"));
-        const retryAfter = data.retry_after ?? (Number.isFinite(header) ? header : 1);
-        return Math.max(0, retryAfter);
-    }
-
-    #backoff(attempt: number): number {
-        return Math.min(10_000, 500 * 2 ** attempt) + Math.random() * 250;
-    }
-
-    #normalizeRoute(path: string): string {
-        const queryIndex = path.indexOf("?");
-        const routePath = queryIndex === -1 ? path : path.slice(0, queryIndex);
-        return routePath.replace(/\/\d+(?=\/|$)/g, "/:id");
-    }
-
-    #update(response: Response, bucket: Bucket): void {
-        const remaining = Number(response.headers.get("X-RateLimit-Remaining"));
-        const resetAfter = Number(response.headers.get("X-RateLimit-Reset-After"));
-        if (Number.isFinite(remaining)) bucket.remaining = remaining;
-        if (Number.isFinite(resetAfter)) bucket.resetAt = Date.now() + resetAfter * 1000;
-        if (response.headers.get("X-RateLimit-Global") === "true") {
-            const retryAfter = Number(response.headers.get("Retry-After"));
-            if (Number.isFinite(retryAfter)) this.#globalResetAt = Date.now() + retryAfter * 1000;
-        }
-    }
+    async #wait(bucket: Bucket): Promise<void> { const delay = bucket.resetAt - Date.now(); if (bucket.remaining <= 0 && delay > 0) await Bun.sleep(delay); }
+    async #waitGlobal(): Promise<void> { const delay = this.#globalResetAt - Date.now(); if (delay > 0) await Bun.sleep(delay); }
+    async #readPayload(response: Response): Promise<unknown> { if (response.status === 204) return undefined; const contentType = response.headers.get("content-type") ?? ""; if (contentType.includes("application/json")) return response.json().catch(() => undefined); return response.text().catch(() => undefined); }
+    #errorData(payload: unknown): { message?: string; code?: number; retry_after?: number; global?: boolean } { if (!payload || typeof payload !== "object") return {}; const data = payload as Record<string, unknown>; return { message: typeof data.message === "string" ? data.message : undefined, code: typeof data.code === "number" ? data.code : undefined, retry_after: typeof data.retry_after === "number" ? data.retry_after : undefined, global: data.global === true }; }
+    #retryAfter(response: Response, data: { retry_after?: number }): number { const header = Number(response.headers.get("Retry-After")); const retryAfter = data.retry_after ?? (Number.isFinite(header) ? header : 1); return Math.max(0, retryAfter); }
+    #backoff(attempt: number): number { return Math.min(10_000, 500 * 2 ** attempt) + Math.random() * 250; }
+    #normalizeRoute(path: string): string { const queryIndex = path.indexOf("?"); const routePath = queryIndex === -1 ? path : path.slice(0, queryIndex); return routePath.replace(/\/\d+(?=\/|$)/g, "/:id"); }
+    #update(response: Response, bucket: Bucket): void { const remaining = Number(response.headers.get("X-RateLimit-Remaining")); const resetAfter = Number(response.headers.get("X-RateLimit-Reset-After")); if (Number.isFinite(remaining)) bucket.remaining = remaining; if (Number.isFinite(resetAfter)) bucket.resetAt = Date.now() + resetAfter * 1000; if (response.headers.get("X-RateLimit-Global") === "true") { const retryAfter = Number(response.headers.get("Retry-After")); if (Number.isFinite(retryAfter)) this.#globalResetAt = Date.now() + retryAfter * 1000; } }
 }
+
+export { Routes } from "./routes.js";
