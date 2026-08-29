@@ -6,7 +6,20 @@
   "module": "./packages/lunibee/src/index.ts",
   "types": "./packages/lunibee/src/index.ts",
   "exports": {
-    ".": "./packages/lunibee/src/index.ts"
+    ".": "./packages/lunibee/src/index.ts",
+    "./core": "./packages/core/src/index.ts",
+    "./builders": "./packages/builders/src/index.ts",
+    "./collection": "./packages/collection/src/index.ts",
+    "./formatters": "./packages/formatters/src/index.ts",
+    "./handlers": "./packages/handlers/src/index.ts",
+    "./managers": "./packages/managers/src/index.ts",
+    "./rest": "./packages/rest/src/index.ts",
+    "./sharding": "./packages/sharding/src/index.ts",
+    "./structures": "./packages/structures/src/index.ts",
+    "./types": "./packages/types/src/index.ts",
+    "./utils": "./packages/utils/src/index.ts",
+    "./voice": "./packages/voice/src/index.ts",
+    "./ws": "./packages/ws/src/index.ts"
   },
   "dependencies": {
     "@lunibee/core": "file:./packages/core"
