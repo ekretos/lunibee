@@ -31,7 +31,7 @@ export const Routes = {
     /** Returns guild scheduled events. */ guildScheduledEvents: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events`,
     /** Returns one guild scheduled event. */ guildScheduledEvent: (guildId: string, eventId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events/${snowflake(eventId, "Event ID")}`,
     /** Returns guild automod rules. */ guildAutoModerationRules: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules`,
-    /** Returns one automod rule. */ guildAutoModerationRule: (guildId: string, ruleId: string) => `/guilds/${snowflake(guildId, "Rule ID")}`,
+    /** Returns one automod rule. */ guildAutoModerationRule: (guildId: string, ruleId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules/${snowflake(ruleId, "Rule ID")}`,
     /** Returns guild soundboard sounds. */ guildSoundboardSounds: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/soundboard-sounds`,
     /** Returns current voice regions. */ voiceRegions: () => "/voice/regions"
 } as const;
