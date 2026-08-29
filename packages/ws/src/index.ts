@@ -40,6 +40,7 @@ export class Gateway {
     #closed = false;
     #attempt = 0;
     #reconnectTimer?: ReturnType<typeof setTimeout>;
+    #initialConnect?: { resolve: () => void; reject: (error: Error) => void; settled: boolean };
     readonly #listeners = new Map<string, Set<GatewayListener>>();
 
     /** Creates a Gateway connection manager. */
@@ -50,17 +51,28 @@ export class Gateway {
         if (this.#options.shardId < 0 || this.#options.shardId >= this.#options.shardCount) throw new RangeError("Gateway shardId must be within the configured shard count.");
     }
 
-    /** Opens a Gateway connection. */
+    /** Opens a Gateway connection and settles when the initial WebSocket opens or fails. */
     public connect(url = "wss://gateway.discord.gg/?v=10&encoding=json"): Promise<void> {
         this.#closed = false;
-        this.#open(url);
-        return Promise.resolve();
+        if (this.#initialConnect && !this.#initialConnect.settled) return new Promise((resolve, reject) => {
+            const previous = this.#initialConnect!;
+            const originalResolve = previous.resolve;
+            const originalReject = previous.reject;
+            previous.resolve = () => { originalResolve(); resolve(); };
+            previous.reject = error => { originalReject(error); reject(error); };
+        });
+        return new Promise((resolve, reject) => {
+            this.#initialConnect = { resolve, reject, settled: false };
+            try { this.#open(url); }
+            catch (error) { this.#settleInitialConnect(error instanceof Error ? error : new Error(String(error))); }
+        });
     }
 
     /** Permanently closes the connection and clears timers. */
     public close(): void {
         this.#closed = true;
         this.#clearTimers();
+        this.#settleInitialConnect(new Error("Gateway connection closed before opening."));
         this.#ws?.close(1000, "Client closed connection");
         this.#ws = undefined;
     }
@@ -89,29 +101,38 @@ export class Gateway {
     }
 
     /** Sends a presence update through the Gateway. */
-    public setPresence(data: Record<string, unknown>): boolean {
-        return this.send({ op: GatewayOpcodes.PresenceUpdate, d: data, s: null, t: null });
-    }
-
+    public setPresence(data: Record<string, unknown>): boolean { return this.send({ op: GatewayOpcodes.PresenceUpdate, d: data, s: null, t: null }); }
     /** Sends a voice-state update through the Gateway. */
-    public setVoiceState(data: Record<string, unknown>): boolean {
-        return this.send({ op: GatewayOpcodes.VoiceStateUpdate, d: data, s: null, t: null });
-    }
-
+    public setVoiceState(data: Record<string, unknown>): boolean { return this.send({ op: GatewayOpcodes.VoiceStateUpdate, d: data, s: null, t: null }); }
     /** Requests guild members through the Gateway. */
-    public requestGuildMembers(data: Record<string, unknown>): boolean {
-        return this.send({ op: GatewayOpcodes.RequestGuildMembers, d: data, s: null, t: null });
-    }
+    public requestGuildMembers(data: Record<string, unknown>): boolean { return this.send({ op: GatewayOpcodes.RequestGuildMembers, d: data, s: null, t: null }); }
 
     #open(url: string): void {
         if (this.#closed) return;
         let ws: WebSocket;
         try { ws = new WebSocket(url); }
-        catch (error) { this.#emitError(error); this.#scheduleReconnect(); return; }
+        catch (error) { this.#emitError(error); this.#settleInitialConnect(error instanceof Error ? error : new Error(String(error))); this.#scheduleReconnect(); return; }
         this.#ws = ws;
+        let opened = false;
+        ws.addEventListener("open", () => { opened = true; this.#settleInitialConnect(); });
         ws.addEventListener("message", event => this.#message(ws, String(event.data)));
-        ws.addEventListener("close", event => this.#close(ws, event.code));
-        ws.addEventListener("error", () => this.#emitError(new Error("Gateway WebSocket error")));
+        ws.addEventListener("close", event => {
+            if (!opened) this.#settleInitialConnect(new Error(`Gateway WebSocket closed before opening (code ${event.code}).`));
+            this.#close(ws, event.code);
+        });
+        ws.addEventListener("error", () => {
+            const error = new Error("Gateway WebSocket error");
+            this.#emitError(error);
+            if (!opened) this.#settleInitialConnect(error);
+        });
+    }
+
+    #settleInitialConnect(error?: Error): void {
+        const pending = this.#initialConnect;
+        if (!pending || pending.settled) return;
+        pending.settled = true;
+        if (error) pending.reject(error); else pending.resolve();
+        this.#initialConnect = undefined;
     }
 
     #message(ws: WebSocket, raw: string): void {
