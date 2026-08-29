@@ -1,4 +1,6 @@
 import { Collection } from "@lunibee/collection";
+import { REST, Routes } from "@lunibee/rest";
+import { Message } from "@lunibee/structures";
 
 /** A cache manager for Lunibee resources. */
 export class Manager<K, V> {
@@ -31,29 +33,50 @@ export class ResourceManager<K, V> extends Manager<K, V> {
     readonly #fetch: (id: K) => Promise<V>;
     readonly #key: (value: V) => K;
 
-    /** Creates a resource manager with a REST fetcher and key extractor. */
     public constructor(fetch: (id: K) => Promise<V>, key: (value: V) => K) {
         super();
         this.#fetch = fetch;
         this.#key = key;
     }
 
-    /** Resolves a resource from cache, fetching it only when absent. */
     public async resolve(id: K): Promise<V> {
         const cached = this.get(id);
         if (cached !== undefined) return cached;
         return this.fetch(id);
     }
 
-    /** Fetches a resource and stores the result in cache. */
     public async fetch(id: K): Promise<V> {
         const value = await this.#fetch(id);
         this.set(this.#key(value), value);
         return value;
     }
 
-    /** Fetches multiple resources while preserving request order. */
     public async fetchMany(ids: Iterable<K>): Promise<V[]> {
         return Promise.all([...ids].map(id => this.fetch(id)));
     }
 }
+
+/** Payload accepted by Discord's Create Message endpoint. */
+export interface MessageCreateOptions {
+    /** Message text. */
+    content?: string;
+}
+
+/** High-level REST-backed channel manager. */
+export class ChannelManager extends Manager<string, import("@lunibee/structures").Channel> {
+    readonly #rest: REST;
+
+    /** Creates a channel manager backed by the client's REST transport. */
+    public constructor(rest: REST) {
+        super();
+        this.#rest = rest;
+    }
+
+    /** Sends a message to a Discord channel. */
+    public async sendMessage(channelId: string, options: MessageCreateOptions): Promise<Message> {
+        const message = await this.#rest.post<MessageData>(Routes.channelMessages(channelId), options);
+        return new Message(message);
+    }
+}
+
+type MessageData = ConstructorParameters<typeof Message>[0];
