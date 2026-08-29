@@ -1,34 +1,32 @@
-/** Type-safe Discord REST route builders. */
+/** Type-safe Discord API v10 route builders. */
 export const Routes = {
-    /** Returns the current bot user. */
-    user: () => "/users/@me",
-    /** Returns a user by ID. */
-    userById: (userId: string) => `/users/${snowflake(userId, "User ID")}`,
-    /** Returns a guild by ID. */
-    guild: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}`,
-    /** Returns channels for a guild. */
-    guildChannels: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/channels`,
-    /** Returns a guild member. */
-    guildMember: (guildId: string, userId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/members/${snowflake(userId, "User ID")}`,
-    /** Returns all guild roles. */
-    guildRoles: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/roles`,
-    /** Returns a channel. */
-    channel: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}`,
-    /** Returns messages in a channel. */
-    channelMessages: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/messages`,
-    /** Returns a message. */
-    message: (channelId: string, messageId: string) => `/channels/${snowflake(channelId, "Channel ID")}/messages/${snowflake(messageId, "Message ID")}`,
-    /** Returns a webhook. */
-    webhook: (webhookId: string, token?: string) => `/webhooks/${snowflake(webhookId, "Webhook ID")}${token ? `/${encodeURIComponent(token)}` : ""}`,
-    /** Returns application commands for an application. */
-    applicationCommands: (applicationId: string) => `/applications/${snowflake(applicationId, "Application ID")}/commands`,
-    /** Returns one application command. */
-    applicationCommand: (applicationId: string, commandId: string) => `/applications/${snowflake(applicationId, "Application ID")}/commands/${snowflake(commandId, "Command ID")}`,
-    /** Returns guild application commands. */
-    guildApplicationCommands: (applicationId: string, guildId: string) => `/applications/${snowflake(applicationId, "Application ID")}/guilds/${snowflake(guildId, "Guild ID")}/commands`
+    /** Returns the current bot user. */ user: () => "/users/@me",
+    /** Returns a user by ID. */ userById: (userId: string) => `/users/${snowflake(userId, "User ID")}`,
+    /** Returns a guild by ID. */ guild: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}`,
+    /** Returns channels for a guild. */ guildChannels: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/channels`,
+    /** Returns a guild member. */ guildMember: (guildId: string, userId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/members/${snowflake(userId, "User ID")}`,
+    /** Returns all guild roles. */ guildRoles: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/roles`,
+    /** Returns a channel. */ channel: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}`,
+    /** Returns messages in a channel. */ channelMessages: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/messages`,
+    /** Returns a message. */ message: (channelId: string, messageId: string) => `/channels/${snowflake(channelId, "Channel ID")}/messages/${snowflake(messageId, "Message ID")}`,
+    /** Returns channel webhooks. */ channelWebhooks: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/webhooks`,
+    /** Returns channel invites. */ channelInvites: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/invites`,
+    /** Returns a webhook. */ webhook: (webhookId: string, token?: string) => `/webhooks/${snowflake(webhookId, "Webhook ID")}${token ? `/${encodeURIComponent(token)}` : ""}`,
+    /** Returns application commands for an application. */ applicationCommands: (applicationId: string) => `/applications/${snowflake(applicationId, "Application ID")}/commands`,
+    /** Returns one application command. */ applicationCommand: (applicationId: string, commandId: string) => `/applications/${snowflake(applicationId, "Application ID")}/commands/${snowflake(commandId, "Command ID")}`,
+    /** Returns guild application commands. */ guildApplicationCommands: (applicationId: string, guildId: string) => `/applications/${snowflake(applicationId, "Application ID")}/guilds/${snowflake(guildId, "Guild ID")}/commands`,
+    /** Returns an interaction webhook token endpoint. */ interactionCallback: (interactionId: string, token: string) => `/interactions/${snowflake(interactionId, "Interaction ID")}/${encodeURIComponent(token)}/callback`,
+    /** Returns the original interaction response endpoint. */ interactionOriginalResponse: (applicationId: string, token: string) => `/webhooks/${snowflake(applicationId, "Application ID")}/${encodeURIComponent(token)}/messages/@original`,
+    /** Returns guild threads that are active. */ guildActiveThreads: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/threads/active`,
+    /** Returns public archived threads for a channel. */ channelPublicArchivedThreads: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/threads/archived/public`,
+    /** Returns private archived threads for a channel. */ channelPrivateArchivedThreads: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/threads/archived/private`,
+    /** Returns a thread's members. */ threadMembers: (threadId: string) => `/channels/${snowflake(threadId, "Thread ID")}/thread-members`,
+    /** Returns guild scheduled events. */ guildScheduledEvents: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events`,
+    /** Returns one guild scheduled event. */ guildScheduledEvent: (guildId: string, eventId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events/${snowflake(eventId, "Event ID")}`,
+    /** Returns guild automod rules. */ guildAutoModerationRules: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules`,
+    /** Returns one automod rule. */ guildAutoModerationRule: (guildId: string, ruleId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules/${snowflake(ruleId, "Rule ID")}`,
+    /** Returns guild soundboard sounds. */ guildSoundboardSounds: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/soundboard-sounds`,
+    /** Returns current voice regions. */ voiceRegions: () => "/voice/regions"
 } as const;
 
-function snowflake(value: string, field: string): string {
-    if (!/^\d{1,20}$/.test(value)) throw new TypeError(`${field} must be a valid Discord snowflake.`);
-    return value;
-}
+function snowflake(value: string, field: string): string { if (!/^\d{1,20}$/.test(value)) throw new TypeError(`${field} must be a valid Discord snowflake.`); return value; }

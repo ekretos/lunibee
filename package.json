@@ -10,15 +10,11 @@
     "format:check": "bunx --bun prettier --check .",
     "typecheck": "bunx --bun tsc --noEmit",
     "test": "bun test",
+    "audit:api": "bun scripts/api-audit.ts",
     "publish": "bun packages/cli/src/index.ts publish",
     "publish:status": "bun packages/cli/src/index.ts status"
   },
-  "engines": {
-    "bun": ">=1.2.0"
-  },
+  "engines": { "bun": ">=1.2.0" },
   "license": "MIT",
-  "devDependencies": {
-    "prettier": "^3.6.2",
-    "typescript": "^5.9.2"
-  }
+  "devDependencies": { "prettier": "^3.6.2", "typescript": "^5.9.2" }
 }
