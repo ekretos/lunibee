@@ -1,6 +1,6 @@
 import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
-import { Message } from "@lunibee/structures";
+import { Channel, Message } from "@lunibee/structures";
 
 /** A cache manager for Lunibee resources. */
 export class Manager<K, V> {
@@ -63,7 +63,7 @@ export interface MessageCreateOptions {
 }
 
 /** High-level REST-backed channel manager. */
-export class ChannelManager extends Manager<string, import("@lunibee/structures").Channel> {
+export class ChannelManager extends Manager<string, Channel> {
     readonly #rest: REST;
 
     /** Creates a channel manager backed by the client's REST transport. */
@@ -73,10 +73,13 @@ export class ChannelManager extends Manager<string, import("@lunibee/structures"
     }
 
     /** Sends a message to a Discord channel. */
-    public async sendMessage(channelId: string, options: MessageCreateOptions): Promise<Message> {
-        const message = await this.#rest.post<MessageData>(Routes.channelMessages(channelId), options);
+    public async send(channelId: string, options: MessageCreateOptions): Promise<Message> {
+        const message = await this.#rest.post<ConstructorParameters<typeof Message>[0]>(
+            Routes.channelMessages(channelId),
+            options,
+        );
         return new Message(message);
     }
 }
 
-type MessageData = ConstructorParameters<typeof Message>[0];
+export type { MessageCreateOptions as CreateMessageOptions };
