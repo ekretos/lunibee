@@ -21,6 +21,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Validate dependency graph
+        run: bun run check:deps
+
       - name: Typecheck every workspace package
         shell: bash
         run: |
@@ -36,6 +39,7 @@ jobs:
                   --moduleResolution Bundler \
                   --strict \
                   --skipLibCheck \
+                  --types bun \
                   "${sources[@]}"
               fi
             fi
