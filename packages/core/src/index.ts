@@ -71,4 +71,4 @@ export { Gateway, GatewayError, GatewayOpcodes } from "@lunibee/ws";
 export { User, Guild, Channel, Message } from "@lunibee/structures";
 export { EmbedBuilder, ButtonBuilder, ActionRowBuilder, StringSelectBuilder, SlashCommandBuilder, StringOptionBuilder } from "@lunibee/builders";
 export * from "@lunibee/types";
-export { Manager, ResourceManager, ChannelManager, MessageCreateOptions } from "@lunibee/managers";
+export { Manager, ResourceManager, ChannelManager, MessageCreateOptions, MessageEditOptions, MessageFetchOptions, MessageThreadOptions, ReactionFetchOptions } from "@lunibee/managers";
