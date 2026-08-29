@@ -3,22 +3,57 @@
   "version": "0.1.0",
   "description": "A lightweight, Bun-first Discord API library.",
   "type": "module",
-  "module": "./packages/lunibee/src/index.ts",
-  "types": "./packages/lunibee/src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./packages/lunibee/src/index.ts",
-      "import": "./packages/lunibee/src/index.ts",
-      "default": "./packages/lunibee/src/index.ts"
-    }
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./core": {
+      "import": "./dist/core/index.js",
+      "default": "./dist/core/index.js"
+    },
+    "./structures": {
+      "import": "./dist/structures/index.js",
+      "default": "./dist/structures/index.js"
+    },
+    "./managers": {
+      "import": "./dist/managers/index.js",
+      "default": "./dist/managers/index.js"
+    },
+    "./rest": {
+      "import": "./dist/rest/index.js",
+      "default": "./dist/rest/index.js"
+    },
+    "./ws": {
+      "import": "./dist/ws/index.js",
+      "default": "./dist/ws/index.js"
+    },
+    "./sharding": {
+      "import": "./dist/sharding/index.js",
+      "default": "./dist/sharding/index.js"
+    },
+    "./builders": {
+      "import": "./dist/builders/index.js",
+      "default": "./dist/builders/index.js"
+    },
+    "./types": {
+      "import": "./dist/types/index.js",
+      "default": "./dist/types/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
-    "packages"
+    "dist"
   ],
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
+    "build": "bun scripts/build.ts",
     "check:deps": "bun scripts/check-dependency-graph.ts",
     "typecheck": "bunx tsc --noEmit --project tsconfig.json",
     "ci:install": "bun install --frozen-lockfile",
@@ -26,7 +61,7 @@
     "ci:typecheck": "bun run typecheck",
     "ci:test": "bun test --coverage",
     "ci": "bun run ci:deps && bun run ci:typecheck && bun run ci:test",
-    "prepare": "bun install --filter ./packages/lunibee --production"
+    "prepare": "bun install --frozen-lockfile && bun run build"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
