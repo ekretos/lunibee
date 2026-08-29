@@ -1,4 +1,4 @@
-import { Gateway } from "@lunibee/ws";
+import { Gateway, type GatewayOptions } from "@lunibee/ws";
 
 /** Configuration for a sharded Gateway client. */
 export interface ShardManagerOptions {
@@ -8,9 +8,16 @@ export interface ShardManagerOptions {
     /** Gateway reconnect behavior. */ reconnect?: boolean;
     /** Delay between shard starts in milliseconds. */ spawnDelay?: number;
     /** Maximum number of concurrent identify operations. */ identifyConcurrency?: number;
+    /** Gateway reconnect base delay. */ reconnectBaseDelay?: number;
+    /** Gateway reconnect maximum delay. */ reconnectMaxDelay?: number;
 }
 /** Runtime state for a managed shard. */
-export interface ShardInfo { /** Shard identifier. */ id: number; /** Gateway instance. */ gateway: Gateway; /** Last observed state. */ state: "idle" | "connecting" | "ready" | "closed" | "failed"; /** Last error, when failed. */ error?: Error; }
+export interface ShardInfo {
+    /** Shard identifier. */ id: number;
+    /** Gateway instance. */ gateway: Gateway;
+    /** Last observed state. */ state: "idle" | "connecting" | "ready" | "closed" | "failed";
+    /** Last error, when failed. */ error?: Error;
+}
 
 /** Manages independent Discord Gateway shards with bounded startup concurrency. */
 export class ShardManager {
@@ -62,9 +69,8 @@ export class ShardManager {
     /** Closes every shard and releases Gateway resources. */
     public destroy(): void { for (const [id, shard] of this.shards) { shard.close(); this.#states.set(id, "closed"); } }
     /** Gets a shard by ID. */ public get(id: number): Gateway | undefined { return this.shards.get(id); }
-    /** Returns information for all managed shards. */
-    public values(): ShardInfo[] { return [...this.shards].map(([id, gateway]) => ({ id, gateway, state: this.#states.get(id) ?? "idle", ...(this.#errors.has(id) ? { error: this.#errors.get(id) } : {}) })); }
+    /** Returns information for all managed shards. */ public values(): ShardInfo[] { return [...this.shards].map(([id, gateway]) => ({ id, gateway, state: this.#states.get(id) ?? "idle", ...(this.#errors.has(id) ? { error: this.#errors.get(id) } : {}) })); }
     /** Returns the number of shards that are ready. */ public get readyCount(): number { let count = 0; for (const state of this.#states.values()) if (state === "ready") count++; return count; }
     /** Returns the number of failed shards. */ public get failedCount(): number { let count = 0; for (const state of this.#states.values()) if (state === "failed") count++; return count; }
-    #createShard(id: number): Gateway { return new Gateway({ token: this.#options.token, intents: this.#options.intents, shardId: id, shardCount: this.shardCount, reconnect: this.#options.reconnect }); }
+    #createShard(id: number): Gateway { return new Gateway({ token: this.#options.token, intents: this.#options.intents, shardId: id, shardCount: this.shardCount, reconnect: this.#options.reconnect, reconnectBaseDelay: this.#options.reconnectBaseDelay, reconnectMaxDelay: this.#options.reconnectMaxDelay }); }
 }
