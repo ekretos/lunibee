@@ -41,8 +41,8 @@
     "@lunibee/ws": "file:./packages/ws"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5.9.3"
+    "@types/bun": "^1.4.0",
+    "typescript": "^7.0.2"
   },
   "engines": {
     "bun": ">=1.2.0"
