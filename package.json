@@ -21,7 +21,6 @@
     "./voice": "./packages/voice/src/index.ts",
     "./ws": "./packages/ws/src/index.ts"
   },
-  "workspaces": ["packages/*"],
   "dependencies": {
     "@lunibee/core": "file:packages/core",
     "@lunibee/builders": "file:packages/builders",
