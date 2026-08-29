@@ -25,7 +25,8 @@
     "ci:deps": "bun run check:deps",
     "ci:typecheck": "bun run typecheck",
     "ci:test": "bun test --coverage",
-    "ci": "bun run ci:deps && bun run ci:typecheck && bun run ci:test"
+    "ci": "bun run ci:deps && bun run ci:typecheck && bun run ci:test",
+    "prepare": "bun install --filter ./packages/lunibee --production"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
