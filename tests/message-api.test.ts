@@ -128,12 +128,8 @@ test("supports pins and message threads", async () => {
   });
   expect(result.id).toBe(thread.id);
   expect(calls[0]?.path).toBe(`/channels/${channelId}/pins`);
-  expect(calls[1]?.path).toBe(
-    `/channels/${channelId}/messages/${messageId}/pins`,
-  );
-  expect(calls[2]?.path).toBe(
-    `/channels/${channelId}/messages/${messageId}/pins`,
-  );
+  expect(calls[1]?.path).toBe(`/channels/${channelId}/pins/${messageId}`);
+  expect(calls[2]?.path).toBe(`/channels/${channelId}/pins/${messageId}`);
   expect(calls[3]?.path).toBe(
     `/channels/${channelId}/messages/${messageId}/threads`,
   );

@@ -168,18 +168,37 @@ export type PermissionName =
   | keyof typeof Permissions
   | keyof typeof PermissionFlagsBits;
 
+export type PermissionResolvable =
+  | bigint
+  | number
+  | string
+  | PermissionName
+  | PermissionFlagsBits
+  | PermissionSet
+  | PermissionResolvable[];
+
 /** Immutable permission bitfield with direct boolean getters. */
 export class PermissionSet {
   /** Permission bitfield. */
   public readonly bitfield: bigint;
 
-  /** Creates a permission set. @param value Initial permission bitfield. @throws {RangeError} If the value is negative. @throws {TypeError} If the value is not a valid integer. */
-  public constructor(value: bigint | number | string = 0n) {
+  /** Creates a permission set. @param value Initial permission bitfield or array of permissions. @throws {RangeError} If the value is negative. @throws {TypeError} If the value is not a valid integer. */
+  public constructor(value: PermissionResolvable = 0n) {
     try {
-      const bitfield = BigInt(value);
-      if (bitfield < 0n)
-        throw new RangeError("Permission bitfield cannot be negative.");
-      this.bitfield = bitfield;
+      if (Array.isArray(value)) {
+        let bit = 0n;
+        for (const item of value) {
+          bit |= this.#resolve(item);
+        }
+        this.bitfield = bit;
+      } else if (value instanceof PermissionSet) {
+        this.bitfield = value.bitfield;
+      } else {
+        const bitfield = this.#resolve(value);
+        if (bitfield < 0n)
+          throw new RangeError("Permission bitfield cannot be negative.");
+        this.bitfield = bitfield;
+      }
     } catch (error) {
       if (error instanceof RangeError) throw error;
       throw new TypeError(
@@ -430,48 +449,52 @@ export class PermissionSet {
   }
 
   /** Checks whether all supplied permissions are present (AND). @param permissions Permission names or raw bits. @returns True when every requested permission is present. */
-  public has(
-    ...permissions: (
-      bigint | number | string | PermissionName | PermissionFlagsBits
-    )[]
-  ): boolean {
-    return permissions.every((permission) => {
-      const bit = this.#resolve(permission);
+  public has(...permissions: PermissionResolvable[]): boolean {
+    if (permissions.length === 1) {
+      const p = permissions[0]!;
+      const bit = typeof p === "bigint" ? p : this.#resolve(p);
       return (this.bitfield & bit) === bit;
-    });
+    }
+    for (let i = 0; i < permissions.length; i++) {
+      const p = permissions[i]!;
+      const bit = typeof p === "bigint" ? p : this.#resolve(p);
+      if ((this.bitfield & bit) !== bit) return false;
+    }
+    return true;
   }
 
   /** Checks whether any supplied permission is present (OR). @param permissions Permission names or raw bits. @returns True when at least one requested permission is present. */
-  public any(
-    ...permissions: (
-      bigint | number | string | PermissionName | PermissionFlagsBits
-    )[]
-  ): boolean {
-    return permissions.some(
-      (permission) => (this.bitfield & this.#resolve(permission)) !== 0n,
-    );
+  public any(...permissions: PermissionResolvable[]): boolean {
+    if (permissions.length === 1) {
+      const p = permissions[0]!;
+      const bit = typeof p === "bigint" ? p : this.#resolve(p);
+      return (this.bitfield & bit) !== 0n;
+    }
+    for (let i = 0; i < permissions.length; i++) {
+      const p = permissions[i]!;
+      const bit = typeof p === "bigint" ? p : this.#resolve(p);
+      if ((this.bitfield & bit) !== 0n) return true;
+    }
+    return false;
   }
 
   /** Returns a new set with permissions added. @param permissions Permission names or raw bits. @returns A new permission set. */
-  public add(
-    ...permissions: (
-      bigint | number | string | PermissionName | PermissionFlagsBits
-    )[]
-  ): PermissionSet {
+  public add(...permissions: PermissionResolvable[]): PermissionSet {
     let bitfield = this.bitfield;
-    for (const permission of permissions) bitfield |= this.#resolve(permission);
+    for (let i = 0; i < permissions.length; i++) {
+      const p = permissions[i]!;
+      bitfield |= typeof p === "bigint" ? p : this.#resolve(p);
+    }
     return new PermissionSet(bitfield);
   }
 
   /** Returns a new set with permissions removed. @param permissions Permission names or raw bits. @returns A new permission set. */
-  public remove(
-    ...permissions: (
-      bigint | number | string | PermissionName | PermissionFlagsBits
-    )[]
-  ): PermissionSet {
+  public remove(...permissions: PermissionResolvable[]): PermissionSet {
     let bitfield = this.bitfield;
-    for (const permission of permissions)
-      bitfield &= ~this.#resolve(permission);
+    for (let i = 0; i < permissions.length; i++) {
+      const p = permissions[i]!;
+      bitfield &= ~(typeof p === "bigint" ? p : this.#resolve(p));
+    }
     return new PermissionSet(bitfield);
   }
 
@@ -498,11 +521,16 @@ export class PermissionSet {
   }
 
   /** Resolves a named permission, enum value, or raw bit. @param permission Permission name, enum value, or raw bit. @returns Numeric permission bit. */
-  #resolve(
-    permission: bigint | number | string | PermissionName | PermissionFlagsBits,
-  ): bigint {
+  #resolve(permission: PermissionResolvable): bigint {
     if (typeof permission === "bigint") return permission;
     if (typeof permission === "number") return BigInt(permission);
+    if (permission instanceof PermissionSet) return permission.bitfield;
+    if (Array.isArray(permission)) {
+      let bit = 0n;
+      for (let i = 0; i < permission.length; i++)
+        bit |= this.#resolve(permission[i]!);
+      return bit;
+    }
     if (typeof permission === "string") {
       if (permission in Permission)
         return (Permission as Record<string, bigint>)[permission]!;
@@ -528,8 +556,8 @@ export class PermissionsBitField extends PermissionSet {
   /** Permission flags constants. */
   public static readonly All = Permission;
 
-  /** Creates a permissions bitfield. @param value Initial permission bitfield. */
-  public constructor(value: bigint | number | string = 0n) {
+  /** Creates a permissions bitfield. @param value Initial permission bitfield or array of permissions. */
+  public constructor(value: PermissionResolvable = 0n) {
     super(value);
   }
 }

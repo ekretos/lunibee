@@ -207,19 +207,20 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     return result;
   }
   /** Opens a modal dialog in the user's client. @param modal Modal builder output or raw modal callback data. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */
-  public async showModal(
-    modal: {
-      custom_id: string;
-      title: string;
-      components: unknown[];
-      [key: string]: unknown;
-    },
-  ): Promise<unknown> {
+  public async showModal(modal: {
+    custom_id: string;
+    title: string;
+    components: unknown[];
+    [key: string]: unknown;
+  }): Promise<unknown> {
     this.assertUnacknowledged();
     const result = await this.#client.postInteractionResponse(
       this.id,
       this.token,
-      new InteractionResponse(InteractionResponseType.Modal, modal as InteractionReplyOptions),
+      new InteractionResponse(
+        InteractionResponseType.Modal,
+        modal as InteractionReplyOptions,
+      ),
     );
     this.replied = true;
     return result;

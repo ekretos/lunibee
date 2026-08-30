@@ -29,7 +29,7 @@ describe("REST Routes Full Coverage", () => {
     );
     expect(Routes.channelPins("123")).toBe("/channels/123/pins");
     expect(Routes.channelPin("123", "456")).toBe(
-      "/channels/123/messages/456/pins",
+      "/channels/123/pins/456",
     );
     expect(Routes.messageThread("123", "456")).toBe(
       "/channels/123/messages/456/threads",

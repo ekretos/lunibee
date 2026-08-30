@@ -178,7 +178,7 @@ export class VoiceConnection {
   }
 
   /** Publishes a speaking state through the attached voice gateway. @param flags Speaking flags. @returns Nothing. @throws {VoiceError} If the connection is destroyed or has no gateway transport. */
-  public setSpeaking(flags = SpeakingFlags.Microphone): void {
+  public setSpeaking(flags: number = SpeakingFlags.Microphone): void {
     this.assertUsable();
     if (!this.gateway) {
       throw new VoiceError(

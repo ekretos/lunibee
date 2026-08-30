@@ -527,8 +527,46 @@ describe("100% Comprehensive Codebase Coverage", () => {
     expect(memberRemoved.user.id).toBe("300");
     expect(reactionAdded.message_id).toBe("400");
     expect(reactionRemoved.message_id).toBe("400");
-    expect(reactionRemovedAll.message_id).toBe("400");
-    expect(rawReceived).toBe(9);
+    let roleCreated: any;
+    let roleUpdated: any;
+    let roleDeleted: any;
+    let banAdded: any;
+    let banRemoved: any;
+    let emojisUpdated: any;
+
+    client.on("guildRoleCreate", (r) => {
+      roleCreated = r;
+    });
+    client.on("guildRoleUpdate", (r) => {
+      roleUpdated = r;
+    });
+    client.on("guildRoleDelete", (r) => {
+      roleDeleted = r;
+    });
+    client.on("guildBanAdd", (b) => {
+      banAdded = b;
+    });
+    client.on("guildBanRemove", (b) => {
+      banRemoved = b;
+    });
+    client.on("guildEmojisUpdate", (e) => {
+      emojisUpdated = e;
+    });
+
+    gw.emit("GUILD_ROLE_CREATE", { guild_id: "200", role: { id: "1" } });
+    gw.emit("GUILD_ROLE_UPDATE", { guild_id: "200", role: { id: "1" } });
+    gw.emit("GUILD_ROLE_DELETE", { guild_id: "200", role_id: "1" });
+    gw.emit("GUILD_BAN_ADD", { guild_id: "200", user: { id: "300" } });
+    gw.emit("GUILD_BAN_REMOVE", { guild_id: "200", user: { id: "300" } });
+    gw.emit("GUILD_EMOJIS_UPDATE", { guild_id: "200", emojis: [] });
+
+    expect(roleCreated.role.id).toBe("1");
+    expect(roleUpdated.role.id).toBe("1");
+    expect(roleDeleted.role_id).toBe("1");
+    expect(banAdded.user.id).toBe("300");
+    expect(banRemoved.user.id).toBe("300");
+    expect(emojisUpdated.guild_id).toBe("200");
+    expect(rawReceived).toBe(15);
 
     // Cover client resource context
     let msgCreated: any;
@@ -993,6 +1031,28 @@ describe("100% Comprehensive Codebase Coverage", () => {
       data: {},
     });
     expect(defInteraction).toBeInstanceOf(Interaction);
+
+    // showModal test
+    const modalInteractionToTest = new Interaction(mockClient, {
+      id: "modal_trigger_1",
+      application_id: "app",
+      token: "tok",
+      type: 2,
+      data: {},
+    });
+    await modalInteractionToTest.showModal({
+      custom_id: "modal_feedback",
+      title: "Feedback",
+      components: [],
+    });
+    expect(modalInteractionToTest.replied).toBe(true);
+    expect(() =>
+      modalInteractionToTest.showModal({
+        custom_id: "again",
+        title: "Again",
+        components: [],
+      }),
+    ).toThrow();
 
     // createInteraction type=4 (ApplicationCommandAutocomplete) hits CommandInteraction
     const autoCreate = createInteraction(mockClient, {

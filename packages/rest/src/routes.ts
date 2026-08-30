@@ -53,7 +53,7 @@ export const Routes = {
       `/channels/${snowflake(channelId, "Channel ID")}/pins`,
   /** Pins a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Pin route. */ channelPin:
     (channelId: string, messageId: string) =>
-      `${Routes.message(channelId, messageId)}/pins`,
+      `/channels/${snowflake(channelId, "Channel ID")}/pins/${snowflake(messageId, "Message ID")}`,
   /** Creates a thread from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Message-thread route. */ messageThread:
     (channelId: string, messageId: string) =>
       `${Routes.message(channelId, messageId)}/threads`,

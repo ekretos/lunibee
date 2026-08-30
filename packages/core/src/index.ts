@@ -8,7 +8,12 @@ export {
   type PermissionName,
 } from "./permissions.js";
 import { Collection } from "@lunibee/collection";
-import { ApplicationCommandManager, ChannelManager, GuildManager, UserManager } from "@lunibee/managers";
+import {
+  ApplicationCommandManager,
+  ChannelManager,
+  GuildManager,
+  UserManager,
+} from "@lunibee/managers";
 import { REST, Routes } from "@lunibee/rest";
 import {
   User,
