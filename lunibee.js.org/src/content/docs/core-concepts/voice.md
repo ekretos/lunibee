@@ -3,24 +3,21 @@ title: Voice
 description: Discord Voice server connections, UDP audio streaming, and voice encryption.
 ---
 
-# Voice
 
-`@lunibee/voice` implements the Discord Voice Gateway protocol, encryption, and audio streaming.
+`lunibee` (voice) implements the Discord Voice Gateway protocol, encryption, and audio streaming.
 
 ## Connecting to Voice
 
 You do not need to pass your bot token to voice connections. The client manages the voice handshake and receives a temporary session token from Discord's `VOICE_SERVER_UPDATE` event automatically.
 
 ```ts
-import { VoiceConnection } from "@lunibee/voice";
-
+import { VoiceConnection } from "lunibee";
 const voice = new VoiceConnection({
   guildId: "123456789012345678",
   channelId: "987654321098765432",
   selfMute: false,
   selfDeaf: false,
 });
-
 voice.connect();
 ```
 

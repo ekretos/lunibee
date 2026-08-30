@@ -3,7 +3,6 @@ title: Caching & Structures
 description: Canonical caching patterns, memory bounds, and structure identity in Lunibee.
 ---
 
-# Caching & Structures
 
 Lunibee manages Discord resources (Users, Guilds, Channels, Roles, Messages) using **Canonical Identity Caching**.
 
@@ -22,11 +21,10 @@ console.log(userA === userB); // true! Exact same instance
 
 ## Bounded Memory & TTL Eviction
 
-`@lunibee/collection` provides a high-performance `Cache` with optional bounds and Time-To-Live (TTL):
+`lunibee` (collection) provides a high-performance `Cache` with optional bounds and Time-To-Live (TTL):
 
 ```ts
-import { Cache } from "@lunibee/collection";
-
+import { Cache } from "lunibee";
 const messageCache = new Cache<string, Message>({
   maxSize: 1000,     // Keeps memory predictable
   ttl: 60 * 1000,    // Evicts unreferenced entries after 60s

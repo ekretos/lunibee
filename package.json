@@ -102,12 +102,7 @@
     "prepare": "bun run build && bun run build:dts"
   },
   "devDependencies": {
-    "@discordjs/builders": "^1.14.1",
-    "@discordjs/collection": "^2.1.1",
-    "@types/bun": "latest",
-    "discord.js": "^14.27.0",
-    "eris": "^0.18.0",
-    "oceanic.js": "^1.15.0",
+    "@types/bun": "^1.4.0",
     "typescript": "^7.0.2"
   },
   "engines": {

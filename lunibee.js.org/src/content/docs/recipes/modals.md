@@ -3,7 +3,6 @@ title: Modals & Form Inputs
 description: Building and handling modal pop-up forms.
 ---
 
-# Modals & Form Inputs
 
 Modals allow bots to present interactive pop-up forms with text inputs.
 
@@ -11,7 +10,6 @@ Modals allow bots to present interactive pop-up forms with text inputs.
 
 ```ts
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from "lunibee";
-
 client.on("interactionCreate", async (interaction) => {
   if (interaction.isChatInputCommand() && interaction.commandName === "feedback") {
     const titleInput = new TextInputBuilder()
@@ -19,21 +17,17 @@ client.on("interactionCreate", async (interaction) => {
       .setLabel("Subject")
       .setStyle(TextInputStyle.Short)
       .setRequired(true);
-
     const bodyInput = new TextInputBuilder()
       .setCustomId("feedback_body")
       .setLabel("Details")
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(true);
-
     const row1 = new ActionRowBuilder().addComponents(titleInput);
     const row2 = new ActionRowBuilder().addComponents(bodyInput);
-
     const modal = new ModalBuilder()
       .setCustomId("feedback_modal")
       .setTitle("Submit Feedback")
       .addComponents(row1, row2);
-
     await interaction.showModal(modal);
   }
 });

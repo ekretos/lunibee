@@ -3,15 +3,13 @@ title: Client & Gateway Lifecycle
 description: Initializing the Lunibee Client, configuring Intents, mobile presence, and event dispatching.
 ---
 
-# Client
-
-The `Client` class in `@lunibee/core` is the primary orchestrator that connects the REST API, Gateway WebSocket, caching layers, and event dispatchers into a cohesive bot interface.
+The `Client` class in `lunibee` (core) is the primary orchestrator that connects the REST API, Gateway WebSocket, caching layers, and event dispatchers into a cohesive bot interface.
 
 ---
 
 ## Initialization & Intents
 
-Lunibee supports specifying intents as **arrays** or **bitwise OR combinations**, using either `IntentBits` (idiomatic camelCase) or `GatewayIntentBits` (PascalCase):
+Lunibee supports specifying intents as **arrays** or **bitwise OR combinations**, using either `IntentBits` (idiomatic camelCase) or `IntentBits` (PascalCase):
 
 ### 1. Using Arrays with `IntentBits` (Recommended)
 ```ts
@@ -27,30 +25,30 @@ const client = new Client({
 });
 ```
 
-### 2. Using Arrays with `GatewayIntentBits`
+### 2. Using Arrays with `IntentBits`
 ```ts
-import { Client, GatewayIntentBits } from "lunibee";
+import { Client, IntentBits } from "lunibee";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
   intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
+    IntentBits.guilds,
+    IntentBits.guildMessages,
+    IntentBits.messageContent,
   ],
 });
 ```
 
 ### 3. Using Bitwise OR
 ```ts
-import { Client, GatewayIntentBits } from "lunibee";
+import { Client, IntentBits } from "lunibee";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
   intents:
-    GatewayIntentBits.Guilds |
-    GatewayIntentBits.GuildMessages |
-    GatewayIntentBits.MessageContent,
+    IntentBits.guilds |
+    IntentBits.guildMessages |
+    IntentBits.messageContent,
 });
 ```
 
@@ -58,7 +56,7 @@ const client = new Client({
 
 ## Gateway Intents Reference
 
-| PascalCase (`GatewayIntentBits`) | camelCase (`IntentBits`) | Bit Shift | Type |
+| PascalCase (`IntentBits`) | camelCase (`IntentBits`) | Bit Shift | Type |
 | :--- | :--- | :--- | :--- |
 | `Guilds` | `guild` / `guilds` | `1 << 0` | Standard |
 | `GuildMembers` | `guildMembers` | `1 << 1` | **Privileged** |

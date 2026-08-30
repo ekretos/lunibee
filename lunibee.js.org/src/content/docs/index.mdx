@@ -48,16 +48,13 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ```ts
 import { Client, GatewayIntentBits, EmbedBuilder } from "lunibee";
-
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
   intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages | GatewayIntentBits.MessageContent,
 });
-
 client.on("ready", (user) => {
   console.log(`🐝 Logged in as ${user.username}!`);
 });
-
 client.on("messageCreate", async (message) => {
   if (message.content === "!ping") {
     const embed = new EmbedBuilder()
@@ -65,10 +62,8 @@ client.on("messageCreate", async (message) => {
       .setDescription("Lunibee is buzzing along smoothly.")
       .setColor(0xf59e0b)
       .setTimestamp();
-
     await message.reply({ embeds: [embed] });
   }
 });
-
 await client.login();
 ```

@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, copyFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const packages = ["types", "utils", "collection", "ws", "rest", "builders", "structures", "managers", "handlers", "sharding", "voice", "formatters", "core", "lunibee"];
@@ -7,8 +7,10 @@ const temp = ".types";
 await rm(temp, { recursive: true, force: true });
 const result = Bun.spawnSync(["bunx", "tsc", "--project", "tsconfig.dts.json"]);
 if (result.exitCode !== 0) {
-  const err = new TextDecoder().decode(result.stderr || result.stdout);
-  throw new Error(err || "TypeScript declaration generation failed");
+  const stdout = new TextDecoder().decode(result.stdout);
+  const stderr = new TextDecoder().decode(result.stderr);
+  console.error(stdout || stderr);
+  throw new Error(stdout || stderr || "TypeScript declaration generation failed");
 }
 
 async function copyTree(source: string, destination: string): Promise<void> {
@@ -17,7 +19,7 @@ async function copyTree(source: string, destination: string): Promise<void> {
     const from = join(source, entry.name);
     const to = join(destination, entry.name);
     if (entry.isDirectory()) await copyTree(from, to);
-    else if (entry.name.endsWith(".d.ts")) await writeFile(to, (await readFile(from, "utf8")).replace(/@lunibee\/([A-Za-z0-9_-]+)/g, "lunibee/$1"));
+    else if (entry.name.endsWith(".d.ts")) await copyFile(from, to);
   }
 }
 

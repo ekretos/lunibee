@@ -1,77 +1,93 @@
 ---
-title: Gateway & WebSocket
-description: Discord WebSocket connection handling, presence updates, heartbeat tracking, and zombie recovery.
+title: "Gateway & WebSocket Guide"
+description: In-depth guide to Discord's WebSocket Gateway lifecycle, intents, heartbeats, and reconnection handling.
 ---
 
-# Gateway & WebSocket
+The Discord Gateway is a real-time, bi-directional WebSocket connection used by bots to receive events (messages, member joins, interaction triggers, voice updates) and send presences.
 
-`@lunibee/ws` manages the low-level Discord WebSocket connection, opcode routing, sequence tracking, custom presence, and session resumption.
+---
 
-## The Gateway Protocol Loop
+## Gateway Lifecycle
 
-```text
-CONNECT ──► HELLO (Opcode 10) ──► IDENTIFY / RESUME
-                 │
-                 ▼
-        Start Heartbeat Timer
-                 │
-        HEARTBEAT ──► HEARTBEAT_ACK
-                 │
-                 ├── (Missed ACK detected) ──► TERMINATE & RECONNECT (Zombie defense)
-                 └── (Opcode 7 / 9)       ──► RESUME or FULL RECONNECT
+```mermaid
+stateDiagram-v2
+    [*] --> Disconnected
+    Disconnected --> Connecting: connect()
+    Connecting --> Handshaking: Socket Open
+    Handshaking --> Identifying: Opcode 10 (Hello)
+    Identifying --> Ready: Opcode 0 (Ready / Resume)
+    
+    state Ready {
+        [*] --> Heartbeating
+        Heartbeating --> Heartbeating: Opcode 1 (Heartbeat) -> Opcode 11 (Ack)
+    }
+    
+    Ready --> Reconnecting: Network Drop / 4000-4009
+    Ready --> Disconnected: Fatal 4004 (Auth Failed)
+    Reconnecting --> Connecting: Exponential Backoff
 ```
 
-## Presence & Mobile Indicators
+---
 
-You can configure custom device properties and initial presence payloads directly on the Gateway:
+## Gateway Intents
+
+Intents allow bots to subscribe only to the events they require, reducing memory usage and bandwidth.
+
+Lunibee supports both:
+1. **`IntentBits`** (Lunibee's camelCase constants, e.g. `IntentBits.messageContent`, `IntentBits.guilds`)
+2. **`IntentBits`** (Discord API standard PascalCase constants, e.g. `IntentBits.messageContent`, `IntentBits.guilds`)
+
+You can pass them as an array or combine them using bitwise OR (`|`):
 
 ```ts
-import { Gateway } from "@lunibee/ws";
+import { Client, IntentBits, IntentBits } from "lunibee";
 
-const gateway = new Gateway({
+// Using Lunibee's camelCase IntentBits array (Recommended)
+const client = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents: 513,
-  properties: {
-    os: "Android",
-    browser: "Discord Android",
-    device: "Discord Android",
-  },
-  presence: {
-    status: "online",
-    activities: [
-      {
-        name: "Custom Status",
-        type: 4,
-        state: "Build on Lunibee 🐝🐝",
-      },
-    ],
-  },
+  intents: [
+    IntentBits.guilds,
+    IntentBits.guildMessages,
+    IntentBits.messageContent,
+  ],
 });
 
-// Update presence dynamically at any time
-gateway.setPresence({
-  status: "idle",
-  activities: [{ name: "with Bun", type: 0 }],
+// Or using Discord's standard PascalCase IntentBits
+const client2 = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [
+    IntentBits.guilds,
+    IntentBits.guildMessages,
+    IntentBits.messageContent,
+  ],
 });
 ```
 
-## Privileged Presence Intent (`GuildPresences`)
+---
 
-To receive real-time presence update events (`PRESENCE_UPDATE`) for members in guilds, your bot must request the privileged **Guild Presences** intent:
+## Privileged Intents
 
-```ts
-import { GatewayIntentBits } from "lunibee";
+Three intent categories require enabling in the [Discord Developer Portal](https://discord.com/developers/applications) under your bot's **Bot &rarr; Privileged Gateway Intents** settings:
 
-const intents = GatewayIntentBits.Guilds | GatewayIntentBits.GuildPresences;
-```
+1. **Message Content** (`IntentBits.messageContent` / `IntentBits.messageContent`): Required to read the text content and attachments of messages sent by other users.
+2. **Guild Members** (`IntentBits.guildMembers` / `IntentBits.GuildMembers`): Required to receive `GUILD_MEMBER_ADD`, `GUILD_MEMBER_UPDATE`, and track member joins/leaves.
+3. **Presences** (`IntentBits.guildPresences` / `IntentBits.GuildPresences`): Required to track user activity and status changes.
 
-> Note: The **Guild Presences** intent must be toggled on in the Discord Developer Portal under your Application's **Bot** tab.
+---
 
-## Heartbeat Acknowledgements & Zombie Detection
+## Intents Reference Table
 
-In unstable network conditions, a TCP socket may silently drop without emitting a close event. Lunibee actively monitors Heartbeat Acknowledgments (`Opcode 11`).
-
-If Discord fails to acknowledge a heartbeat before the next one is due, Lunibee:
-1. Marks the connection as unhealthy (`zombie`).
-2. Immediately closes and destroys the stale socket.
-3. Automatically attempts a session resume using the cached `resume_gateway_url` and session ID.
+| Intent Flag (`IntentBits` / `IntentBits`) | Bitfield Value | Events Included |
+|---|---|---|
+| `guilds` / `Guilds` | `1 << 0` | `GUILD_CREATE`, `GUILD_UPDATE`, `GUILD_DELETE`, `CHANNEL_*` |
+| `guildMembers` / `GuildMembers` | `1 << 1` | `GUILD_MEMBER_ADD`, `GUILD_MEMBER_UPDATE`, `GUILD_MEMBER_REMOVE` *(Privileged)* |
+| `guildModeration` / `GuildModeration` | `1 << 2` | `GUILD_AUDIT_LOG_ENTRY_CREATE`, `GUILD_BAN_ADD`, `GUILD_BAN_REMOVE` |
+| `guildEmojisAndStickers` / `GuildEmojisAndStickers` | `1 << 3` | `GUILD_EMOJIS_UPDATE`, `GUILD_STICKERS_UPDATE` |
+| `guildIntegrations` / `GuildIntegrations` | `1 << 4` | `INTEGRATIONS_UPDATE` |
+| `guildWebhooks` / `GuildWebhooks` | `1 << 5` | `WEBHOOKS_UPDATE` |
+| `guildInvites` / `GuildInvites` | `1 << 6` | `INVITE_CREATE`, `INVITE_DELETE` |
+| `guildVoiceStates` / `GuildVoiceStates` | `1 << 7` | `VOICE_STATE_UPDATE` |
+| `guildPresences` / `GuildPresences` | `1 << 8` | `PRESENCE_UPDATE` *(Privileged)* |
+| `guildMessages` / `GuildMessages` | `1 << 9` | `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE` |
+| `guildMessageReactions` / `GuildMessageReactions` | `1 << 10` | `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE` |
+| `messageContent` / `MessageContent` | `1 << 15` | Message text, embeds, and attachments *(Privileged)* |

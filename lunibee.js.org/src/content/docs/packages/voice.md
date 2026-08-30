@@ -1,11 +1,9 @@
 ---
 title: "@lunibee/voice"
-description: Discord Voice server connections and audio streaming.
+description: Discord Voice Gateway connection and audio streaming abstractions.
 ---
 
-# `@lunibee/voice`
-
-`@lunibee/voice` provides audio transport, Voice Gateway v4 connections, and packet encryption.
+The `@lunibee/voice` package manages Discord Voice WebSocket and UDP encryption handshakes for connecting bots to voice channels.
 
 ## Installation
 
@@ -13,8 +11,21 @@ description: Discord Voice server connections and audio streaming.
 bun add @lunibee/voice
 ```
 
-## Features
+---
 
-- UDP voice packet transmission.
-- `xsalsa20_poly1305` and `aead_xchacha20_poly1305_ietf` encryption.
-- Direct Opus/PCM audio streaming.
+## `VoiceConnection`
+
+```ts
+import { VoiceConnection } from "@lunibee/voice";
+
+const voice = new VoiceConnection({
+  guildId: "123456789012345678",
+  channelId: "987654321098765432",
+  selfDeaf: true,
+  selfMute: false,
+});
+
+voice.on("stateChange", (oldState, newState) => {
+  console.log(`Voice state transitioned from ${oldState} to ${newState}`);
+});
+```

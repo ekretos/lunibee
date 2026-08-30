@@ -3,7 +3,6 @@ title: Slash Command Deployment
 description: Registering and deploying global and guild application slash commands.
 ---
 
-# Slash Command Deployment
 
 Before Discord users can use your slash commands, they must be registered via the REST API.
 
@@ -17,10 +16,8 @@ Before Discord users can use your slash commands, they must be registered via th
 Create a deployment script `scripts/deploy-commands.ts`:
 
 ```ts
-import { REST, Routes } from "@lunibee/rest";
-
+import { REST, Routes } from "lunibee";
 const rest = new REST({ token: process.env.DISCORD_TOKEN! });
-
 const commands = [
   {
     name: "ping",
@@ -39,14 +36,11 @@ const commands = [
     ],
   },
 ];
-
 console.log("Registering guild application commands...");
-
 await rest.put(
   Routes.applicationGuildCommands(process.env.CLIENT_ID!, process.env.GUILD_ID!),
   { body: commands }
 );
-
 console.log("Commands registered successfully!");
 ```
 

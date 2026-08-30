@@ -3,7 +3,6 @@ title: Permissions
 description: Ergonomic permission checks, direct boolean properties, and multi-permission resolution in Lunibee.
 ---
 
-# Permissions
 
 Discord represents user, member, and role permissions as 64-bit integer bitfields. Lunibee offers two powerful and ergonomic ways to check and manipulate permissions:
 
@@ -41,12 +40,10 @@ Pass multiple arguments to verify that **every** permission is present:
 
 ```ts
 import { Permission } from "lunibee";
-
 // 1. Using clean Permission constants:
 if (member.permissions.has(Permission.kickMembers, Permission.banMembers)) {
   console.log("Member has BOTH kick AND ban permissions.");
 }
-
 // 2. Using string names:
 if (member.permissions.has("kickMembers", "banMembers")) {
   console.log("Member has both permissions.");
@@ -58,7 +55,6 @@ Use `.any()` to check if **at least one** of the specified permissions is enable
 
 ```ts
 import { Permission } from "lunibee";
-
 // Returns true if the member has either Kick OR Ban:
 if (member.permissions.any(Permission.kickMembers, Permission.banMembers)) {
   console.log("Member can either kick or ban.");
@@ -73,18 +69,14 @@ if (member.permissions.any(Permission.kickMembers, Permission.banMembers)) {
 
 ```ts
 import { PermissionSet, Permission } from "lunibee";
-
 const basePermissions = new PermissionSet([
   Permission.viewChannel,
   Permission.sendMessages,
 ]);
-
 // Add permissions
 const elevated = basePermissions.add(Permission.embedLinks, Permission.attachFiles);
-
 // Remove permissions
 const restricted = elevated.remove(Permission.sendMessages);
-
 // Inspect results
 console.log(elevated.embedLinks); // true
 console.log(restricted.sendMessages); // false
