@@ -6,18 +6,25 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+
     groups:
-      dependencies:
+      bun-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "@types/bun"
+
+    ignore:
+      - dependency-name: "@types/bun"
 
   - package-ecosystem: "bun"
     directory: "/lunibee.js.org"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+
     groups:
-      dependencies:
+      docs-dependencies:
         patterns:
           - "*"
 
@@ -26,6 +33,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+
     groups:
       github-actions:
         patterns:
