@@ -13,6 +13,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -34,6 +39,7 @@ jobs:
               mapfile -t sources < <(find "$package/src" -type f -name '*.ts' -print)
               if [ "${#sources[@]}" -gt 0 ]; then
                 bunx tsc --noEmit \
+                  --ignoreConfig \
                   --target ESNext \
                   --module ESNext \
                   --moduleResolution Bundler \
