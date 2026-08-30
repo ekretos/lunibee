@@ -1,0 +1,94 @@
+:root {
+  --sl-color-accent-low: #2b1f09;
+  --sl-color-accent: #f59e0b;
+  --sl-color-accent-high: #fde68a;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #f3f4f6;
+  --sl-color-gray-2: #e5e7eb;
+  --sl-color-gray-3: #9ca3af;
+  --sl-color-gray-4: #4b5563;
+  --sl-color-gray-5: #1f2937;
+  --sl-color-gray-6: #111827;
+  --sl-color-black: #0b0f19;
+
+  --sl-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sl-font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #fef3c7;
+  --sl-color-accent: #d97706;
+  --sl-color-accent-high: #78350f;
+  --sl-color-white: #0f172a;
+  --sl-color-gray-1: #1e293b;
+  --sl-color-gray-2: #334155;
+  --sl-color-gray-3: #64748b;
+  --sl-color-gray-4: #cbd5e1;
+  --sl-color-gray-5: #f1f5f9;
+  --sl-color-gray-6: #f8fafc;
+  --sl-color-black: #ffffff;
+}
+
+/* Custom hero badge and glowing elements */
+.hero-tagline {
+  font-size: 1.25rem;
+  color: var(--sl-color-gray-2);
+  margin-top: 0.5rem;
+}
+
+.badge-bun {
+  background: linear-gradient(135deg, #f59e0b22 0%, #d9770644 100%);
+  color: #f59e0b;
+  border: 1px solid #f59e0b55;
+  border-radius: 9999px;
+  padding: 0.2rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Code block enhancements */
+.expressive-code {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  border-radius: 0.5rem;
+}
+
+/* Feature grid styling */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin: 2rem 0;
+}
+
+.feature-card {
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.feature-card:hover {
+  border-color: var(--sl-color-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.12);
+}
+
+.feature-card h3 {
+  margin-top: 0;
+  color: var(--sl-color-white);
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.feature-card p {
+  color: var(--sl-color-gray-3);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 0;
+}

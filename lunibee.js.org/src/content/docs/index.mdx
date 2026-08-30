@@ -1,0 +1,74 @@
+---
+title: Lunibee 🐝
+description: A lightweight, Bun-first Discord API library for TypeScript.
+template: splash
+hero:
+  tagline: A lightweight, blazingly fast, Bun-first Discord API library for TypeScript. Zero fluff, strict typings, resilient WebSocket lifecycle, and compile-time-safe builders.
+  image:
+    html: "<div style='font-size: 6rem; text-align: center; filter: drop-shadow(0 0 35px #f59e0b88); animation: float 3s ease-in-out infinite;'>🐝</div><style>@keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-12px); } }</style>"
+  actions:
+    - text: Getting Started
+      link: /getting-started/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/Ekretos/lunibee
+      icon: external
+      variant: secondary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why Lunibee?
+
+<CardGrid stagger>
+  <Card title="⚡ Bun-First Runtime" icon="rocket">
+    Built from the ground up for Bun. Native WebSocket performance, lightning-fast startup times, and minimal memory footprint.
+  </Card>
+  <Card title="🛡️ 100% Type-Safe" icon="approve-check-circle">
+    Complete TypeScript coverage with strict compile-time builders, Discord API v10 typing, and ergonomic autocomplete.
+  </Card>
+  <Card title="🔄 Resilient Gateway" icon="refresh">
+    Automatic heartbeat ACK tracking, zombie connection detection, seamless session resume, and non-blocking reconnect cycles.
+  </Card>
+  <Card title="🎯 Bucket-Aware REST" icon="seti:graphql">
+    Precise per-route Discord rate limit management with automatic retry backoff and non-leaking AbortSignal cancellations.
+  </Card>
+  <Card title="🧩 Modular Architecture" icon="puzzle">
+    Split into lightweight independent packages (`@lunibee/ws`, `@lunibee/rest`, `@lunibee/builders`, etc.) so you only load what you need.
+  </Card>
+  <Card title="⚡ Zero Bloat" icon="document">
+    No bloated legacy dependencies. Pure, modern ESM designed for speed, clarity, and rock-solid production bots.
+  </Card>
+</CardGrid>
+
+---
+
+## Quick Look
+
+```ts
+import { Client, GatewayIntentBits, EmbedBuilder } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages | GatewayIntentBits.MessageContent,
+});
+
+client.on("ready", (user) => {
+  console.log(`🐝 Logged in as ${user.username}!`);
+});
+
+client.on("messageCreate", async (message) => {
+  if (message.content === "!ping") {
+    const embed = new EmbedBuilder()
+      .setTitle("Pong! 🏓")
+      .setDescription("Lunibee is buzzing along smoothly.")
+      .setColor(0xf59e0b)
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  }
+});
+
+await client.login();
+```
