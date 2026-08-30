@@ -32,8 +32,9 @@ export const Routes = {
     /** Returns one guild scheduled event. @param guildId Guild identifier. @param eventId Event identifier. @returns Scheduled-event route. */ guildScheduledEvent: (guildId: string, eventId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events/${snowflake(eventId, "Event ID")}`,
     /** Returns guild automod rules. @param guildId Guild identifier. @returns Automod-rule collection route. */ guildAutoModerationRules: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules`,
     /** Returns one automod rule. @param guildId Guild identifier. @param ruleId Rule identifier. @returns Automod-rule route. */ guildAutoModerationRule: (guildId: string, ruleId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules/${snowflake(ruleId, "Rule ID")}`,
-    /** Returns guild soundboard sounds. @param guildId Guild identifier. @returns Soundboard route. */ guildSoundboardSounds: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/soundboard-sounds`,
-    /** Returns current voice regions. @returns Voice-region route. */ voiceRegions: () => "/voice/regions"
+    /** Returns current voice regions. @returns Voice-region route. */ voiceRegions: () => "/voice/regions",
+    /** Returns the generic Gateway endpoint. @returns Gateway route. */ gateway: () => "/gateway",
+    /** Returns the Gateway endpoint and recommended shard count for bots. @returns Gateway bot route. */ gatewayBot: () => "/gateway/bot"
 } as const;
 
 /** Validates a Discord snowflake route parameter. @param value Candidate identifier. @param field Human-readable field name. @returns The validated identifier. @throws {TypeError} If the identifier is not a Discord snowflake. */

@@ -45,6 +45,9 @@ jobs:
       - name: Build documentation
         working-directory: lunibee.js.org
         run: bun run build
+        env:
+          ASTRO_BASE: ${{ steps.pages.outputs.base_path }}
+          ASTRO_SITE: ${{ steps.pages.outputs.origin }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

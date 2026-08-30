@@ -1,5 +1,5 @@
-import { rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { rm, writeFile, mkdir } from "node:fs/promises";
+import { dirname, join, resolve, relative } from "node:path";
 
 /**
  * Describes a workspace package that is emitted into the public distribution tree.
@@ -93,6 +93,12 @@ async function build(): Promise<void> {
         .join("\n");
       throw new Error(`Failed to build ${target.source}:\n${errors}`);
     }
+
+    // Write .d.ts declaration forwarder
+    const dtsPath = join(outdir, "index.d.ts");
+    await mkdir(dirname(dtsPath), { recursive: true });
+    const relSource = relative(dirname(dtsPath), resolve(target.source)).replace(/\\/g, "/");
+    await writeFile(dtsPath, `export * from "./${relSource.startsWith(".") ? relSource : "./" + relSource}";\n`);
   }
 }
 

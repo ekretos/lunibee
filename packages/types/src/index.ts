@@ -10,10 +10,17 @@ export const GatewayIntentBits = {
     AutoModerationConfiguration: 1 << 20, AutoModerationExecution: 1 << 21, GuildMessagePolls: 1 << 24, DirectMessagePolls: 1 << 25
 } as const;
 
+/** Gateway connection properties (OS, browser, device). */
+export interface GatewayProperties { os?: string; browser?: string; device?: string; [key: string]: unknown; }
+/** Gateway presence activity. */
+export interface GatewayPresenceActivity { name: string; type?: number; url?: string; state?: string; }
+/** Gateway presence data. */
+export interface GatewayPresence { status?: "online" | "dnd" | "idle" | "invisible" | "offline"; activities?: GatewayPresenceActivity[]; afk?: boolean; since?: number | null; }
 /** Client configuration. */
 export interface ClientOptions { token: string; intents: number; gateway?: GatewayOptions; rest?: RESTOptions; }
 /** Gateway connection configuration. */
-export interface GatewayOptions { reconnect?: boolean; maxReconnectAttempts?: number; reconnectBaseDelay?: number; reconnectMaxDelay?: number; shardId?: number; shardCount?: number; }
+export interface GatewayOptions { reconnect?: boolean; maxReconnectAttempts?: number; reconnectBaseDelay?: number; reconnectMaxDelay?: number; shardId?: number; shardCount?: number; properties?: GatewayProperties; presence?: GatewayPresence; }
+
 /** REST request configuration. */
 export interface RESTOptions { timeout?: number; retries?: number; baseURL?: string; }
 /** Discord user object. */

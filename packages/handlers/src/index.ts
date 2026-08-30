@@ -1,5 +1,6 @@
 /** A typed handler registry for Lunibee events. */
-export class HandlerRegistry<Events extends Record<string, unknown[]>> {
+export class HandlerRegistry<Events extends { [K in keyof Events]: unknown[] }> {
+
     /** Registered event handlers. */
     readonly #handlers = new Map<keyof Events, Set<(...args: any[]) => unknown>>();
     /** Registers a handler for an event. @param event Event key. @param handler Handler callback. @returns This registry. */
