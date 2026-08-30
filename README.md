@@ -1,5 +1,10 @@
 # Lunibee 🐝
 
+[![npm version](https://badge.fury.io/js/lunibee.svg)](https://www.npmjs.com/package/lunibee)
+[![NPM Downloads](https://img.shields.io/npm/dt/lunibee.svg?style=flat-square)](https://www.npmjs.com/package/lunibee)
+
+[![NPM Graph](https://nodei.co/npm/lunibee.png?downloads=true&downloadRank=true&stars=true)](https://www.npmjs.com/package/lunibee)
+
 A lightweight, Bun-first Discord API library for TypeScript.
 
 ## Production-readiness status
