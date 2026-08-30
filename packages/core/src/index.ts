@@ -8,7 +8,7 @@ export {
   type PermissionName,
 } from "./permissions.js";
 import { Collection } from "@lunibee/collection";
-import { ChannelManager, GuildManager, UserManager } from "@lunibee/managers";
+import { ApplicationCommandManager, ChannelManager, GuildManager, UserManager } from "@lunibee/managers";
 import { REST, Routes } from "@lunibee/rest";
 import {
   User,
@@ -25,10 +25,15 @@ import type {
   APIChannel,
   APIGuild,
   APIGuildMember,
+  APIGuildRoleEvent,
+  APIGuildRoleDeleteEvent,
+  APIGuildBanEvent,
+  APIGuildEmojisUpdateEvent,
   APIMessageDeleteBulkEvent,
   APIMessageDeleteEvent,
   APIMessageReactionEvent,
   APIReadyEvent,
+  APIRole,
   APIThreadEvent,
   ClientOptions,
   ClientUser,
@@ -47,8 +52,8 @@ export interface ClientEvents {
   /** Messages deleted in bulk. */ messageDeleteBulk: [
     APIMessageDeleteBulkEvent,
   ];
-  /** Guild became available. */ guildCreate: [Guild];
-  /** Guild updated. */ guildUpdate: [Guild];
+  /** Guild became available. */ guildCreate: [APIGuild];
+  /** Guild updated. */ guildUpdate: [APIGuild];
   /** Guild became unavailable or was removed. */ guildDelete: [
     { id: string; unavailable?: boolean },
   ];
@@ -67,6 +72,12 @@ export interface ClientEvents {
     APIMessageDeleteEvent,
   ];
   /** Interaction created. */ interactionCreate: [Interaction];
+  /** Guild role created. */ guildRoleCreate: [APIGuildRoleEvent];
+  /** Guild role updated. */ guildRoleUpdate: [APIGuildRoleEvent];
+  /** Guild role deleted. */ guildRoleDelete: [APIGuildRoleDeleteEvent];
+  /** Guild ban added. */ guildBanAdd: [APIGuildBanEvent];
+  /** Guild ban removed. */ guildBanRemove: [APIGuildBanEvent];
+  /** Guild emojis updated. */ guildEmojisUpdate: [APIGuildEmojisUpdateEvent];
 }
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
@@ -154,9 +165,22 @@ export class Client
   /** User resource manager. */ public readonly users: UserManager;
   /** Guild resource manager. */ public readonly guilds: GuildManager;
   /** Channel and message resource manager. */ public readonly channels: ChannelManager;
+  /** Application command manager (available after login). */ public readonly application: {
+    /** Application command registration API. */ commands: ApplicationCommandManager;
+  };
+  /** Underlying WebSocket Gateway connection. */ public get ws(): Gateway {
+    return this.#gateway;
+  }
+  /** Underlying WebSocket Gateway connection. */ public get gateway(): Gateway {
+    return this.#gateway;
+  }
   /** Current authenticated bot user. */ public user?: ClientUser;
   /** Time at which the gateway became ready. */ public readyAt?: Date;
   /** Current client lifecycle state. */ public state: ClientState = "idle";
+  /** Time in milliseconds since the client became ready, or null if not ready. */
+  public get uptime(): number | null {
+    return this.readyAt ? Date.now() - this.readyAt.getTime() : null;
+  }
   readonly #gateway: Gateway;
   readonly #resourceContext: ResourceContext;
   /** Creates a client. @param options Client configuration. @throws {TypeError} If no token is supplied. */ public constructor(
@@ -169,6 +193,13 @@ export class Client
     this.users = new UserManager(this.rest);
     this.guilds = new GuildManager(this.rest);
     this.channels = new ChannelManager(this.rest);
+    // application.commands is lazily re-pointed to the real app ID after READY;
+    // a placeholder is created now so the property is always accessible.
+    const placeholderAppCommands = new ApplicationCommandManager(
+      this.rest,
+      "0",
+    );
+    this.application = { commands: placeholderAppCommands };
     this.#resourceContext = {
       sendMessage: (channelId, options) =>
         this.channels.send(channelId, options),
@@ -190,6 +221,10 @@ export class Client
       this.users.set(this.user.id, new User(this.user));
       this.readyAt = new Date();
       this.state = "ready";
+      // Reinitialise application.commands with the real application ID from READY
+      const appId = ready.application?.id ?? this.user.id;
+      (this.application as { commands: ApplicationCommandManager }).commands =
+        new ApplicationCommandManager(this.rest, appId);
       this.emit("ready", this.user);
     });
     this.#gateway.on("open", () => this.emit("open"));
@@ -238,12 +273,12 @@ export class Client
         const channel = new Channel(channelData, this.#resourceContext);
         this.channels.set(channel.id, channel);
       }
-      this.emit("guildCreate", guild);
+      this.emit("guildCreate", data as APIGuild);
     });
     this.#gateway.on("GUILD_UPDATE", (data) => {
       const guild = new Guild(data as APIGuild);
       this.guilds.update(guild);
-      this.emit("guildUpdate", guild);
+      this.emit("guildUpdate", data as APIGuild);
     });
     this.#gateway.on("GUILD_DELETE", (data) => {
       const payload = data as { id: string; unavailable?: boolean };
@@ -311,6 +346,25 @@ export class Client
     this.#gateway.on("INTERACTION_CREATE", (data) =>
       this.emit("interactionCreate", createInteraction(this, data as any)),
     );
+    // Phase 1.4 — Guild role / ban / emoji events
+    this.#gateway.on("GUILD_ROLE_CREATE", (data) =>
+      this.emit("guildRoleCreate", data as APIGuildRoleEvent),
+    );
+    this.#gateway.on("GUILD_ROLE_UPDATE", (data) =>
+      this.emit("guildRoleUpdate", data as APIGuildRoleEvent),
+    );
+    this.#gateway.on("GUILD_ROLE_DELETE", (data) =>
+      this.emit("guildRoleDelete", data as APIGuildRoleDeleteEvent),
+    );
+    this.#gateway.on("GUILD_BAN_ADD", (data) =>
+      this.emit("guildBanAdd", data as APIGuildBanEvent),
+    );
+    this.#gateway.on("GUILD_BAN_REMOVE", (data) =>
+      this.emit("guildBanRemove", data as APIGuildBanEvent),
+    );
+    this.#gateway.on("GUILD_EMOJIS_UPDATE", (data) =>
+      this.emit("guildEmojisUpdate", data as APIGuildEmojisUpdateEvent),
+    );
     for (const event of [
       "READY",
       "MESSAGE_CREATE",
@@ -333,6 +387,12 @@ export class Client
       "MESSAGE_REACTION_REMOVE",
       "MESSAGE_REACTION_REMOVE_ALL",
       "INTERACTION_CREATE",
+      "GUILD_ROLE_CREATE",
+      "GUILD_ROLE_UPDATE",
+      "GUILD_ROLE_DELETE",
+      "GUILD_BAN_ADD",
+      "GUILD_BAN_REMOVE",
+      "GUILD_EMOJIS_UPDATE",
     ])
       this.#gateway.on(event, (data) => this.emit("raw", { event, data }));
     this.#gateway.on("error", (data) => this.emit("error", data as Error));
@@ -448,3 +508,18 @@ export {
   MessageThreadOptions,
   ReactionFetchOptions,
 } from "@lunibee/managers";
+
+export { Collector, type CollectorOptions } from "./collector.js";
+export { ApplicationCommandManager } from "@lunibee/managers";
+export type {
+  APIApplicationCommand,
+  ApplicationCommandData,
+  APIRole,
+  APIGuildRoleEvent,
+  APIGuildRoleDeleteEvent,
+  APIGuildBanEvent,
+  APIEmoji,
+  APIGuildEmojisUpdateEvent,
+  ApplicationCommandOptionType,
+  ApplicationCommandType,
+} from "@lunibee/types";

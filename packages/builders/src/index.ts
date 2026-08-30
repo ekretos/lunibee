@@ -26,3 +26,4 @@ export {
   SubcommandGroupBuilder,
   ApplicationCommandOptionType,
 } from "./commands.js";
+export { AttachmentBuilder, type AttachmentData } from "./attachment.js";

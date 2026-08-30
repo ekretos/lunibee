@@ -45,6 +45,7 @@ export interface APIStringSelectComponent {
   min_values?: number;
   max_values?: number;
   required?: boolean;
+  disabled?: boolean;
   options?: APISelectOption[];
 }
 export interface APIEntitySelectComponent {
@@ -140,6 +141,10 @@ export class StringSelectBuilder {
     this.#data.required = value;
     return this;
   }
+  public setDisabled(value = true): this {
+    this.#data.disabled = value;
+    return this;
+  }
   public addOptions(...options: APISelectOption[]): this {
     if (!options.length)
       throw new TypeError("At least one select option is required.");
@@ -199,8 +204,9 @@ export class ButtonBuilder {
     this.#data.url = url.toString();
     return this;
   }
-  public setEmoji(emoji: APIComponentEmoji): this {
-    this.#data.emoji = { ...emoji };
+  public setEmoji(emoji: APIComponentEmoji | string): this {
+    this.#data.emoji =
+      typeof emoji === "string" ? { name: emoji } : { ...emoji };
     return this;
   }
   public setDisabled(value = true): this {
@@ -213,7 +219,20 @@ export class ButtonBuilder {
 }
 export class EntitySelectBuilder {
   readonly #data: APIEntitySelectComponent;
-  public constructor(type: APIEntitySelectComponent["type"]) {
+  public constructor(
+    type:
+      | typeof ComponentType.UserSelect
+      | typeof ComponentType.RoleSelect
+      | typeof ComponentType.MentionableSelect
+      | typeof ComponentType.ChannelSelect,
+  ) {
+    if (
+      type !== ComponentType.UserSelect &&
+      type !== ComponentType.RoleSelect &&
+      type !== ComponentType.MentionableSelect &&
+      type !== ComponentType.ChannelSelect
+    )
+      throw new TypeError("Invalid select component type.");
     this.#data = { type };
   }
   public setCustomId(value: string): this {
@@ -242,6 +261,12 @@ export class EntitySelectBuilder {
   }
   public setDisabled(value = true): this {
     this.#data.disabled = value;
+    return this;
+  }
+  public setDefaultValues(
+    ...values: { id: string; type: "user" | "role" | "channel" }[]
+  ): this {
+    (this.#data as any).default_values = values;
     return this;
   }
   public toJSON(): APIEntitySelectComponent {
@@ -286,15 +311,13 @@ export class TextInputBuilder {
     type: ComponentType.TextInput,
     style: TextInputStyle.Short,
   };
+  public setStyle(style: APITextInputComponent["style"]): this {
+    this.#data.style = style;
+    return this;
+  }
   public setCustomId(value: string): this {
     validateText(value, 100, "Text input custom ID");
     this.#data.custom_id = value;
-    return this;
-  }
-  public setStyle(
-    style: typeof TextInputStyle.Short | typeof TextInputStyle.Paragraph,
-  ): this {
-    this.#data.style = style;
     return this;
   }
   public setLabel(value: string): this {
@@ -308,7 +331,7 @@ export class TextInputBuilder {
     return this;
   }
   public setMinLength(value: number): this {
-    validateLength(value, "min_length");
+    validateLength(value, "min_length", 4000);
     this.#data.min_length = value;
     return this;
   }
@@ -322,8 +345,7 @@ export class TextInputBuilder {
     return this;
   }
   public setValue(value: string): this {
-    if (value.length > 4000)
-      throw new RangeError("Text input value cannot exceed 4000 characters.");
+    validateText(value, 4000, "Text input value");
     this.#data.value = value;
     return this;
   }
@@ -339,9 +361,16 @@ function validateText(value: string, max: number, field: string): void {
   if (value.length > max)
     throw new RangeError(`${field} cannot exceed ${max} characters.`);
 }
-function validateCount(value: number, field: string, min: number): void {
-  if (!Number.isInteger(value) || value < min || value > 25)
-    throw new RangeError(`${field} must be an integer between ${min} and 25.`);
+function validateCount(
+  value: number,
+  field: string,
+  min: number,
+  max = 25,
+): void {
+  if (!Number.isInteger(value) || value < min || value > max)
+    throw new RangeError(
+      `${field} must be an integer between ${min} and ${max}.`,
+    );
 }
 function validateLength(value: number, field: string, max = 4000): void {
   if (!Number.isInteger(value) || value < 0 || value > max)

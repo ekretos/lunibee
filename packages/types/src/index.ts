@@ -64,10 +64,14 @@ export type GatewayIntentResolvable =
   | number
   | keyof typeof GatewayIntentBits
   | keyof typeof IntentBits
-  | (number | keyof typeof GatewayIntentBits | keyof typeof IntentBits | string)[];
+  | (
+      number | keyof typeof GatewayIntentBits | keyof typeof IntentBits | string
+    )[];
 
 /** Resolves any GatewayIntentResolvable into a raw bitfield integer. */
-export function resolveGatewayIntents(intents: GatewayIntentResolvable): number {
+export function resolveGatewayIntents(
+  intents: GatewayIntentResolvable,
+): number {
   if (typeof intents === "number") return intents;
   if (Array.isArray(intents)) {
     return intents.reduce<number>((acc, intent) => {
@@ -75,16 +79,18 @@ export function resolveGatewayIntents(intents: GatewayIntentResolvable): number 
     }, 0);
   }
   if (typeof intents === "string") {
-    if (intents in GatewayIntentBits) return (GatewayIntentBits as Record<string, number>)[intents]!;
-    if (intents in IntentBits) return (IntentBits as Record<string, number>)[intents]!;
+    if (intents in GatewayIntentBits)
+      return (GatewayIntentBits as Record<string, number>)[intents]!;
+    if (intents in IntentBits)
+      return (IntentBits as Record<string, number>)[intents]!;
     const lower = intents.charAt(0).toLowerCase() + intents.slice(1);
-    if (lower in IntentBits) return (IntentBits as Record<string, number>)[lower]!;
+    if (lower in IntentBits)
+      return (IntentBits as Record<string, number>)[lower]!;
     const num = Number(intents);
     if (!Number.isNaN(num)) return num;
   }
   return 0;
 }
-
 
 /** Gateway connection properties (OS, browser, device). */
 export interface GatewayProperties {
@@ -417,5 +423,122 @@ export interface APIReadyEvent {
   session_id: string;
   resume_gateway_url: string;
   shard?: [number, number];
-  application?: Record<string, unknown>;
+  application?: { id: Snowflake; flags: number; [key: string]: unknown };
 }
+
+/** Discord application command option types. */
+export const ApplicationCommandOptionType = {
+  SubCommand: 1,
+  SubCommandGroup: 2,
+  String: 3,
+  Integer: 4,
+  Boolean: 5,
+  User: 6,
+  Channel: 7,
+  Role: 8,
+  Mentionable: 9,
+  Number: 10,
+  Attachment: 11,
+} as const;
+
+/** Discord application command types. */
+export const ApplicationCommandType = {
+  ChatInput: 1,
+  User: 2,
+  Message: 3,
+} as const;
+
+/** Raw Discord application command option. */
+export interface APIApplicationCommandOption {
+  type: number;
+  name: string;
+  description: string;
+  required?: boolean;
+  choices?: Array<{ name: string; value: string | number }>;
+  options?: APIApplicationCommandOption[];
+  min_value?: number;
+  max_value?: number;
+  min_length?: number;
+  max_length?: number;
+  autocomplete?: boolean;
+  channel_types?: number[];
+}
+
+/** Raw Discord application command object (from API). */
+export interface APIApplicationCommand {
+  id: Snowflake;
+  type?: number;
+  application_id: Snowflake;
+  guild_id?: Snowflake;
+  name: string;
+  description: string;
+  options?: APIApplicationCommandOption[];
+  default_member_permissions?: string | null;
+  dm_permission?: boolean;
+  nsfw?: boolean;
+  version: Snowflake;
+}
+
+/** Data for creating/overwriting an application command. */
+export interface ApplicationCommandData {
+  name: string;
+  description: string;
+  type?: number;
+  options?: APIApplicationCommandOption[];
+  default_member_permissions?: string | null;
+  dm_permission?: boolean;
+  nsfw?: boolean;
+}
+
+/** Raw Discord role object. */
+export interface APIRole {
+  id: Snowflake;
+  name: string;
+  color: number;
+  hoist: boolean;
+  icon?: string | null;
+  unicode_emoji?: string | null;
+  position: number;
+  permissions: string;
+  managed: boolean;
+  mentionable: boolean;
+  tags?: Record<string, unknown>;
+  flags?: number;
+}
+
+/** Raw Discord guild role event payload. */
+export interface APIGuildRoleEvent {
+  guild_id: Snowflake;
+  role: APIRole;
+}
+
+/** Raw Discord guild role delete event payload. */
+export interface APIGuildRoleDeleteEvent {
+  guild_id: Snowflake;
+  role_id: Snowflake;
+}
+
+/** Raw Discord guild ban event payload. */
+export interface APIGuildBanEvent {
+  guild_id: Snowflake;
+  user: UserData;
+}
+
+/** Raw Discord emoji object. */
+export interface APIEmoji {
+  id: Snowflake | null;
+  name: string | null;
+  roles?: Snowflake[];
+  user?: UserData;
+  require_colons?: boolean;
+  managed?: boolean;
+  animated?: boolean;
+  available?: boolean;
+}
+
+/** Raw Discord guild emojis update event payload. */
+export interface APIGuildEmojisUpdateEvent {
+  guild_id: Snowflake;
+  emojis: APIEmoji[];
+}
+

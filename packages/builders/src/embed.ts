@@ -109,15 +109,21 @@ export class EmbedBuilder {
   /** Adds embed fields. @param fields Field payloads. @returns This builder. @throws {RangeError} If the 25-field limit is exceeded. */ public addFields(
     ...fields: EmbedField[]
   ): this {
+    if (!fields.length)
+      throw new TypeError("At least one embed field is required.");
     const current = this.#data.fields ?? [];
     if (current.length + fields.length > 25)
       throw new RangeError("An embed cannot contain more than 25 fields.");
     for (const field of fields) {
-      validate(field.name, 256, "Field name");
-      validate(field.value, 1024, "Field value");
+      validate(field.name, 256, "Embed field name");
+      validate(field.value, 1024, "Embed field value");
     }
     this.#data.fields = [...current, ...fields.map((field) => ({ ...field }))];
     return this;
+  }
+  public setFields(fields: EmbedField[]): this {
+    this.#data.fields = [];
+    return this.addFields(...fields);
   }
   /** Replaces fields starting at an index. @param index Start index. @param deleteCount Number of fields to remove. @param fields Replacement fields. @returns This builder. @throws {RangeError} If arguments are invalid or the 25-field limit is exceeded. */ public spliceFields(
     index: number,
@@ -152,7 +158,10 @@ export class EmbedBuilder {
     delete this.#data.description;
     return this;
   }
-  /** Returns a deep-cloned Discord API payload. @returns Strict embed payload. */ public toJSON(): APIEmbed {
+  /** Returns a deep-cloned Discord API payload. @returns Strict embed payload. */ public get data(): APIEmbed {
+    return this.toJSON();
+  }
+  public toJSON(): APIEmbed {
     return structuredClone(this.#data);
   }
 }

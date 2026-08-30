@@ -161,6 +161,10 @@ export class Gateway {
     this.#setState(GatewayState.Closed);
   }
   /** Registers a Gateway event listener. @param event Event name. @param listener Event callback. @returns This Gateway. */
+  /** Emits an event to all registered listeners. @param event Event name. @param data Event payload. */
+  public emit(event: string, data?: unknown): void {
+    this.#emit(event, data);
+  }
   public on(event: string, listener: GatewayListener): this {
     if (!event || typeof listener !== "function")
       throw new TypeError("Gateway event and listener are required.");

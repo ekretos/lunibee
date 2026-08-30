@@ -405,3 +405,9 @@ export class REST {
 }
 
 export { Routes } from "./routes.js";
+
+export {
+  WebhookClient,
+  type WebhookClientOptions,
+  type WebhookMessageOptions,
+} from "./webhook.js";

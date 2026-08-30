@@ -3,7 +3,7 @@ import { HandlerRegistry } from "../packages/handlers/src/index.ts";
 
 describe("HandlerRegistry", () => {
   test("dispatches registered handlers", async () => {
-    const registry = new HandlerRegistry<{ ready: string }>();
+    const registry = new HandlerRegistry<{ ready: [string] }>();
     let value = "";
     registry.on("ready", (payload) => {
       value = payload;
@@ -13,7 +13,7 @@ describe("HandlerRegistry", () => {
   });
 
   test("removes handlers", async () => {
-    const registry = new HandlerRegistry<{ ready: string }>();
+    const registry = new HandlerRegistry<{ ready: [string] }>();
     let calls = 0;
     const handler = () => {
       calls++;
