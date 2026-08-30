@@ -1,28 +1,37 @@
 ---
 title: Permissions
-description: Bitfield-based permission resolution and checks.
+description: Bitfield-based permission resolution, PermissionFlagsBits enum, and check utilities.
 ---
 
 # Permissions
 
-Discord represents user, member, and role permissions as 64-bit integer bitfields. `@lunibee/structures` and `@lunibee/core` provide `PermissionsBitField` for expressive, type-safe permission checks.
+Discord represents user, member, and role permissions as 64-bit integer bitfields. Lunibee exposes `PermissionFlagsBits` (enum) and the immutable `PermissionsBitField` / `PermissionSet` for expressive, type-safe permission checks.
 
-## Checking Permissions
+## Checking Permissions with Enums
+
+You can check permissions using `PermissionFlagsBits` enum values, BigInt constants, or string keys:
 
 ```ts
-// Check a single permission
-if (member.permissions.has("ManageMessages")) {
+import { PermissionFlagsBits } from "lunibee";
+
+// Check a single permission using enum
+if (member.permissions.has(PermissionFlagsBits.ManageMessages)) {
   console.log("Member can manage messages!");
 }
 
 // Check multiple permissions simultaneously
-if (member.permissions.has(["BanMembers", "KickMembers"])) {
+if (
+  member.permissions.has(
+    PermissionFlagsBits.BanMembers,
+    PermissionFlagsBits.KickMembers
+  )
+) {
   console.log("Member has moderation permissions.");
 }
 
-// Check administrator bypass
-if (member.permissions.has("Administrator")) {
-  console.log("Member is an admin.");
+// Check administrator permissions
+if (member.permissions.has(PermissionFlagsBits.Administrator)) {
+  console.log("Member is an administrator.");
 }
 ```
 
@@ -31,17 +40,35 @@ if (member.permissions.has("Administrator")) {
 `PermissionsBitField` operations are immutable and return fresh instances:
 
 ```ts
-import { PermissionsBitField } from "lunibee";
+import { PermissionsBitField, PermissionFlagsBits } from "lunibee";
 
-const basePermissions = new PermissionsBitField(["ViewChannel", "SendMessages"]);
+const basePermissions = new PermissionsBitField([
+  PermissionFlagsBits.ViewChannel,
+  PermissionFlagsBits.SendMessages,
+]);
 
 // Add permissions
-const elevated = basePermissions.add("EmbedLinks", "AttachFiles");
+const elevated = basePermissions.add(
+  PermissionFlagsBits.EmbedLinks,
+  PermissionFlagsBits.AttachFiles
+);
 
 // Remove permissions
-const restricted = elevated.remove("SendMessages");
+const restricted = elevated.remove(PermissionFlagsBits.SendMessages);
 
-// Check difference
-console.log(elevated.has("EmbedLinks")); // true
-console.log(restricted.has("SendMessages")); // false
+// Inspect permissions
+console.log(elevated.has(PermissionFlagsBits.EmbedLinks)); // true
+console.log(restricted.has(PermissionFlagsBits.SendMessages)); // false
+console.log(elevated.toArray()); // Array of enabled permission names
+```
+
+## Permission Overwrite Types
+
+Channel permission overwrites use `PermissionOverwriteType`:
+
+```ts
+import { PermissionOverwriteType } from "lunibee";
+
+const roleOverwriteType = PermissionOverwriteType.Role; // 0
+const memberOverwriteType = PermissionOverwriteType.Member; // 1
 ```
