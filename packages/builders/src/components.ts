@@ -8,7 +8,7 @@ export interface APISelectOption { label: string; value: string; description?: s
 export interface APIStringSelectComponent { type: typeof ComponentType.StringSelect; custom_id?: string; placeholder?: string; min_values?: number; max_values?: number; required?: boolean; options?: APISelectOption[]; }
 export interface APIEntitySelectComponent { type: typeof ComponentType.UserSelect | typeof ComponentType.RoleSelect | typeof ComponentType.MentionableSelect | typeof ComponentType.ChannelSelect; custom_id?: string; placeholder?: string; min_values?: number; max_values?: number; required?: boolean; disabled?: boolean; }
 export interface APITextInputComponent { type: typeof ComponentType.TextInput; style: typeof TextInputStyle.Short | typeof TextInputStyle.Paragraph; custom_id?: string; label?: string; placeholder?: string; min_length?: number; max_length?: number; required?: boolean; value?: string; }
-export interface APIModalComponent { type: 9; custom_id?: string; title?: string; components: Array<{ toJSON(): unknown }>; }
+export interface APIModalComponent { type: 9; custom_id?: string; title?: string; components: APIActionRowComponent[]; }
 export type APIActionRowChild = APIButtonComponent | APIStringSelectComponent | APIEntitySelectComponent | APITextInputComponent;
 export interface APIActionRowComponent { type: typeof ComponentType.ActionRow; components: APIActionRowChild[]; }
 
@@ -50,11 +50,13 @@ export class EntitySelectBuilder {
     public toJSON(): APIEntitySelectComponent { return structuredClone(this.#data); }
 }
 export class ModalBuilder {
-    readonly #data: APIModalComponent = { type: 9, components: [] };
-    public setCustomId(value: string): this { validateText(value, 100, "Modal custom ID"); this.#data.custom_id = value; return this; }
-    public setTitle(value: string): this { validateText(value, 45, "Modal title"); this.#data.title = value; return this; }
-    public addComponents(...components: Array<{ toJSON(): unknown }>): this { if (!components.length) throw new TypeError("At least one modal component is required."); if (this.#data.components.length + components.length > 5) throw new RangeError("A modal cannot contain more than 5 action rows."); this.#data.components.push(...components); return this; }
-    public toJSON(): APIModalComponent { return { type: this.#data.type, ...(this.#data.custom_id ? { custom_id: this.#data.custom_id } : {}), ...(this.#data.title ? { title: this.#data.title } : {}), components: this.#data.components.map(component => component.toJSON()) }; }
+    readonly #components: Array<{ toJSON(): APIActionRowComponent }> = [];
+    #custom_id?: string;
+    #title?: string;
+    public setCustomId(value: string): this { validateText(value, 100, "Modal custom ID"); this.#custom_id = value; return this; }
+    public setTitle(value: string): this { validateText(value, 45, "Modal title"); this.#title = value; return this; }
+    public addComponents(...components: Array<{ toJSON(): APIActionRowComponent }>): this { if (!components.length) throw new TypeError("At least one modal component is required."); if (this.#components.length + components.length > 5) throw new RangeError("A modal cannot contain more than 5 action rows."); this.#components.push(...components); return this; }
+    public toJSON(): APIModalComponent { return { type: 9, ...(this.#custom_id ? { custom_id: this.#custom_id } : {}), ...(this.#title ? { title: this.#title } : {}), components: this.#components.map(component => component.toJSON()) }; }
 }
 export class TextInputBuilder {
     readonly #data: APITextInputComponent = { type: ComponentType.TextInput, style: TextInputStyle.Short };
