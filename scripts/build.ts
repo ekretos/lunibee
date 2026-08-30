@@ -1,8 +1,8 @@
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 /**
- * Public Lunibee workspace package compiled into the distributable dist tree.
+ * Describes a workspace package that is emitted into the public distribution tree.
  */
 interface BuildTarget {
   /** Package source entrypoint. */
@@ -11,6 +11,42 @@ interface BuildTarget {
   output: string;
 }
 
+/**
+ * Maps every internal package name to its source entrypoint so a Git consumer can build
+ * Lunibee without first installing the private workspace packages.
+ */
+const workspaceAliases: Record<string, string> = {
+  "@lunibee/types": "packages/types/src/index.ts",
+  "@lunibee/utils": "packages/utils/src/index.ts",
+  "@lunibee/collection": "packages/collection/src/index.ts",
+  "@lunibee/ws": "packages/ws/src/index.ts",
+  "@lunibee/rest": "packages/rest/src/index.ts",
+  "@lunibee/builders": "packages/builders/src/index.ts",
+  "@lunibee/structures": "packages/structures/src/index.ts",
+  "@lunibee/managers": "packages/managers/src/index.ts",
+  "@lunibee/handlers": "packages/handlers/src/index.ts",
+  "@lunibee/sharding": "packages/sharding/src/index.ts",
+  "@lunibee/voice": "packages/voice/src/index.ts",
+  "@lunibee/formatters": "packages/formatters/src/index.ts",
+  "@lunibee/core": "packages/core/src/index.ts",
+};
+
+/**
+ * Resolves internal workspace package imports directly to their source entrypoints.
+ */
+const workspaceResolver = {
+  /** Plugin name used by Bun's build diagnostics. */
+  name: "lunibee-workspace-resolver",
+  /** Registers the internal package resolution hook. */
+  setup(build: { onResolve: (options: { filter: RegExp }, callback: (args: { path: string }) => { path: string } | undefined) => void }): void {
+    build.onResolve({ filter: /^@lunibee\// }, (args) => {
+      const source = workspaceAliases[args.path];
+      return source ? { path: resolve(source) } : undefined;
+    });
+  },
+};
+
+/** Every workspace package exposed through the public dist tree. */
 const targets: BuildTarget[] = [
   { source: "packages/types/src/index.ts", output: "types" },
   { source: "packages/utils/src/index.ts", output: "utils" },
@@ -47,6 +83,7 @@ async function build(): Promise<void> {
       sourcemap: "external",
       minify: false,
       splitting: false,
+      plugins: [workspaceResolver],
     });
 
     if (!result.success) {
