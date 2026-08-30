@@ -1,7 +1,9 @@
-import type {
-  GatewayPayload,
-  GatewayProperties,
-  GatewayPresence,
+import {
+  resolveGatewayIntents,
+  type GatewayPayload,
+  type GatewayProperties,
+  type GatewayPresence,
+  type GatewayIntentResolvable,
 } from "@lunibee/types";
 
 /** Discord Gateway opcodes. */
@@ -46,7 +48,7 @@ export class GatewayError extends Error {
 /** Gateway connection configuration. */
 export interface GatewayOptions {
   /** Authentication token. */ token: string;
-  /** Gateway intent bitfield. */ intents: number;
+  /** Gateway intent bitfield or resolvable. */ intents: GatewayIntentResolvable;
   /** Shard identifier. */ shardId?: number;
   /** Total shard count. */ shardCount?: number;
   /** Whether automatic reconnect is enabled. */ reconnect?: boolean;
@@ -93,7 +95,8 @@ export class Gateway {
   public constructor(options: GatewayOptions) {
     if (!options.token?.trim())
       throw new TypeError("A Gateway token is required.");
-    if (!Number.isInteger(options.intents) || options.intents < 0)
+    const resolvedIntents = resolveGatewayIntents(options.intents);
+    if (!Number.isInteger(resolvedIntents) || resolvedIntents < 0)
       throw new TypeError("Gateway intents must be a non-negative integer.");
     this.#options = {
       shardId: 0,

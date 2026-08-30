@@ -1,36 +1,47 @@
 ---
-title: Client & Lifecycle
-description: The main application entry point, state machine, and presence management in Lunibee.
+title: Client & Gateway Lifecycle
+description: Initializing the Lunibee Client, configuring Intents, mobile presence, and event dispatching.
 ---
 
-# Client & Lifecycle
+# Client
 
-The `Client` class is the central orchestrator in Lunibee. It coordinates WebSocket connections, the REST client, event dispatchers, presence updates, and resource managers.
+The `Client` class in `@lunibee/core` is the primary orchestrator that connects the REST API, Gateway WebSocket, caching layers, and event dispatchers into a cohesive bot interface.
 
-## Lifecycle State Machine
+---
 
-Lunibee clients follow a deterministic lifecycle:
+## Initialization & Intents
 
-```text
-  ┌──────────────┐
-  │     IDLE     │ ─── client.login() ───┐
-  └──────────────┘                       │
-         ▲                               ▼
-         │                      ┌────────────────┐
-     reconnect                  │   CONNECTING   │
-         │                      └────────────────┘
-         │                               │
-         │                         WebSocket OPEN
-         │                         & READY packet
-         │                               │
-         │                               ▼
-  ┌──────────────┐              ┌────────────────┐
-  │  DESTROYED   │ ◄── destroy ─│     READY      │
-  └──────────────┘              └────────────────┘
+Lunibee supports specifying intents as **arrays** or **bitwise OR combinations**, using either `IntentBits` (idiomatic camelCase) or `GatewayIntentBits` (PascalCase):
+
+### 1. Using Arrays with `IntentBits` (Recommended)
+```ts
+import { Client, IntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [
+    IntentBits.guild,
+    IntentBits.guildMessages,
+    IntentBits.messageContent,
+  ],
+});
 ```
 
-## Initializing the Client
+### 2. Using Arrays with `GatewayIntentBits`
+```ts
+import { Client, GatewayIntentBits } from "lunibee";
 
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+});
+```
+
+### 3. Using Bitwise OR
 ```ts
 import { Client, GatewayIntentBits } from "lunibee";
 
@@ -40,77 +51,50 @@ const client = new Client({
     GatewayIntentBits.Guilds |
     GatewayIntentBits.GuildMessages |
     GatewayIntentBits.MessageContent,
-  gateway: {
-    properties: {
-      os: "Android",
-      browser: "Discord Android",
-      device: "Discord Android",
-    },
-    presence: {
-      status: "online",
-      activities: [
-        {
-          name: "Custom Status",
-          type: 4,
-          state: "Build on Lunibee 🐝🐝",
-        },
-      ],
-    },
-  },
-  rest: {
-    timeout: 15_000,
-    retries: 3,
-  },
 });
 ```
 
-## Gateway Intents & Privileged Intents
+---
 
-Discord Gateway requires bitfield intents to receive specific event payloads:
+## Gateway Intents Reference
 
-- `GatewayIntentBits.Guilds` (`1 << 0`)
-- `GatewayIntentBits.GuildMembers` (`1 << 1`) *(Privileged)*
-- `GatewayIntentBits.GuildPresences` (`1 << 8`) *(Privileged - required to receive member presence updates)*
-- `GatewayIntentBits.GuildMessages` (`1 << 9`)
-- `GatewayIntentBits.MessageContent` (`1 << 15`) *(Privileged)*
+| PascalCase (`GatewayIntentBits`) | camelCase (`IntentBits`) | Bit Shift | Type |
+| :--- | :--- | :--- | :--- |
+| `Guilds` | `guild` / `guilds` | `1 << 0` | Standard |
+| `GuildMembers` | `guildMembers` | `1 << 1` | **Privileged** |
+| `GuildModeration` | `guildModeration` / `guildBans` | `1 << 2` | Standard |
+| `GuildExpressions` | `guildExpressions` / `guildEmojis` | `1 << 3` | Standard |
+| `GuildIntegrations` | `guildIntegrations` | `1 << 4` | Standard |
+| `GuildWebhooks` | `guildWebhooks` | `1 << 5` | Standard |
+| `GuildInvites` | `guildInvites` | `1 << 6` | Standard |
+| `GuildVoiceStates` | `guildVoiceStates` | `1 << 7` | Standard |
+| `GuildPresences` | `guildPresences` | `1 << 8` | **Privileged** |
+| `GuildMessages` | `guildMessages` / `guildMessage` | `1 << 9` | Standard |
+| `GuildMessageReactions` | `guildMessageReactions` | `1 << 10` | Standard |
+| `GuildMessageTyping` | `guildMessageTyping` | `1 << 11` | Standard |
+| `DirectMessages` | `directMessages` | `1 << 12` | Standard |
+| `DirectMessageReactions` | `directMessageReactions` | `1 << 13` | Standard |
+| `DirectMessageTyping` | `directMessageTyping` | `1 << 14` | Standard |
+| `MessageContent` | `messageContent` | `1 << 15` | **Privileged** |
+| `GuildScheduledEvents` | `guildScheduledEvents` | `1 << 16` | Standard |
+| `AutoModerationConfiguration` | `autoModerationConfiguration` | `1 << 20` | Standard |
+| `AutoModerationExecution` | `autoModerationExecution` | `1 << 21` | Standard |
+| `GuildMessagePolls` | `guildMessagePolls` | `1 << 24` | Standard |
+| `DirectMessagePolls` | `directMessagePolls` | `1 << 25` | Standard |
+
+---
 
 ## Managing Bot Presence & Status
 
-You can dynamically update your bot's presence or custom status after login:
-
 ```ts
-// Update presence at runtime
 client.setPresence({
-  status: "dnd",
+  status: "online",
   activities: [
     {
-      name: "Custom Status",
+      name: "custom_status",
+      state: "⚡ Running on Bun & Lunibee",
       type: 4,
-      state: "Buzzing fast! ⚡",
     },
   ],
-});
-```
-
-## Key Properties & Methods
-
-- `client.login()`: Connects to the Discord Gateway and authenticates.
-- `client.destroy()`: Closes the WebSocket, halts heartbeat timers, and releases cached resources cleanly.
-- `client.setPresence(presence)`: Sends an `Opcode 3 (Presence Update)` to Discord Gateway.
-- `client.isReady()`: TypeScript type guard checking if `client.user` is defined.
-- `client.rest`: Access to the underlying `@lunibee/rest` HTTP client.
-- `client.users`, `client.channels`, `client.guilds`: Resource managers with integrated caching.
-
-## Event Handling
-
-```ts
-client.on("ready", (user) => {
-  console.log(`Ready as ${user.tag}`);
-});
-
-client.on("interactionCreate", async (interaction) => {
-  if (interaction.isChatInputCommand()) {
-    await interaction.reply({ content: "Command received!" });
-  }
 });
 ```
