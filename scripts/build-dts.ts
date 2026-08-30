@@ -2,12 +2,14 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const packages = ["types", "utils", "collection", "ws", "rest", "builders", "structures", "managers", "handlers", "sharding", "voice", "formatters", "core", "lunibee"];
-const entries = packages.map(name => `packages/${name}/src/index.ts`);
 const temp = ".types";
 
 await rm(temp, { recursive: true, force: true });
-const result = Bun.spawnSync(["bunx", "tsc", "--declaration", "--emitDeclarationOnly", "--noEmitOnError", "false", "--skipLibCheck", "--exactOptionalPropertyTypes", "false", "--target", "ESNext", "--module", "ESNext", "--moduleResolution", "Bundler", "--rootDir", "packages", "--outDir", temp, "--types", "bun", ...entries]);
-if (result.exitCode !== 0) throw new Error(new TextDecoder().decode(result.stderr || result.stdout));
+const result = Bun.spawnSync(["bunx", "tsc", "--project", "tsconfig.dts.json"]);
+if (result.exitCode !== 0) {
+  const err = new TextDecoder().decode(result.stderr || result.stdout);
+  throw new Error(err || "TypeScript declaration generation failed");
+}
 
 async function copyTree(source: string, destination: string): Promise<void> {
   await mkdir(destination, { recursive: true });
