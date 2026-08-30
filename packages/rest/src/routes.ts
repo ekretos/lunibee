@@ -1,18 +1,36 @@
-/** Type-safe Discord API v10 route builders. */
+/** Discord REST API route definitions. */
 export const Routes = {
-  /** Returns the current bot user. @returns Current-user route. */ user: () =>
+  /** Returns the current bot user. @returns User route. */ user: () =>
     "/users/@me",
-  /** Returns a user by ID. @param userId User identifier. @returns User route. */ userById:
+  /** Returns one user. @param userId User identifier. @returns User route. */ userById:
     (userId: string) => `/users/${snowflake(userId, "User ID")}`,
-  /** Returns a guild by ID. @param guildId Guild identifier. @returns Guild route. */ guild:
+  /** Returns a guild. @param guildId Guild identifier. @returns Guild route. */ guild:
     (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}`,
-  /** Returns channels for a guild. @param guildId Guild identifier. @returns Guild-channel route. */ guildChannels:
+  /** Returns channels in a guild. @param guildId Guild identifier. @returns Channel collection route. */ guildChannels:
     (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/channels`,
   /** Returns a guild member. @param guildId Guild identifier. @param userId User identifier. @returns Guild-member route. */ guildMember:
     (guildId: string, userId: string) =>
       `/guilds/${snowflake(guildId, "Guild ID")}/members/${snowflake(userId, "User ID")}`,
   /** Returns all guild roles. @param guildId Guild identifier. @returns Guild-role route. */ guildRoles:
     (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/roles`,
+  /** Returns an individual guild role. */ guildRole: (
+    guildId: string,
+    roleId: string,
+  ) =>
+    `/guilds/${snowflake(guildId, "Guild ID")}/roles/${snowflake(roleId, "Role ID")}`,
+  /** Returns a member role route. */ guildMemberRole: (
+    guildId: string,
+    userId: string,
+    roleId: string,
+  ) =>
+    `/guilds/${snowflake(guildId, "Guild ID")}/members/${snowflake(userId, "User ID")}/roles/${snowflake(roleId, "Role ID")}`,
+  /** Returns guild bans collection. */ guildBans: (guildId: string) =>
+    `/guilds/${snowflake(guildId, "Guild ID")}/bans`,
+  /** Returns an individual guild ban. */ guildBan: (
+    guildId: string,
+    userId: string,
+  ) =>
+    `/guilds/${snowflake(guildId, "Guild ID")}/bans/${snowflake(userId, "User ID")}`,
   /** Returns a channel. @param channelId Channel identifier. @returns Channel route. */ channel:
     (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}`,
   /** Returns messages in a channel. @param channelId Channel identifier. @returns Message collection route. */ channelMessages:
@@ -51,6 +69,12 @@ export const Routes = {
   /** Returns a webhook. @param webhookId Webhook identifier. @param token Optional webhook token. @returns Webhook route. */ webhook:
     (webhookId: string, token?: string) =>
       `/webhooks/${snowflake(webhookId, "Webhook ID")}${token ? `/${encodeURIComponent(token)}` : ""}`,
+  /** Returns a webhook message. */ webhookMessage: (
+    webhookId: string,
+    token: string,
+    messageId: string,
+  ) =>
+    `/webhooks/${snowflake(webhookId, "Webhook ID")}/${encodeURIComponent(token)}/messages/${snowflake(messageId, "Message ID")}`,
   /** Returns application commands for an application. @param applicationId Application identifier. @returns Global command route. */ applicationCommands:
     (applicationId: string) =>
       `/applications/${snowflake(applicationId, "Application ID")}/commands`,
@@ -60,6 +84,9 @@ export const Routes = {
   /** Returns guild application commands. @param applicationId Application identifier. @param guildId Guild identifier. @returns Guild command route. */ guildApplicationCommands:
     (applicationId: string, guildId: string) =>
       `/applications/${snowflake(applicationId, "Application ID")}/guilds/${snowflake(guildId, "Guild ID")}/commands`,
+  /** Returns a single guild application command. @param applicationId Application identifier. @param guildId Guild identifier. @param commandId Command identifier. @returns Guild command route. */ guildApplicationCommand:
+    (applicationId: string, guildId: string, commandId: string) =>
+      `/applications/${snowflake(applicationId, "Application ID")}/guilds/${snowflake(guildId, "Guild ID")}/commands/${snowflake(commandId, "Command ID")}`,
   /** Returns an interaction callback endpoint. @param interactionId Interaction identifier. @param token Interaction token. @returns Interaction callback route. */ interactionCallback:
     (interactionId: string, token: string) =>
       `/interactions/${snowflake(interactionId, "Interaction ID")}/${encodeURIComponent(token)}/callback`,

@@ -29,10 +29,19 @@ export class SlashCommandBuilder {
     return this;
   }
   /** Sets whether the command is available in direct messages. */ public setDMPermission(
-    value: boolean,
+    enabled: boolean,
   ): this {
-    this.#data.dm_permission = value;
+    this.#data.dm_permission = enabled;
     return this;
+  }
+  /** Sets whether the command is NSFW. */
+  public setNSFW(nsfw = true): this {
+    this.#data.nsfw = nsfw;
+    return this;
+  }
+  /** Sets whether the command is NSFW. */
+  public setNsfw(nsfw = true): this {
+    return this.setNSFW(nsfw);
   }
   /** Sets command default member permissions. */ public setDefaultMemberPermissions(
     permissions: bigint | number | string | null,
@@ -222,43 +231,101 @@ export class StringOptionBuilder extends CommandOptionBuilder {
 }
 /** Builds an integer command option. */
 export class IntegerOptionBuilder extends CommandOptionBuilder {
-  /** Creates an integer option. */ public constructor() {
+  public constructor() {
     super(ApplicationCommandOptionType.Integer);
   }
-  /** Sets minimum value. */ public setMinValue(value: number): this {
-    validateNumberRange(value, -2_147_483_648, 2_147_483_647, "min_value");
+  public setMinValue(value: number): this {
+    validateNumberRange(
+      value,
+      -9_007_199_254_740_991,
+      9_007_199_254_740_991,
+      "min_value",
+      true,
+    );
     this.data.min_value = value;
     return this;
   }
-  /** Sets maximum value. */ public setMaxValue(value: number): this {
-    validateNumberRange(value, -2_147_483_648, 2_147_483_647, "max_value");
+  public setMaxValue(value: number): this {
+    validateNumberRange(
+      value,
+      -9_007_199_254_740_991,
+      9_007_199_254_740_991,
+      "max_value",
+      true,
+    );
     if (
       (this.data.min_value as number | undefined) !== undefined &&
       (this.data.min_value as number) > value
     )
       throw new RangeError("min_value cannot exceed max_value.");
     this.data.max_value = value;
+    return this;
+  }
+  public setAutocomplete(enabled = true): this {
+    if (enabled && Array.isArray(this.data.choices) && this.data.choices.length)
+      throw new RangeError("Autocomplete options cannot define choices.");
+    this.data.autocomplete = enabled;
+    return this;
+  }
+  public addChoices(...choices: { name: string; value: number }[]): this {
+    const current = (this.data.choices as unknown[] | undefined) ?? [];
+    if (!choices.length)
+      throw new TypeError("At least one choice is required.");
+    if (this.data.autocomplete === true)
+      throw new RangeError("Autocomplete options cannot define choices.");
+    if (current.length + choices.length > 25)
+      throw new RangeError("An option cannot contain more than 25 choices.");
+    this.data.choices = [...current, ...choices];
     return this;
   }
 }
 /** Builds a number command option. */
 export class NumberOptionBuilder extends CommandOptionBuilder {
-  /** Creates a number option. */ public constructor() {
+  public constructor() {
     super(ApplicationCommandOptionType.Number);
   }
-  /** Sets minimum value. */ public setMinValue(value: number): this {
-    finite(value, "min_value");
+  public setMinValue(value: number): this {
+    validateNumberRange(
+      value,
+      -9_007_199_254_740_991,
+      9_007_199_254_740_991,
+      "min_value",
+      false,
+    );
     this.data.min_value = value;
     return this;
   }
-  /** Sets maximum value. */ public setMaxValue(value: number): this {
-    finite(value, "max_value");
+  public setMaxValue(value: number): this {
+    validateNumberRange(
+      value,
+      -9_007_199_254_740_991,
+      9_007_199_254_740_991,
+      "max_value",
+      false,
+    );
     if (
       (this.data.min_value as number | undefined) !== undefined &&
       (this.data.min_value as number) > value
     )
       throw new RangeError("min_value cannot exceed max_value.");
     this.data.max_value = value;
+    return this;
+  }
+  public setAutocomplete(enabled = true): this {
+    if (enabled && Array.isArray(this.data.choices) && this.data.choices.length)
+      throw new RangeError("Autocomplete options cannot define choices.");
+    this.data.autocomplete = enabled;
+    return this;
+  }
+  public addChoices(...choices: { name: string; value: number }[]): this {
+    const current = (this.data.choices as unknown[] | undefined) ?? [];
+    if (!choices.length)
+      throw new TypeError("At least one choice is required.");
+    if (this.data.autocomplete === true)
+      throw new RangeError("Autocomplete options cannot define choices.");
+    if (current.length + choices.length > 25)
+      throw new RangeError("An option cannot contain more than 25 choices.");
+    this.data.choices = [...current, ...choices];
     return this;
   }
 }
@@ -438,12 +505,15 @@ function validateNumberRange(
   minimum: number,
   maximum: number,
   field: string,
+  integerOnly = true,
 ): void {
-  if (!Number.isInteger(value) || value < minimum || value > maximum)
+  if (
+    !Number.isFinite(value) ||
+    (integerOnly && !Number.isInteger(value)) ||
+    value < minimum ||
+    value > maximum
+  )
     throw new RangeError(
-      `${field} must be an integer between ${minimum} and ${maximum}.`,
+      `${field} must be ${integerOnly ? "an integer" : "a number"} between ${minimum} and ${maximum}.`,
     );
-}
-function finite(value: number, field: string): void {
-  if (!Number.isFinite(value)) throw new RangeError(`${field} must be finite.`);
 }

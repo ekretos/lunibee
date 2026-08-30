@@ -5,8 +5,26 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
-    "types": ["bun"]
+    "types": [
+      "bun"
+    ],
+    "paths": {
+      "@lunibee/builders": ["./packages/builders/src/index.ts"],
+      "@lunibee/collection": ["./packages/collection/src/index.ts"],
+      "@lunibee/core": ["./packages/core/src/index.ts"],
+      "@lunibee/handlers": ["./packages/handlers/src/index.ts"],
+      "@lunibee/managers": ["./packages/managers/src/index.ts"],
+      "@lunibee/rest": ["./packages/rest/src/index.ts"],
+      "@lunibee/sharding": ["./packages/sharding/src/index.ts"],
+      "@lunibee/structures": ["./packages/structures/src/index.ts"],
+      "@lunibee/types": ["./packages/types/src/index.ts"],
+      "@lunibee/ws": ["./packages/ws/src/index.ts"]
+    }
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "packages/*/src/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }

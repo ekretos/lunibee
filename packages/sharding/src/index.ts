@@ -88,6 +88,11 @@ export class ShardManager {
     this.#resolved = false;
     this.#destroyed = true;
   }
+  /** Calculates the target shard ID for a Discord guild snowflake. @param guildId Guild snowflake. @returns Shard identifier. */
+  public getShardIdForGuild(guildId: string): number {
+    const id = BigInt(guildId);
+    return Number((id >> 22n) % BigInt(this.shardCount || 1));
+  }
   /** Gets a shard by ID. @param id Shard identifier. @returns Gateway instance or undefined. */ public get(
     id: number,
   ): Gateway | undefined {

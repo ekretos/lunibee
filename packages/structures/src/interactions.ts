@@ -22,7 +22,7 @@ export interface InteractionData {
   /** Application identifier. */ application_id: string;
   /** Interaction type. */ type: number;
   /** Interaction token. */ token: string;
-  /** Gateway/API version. */ version: number;
+  /** Gateway/API version. */ version?: number;
   /** Guild identifier. */ guild_id?: string;
   /** Channel identifier. */ channel_id?: string;
   /** Interaction-specific data. */ data?: Record<string, unknown>;
@@ -58,12 +58,10 @@ export interface InteractionClient {
 }
 /** A Discord interaction callback payload. */
 export class InteractionResponse {
-  /** Callback response type. */ public readonly type: number;
-  /** Optional callback data. */ public readonly data?: InteractionReplyOptions;
-  /** Creates a response payload. @param type Discord callback type. @param data Optional callback data. @throws {TypeError} If type is not finite. */ public constructor(
-    type: number,
-    data?: InteractionReplyOptions,
-  ) {
+  readonly type: number;
+  readonly data?: InteractionReplyOptions;
+  /** Creates a response payload. @param type Discord callback type. @param data Optional callback data. @throws {TypeError} If type is not finite. */
+  public constructor(type: number, data?: InteractionReplyOptions) {
     if (!Number.isFinite(type))
       throw new TypeError("Interaction response type must be finite.");
     this.type = type;
@@ -148,6 +146,10 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     if (!this.replied && !this.deferred)
       throw new Error("Interaction has not been acknowledged.");
   }
+  /** Posts a raw interaction response callback. */
+  protected postResponse(response: InteractionResponse): Promise<unknown> {
+    return this.#client.postInteractionResponse(this.id, this.token, response);
+  }
   /** Sends the initial interaction response. @param options Response message options. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */ public async reply(
     options: InteractionReplyOptions | string,
   ): Promise<unknown> {
@@ -204,6 +206,24 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     this.replied = true;
     return result;
   }
+  /** Opens a modal dialog in the user's client. @param modal Modal builder output or raw modal callback data. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */
+  public async showModal(
+    modal: {
+      custom_id: string;
+      title: string;
+      components: unknown[];
+      [key: string]: unknown;
+    },
+  ): Promise<unknown> {
+    this.assertUnacknowledged();
+    const result = await this.#client.postInteractionResponse(
+      this.id,
+      this.token,
+      new InteractionResponse(InteractionResponseType.Modal, modal as InteractionReplyOptions),
+    );
+    this.replied = true;
+    return result;
+  }
 }
 /** Application command interaction. */
 export class CommandInteraction extends Interaction {
@@ -213,19 +233,38 @@ export class CommandInteraction extends Interaction {
 }
 /** Message component interaction. */
 export class ComponentInteraction extends Interaction {
-  /** Component custom ID. @returns Custom ID or an empty string. */
+  /** Gets component custom ID. */
   public get customId(): string {
-    return typeof this.data.data?.custom_id === "string"
-      ? this.data.data.custom_id
-      : "";
+    return (this.data as any)?.data?.custom_id ?? "";
   }
-  /** Submitted select-menu values. @returns String values. */
+  /** Gets component type. */
+  public get componentType(): number {
+    return (this.data as any)?.data?.component_type ?? 0;
+  }
+  /** Gets selected values for select menu component interactions. */
   public get values(): string[] {
-    return Array.isArray(this.data.data?.values)
-      ? this.data.data.values.filter(
-          (value): value is string => typeof value === "string",
-        )
-      : [];
+    return (this.data as any)?.data?.values ?? [];
+  }
+  /** Defers updating the message to which the component was attached. */
+  public async deferUpdate(): Promise<void> {
+    this.assertUnacknowledged();
+    await this.postResponse(
+      new InteractionResponse(InteractionResponseType.DeferredMessageUpdate),
+    );
+    this.deferred = true;
+  }
+  /** Updates the message to which the component was attached. */
+  public async update(
+    options: InteractionReplyOptions | string,
+  ): Promise<unknown> {
+    this.assertUnacknowledged();
+    const payload =
+      typeof options === "string" ? { content: options } : options;
+    const result = await this.postResponse(
+      new InteractionResponse(InteractionResponseType.MessageUpdate, payload),
+    );
+    this.replied = true;
+    return result;
   }
 }
 
@@ -243,5 +282,49 @@ export function createInteraction(
       return new ComponentInteraction(client, data);
     default:
       return new Interaction(client, data);
+  }
+}
+
+/** Represents a Discord modal submission interaction. */
+export class ModalSubmitInteraction extends Interaction {
+  /** Gets the submitted modal custom ID. */
+  public get customId(): string {
+    return (this.data as any)?.data?.custom_id ?? "";
+  }
+
+  /** Retrieves the text value for a specific text input custom ID. */
+  public getInputValue(customId: string): string | undefined {
+    const rows = (this.data as any)?.data?.components ?? [];
+    for (const row of rows) {
+      for (const comp of row.components ?? []) {
+        if (comp.custom_id === customId) return comp.value;
+      }
+    }
+    return undefined;
+  }
+}
+
+/** Represents a Discord slash command autocomplete interaction. */
+export class AutocompleteInteraction extends Interaction {
+  /** Gets the target command name. */
+  public get commandName(): string {
+    return (this.data as any)?.data?.name ?? "";
+  }
+
+  /** Gets the currently focused autocomplete option. */
+  public get focusedOption(): { name: string; value: unknown } | undefined {
+    const options = (this.data as any)?.data?.options ?? [];
+    return options.find((opt: any) => opt.focused);
+  }
+
+  /** Responds to Discord with autocomplete choices. */
+  public async respond(
+    choices: { name: string; value: string | number }[],
+  ): Promise<void> {
+    const response = new InteractionResponse(
+      InteractionResponseType.Autocomplete,
+      { choices },
+    );
+    await this.postResponse(response);
   }
 }

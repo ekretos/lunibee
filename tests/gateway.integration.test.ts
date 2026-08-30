@@ -3,6 +3,7 @@ import {
   Gateway,
   GatewayError,
   GatewayOpcodes,
+  GatewayState,
 } from "../packages/ws/src/index.ts";
 
 class FakeWebSocket {
@@ -183,6 +184,231 @@ describe("Gateway integration lifecycle", () => {
     await new Promise((resolve) => setTimeout(resolve, 40));
     expect(zombies.length).toBe(1);
     expect(socket.closeCode).toBe(1001);
+    gateway.close();
+  });
+
+  test("closes connection when heartbeat acknowledgement times out", async () => {
+    const gateway = new Gateway({
+      token: "token",
+      intents: 1,
+      heartbeatAckTimeout: 10,
+      reconnect: false,
+    });
+    const promise = gateway.connect();
+    const socket = FakeWebSocket.instances[0]!;
+    socket.open();
+    await promise;
+    socket.receive({ op: GatewayOpcodes.Hello, d: { heartbeat_interval: 20 } });
+    await Bun.sleep(60);
+    expect(socket.closeCode).toBe(1001);
+    gateway.close();
+
+    const gwCloseErr = new Gateway({
+      token: "token",
+      intents: 1,
+      heartbeatAckTimeout: 10,
+      reconnect: false,
+    });
+    let gwError: any;
+    gwCloseErr.on("error", (e) => {
+      gwError = e;
+    });
+    const p = gwCloseErr.connect();
+    const s = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
+    s.open();
+    await p;
+    s.close = () => {
+      throw new Error("close failure");
+    };
+    s.receive({ op: GatewayOpcodes.Hello, d: { heartbeat_interval: 20 } });
+    await Bun.sleep(60);
+    expect(gwError).toBeDefined();
+    gwCloseErr.close();
+  });
+
+  test("normalizes connection error", async () => {
+    const gateway = new Gateway({
+      token: "token",
+      intents: 1,
+      reconnect: false,
+    });
+    globalThis.WebSocket = class FailingWebSocket {
+      constructor() {
+        throw "raw connection error";
+      }
+    } as any;
+    await expect(gateway.connect()).rejects.toThrow();
+    gateway.close();
+
+    const gw2 = new Gateway({
+      token: "token",
+      intents: 1,
+      reconnect: false,
+    });
+    globalThis.WebSocket = class FailingGwWebSocket {
+      constructor() {
+        throw new GatewayError("Custom Gateway error");
+      }
+    } as any;
+    await expect(gw2.connect()).rejects.toThrow("Custom Gateway error");
+    gw2.close();
+  });
+
+  test("emits error on websocket error event", async () => {
+    const gateway = new Gateway({
+      token: "token",
+      intents: 1,
+      reconnect: false,
+    });
+    let error: any;
+    gateway.on("error", (e) => {
+      error = e;
+    });
+    const promise = gateway.connect();
+    const socket = FakeWebSocket.instances[0]!;
+    socket.open();
+    await promise;
+    socket.emit("error", {});
+    expect(error).toBeInstanceOf(GatewayError);
+    gateway.close();
+  });
+
+  test("sends presence, voice state, member requests and handles rate limits", async () => {
+    const gateway = new Gateway({
+      token: "token",
+      intents: 1,
+      reconnect: false,
+    });
+    const promise = gateway.connect();
+    const socket = FakeWebSocket.instances[0]!;
+    socket.open();
+    await promise;
+
+    expect(
+      gateway.setPresence({ status: "dnd", activities: [{ name: "Playing" }] }),
+    ).toBe(true);
+    expect(gateway.setVoiceState({ guild_id: "1", channel_id: "2" })).toBe(
+      true,
+    );
+    expect(gateway.requestGuildMembers({ guild_id: "1", query: "" })).toBe(
+      true,
+    );
+
+    for (let i = 0; i < 112; i++) {
+      gateway.send({ op: 1, d: null, s: null, t: null });
+    }
+    let error: any;
+    gateway.on("error", (e) => {
+      error = e;
+    });
+    expect(gateway.send({ op: 1, d: null, s: null, t: null })).toBe(false);
+    gateway.close();
+
+    const failingGw = new Gateway({
+      token: "token",
+      intents: 1,
+      reconnect: false,
+    });
+    const p2 = failingGw.connect();
+    const s2 = FakeWebSocket.instances[1]!;
+    s2.open();
+    await p2;
+    s2.send = () => {
+      throw new Error("send failure");
+    };
+    expect(failingGw.send({ op: 1, d: null, s: null, t: null })).toBe(false);
+    failingGw.close();
+  });
+
+  test("reconnects with fresh identity on 4007", async () => {
+    const gateway = new Gateway({
+      token: "token",
+      intents: 1,
+      reconnect: true,
+      reconnectBaseDelay: 5,
+    });
+    const promise = gateway.connect();
+    const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
+    socket.open();
+    await promise;
+    socket.close(4007);
+    await Bun.sleep(20);
+    expect(FakeWebSocket.instances.length).toBeGreaterThan(1);
+    gateway.close();
+  });
+
+  test("stops reconnecting on fatal close code 4004", async () => {
+    const gateway = new Gateway({
+      token: "token",
+      intents: 1,
+      reconnect: true,
+    });
+    const promise = gateway.connect();
+    const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
+    socket.open();
+    await promise;
+    socket.close(4004);
+    gateway.close();
+  });
+
+  test("exhausts max reconnect attempts", async () => {
+    const gateway = new Gateway({
+      token: "token",
+      intents: 1,
+      reconnect: true,
+      maxReconnectAttempts: 1,
+      reconnectBaseDelay: 5,
+    });
+    const promise = gateway.connect();
+    const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
+    socket.open();
+    await promise;
+    socket.close(1006);
+    await Bun.sleep(20);
+    const socket2 =
+      FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
+    socket2.close(1006);
+    await Bun.sleep(20);
+    expect(gateway.state).toBe(GatewayState.Connect);
+    gateway.close();
+  });
+
+  test("emits and removes custom event listeners with emit and off", async () => {
+    const gateway = new Gateway({ token: "token", intents: 0 });
+    let val: any;
+    const fn = (v: any) => {
+      val = v;
+    };
+    gateway.on("custom", fn);
+    gateway.emit("custom", 42);
+    expect(val).toBe(42);
+    gateway.off("custom", fn);
+    gateway.emit("custom", 99);
+    expect(val).toBe(42);
+
+    let caughtError: any;
+    gateway.on("error", (e) => {
+      caughtError = e;
+    });
+    gateway.on("syncThrow", () => {
+      throw new Error("sync error");
+    });
+    gateway.emit("syncThrow", null);
+    expect(caughtError).toBeDefined();
+
+    gateway.on("rawThrow", () => {
+      throw "raw non error";
+    });
+    gateway.emit("rawThrow", null);
+    expect(caughtError).toBeDefined();
+
+    gateway.on("asyncThrow", async () => {
+      throw new Error("async error");
+    });
+    gateway.emit("asyncThrow", null);
+    await Bun.sleep(10);
+    expect(caughtError).toBeDefined();
+
     gateway.close();
   });
 });

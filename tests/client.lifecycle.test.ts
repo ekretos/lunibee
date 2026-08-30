@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { Client, IntentBits, GatewayIntentBits, resolveGatewayIntents } from "../packages/core/src/index.ts";
+import {
+  Client,
+  IntentBits,
+  GatewayIntentBits,
+  resolveGatewayIntents,
+} from "../packages/core/src/index.ts";
 
 describe("Client lifecycle & Intents", () => {
   test("starts idle and exposes readiness state", () => {
@@ -28,8 +33,8 @@ describe("Client lifecycle & Intents", () => {
     const resolved = resolveGatewayIntents(intentsArray);
     expect(resolved).toBe(
       GatewayIntentBits.Guilds |
-      GatewayIntentBits.GuildMessages |
-      GatewayIntentBits.MessageContent
+        GatewayIntentBits.GuildMessages |
+        GatewayIntentBits.MessageContent,
     );
 
     const client = new Client({
@@ -45,11 +50,15 @@ describe("Client lifecycle & Intents", () => {
   });
 
   test("supports intents as string array", () => {
-    const resolved = resolveGatewayIntents(["guilds", "guildMessages", "messageContent"]);
+    const resolved = resolveGatewayIntents([
+      "guilds",
+      "guildMessages",
+      "messageContent",
+    ]);
     expect(resolved).toBe(
       GatewayIntentBits.Guilds |
-      GatewayIntentBits.GuildMessages |
-      GatewayIntentBits.MessageContent
+        GatewayIntentBits.GuildMessages |
+        GatewayIntentBits.MessageContent,
     );
   });
 });

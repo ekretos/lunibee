@@ -57,7 +57,14 @@ test("message resource methods delegate through ChannelManager", async () => {
   expect(calls[2]).toEqual({
     method: "POST",
     path: `/channels/${channelId}/messages`,
-    body: { content: "reply" },
+    body: {
+      content: "reply",
+      message_reference: {
+        message_id: messageId,
+        channel_id: channelId,
+        guild_id: undefined,
+      },
+    },
   });
   expect(calls[3]).toEqual({
     method: "PATCH",

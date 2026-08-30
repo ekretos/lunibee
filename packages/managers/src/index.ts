@@ -1,3 +1,5 @@
+import { Manager, ResourceManager } from "./base.js";
+export { Manager, ResourceManager } from "./base.js";
 /** Collection-backed generic resource manager. */
 import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
@@ -11,93 +13,6 @@ import {
 import { MessageManager } from "./message.js";
 import { ThreadManager } from "./thread.js";
 
-/** Generic cache manager. @typeParam K Cache key type. @typeParam V Cached value type. */
-export class Manager<K, V> {
-  /** Cached resources. */ public readonly cache = new Collection<K, V>();
-  /** Gets a cached value. @param id Cache key. @returns Cached value. */ public get(
-    id: K,
-  ): V | undefined {
-    return this.cache.get(id);
-  }
-  /** Checks whether a value is cached. @param id Cache key. @returns True when cached. */ public has(
-    id: K,
-  ): boolean {
-    return this.cache.has(id);
-  }
-  /** Stores a value. @param id Cache key. @param value Value. @returns This manager. */ public set(
-    id: K,
-    value: V,
-  ): this {
-    this.cache.set(id, value);
-    return this;
-  }
-  /** Deletes a cached value. @param id Cache key. @returns True when deleted. */ public delete(
-    id: K,
-  ): boolean {
-    return this.cache.delete(id);
-  }
-  /** Clears the cache. @returns Nothing. */ public clear(): void {
-    this.cache.clear();
-  }
-  /** Gets cache size. @returns Number of cached values. */ public get size(): number {
-    return this.cache.size;
-  }
-  /** Gets the first cached value. @returns First value. */ public first():
-    V | undefined {
-    return this.cache.first();
-  }
-  /** Returns cached values. @returns Array of values. */ public values(): V[] {
-    return this.cache.array();
-  }
-  /** Finds a cached value. @param predicate Predicate. @returns Matching value. */ public find(
-    predicate: (value: V, key: K) => boolean,
-  ): V | undefined {
-    return this.cache.find(predicate);
-  }
-  /** Iterates cached entries. @returns Cache iterator. */ public [Symbol.iterator](): IterableIterator<
-    [K, V]
-  > {
-    return this.cache[Symbol.iterator]();
-  }
-}
-/** Generic REST-backed resource manager. @typeParam K Resource key type. @typeParam V Resource type. */
-export class ResourceManager<K, V> extends Manager<K, V> {
-  readonly #fetcher: (id: K) => Promise<V>;
-  readonly #key: (value: V) => K;
-  /** Creates a resource manager. @param fetcher Resource fetcher. @param key Key extractor. @throws {TypeError} When callbacks are invalid. */
-  public constructor(fetcher: (id: K) => Promise<V>, key: (value: V) => K) {
-    super();
-    if (typeof fetcher !== "function" || typeof key !== "function")
-      throw new TypeError(
-        "ResourceManager requires fetcher and key functions.",
-      );
-    this.#fetcher = fetcher;
-    this.#key = key;
-  }
-  /** Resolves from cache or REST. @param id Resource key. @returns Resource. */ public async resolve(
-    id: K,
-  ): Promise<V> {
-    return this.get(id) ?? this.fetch(id);
-  }
-  /** Fetches and caches a resource. @param id Resource key. @returns Resource. */ public async fetch(
-    id: K,
-  ): Promise<V> {
-    const value = await this.#fetcher(id);
-    this.update(value);
-    return value;
-  }
-  /** Fetches multiple resources. @param ids Resource keys. @returns Resources. */ public async fetchMany(
-    ids: Iterable<K>,
-  ): Promise<V[]> {
-    return Promise.all([...ids].map((id) => this.fetch(id)));
-  }
-  /** Updates a resource in cache. @param value Resource. @returns This manager. */ public update(
-    value: V,
-  ): this {
-    this.set(this.#key(value), value);
-    return this;
-  }
-}
 /** Manages users. */
 export class UserManager extends ResourceManager<string, User> {
   /** Creates a user manager. @param rest REST transport. */ public constructor(
@@ -422,3 +337,17 @@ export type CreateMessageOptions = MessageCreateOptions;
 export { MessageManager } from "./message.js";
 /** Exposes the thread manager class. */
 export { ThreadManager } from "./thread.js";
+
+export {
+  RoleManager,
+  type RoleCreateOptions,
+  type RoleEditOptions,
+} from "./role.js";
+export {
+  GuildMemberManager,
+  type MemberEditOptions,
+  type BanOptions,
+} from "./member.js";
+export {
+  ApplicationCommandManager,
+} from "./application.js";

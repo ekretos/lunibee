@@ -21,6 +21,8 @@ export class Message extends BaseStructure {
   /** Whether the message is pinned. */ public pinned: boolean;
   /** Whether the message mentions everyone. */ public mentionEveryone: boolean;
   /** Discord message type. */ public type: number;
+  /** Message reference (reply chain data). */ public readonly reference?: import("@lunibee/types").APIMessageReference;
+  /** The referenced/replied-to message, if included by Discord. */ public readonly referencedMessage?: Message | null;
   readonly #context?: ResourceContext;
   /** Creates a message from Discord API data. @param data Message payload. @param context Optional owning resource context. @throws {TypeError} If required message identifiers are invalid. */
   public constructor(
@@ -45,6 +47,12 @@ export class Message extends BaseStructure {
     this.pinned = data.pinned ?? false;
     this.mentionEveryone = data.mention_everyone ?? false;
     this.type = data.type ?? 0;
+    this.reference = data.message_reference;
+    this.referencedMessage = data.referenced_message
+      ? new Message(data.referenced_message, context)
+      : data.referenced_message === null
+        ? null
+        : undefined;
     this.#context = context;
     this.channel = new Channel(
       { id: data.channel_id, type: 0, guild_id: data.guild_id },
@@ -71,15 +79,20 @@ export class Message extends BaseStructure {
       throw new Error("This message is not attached to a client.");
     return this.#context.crosspostMessage(this.channelId, this.id);
   }
-  /** Replies in this message's channel. @param options Message content or payload. @returns Created reply. @throws {Error} If detached from a client. */ public reply(
-    options: string | { content?: string },
+  /** Replies in this message's channel, auto-populating message_reference. @param options Message content or payload. @returns Created reply. @throws {Error} If detached from a client. */ public reply(
+    options: string | { content?: string; [key: string]: unknown },
   ): Promise<Message> {
     if (!this.#context)
       throw new Error("This message is not attached to a client.");
-    return this.#context.sendMessage(
-      this.channelId,
-      typeof options === "string" ? { content: options } : options,
-    );
+    const payload =
+      typeof options === "string" ? { content: options } : { ...options };
+    // Automatically thread the reply via Discord's message_reference
+    (payload as Record<string, unknown>).message_reference = {
+      message_id: this.id,
+      channel_id: this.channelId,
+      guild_id: this.guildId,
+    };
+    return this.#context.sendMessage(this.channelId, payload);
   }
 }
 

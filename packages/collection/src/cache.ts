@@ -64,8 +64,7 @@ export class Cache<K, V> {
     this.#entries.set(key, { value, expiresAt });
     while (this.#entries.size > this.#maxSize) {
       const oldest = this.#entries.firstKey();
-      if (oldest === undefined) break;
-      this.#entries.delete(oldest);
+      if (oldest !== undefined) this.#entries.delete(oldest);
     }
     return this;
   }
