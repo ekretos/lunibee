@@ -1,7 +1,6 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
-// Support both custom domain (lunibee.js.org) and GitHub Pages subpath (ekretos.github.io/lunibee)
 const site = process.env.ASTRO_SITE || "https://lunibee.js.org";
 const base = process.env.ASTRO_BASE || undefined;
 
@@ -45,7 +44,7 @@ export default defineConfig({
           ],
         },
         {
-          label: "Packages",
+          label: "API Reference",
           collapsed: false,
           items: [
             { label: "Architecture Overview", link: "/packages/overview" },

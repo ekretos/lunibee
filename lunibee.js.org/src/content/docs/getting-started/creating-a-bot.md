@@ -3,7 +3,6 @@ title: Creating a Bot
 description: Setting up your Discord Application, Bot Account, and Bot Token.
 ---
 
-# Creating a Discord Bot
 
 To connect Lunibee to Discord, you need a Bot Token from the Discord Developer Portal.
 

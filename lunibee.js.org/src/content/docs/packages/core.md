@@ -1,26 +1,23 @@
 ---
 title: "@lunibee/core"
-description: Complete guide for the Lunibee Client, event dispatching, collectors, and bot lifecycle.
+description: Main Client coordinator, event emitter, and lifecycle state management.
 ---
 
-# `@lunibee/core`
-
-`@lunibee/core` is the primary orchestrator that connects the WebSocket Gateway, REST API, Managers, and Interaction handling into a cohesive, production-ready Discord bot client.
+The `@lunibee/core` package is the primary coordinator for Lunibee bots. It integrates the WebSocket Gateway, REST HTTP client, Resource Managers, and interaction dispatching into a cohesive client.
 
 ## Installation
 
 ```bash
-bun add @lunibee/core
+bun add @lunibee/core @lunibee/types
 ```
 
 ---
 
-## `Client`
-
-The `Client` is the main entrypoint for your bot application.
+## `Client` Class
 
 ```ts
-import { Client, IntentBits, GatewayIntentBits } from "lunibee";
+import { Client } from "@lunibee/core";
+import { IntentBits } from "@lunibee/types";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
@@ -33,12 +30,10 @@ const client = new Client({
 
 client.on("ready", (user) => {
   console.log(`Logged in as ${user.username}#${user.discriminator}!`);
-  console.log(`Bot is in ${client.guilds.size} guilds.`);
 });
 
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
-
   if (message.content === "!ping") {
     await message.reply({ content: "🏓 Pong!" });
   }
@@ -47,59 +42,46 @@ client.on("messageCreate", async (message) => {
 await client.login();
 ```
 
-### Client Properties
+### Constructor Options (`ClientOptions`)
 
-- **`client.user`**: `ClientUser | undefined` — Authenticated bot user.
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `token` | `string` | Required | Discord Bot Authentication Token. |
+| `intents` | `number[] \| number \| string[]` | Required | Gateway Intents to subscribe to. |
+| `rest` | `RESTOptions` | `{}` | Custom REST configuration. |
+| `ws` | `GatewayOptions` | `{}` | Custom Gateway configuration. |
+
+### Properties
+
+- **`client.user`**: `ClientUser | undefined` — The authenticated bot user once connected.
 - **`client.guilds`**: `GuildManager` — Cache and resource manager for Discord guilds.
-- **`client.channels`**: `ChannelManager` — Cache and resource manager for channels and messages.
-- **`client.users`**: `UserManager` — Cache and resource manager for users.
-- **`client.rest`**: `REST` — REST client for direct Discord HTTP calls.
-- **`client.ws`**: `Gateway` — Low-level WebSocket gateway connection.
-- **`client.uptime`**: `number | null` — Time in milliseconds since the bot became ready.
-- **`client.isReady()`**: `boolean` — Returns true if the client is connected and ready.
-- **`client.destroy()`**: `void` — Closes Gateway connections, aborts pending REST requests, and releases all resources.
+- **`client.channels`**: `ChannelManager` — Cache and resource manager for Discord channels and messages.
+- **`client.users`**: `UserManager` — Cache and resource manager for Discord users.
+- **`client.rest`**: `REST` — Low-level REST client for Discord API HTTP requests.
+- **`client.ws`**: `Gateway` — Low-level WebSocket Gateway connection.
+- **`client.uptime`**: `number | null` — Time in milliseconds since the client established the ready state.
+- **`client.isReady()`**: `boolean` — Returns true if the client is currently connected and ready.
 
-### Client Gateway Events
+### Methods
 
-| Event | Payload | Description |
-|---|---|---|
-| `"ready"` | `ClientUser` | Emitted when Gateway finishes handshake and initial cache sync. |
-| `"messageCreate"` | `Message` | Emitted when a new message is posted in a channel. |
-| `"messageUpdate"` | `Message` | Emitted when a message is edited. |
-| `"messageDelete"` | `APIMessageDeleteEvent` | Emitted when a message is deleted. |
-| `"messageDeleteBulk"` | `APIMessageDeleteBulkEvent` | Emitted when multiple messages are bulk deleted. |
-| `"guildCreate"` | `Guild` | Emitted when the bot joins a guild or becomes available. |
-| `"guildUpdate"` | `Guild` | Emitted when guild settings change. |
-| `"guildDelete"` | `{ id: string; unavailable?: boolean }` | Emitted when the bot leaves or is kicked from a guild. |
-| `"interactionCreate"` | `Interaction` | Emitted when a slash command, button, select menu, or modal is submitted. |
-| `"channelCreate"` | `Channel` | Emitted when a channel is created. |
-| `"channelUpdate"` | `Channel` | Emitted when a channel is updated. |
-| `"channelDelete"` | `APIChannel` | Emitted when a channel is deleted. |
+- **`login(token?: string): Promise<string>`**: Logs into Discord and establishes Gateway and REST connections.
+- **`destroy(): void`**: Gracefully closes WebSocket connections, cancels pending REST requests, and cleans up event listeners.
 
 ---
 
-## `Collector<T>`
+## `Collector<T>` Class
 
-`Collector` gathers items (such as messages or interaction responses) over a period of time matching a filter.
+Gathers events over a time window or until a condition is met.
 
 ```ts
 import { Collector } from "@lunibee/core";
 
-// Collect up to 5 messages from a user within 30 seconds
-const collector = new Collector<Message>(emitter, "messageCreate", {
-  filter: (msg) => msg.author.id === userId,
+const collector = new Collector(client, "messageCreate", {
+  filter: (msg) => msg.author.id === targetUserId,
   max: 5,
   time: 30_000,
 });
 
-collector.on("collect", (msg) => {
-  console.log("Collected message:", msg.content);
-});
-
-collector.on("end", (collected, reason) => {
-  console.log(`Collected ${collected.length} messages. Reason: ${reason}`);
-});
-
-// Or await the next single item with async/await
-const nextMessage = await collector.next();
+collector.on("collect", (msg) => console.log("Collected:", msg.content));
+collector.on("end", (collected, reason) => console.log(`Finished: ${collected.length} items.`));
 ```

@@ -3,7 +3,6 @@ title: Error Handling & Retries
 description: Inspecting REST errors, Discord error codes, and handling rate limits.
 ---
 
-# Error Handling & Retries
 
 Lunibee provides structured `RESTError` types with Discord API details.
 
@@ -11,7 +10,6 @@ Lunibee provides structured `RESTError` types with Discord API details.
 
 ```ts
 import { RESTError } from "lunibee";
-
 try {
   await client.channels.sendMessage("invalid-id", { content: "Hello!" });
 } catch (error) {

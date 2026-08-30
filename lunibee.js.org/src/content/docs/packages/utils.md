@@ -1,11 +1,9 @@
 ---
 title: "@lunibee/utils"
-description: Snowflake validation and shared monorepo utilities.
+description: Utility functions for snowflakes, async delays, and random numbers.
 ---
 
-# `@lunibee/utils`
-
-`@lunibee/utils` provides shared runtime helpers across Lunibee packages.
+The `@lunibee/utils` package provides zero-overhead utility functions used across Lunibee packages.
 
 ## Installation
 
@@ -13,8 +11,20 @@ description: Snowflake validation and shared monorepo utilities.
 bun add @lunibee/utils
 ```
 
-## Features
+---
 
-- Snowflake validation (`isSnowflake`, `extractTimestamp`).
-- Fast shallow/deep cloning.
-- Constant-time string matching.
+## Utility Functions
+
+```ts
+import { sleep, randomInt, isSnowflake } from "@lunibee/utils";
+
+// Asynchronous sleep
+await sleep(1000); // Waits 1 second
+
+// Random integer between min and max (inclusive)
+const diceRoll = randomInt(1, 6);
+
+// Validate Discord snowflake string
+const valid = isSnowflake("123456789012345678"); // true
+const invalid = isSnowflake("abc"); // false
+```

@@ -3,7 +3,6 @@ title: "Permissions & Bitfields"
 description: Complete guide for Discord permissions, bitwise calculations, and camelCase getters in Lunibee.
 ---
 
-# Permissions & Bitfields
 
 Lunibee provides dual-approach permission checking:
 1. **Bitwise Bitfields** (`PermissionsBitField` and `PermissionFlagsBits`) for raw bitwise math and serialized Discord API strings.
@@ -16,33 +15,69 @@ Lunibee provides dual-approach permission checking:
 ```ts
 import { PermissionsBitField, PermissionFlagsBits } from "lunibee";
 
-// Instantiate from BigInt, number, string, array, or another bitfield
-const perms = new PermissionsBitField([
-  PermissionFlagsBits.ViewChannel,
-  PermissionFlagsBits.SendMessages,
-  PermissionFlagsBits.EmbedLinks,
+if (member.permissions.administrator) {
+  console.log("Member is a server administrator.");
+}
+
+// Property destructuring:
+const { administrator, kickMembers, banMembers } = member.permissions;
+if (administrator || (kickMembers && banMembers)) {
+  console.log("Authorized for moderation action.");
+}
+```
+
+---
+
+## 2. Multi-Permission Checks (`has` vs `any`)
+
+When evaluating multiple permissions, Lunibee provides `.has()` for **ALL** checks and `.any()` for **ANY** checks:
+
+### Check if member has ALL permissions (AND)
+Pass multiple arguments to verify that **every** permission is present:
+
+```ts
+import { Permission } from "lunibee";
+// 1. Using clean Permission constants:
+if (member.permissions.has(Permission.kickMembers, Permission.banMembers)) {
+  console.log("Member has BOTH kick AND ban permissions.");
+}
+// 2. Using string names:
+if (member.permissions.has("kickMembers", "banMembers")) {
+  console.log("Member has both permissions.");
+}
+```
+
+### Check if member has AT LEAST ONE permission (OR)
+Use `.any()` to check if **at least one** of the specified permissions is enabled:
+
+```ts
+import { Permission } from "lunibee";
+// Returns true if the member has either Kick OR Ban:
+if (member.permissions.any(Permission.kickMembers, Permission.banMembers)) {
+  console.log("Member can either kick or ban.");
+}
+```
+
+---
+
+## 3. Immutable BitField Manipulation
+
+`PermissionSet` operations are completely immutable:
+
+```ts
+import { PermissionSet, Permission } from "lunibee";
+const basePermissions = new PermissionSet([
+  Permission.viewChannel,
+  Permission.sendMessages,
 ]);
-
-// Check permissions
-if (perms.has(PermissionFlagsBits.Administrator)) {
-  console.log("User is an Administrator!");
-}
-
-// Check multiple permissions
-if (perms.has([PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks])) {
-  console.log("User can send messages and embed links.");
-}
-
-// Check if user has ANY of the specified permissions
-if (perms.any([PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers])) {
-  console.log("User can moderate members.");
-}
-
-// Add / remove permissions (immutable bitwise operations)
-const updated = perms.add(PermissionFlagsBits.AttachFiles).remove(PermissionFlagsBits.SendMessages);
-
-// Convert to array of permission names
-const names = perms.toArray(); // ["ViewChannel", "SendMessages", "EmbedLinks"]
+// Add permissions
+const elevated = basePermissions.add(Permission.embedLinks, Permission.attachFiles);
+// Remove permissions
+const restricted = elevated.remove(Permission.sendMessages);
+// Inspect results
+console.log(elevated.embedLinks); // true
+console.log(restricted.sendMessages); // false
+console.log(elevated.toArray()); // ['viewChannel', 'sendMessages', 'embedLinks', 'attachFiles']
 ```
 
 ---

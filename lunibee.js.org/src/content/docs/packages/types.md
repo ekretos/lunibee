@@ -1,11 +1,9 @@
 ---
 title: "@lunibee/types"
-description: Discord API v10 and WebSocket Gateway TypeScript types.
+description: Complete TypeScript type definitions and enums for Discord API v10.
 ---
 
-# `@lunibee/types`
-
-`@lunibee/types` provides complete TypeScript types for Discord API v10 and Gateway opcodes.
+The `@lunibee/types` package provides complete TypeScript type definitions, Gateway event interfaces, and constants for the Discord API v10.
 
 ## Installation
 
@@ -13,7 +11,21 @@ description: Discord API v10 and WebSocket Gateway TypeScript types.
 bun add @lunibee/types
 ```
 
-## Features
+---
 
-- Zero-runtime overhead (pure type definitions).
-- Up-to-date Discord API v10 enum definitions (`GatewayIntentBits`, `ActivityType`, `ChannelType`, `ButtonStyle`, `TextInputStyle`).
+## Enums & Constants
+
+```ts
+import {
+  IntentBits,
+  ChannelType,
+  MessageFlags,
+  ApplicationCommandType,
+  ApplicationCommandOptionType,
+  InteractionType,
+} from "@lunibee/types";
+
+const intents = IntentBits.guilds | IntentBits.guildMessages;
+const channelType = ChannelType.GuildText;
+const flags = MessageFlags.Ephemeral;
+```
