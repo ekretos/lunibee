@@ -13,36 +13,69 @@
       "default": "./dist/index.js"
     },
     "./core": {
+      "types": "./dist/core/index.d.ts",
       "import": "./dist/core/index.js",
       "default": "./dist/core/index.js"
     },
     "./structures": {
+      "types": "./dist/structures/index.d.ts",
       "import": "./dist/structures/index.js",
       "default": "./dist/structures/index.js"
     },
     "./managers": {
+      "types": "./dist/managers/index.d.ts",
       "import": "./dist/managers/index.js",
       "default": "./dist/managers/index.js"
     },
     "./rest": {
+      "types": "./dist/rest/index.d.ts",
       "import": "./dist/rest/index.js",
       "default": "./dist/rest/index.js"
     },
     "./ws": {
+      "types": "./dist/ws/index.d.ts",
       "import": "./dist/ws/index.js",
       "default": "./dist/ws/index.js"
     },
     "./sharding": {
+      "types": "./dist/sharding/index.d.ts",
       "import": "./dist/sharding/index.js",
       "default": "./dist/sharding/index.js"
     },
     "./builders": {
+      "types": "./dist/builders/index.d.ts",
       "import": "./dist/builders/index.js",
       "default": "./dist/builders/index.js"
     },
     "./types": {
+      "types": "./dist/types/index.d.ts",
       "import": "./dist/types/index.js",
       "default": "./dist/types/index.js"
+    },
+    "./voice": {
+      "types": "./dist/voice/index.d.ts",
+      "import": "./dist/voice/index.js",
+      "default": "./dist/voice/index.js"
+    },
+    "./collection": {
+      "types": "./dist/collection/index.d.ts",
+      "import": "./dist/collection/index.js",
+      "default": "./dist/collection/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js",
+      "default": "./dist/utils/index.js"
+    },
+    "./handlers": {
+      "types": "./dist/handlers/index.d.ts",
+      "import": "./dist/handlers/index.js",
+      "default": "./dist/handlers/index.js"
+    },
+    "./formatters": {
+      "types": "./dist/formatters/index.d.ts",
+      "import": "./dist/formatters/index.js",
+      "default": "./dist/formatters/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -54,6 +87,7 @@
   ],
   "scripts": {
     "build": "bun scripts/build.ts",
+    "build:dts": "bunx tsc --project tsconfig.declaration.json",
     "check:deps": "bun scripts/check-dependency-graph.ts",
     "typecheck": "bunx tsc --noEmit --project tsconfig.json",
     "ci:install": "bun install --frozen-lockfile",
