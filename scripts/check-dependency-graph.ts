@@ -34,21 +34,43 @@ async function loadManifests(): Promise<Map<string, PackageManifest>> {
         if (!entry.isDirectory()) continue;
         const directory = join("packages", entry.name);
         const manifestPath = join(process.cwd(), directory, "package.json");
-        const manifest = JSON.parse(await Bun.file(manifestPath).text()) as {
-            name?: unknown;
+        try {
+            const manifestContent = await Bun.file(manifestPath).text();
+            const manifest = JSON.parse(manifestContent) as {
+                name?: unknown;
+                dependencies?: Record<string, string>;
+                devDependencies?: Record<string, string>;
+            };
+            if (typeof manifest.name !== "string" || !manifest.name) continue;
+            
+            manifests.set(manifest.name, {
+                name: manifest.name,
+                directory,
+                dependencies: Object.keys(manifest.dependencies ?? {}),
+                devDependencies: Object.keys(manifest.devDependencies ?? {}),
+            });
+        } catch (e) {
+            continue;
+        }
+    }
+
+    try {
+        const rootManifestPath = join(process.cwd(), "package.json");
+        const rootManifestContent = await Bun.file(rootManifestPath).text();
+        const rootManifest = JSON.parse(rootManifestContent) as {
+            name?: string;
             dependencies?: Record<string, string>;
             devDependencies?: Record<string, string>;
         };
-        if (typeof manifest.name !== "string" || !manifest.name) {
-            throw new Error(`Invalid package name in ${manifestPath}`);
+        if (typeof rootManifest.name === "string" && rootManifest.name) {
+            manifests.set(rootManifest.name, {
+                name: rootManifest.name,
+                directory: ".",
+                dependencies: Object.keys(rootManifest.dependencies ?? {}),
+                devDependencies: Object.keys(rootManifest.devDependencies ?? {}),
+            });
         }
-        manifests.set(manifest.name, {
-            name: manifest.name,
-            directory,
-            dependencies: Object.keys(manifest.dependencies ?? {}),
-            devDependencies: Object.keys(manifest.devDependencies ?? {}),
-        });
-    }
+    } catch (e) {}
 
     return manifests;
 }

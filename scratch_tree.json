@@ -1,0 +1,2217 @@
+{
+  "sha": "4ef14ec4a804e7013bd920a744fe7261d6e3cba1",
+  "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/4ef14ec4a804e7013bd920a744fe7261d6e3cba1",
+  "tree": [
+    {
+      "path": ".gitattributes",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cc672fedf98d6fcd5a5e63e4306a1399c7c4e986",
+      "size": 25,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/cc672fedf98d6fcd5a5e63e4306a1399c7c4e986"
+    },
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "28531d1a4008113565d130bf174e8529409e2621",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/28531d1a4008113565d130bf174e8529409e2621"
+    },
+    {
+      "path": ".github/workflows",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4fb01a13d649ac128ca75537400faf1d9e87cb61",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/4fb01a13d649ac128ca75537400faf1d9e87cb61"
+    },
+    {
+      "path": ".github/workflows/check.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "066d42811839d58956a5ab2165cd154c31b8d1e1",
+      "size": 382,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/066d42811839d58956a5ab2165cd154c31b8d1e1"
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ddda58393a047ea91ebbaa04c535502002d9f1fe",
+      "size": 647,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ddda58393a047ea91ebbaa04c535502002d9f1fe"
+    },
+    {
+      "path": ".github/workflows/publish-core.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "54efd79a801c92547e0658b2cb5346f078e8bf36",
+      "size": 858,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/54efd79a801c92547e0658b2cb5346f078e8bf36"
+    },
+    {
+      "path": ".github/workflows/publish-create.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9898e2f225394acfeb6eb05d1cea457dd67c630f",
+      "size": 874,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/9898e2f225394acfeb6eb05d1cea457dd67c630f"
+    },
+    {
+      "path": ".github/workflows/publish-handlers.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "91b18fc557616c7207866498c7da84074226c32c",
+      "size": 922,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/91b18fc557616c7207866498c7da84074226c32c"
+    },
+    {
+      "path": ".github/workflows/publish-helpers.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "14459724b44d847676b0f1103d510e6cc9d55d47",
+      "size": 918,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/14459724b44d847676b0f1103d510e6cc9d55d47"
+    },
+    {
+      "path": ".github/workflows/publish-jsx.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f387401c5520c7549ba52bef4a4de160e3c84c3a",
+      "size": 872,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f387401c5520c7549ba52bef4a4de160e3c84c3a"
+    },
+    {
+      "path": ".github/workflows/publish-redis.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3812e9d91f3f4e0efb8050d8edf1508c9301ae99",
+      "size": 880,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3812e9d91f3f4e0efb8050d8edf1508c9301ae99"
+    },
+    {
+      "path": ".github/workflows/publish-transformers.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ff9a2359779fa4f5caaa37ce50545c04ad9100e0",
+      "size": 908,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ff9a2359779fa4f5caaa37ce50545c04ad9100e0"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ad0853c8bf1e11aa1471695eacd7c4234f823e8b",
+      "size": 181,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ad0853c8bf1e11aa1471695eacd7c4234f823e8b"
+    },
+    {
+      "path": ".vscode",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2bf2f219b320c273befc1ef0665b47c072f3e971",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/2bf2f219b320c273befc1ef0665b47c072f3e971"
+    },
+    {
+      "path": ".vscode/extensions.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9c29ff944337c443893112b89ea84fc501fb3a44",
+      "size": 162,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/9c29ff944337c443893112b89ea84fc501fb3a44"
+    },
+    {
+      "path": ".vscode/settings.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8cfa504c745fd3e2a5cff2acf27d3eaaf93f570",
+      "size": 814,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a8cfa504c745fd3e2a5cff2acf27d3eaaf93f570"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "00585b2ede4bfd192b29975867663428364b95aa",
+      "size": 611,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/00585b2ede4bfd192b29975867663428364b95aa"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "size": 11357,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "825f5f29dfdc1d54f412281200c11c00015e7f8b",
+      "size": 349,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/825f5f29dfdc1d54f412281200c11c00015e7f8b"
+    },
+    {
+      "path": "bun.lock",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb2d6c7908fa913126baf090cad8628b9b89f924",
+      "size": 162006,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/bb2d6c7908fa913126baf090cad8628b9b89f924"
+    },
+    {
+      "path": "eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "864480d24ba22838aae3be66a52346cbd0363d1f",
+      "size": 24645,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/864480d24ba22838aae3be66a52346cbd0363d1f"
+    },
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1001bb5e1c087842d9f4fbe4ea0c457180fae08",
+      "size": 1244,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/d1001bb5e1c087842d9f4fbe4ea0c457180fae08"
+    },
+    {
+      "path": "packages",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6b66bc3ea599f0925f41031e59667216cbae7cbb",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/6b66bc3ea599f0925f41031e59667216cbae7cbb"
+    },
+    {
+      "path": "packages/core",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "90eb49746bcce1a00a0a0cc9ef8f510a78c90d27",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/90eb49746bcce1a00a0a0cc9ef8f510a78c90d27"
+    },
+    {
+      "path": "packages/core/.npmignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "464a3d271c3951ceb5ef348a26e08632984a2df4",
+      "size": 21,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/464a3d271c3951ceb5ef348a26e08632984a2df4"
+    },
+    {
+      "path": "packages/core/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f8a51cc7e0a960cd4341e03d9940ed9b5c8d1455",
+      "size": 222,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f8a51cc7e0a960cd4341e03d9940ed9b5c8d1455"
+    },
+    {
+      "path": "packages/core/bunfig.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7caf33aef37e5990ffc5452fcacfff1a7d0a6666",
+      "size": 195,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7caf33aef37e5990ffc5452fcacfff1a7d0a6666"
+    },
+    {
+      "path": "packages/core/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "952693f167fd28aa12cb44640bfbf121373b3413",
+      "size": 72,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/952693f167fd28aa12cb44640bfbf121373b3413"
+    },
+    {
+      "path": "packages/core/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a310ab767976c48466a92318b9a313248e921591",
+      "size": 1426,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a310ab767976c48466a92318b9a313248e921591"
+    },
+    {
+      "path": "packages/core/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6c378f2af6c940ec2f3484699c1f833c2cc3af2b",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/6c378f2af6c940ec2f3484699c1f833c2cc3af2b"
+    },
+    {
+      "path": "packages/core/src/cache",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "35aefeb318d38603f1c1bf850642b99d1c070c68",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/35aefeb318d38603f1c1bf850642b99d1c070c68"
+    },
+    {
+      "path": "packages/core/src/cache/manager.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "63aad1b8296d970fc640f711489d20f69d8d08dd",
+      "size": 1914,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/63aad1b8296d970fc640f711489d20f69d8d08dd"
+    },
+    {
+      "path": "packages/core/src/client.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5df28bde4340d410d5b3a444753f0324da5cc01d",
+      "size": 26268,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/5df28bde4340d410d5b3a444753f0324da5cc01d"
+    },
+    {
+      "path": "packages/core/src/enums",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1def8c82379a2618ec25a381180474e5a4238294",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/1def8c82379a2618ec25a381180474e5a4238294"
+    },
+    {
+      "path": "packages/core/src/enums/activity.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4af36aceca9b47ee69753d165c7a3c7f52add090",
+      "size": 344,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4af36aceca9b47ee69753d165c7a3c7f52add090"
+    },
+    {
+      "path": "packages/core/src/enums/application.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dddf5ac0933185ddfff3e82201ccb9bb2253d152",
+      "size": 802,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/dddf5ac0933185ddfff3e82201ccb9bb2253d152"
+    },
+    {
+      "path": "packages/core/src/enums/audit-log.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5f71baff3a1eb32cf0d57cceeed5ebd4dd8c3b7c",
+      "size": 1477,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/5f71baff3a1eb32cf0d57cceeed5ebd4dd8c3b7c"
+    },
+    {
+      "path": "packages/core/src/enums/auto-moderation.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ed7f6e9e18b43e7e0cc87f70634cd0f5cdbafe2d",
+      "size": 395,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ed7f6e9e18b43e7e0cc87f70634cd0f5cdbafe2d"
+    },
+    {
+      "path": "packages/core/src/enums/cache.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dd8b0875029279459d665bb2885d3ea2ae71d34c",
+      "size": 886,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/dd8b0875029279459d665bb2885d3ea2ae71d34c"
+    },
+    {
+      "path": "packages/core/src/enums/channel.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ef3139dcad5db9da4dae64faa27a37cddf98312",
+      "size": 806,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4ef3139dcad5db9da4dae64faa27a37cddf98312"
+    },
+    {
+      "path": "packages/core/src/enums/client.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7c0292a4cbe6394d489dcd70fcf1a32be0b0efe",
+      "size": 567,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e7c0292a4cbe6394d489dcd70fcf1a32be0b0efe"
+    },
+    {
+      "path": "packages/core/src/enums/gateway.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eda9d58b16625ef30fd2edd44fcad866955ccfe5",
+      "size": 4277,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/eda9d58b16625ef30fd2edd44fcad866955ccfe5"
+    },
+    {
+      "path": "packages/core/src/enums/guild-schedule-event.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d03938a1b1a4d84974d79e3d7b6aefbba74e0dd2",
+      "size": 282,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/d03938a1b1a4d84974d79e3d7b6aefbba74e0dd2"
+    },
+    {
+      "path": "packages/core/src/enums/guild.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "642c2bcb3852d253845dd0a2467b3f78751073e5",
+      "size": 1751,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/642c2bcb3852d253845dd0a2467b3f78751073e5"
+    },
+    {
+      "path": "packages/core/src/enums/image.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "71aaa86914bc19296ab1fa5abcc3a0e5412a494a",
+      "size": 237,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/71aaa86914bc19296ab1fa5abcc3a0e5412a494a"
+    },
+    {
+      "path": "packages/core/src/enums/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "980f0f1a1eb149ebfa69b3e57f43993f35b244ee",
+      "size": 589,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/980f0f1a1eb149ebfa69b3e57f43993f35b244ee"
+    },
+    {
+      "path": "packages/core/src/enums/interaction.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "99e7ce02a92f2e95edf60704216f469e4de7de15",
+      "size": 1315,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/99e7ce02a92f2e95edf60704216f469e4de7de15"
+    },
+    {
+      "path": "packages/core/src/enums/message.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f0345a9b9e7d792c4dabc355557d4ed13cf046b3",
+      "size": 1916,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f0345a9b9e7d792c4dabc355557d4ed13cf046b3"
+    },
+    {
+      "path": "packages/core/src/enums/others.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aeb9c9c37e637ad892373f6b044f8c83d47c9c64",
+      "size": 769,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/aeb9c9c37e637ad892373f6b044f8c83d47c9c64"
+    },
+    {
+      "path": "packages/core/src/enums/permissions.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fac2b37fce8a246730206880a677e0a03a916cf3",
+      "size": 1695,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/fac2b37fce8a246730206880a677e0a03a916cf3"
+    },
+    {
+      "path": "packages/core/src/enums/poll.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "50f7e38e7af69272904854e56cf412233c42099f",
+      "size": 140,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/50f7e38e7af69272904854e56cf412233c42099f"
+    },
+    {
+      "path": "packages/core/src/enums/team.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7302f94a597daea62f162111d46d08f3dcee680f",
+      "size": 114,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7302f94a597daea62f162111d46d08f3dcee680f"
+    },
+    {
+      "path": "packages/core/src/enums/user.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a16331a054fb985ff164fb546b62188632957bb",
+      "size": 582,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1a16331a054fb985ff164fb546b62188632957bb"
+    },
+    {
+      "path": "packages/core/src/enums/webhook.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "689b83c9965acc3e364ecd2f2c53ad7cec8c7c50",
+      "size": 89,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/689b83c9965acc3e364ecd2f2c53ad7cec8c7c50"
+    },
+    {
+      "path": "packages/core/src/http",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "32fc788005136ff0293038484d04308ff93fa444",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/32fc788005136ff0293038484d04308ff93fa444"
+    },
+    {
+      "path": "packages/core/src/http/cdn.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7b94b570a2052cb72a2a0dc9f78d49229f32d77b",
+      "size": 5607,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7b94b570a2052cb72a2a0dc9f78d49229f32d77b"
+    },
+    {
+      "path": "packages/core/src/http/rest.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a91b3bbc6ffb94f9d5cd44ea95d313514f89e9c5",
+      "size": 56230,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a91b3bbc6ffb94f9d5cd44ea95d313514f89e9c5"
+    },
+    {
+      "path": "packages/core/src/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ecc67ec1fa22468bb69a3af56c6821ded31ceb57",
+      "size": 211,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ecc67ec1fa22468bb69a3af56c6821ded31ceb57"
+    },
+    {
+      "path": "packages/core/src/typings",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fa6d9918a9fce6066adfba2b53379e7b4804db53",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/fa6d9918a9fce6066adfba2b53379e7b4804db53"
+    },
+    {
+      "path": "packages/core/src/typings/activity.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2bd4079b9018534969b0887eebf6172d8f1d9d35",
+      "size": 1016,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/2bd4079b9018534969b0887eebf6172d8f1d9d35"
+    },
+    {
+      "path": "packages/core/src/typings/application-command-options.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5d4c34a4e712e0395104333569987ee5d5f65c00",
+      "size": 2756,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/5d4c34a4e712e0395104333569987ee5d5f65c00"
+    },
+    {
+      "path": "packages/core/src/typings/application-command.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "819f3e0abb962f4ed967b3249eae1e1f4d57f858",
+      "size": 4619,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/819f3e0abb962f4ed967b3249eae1e1f4d57f858"
+    },
+    {
+      "path": "packages/core/src/typings/application.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3feb63a7861617dec07bd25fa5bc96774dccfdba",
+      "size": 3348,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3feb63a7861617dec07bd25fa5bc96774dccfdba"
+    },
+    {
+      "path": "packages/core/src/typings/audit-log.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "53dd75ba1152e7649ce2c1753d08993338f4ffd9",
+      "size": 1700,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/53dd75ba1152e7649ce2c1753d08993338f4ffd9"
+    },
+    {
+      "path": "packages/core/src/typings/auto-moderation.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f7ccc9616b6d4efdd4f37263f75af98cbc75e90",
+      "size": 1976,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1f7ccc9616b6d4efdd4f37263f75af98cbc75e90"
+    },
+    {
+      "path": "packages/core/src/typings/cache-manager.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8cf867dc7afe48936b9aea8c11650b1b82270e68",
+      "size": 700,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/8cf867dc7afe48936b9aea8c11650b1b82270e68"
+    },
+    {
+      "path": "packages/core/src/typings/channel.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a226d5adab4d7d48e0f6cd062adeae908c976f6f",
+      "size": 10203,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a226d5adab4d7d48e0f6cd062adeae908c976f6f"
+    },
+    {
+      "path": "packages/core/src/typings/client.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62b52be066b4c668120b8e703634344d1610e3d4",
+      "size": 9241,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/62b52be066b4c668120b8e703634344d1610e3d4"
+    },
+    {
+      "path": "packages/core/src/typings/embed.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2098fe4e219461324e8991dcf58efc97005915cb",
+      "size": 2476,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/2098fe4e219461324e8991dcf58efc97005915cb"
+    },
+    {
+      "path": "packages/core/src/typings/emoji.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ecf29e4709da219fb49cca003d2631c94137e241",
+      "size": 467,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ecf29e4709da219fb49cca003d2631c94137e241"
+    },
+    {
+      "path": "packages/core/src/typings/gateway-events.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4776d4402f32e6a07772344591dbc05f1c65edbe",
+      "size": 19056,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4776d4402f32e6a07772344591dbc05f1c65edbe"
+    },
+    {
+      "path": "packages/core/src/typings/guild.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e23e6e8ae9611619025da690afd6eee2d1785c6d",
+      "size": 16438,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e23e6e8ae9611619025da690afd6eee2d1785c6d"
+    },
+    {
+      "path": "packages/core/src/typings/image-data.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "092e00c46560e76b97638f2221b5defd8e32d876",
+      "size": 133,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/092e00c46560e76b97638f2221b5defd8e32d876"
+    },
+    {
+      "path": "packages/core/src/typings/image.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "41ccca006e17b63c32d1c20cc89ba544a8570593",
+      "size": 297,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/41ccca006e17b63c32d1c20cc89ba544a8570593"
+    },
+    {
+      "path": "packages/core/src/typings/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8ba1fc84b30d04ae1d9d07b489d4c470a8aa1bfd",
+      "size": 1047,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/8ba1fc84b30d04ae1d9d07b489d4c470a8aa1bfd"
+    },
+    {
+      "path": "packages/core/src/typings/interaction.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3a3482807ca51fc34f8144def90641b03352bc71",
+      "size": 5486,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3a3482807ca51fc34f8144def90641b03352bc71"
+    },
+    {
+      "path": "packages/core/src/typings/invite.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "64646d0bbf5617b17910227bc9452ef7d7b4c5d8",
+      "size": 1424,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/64646d0bbf5617b17910227bc9452ef7d7b4c5d8"
+    },
+    {
+      "path": "packages/core/src/typings/localizations.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "418f9f726e9467d4e96ebf14d5643393047d8bbe",
+      "size": 417,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/418f9f726e9467d4e96ebf14d5643393047d8bbe"
+    },
+    {
+      "path": "packages/core/src/typings/message-components.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "903e289c74a6089fd5596add869f308d948c47df",
+      "size": 2783,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/903e289c74a6089fd5596add869f308d948c47df"
+    },
+    {
+      "path": "packages/core/src/typings/message.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c46c34b8bb149f4c83bf893a6347731180d78264",
+      "size": 6330,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/c46c34b8bb149f4c83bf893a6347731180d78264"
+    },
+    {
+      "path": "packages/core/src/typings/oauth2.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "771fe0c9390be8acd1de90b9cc66fb652c215427",
+      "size": 734,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/771fe0c9390be8acd1de90b9cc66fb652c215427"
+    },
+    {
+      "path": "packages/core/src/typings/others.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8fdc78f5860a48414d7b3fc6fa7d015f8610824a",
+      "size": 936,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/8fdc78f5860a48414d7b3fc6fa7d015f8610824a"
+    },
+    {
+      "path": "packages/core/src/typings/poll.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61b554fb87959f460283da1c05a681c94398dcbb",
+      "size": 2659,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/61b554fb87959f460283da1c05a681c94398dcbb"
+    },
+    {
+      "path": "packages/core/src/typings/role.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b52416b299f84d1b30a48ff5f4777a8ce24c49bb",
+      "size": 1525,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/b52416b299f84d1b30a48ff5f4777a8ce24c49bb"
+    },
+    {
+      "path": "packages/core/src/typings/stage-instance.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7461bc53620316fb3998b77d8386030e827f4907",
+      "size": 597,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7461bc53620316fb3998b77d8386030e827f4907"
+    },
+    {
+      "path": "packages/core/src/typings/sticker.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e409e6ae44d18fe73f55a88dafa3df72b1c3f191",
+      "size": 858,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e409e6ae44d18fe73f55a88dafa3df72b1c3f191"
+    },
+    {
+      "path": "packages/core/src/typings/team.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "23216b3acf019696e88449bfcde618ac0d6cd1c9",
+      "size": 502,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/23216b3acf019696e88449bfcde618ac0d6cd1c9"
+    },
+    {
+      "path": "packages/core/src/typings/user.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c6db27532a4cf0ccd1fa61d5a0baf490bfd21f85",
+      "size": 892,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/c6db27532a4cf0ccd1fa61d5a0baf490bfd21f85"
+    },
+    {
+      "path": "packages/core/src/typings/utils.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7b9df34885ab7191b873578f5d7cfdffa5cadd10",
+      "size": 43,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7b9df34885ab7191b873578f5d7cfdffa5cadd10"
+    },
+    {
+      "path": "packages/core/src/typings/voice.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb92656e6bbc0ae0c8d94fcd8fd03e5e19235bef",
+      "size": 848,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/fb92656e6bbc0ae0c8d94fcd8fd03e5e19235bef"
+    },
+    {
+      "path": "packages/core/src/typings/webhook.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cfa5d3ac5ee1c2d3bcf8b3afebc0369041cb837b",
+      "size": 1612,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/cfa5d3ac5ee1c2d3bcf8b3afebc0369041cb837b"
+    },
+    {
+      "path": "packages/core/src/utils.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "662ae2997d709ccd44fb9e93ae9518fea515a74c",
+      "size": 790,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/662ae2997d709ccd44fb9e93ae9518fea515a74c"
+    },
+    {
+      "path": "packages/core/src/ws",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bcdafa84d5c5886c77cd93cf721e07f154dce61e",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/bcdafa84d5c5886c77cd93cf721e07f154dce61e"
+    },
+    {
+      "path": "packages/core/src/ws/manager.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f98c5b43f97c62c8c0358fa714038f8dacaf4a4e",
+      "size": 8593,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f98c5b43f97c62c8c0358fa714038f8dacaf4a4e"
+    },
+    {
+      "path": "packages/core/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f6749eee3b54139449b1e84c844f2628d92a6539",
+      "size": 345,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f6749eee3b54139449b1e84c844f2628d92a6539"
+    },
+    {
+      "path": "packages/create",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "534eff69f128025cb389d182f309194123bffba4",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/534eff69f128025cb389d182f309194123bffba4"
+    },
+    {
+      "path": "packages/create/.npmignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46af539c17953195b7ec79d00c431feee09e0e02",
+      "size": 5,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/46af539c17953195b7ec79d00c431feee09e0e02"
+    },
+    {
+      "path": "packages/create/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "737a1e457fc9b4e1ada0a61993d307b50a5b62d5",
+      "size": 248,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/737a1e457fc9b4e1ada0a61993d307b50a5b62d5"
+    },
+    {
+      "path": "packages/create/bunfig.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4645cf6714a9e8847cfb8530e66d51c6943af322",
+      "size": 194,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4645cf6714a9e8847cfb8530e66d51c6943af322"
+    },
+    {
+      "path": "packages/create/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a5cf1ce2dc1bca837cf3aab4260b0d21b58b7c8",
+      "size": 122,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1a5cf1ce2dc1bca837cf3aab4260b0d21b58b7c8"
+    },
+    {
+      "path": "packages/create/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3a2fa96b52d7f405fca9c78a9741fc3a909fef82",
+      "size": 1109,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3a2fa96b52d7f405fca9c78a9741fc3a909fef82"
+    },
+    {
+      "path": "packages/create/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9b7f4155b412831a724ea1325d1a4a7848c04ccd",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/9b7f4155b412831a724ea1325d1a4a7848c04ccd"
+    },
+    {
+      "path": "packages/create/src/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "94dd0141f3865690a95a5f14de8bac4b2109fa29",
+      "size": 5672,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/94dd0141f3865690a95a5f14de8bac4b2109fa29"
+    },
+    {
+      "path": "packages/create/src/templates.cts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d4587480825a4c5f79f395283db48e9ff694f08f",
+      "size": 1817,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/d4587480825a4c5f79f395283db48e9ff694f08f"
+    },
+    {
+      "path": "packages/create/src/templates",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "28af469a4634620f9156ffea6ddaf2aaa6b7b7a1",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/28af469a4634620f9156ffea6ddaf2aaa6b7b7a1"
+    },
+    {
+      "path": "packages/create/src/templates/basic-template.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5d9114ddbc1581d87d3c15dd0f7e7af0af7770a7",
+      "size": 259,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/5d9114ddbc1581d87d3c15dd0f7e7af0af7770a7"
+    },
+    {
+      "path": "packages/create/src/templates/handlers-template.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "503eee2c26296f9cb313a2a5d67e1a1dc47ae851",
+      "size": 496,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/503eee2c26296f9cb313a2a5d67e1a1dc47ae851"
+    },
+    {
+      "path": "packages/create/src/templates/listener-template.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb40fc0497cecbf8297a11d193c7d127cff82bfd",
+      "size": 180,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/fb40fc0497cecbf8297a11d193c7d127cff82bfd"
+    },
+    {
+      "path": "packages/create/src/templates/transformers-template.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1ad3927c4728f3f34e8b7659bfd12c365c0c9932",
+      "size": 360,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1ad3927c4728f3f34e8b7659bfd12c365c0c9932"
+    },
+    {
+      "path": "packages/create/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9b23db4195d3ed323a0f3d56fc0bf8a49da2815c",
+      "size": 220,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/9b23db4195d3ed323a0f3d56fc0bf8a49da2815c"
+    },
+    {
+      "path": "packages/docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1e68f49611c8e08d5438e3312113a56803c0b189",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/1e68f49611c8e08d5438e3312113a56803c0b189"
+    },
+    {
+      "path": "packages/docs/astro.config.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cae0e7ad75870069d48bd92a3d58ffd096e610a9",
+      "size": 6698,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/cae0e7ad75870069d48bd92a3d58ffd096e610a9"
+    },
+    {
+      "path": "packages/docs/bunfig.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7caf33aef37e5990ffc5452fcacfff1a7d0a6666",
+      "size": 195,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7caf33aef37e5990ffc5452fcacfff1a7d0a6666"
+    },
+    {
+      "path": "packages/docs/compile.sh",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f2fe3ac34326dba7b3de801e2fa26a141068b325",
+      "size": 241,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f2fe3ac34326dba7b3de801e2fa26a141068b325"
+    },
+    {
+      "path": "packages/docs/diagrams",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "817673102f5704da6e6f4f9bdfc50e28a4daa6dd",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/817673102f5704da6e6f4f9bdfc50e28a4daa6dd"
+    },
+    {
+      "path": "packages/docs/diagrams/api-flow.d2",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9fd5589606d9ed2d6e3ca09af5a9faaabd9b98f8",
+      "size": 446,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/9fd5589606d9ed2d6e3ca09af5a9faaabd9b98f8"
+    },
+    {
+      "path": "packages/docs/diagrams/compiler.d2",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7d3ff41017889dda7913f1213dca374da35f441b",
+      "size": 1725,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7d3ff41017889dda7913f1213dca374da35f441b"
+    },
+    {
+      "path": "packages/docs/diagrams/shared.d2",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "305463e7eb8db80dc79d74127e1fb2ed6d8c3093",
+      "size": 1188,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/305463e7eb8db80dc79d74127e1fb2ed6d8c3093"
+    },
+    {
+      "path": "packages/docs/diagrams/websocket-flow.d2",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d490bf3432219ef5958f22f927fb0c046d7c887e",
+      "size": 2679,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/d490bf3432219ef5958f22f927fb0c046d7c887e"
+    },
+    {
+      "path": "packages/docs/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "952693f167fd28aa12cb44640bfbf121373b3413",
+      "size": 72,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/952693f167fd28aa12cb44640bfbf121373b3413"
+    },
+    {
+      "path": "packages/docs/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d4699ec9a9ee2de2245b268951e6041c8c2e4275",
+      "size": 677,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/d4699ec9a9ee2de2245b268951e6041c8c2e4275"
+    },
+    {
+      "path": "packages/docs/public",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "da4affd5713afd3ee7651909ca8743f1c46a1b27",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/da4affd5713afd3ee7651909ca8743f1c46a1b27"
+    },
+    {
+      "path": "packages/docs/public/favicon.svg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cba5ac140a25951a20704b481a65514838f0f4b6",
+      "size": 696,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/cba5ac140a25951a20704b481a65514838f0f4b6"
+    },
+    {
+      "path": "packages/docs/public/oembed",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "892c8a872907df420d2a1db8cecbfe63cf3bdd84",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/892c8a872907df420d2a1db8cecbfe63cf3bdd84"
+    },
+    {
+      "path": "packages/docs/public/oembed/main.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c0f287d7f93e637b0ddd8f4c5ef87bf442b741bc",
+      "size": 209,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/c0f287d7f93e637b0ddd8f4c5ef87bf442b741bc"
+    },
+    {
+      "path": "packages/docs/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "975f75a53deec2581e712928ce699fd1bf68a659",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/975f75a53deec2581e712928ce699fd1bf68a659"
+    },
+    {
+      "path": "packages/docs/src/assets",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "daea3b789727c7f4e34af44197dc6ec5429fe390",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/daea3b789727c7f4e34af44197dc6ec5429fe390"
+    },
+    {
+      "path": "packages/docs/src/assets/diagrams",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4db278970220b741703fc53765b89ab3bb6cd44d",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/4db278970220b741703fc53765b89ab3bb6cd44d"
+    },
+    {
+      "path": "packages/docs/src/assets/diagrams/api-flow.svg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "524d4c20bfdca506aabb242e0ca8c4091de99237",
+      "size": 33848,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/524d4c20bfdca506aabb242e0ca8c4091de99237"
+    },
+    {
+      "path": "packages/docs/src/assets/diagrams/compiler.svg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2c816f5a0fc3d84d95f91eb3429818297c07337d",
+      "size": 60863,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/2c816f5a0fc3d84d95f91eb3429818297c07337d"
+    },
+    {
+      "path": "packages/docs/src/assets/diagrams/websocket-flow.svg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "90a1a3f6f91dbb44c7ec1d916ef29f99aa9e4831",
+      "size": 49896,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/90a1a3f6f91dbb44c7ec1d916ef29f99aa9e4831"
+    },
+    {
+      "path": "packages/docs/src/assets/houston.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "930c164974ad8eb528878f15a98016249b8cf546",
+      "size": 98506,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/930c164974ad8eb528878f15a98016249b8cf546"
+    },
+    {
+      "path": "packages/docs/src/content",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "44095d80cfaa31990d9959e1a862498809d72fcd",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/44095d80cfaa31990d9959e1a862498809d72fcd"
+    },
+    {
+      "path": "packages/docs/src/content/config.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bcfd5f05b4482f29ac3f3b74044b8390658831fe",
+      "size": 476,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/bcfd5f05b4482f29ac3f3b74044b8390658831fe"
+    },
+    {
+      "path": "packages/docs/src/content/docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fe055482d03c5a388bdd0e489334321a11ff0293",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/fe055482d03c5a388bdd0e489334321a11ff0293"
+    },
+    {
+      "path": "packages/docs/src/content/docs/api",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "707e0760c98c90525e6bd0db4d0686009aceb9e3",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/707e0760c98c90525e6bd0db4d0686009aceb9e3"
+    },
+    {
+      "path": "packages/docs/src/content/docs/api/cache.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c7d238a5ef35ce013e1169692c9f81007e3b3fb0",
+      "size": 2182,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/c7d238a5ef35ce013e1169692c9f81007e3b3fb0"
+    },
+    {
+      "path": "packages/docs/src/content/docs/api/compiler.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4626cbd3a00e40f17762c493f1e0e3198330a654",
+      "size": 1424,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4626cbd3a00e40f17762c493f1e0e3198330a654"
+    },
+    {
+      "path": "packages/docs/src/content/docs/api/internal-workflow.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6058837566ce53b0e527ded8c0184765acf9f30e",
+      "size": 741,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/6058837566ce53b0e527ded8c0184765acf9f30e"
+    },
+    {
+      "path": "packages/docs/src/content/docs/api/no-events.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1957afc900e04ddac98ef5b9708feeeea8d17d42",
+      "size": 1607,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1957afc900e04ddac98ef5b9708feeeea8d17d42"
+    },
+    {
+      "path": "packages/docs/src/content/docs/api/setup.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e9cb63a4a636978b1425435a69c7adc285c37dc",
+      "size": 631,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/9e9cb63a4a636978b1425435a69c7adc285c37dc"
+    },
+    {
+      "path": "packages/docs/src/content/docs/api/transformers.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4e049aeac12b92fdc6c6a02c5acb0d67a4a7ec67",
+      "size": 2199,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4e049aeac12b92fdc6c6a02c5acb0d67a4a7ec67"
+    },
+    {
+      "path": "packages/docs/src/content/docs/community.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1628128826398fa16b6757ba66cf36fb0b882006",
+      "size": 576,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1628128826398fa16b6757ba66cf36fb0b882006"
+    },
+    {
+      "path": "packages/docs/src/content/docs/guides",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "895516d4c0dd8717bae5c2a9e2b65ece070e1e0e",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/895516d4c0dd8717bae5c2a9e2b65ece070e1e0e"
+    },
+    {
+      "path": "packages/docs/src/content/docs/guides/coloring.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0ffcdc4a4b4c08e7b53fe6982774151f991308cb",
+      "size": 3502,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/0ffcdc4a4b4c08e7b53fe6982774151f991308cb"
+    },
+    {
+      "path": "packages/docs/src/content/docs/guides/embeds-attachments.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f5a92194f5aa503ce7dbf2e0520c26169784c52b",
+      "size": 3986,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f5a92194f5aa503ce7dbf2e0520c26169784c52b"
+    },
+    {
+      "path": "packages/docs/src/content/docs/guides/getting-started.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac0b5da83c6c41c048c715233790d2acc70e3e3e",
+      "size": 2117,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ac0b5da83c6c41c048c715233790d2acc70e3e3e"
+    },
+    {
+      "path": "packages/docs/src/content/docs/guides/handling-commands.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3ad37567a19ad2f47646c20a94251da75ad95ce0",
+      "size": 3360,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3ad37567a19ad2f47646c20a94251da75ad95ce0"
+    },
+    {
+      "path": "packages/docs/src/content/docs/guides/localization.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e857e9362b9553682b0afca7a86ee3fea8e1f8e2",
+      "size": 6995,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e857e9362b9553682b0afca7a86ee3fea8e1f8e2"
+    },
+    {
+      "path": "packages/docs/src/content/docs/guides/manual-setup.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dcf1d0a4999f9d3f65b1dd872bf98212cc3c7d93",
+      "size": 2046,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/dcf1d0a4999f9d3f65b1dd872bf98212cc3c7d93"
+    },
+    {
+      "path": "packages/docs/src/content/docs/guides/receiving-messages.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "73ee70840b137d800ea82cb5990cc3fef52562f6",
+      "size": 748,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/73ee70840b137d800ea82cb5990cc3fef52562f6"
+    },
+    {
+      "path": "packages/docs/src/content/docs/index.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9c9f5f67c58a7b18b61241dfce4ec4d47f18a048",
+      "size": 1284,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/9c9f5f67c58a7b18b61241dfce4ec4d47f18a048"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "77446be8042c0dc7603628fe86fb79348bf573bf",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/77446be8042c0dc7603628fe86fb79348bf573bf"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "22131a0ce52abe19b12d04b1b608d1e1feac8fd5",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/22131a0ce52abe19b12d04b1b608d1e1feac8fd5"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers/default",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "71fca509c2296c8bec0b63b25920fcdc6f25ac6f",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/71fca509c2296c8bec0b63b25920fcdc6f25ac6f"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers/default/application-commands.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a3e4d6944cfb06f8a48fe86ec54bfbd08d67d78f",
+      "size": 3158,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a3e4d6944cfb06f8a48fe86ec54bfbd08d67d78f"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers/default/events.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c28f8124bc31b4c2d5e8b4762206f12a11892158",
+      "size": 933,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/c28f8124bc31b4c2d5e8b4762206f12a11892158"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers/intro.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3a23104cbac8459860b9b5179d316a7d4b9d062b",
+      "size": 779,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3a23104cbac8459860b9b5179d316a7d4b9d062b"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers/simple",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "78522fc1fe94eb1ee584caaa106190f15eedfc65",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/78522fc1fe94eb1ee584caaa106190f15eedfc65"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers/simple/application-commands.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fd0f97d6a0a4e6966aa2aa150073932820083db4",
+      "size": 1468,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/fd0f97d6a0a4e6966aa2aa150073932820083db4"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers/simple/events.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e4880f55ad4a19ee99a7c7c69ac1cc66f4bba84",
+      "size": 1021,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/9e4880f55ad4a19ee99a7c7c69ac1cc66f4bba84"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/handlers/simple/message-commands.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "63c2c399f12786466319c9c47e627a8d612e6f05",
+      "size": 1534,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/63c2c399f12786466319c9c47e627a8d612e6f05"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/helpers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9a018f2995d00838139a6be699fb5c78fee4e88a",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/9a018f2995d00838139a6be699fb5c78fee4e88a"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/helpers/builders.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "58312f3fbe7f357a4ec64230f5c499faf7b7c1b2",
+      "size": 1894,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/58312f3fbe7f357a4ec64230f5c499faf7b7c1b2"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/helpers/formatters.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c5bd310dfeeac53ea07ca557ad034242fd336e3a",
+      "size": 4646,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/c5bd310dfeeac53ea07ca557ad034242fd336e3a"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/helpers/intro.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8213c8079802a7dddb78168df7eeb9b4fd07da17",
+      "size": 796,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/8213c8079802a7dddb78168df7eeb9b4fd07da17"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/helpers/utils.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b7da10b9d7e415f6c68a05fd8836b62c9eac8674",
+      "size": 1438,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/b7da10b9d7e415f6c68a05fd8836b62c9eac8674"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/helpers/webhook.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f256e29bb7f626af2937621ec76046f8e0c7c079",
+      "size": 1545,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f256e29bb7f626af2937621ec76046f8e0c7c079"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/jsx",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8b0c2b971f180c54a46a3ec6ab7950f73ff8cd9c",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/8b0c2b971f180c54a46a3ec6ab7950f73ff8cd9c"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/jsx/attachment.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "efd246d7952946973146745c8ad2f55ff6bbbcc8",
+      "size": 1621,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/efd246d7952946973146745c8ad2f55ff6bbbcc8"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/jsx/command.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1bbe07072fb7e189f307913334bc4d9ae609e75",
+      "size": 827,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/d1bbe07072fb7e189f307913334bc4d9ae609e75"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/jsx/components.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7c0322bf91de005ac8088b07b3dd5790c4f1c07f",
+      "size": 1887,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7c0322bf91de005ac8088b07b3dd5790c4f1c07f"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/jsx/embed.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "59ad3b66832345acfb74300512d6ccae2e48bf73",
+      "size": 586,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/59ad3b66832345acfb74300512d6ccae2e48bf73"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/jsx/intro.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b40c15c98db4cb2480a2ce80080da494e3bb7f7e",
+      "size": 1606,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/b40c15c98db4cb2480a2ce80080da494e3bb7f7e"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/transformers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9aa3ad27ab9c4939a51c05b9f84c52539501cc66",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/9aa3ad27ab9c4939a51c05b9f84c52539501cc66"
+    },
+    {
+      "path": "packages/docs/src/content/docs/modules/transformers/intro.mdx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "688785eb68fc646af0aeeccda24df2c7aa96c8d7",
+      "size": 777,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/688785eb68fc646af0aeeccda24df2c7aa96c8d7"
+    },
+    {
+      "path": "packages/docs/src/content/docs/philosophy.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dbf7d806dce797faa0ab8ca0eb71ca2dc28d7437",
+      "size": 839,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/dbf7d806dce797faa0ab8ca0eb71ca2dc28d7437"
+    },
+    {
+      "path": "packages/docs/src/styles",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1d4c573600f0b460a4f3b8b83e91691df98b65fc",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/1d4c573600f0b460a4f3b8b83e91691df98b65fc"
+    },
+    {
+      "path": "packages/docs/src/styles/index.css",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "721aac71d7ee023961870422452b5f410fd4baff",
+      "size": 839,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/721aac71d7ee023961870422452b5f410fd4baff"
+    },
+    {
+      "path": "packages/docs/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d3e037f3598a4746d6d0adf05d92dd41090cb2d",
+      "size": 105,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3d3e037f3598a4746d6d0adf05d92dd41090cb2d"
+    },
+    {
+      "path": "packages/handlers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5b43c3ad60e2a2784d26f87fa30c572c6c8f191f",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/5b43c3ad60e2a2784d26f87fa30c572c6c8f191f"
+    },
+    {
+      "path": "packages/handlers/.npmignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46af539c17953195b7ec79d00c431feee09e0e02",
+      "size": 5,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/46af539c17953195b7ec79d00c431feee09e0e02"
+    },
+    {
+      "path": "packages/handlers/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "23d5040e290dc2b01e7850162b64b6350badf64f",
+      "size": 250,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/23d5040e290dc2b01e7850162b64b6350badf64f"
+    },
+    {
+      "path": "packages/handlers/bunfig.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4645cf6714a9e8847cfb8530e66d51c6943af322",
+      "size": 194,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4645cf6714a9e8847cfb8530e66d51c6943af322"
+    },
+    {
+      "path": "packages/handlers/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "952693f167fd28aa12cb44640bfbf121373b3413",
+      "size": 72,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/952693f167fd28aa12cb44640bfbf121373b3413"
+    },
+    {
+      "path": "packages/handlers/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac6afc766b7f40e5c208d943440f0cbbf3754aea",
+      "size": 1334,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ac6afc766b7f40e5c208d943440f0cbbf3754aea"
+    },
+    {
+      "path": "packages/handlers/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8b4e459994893e29813ec6d7c8aec969450e89ce",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/8b4e459994893e29813ec6d7c8aec969450e89ce"
+    },
+    {
+      "path": "packages/handlers/src/advanced",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6dc3160d75f2892e1048e69cdfc86bb5f65b3a7e",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/6dc3160d75f2892e1048e69cdfc86bb5f65b3a7e"
+    },
+    {
+      "path": "packages/handlers/src/advanced/application-command-store.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f22d213acf8ab179db4bd7d538c681d6b9658f5d",
+      "size": 16535,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f22d213acf8ab179db4bd7d538c681d6b9658f5d"
+    },
+    {
+      "path": "packages/handlers/src/advanced/handler.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b4e49fa9ef27587161e516fc42958233f522fd1",
+      "size": 14635,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4b4e49fa9ef27587161e516fc42958233f522fd1"
+    },
+    {
+      "path": "packages/handlers/src/advanced/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1fa27cee34d5d64c93e750d6bd3dd6cac365ed5",
+      "size": 153,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/d1fa27cee34d5d64c93e750d6bd3dd6cac365ed5"
+    },
+    {
+      "path": "packages/handlers/src/advanced/message-component-store.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b25078384ab04c8df3e238b4f9d80b685ba15c06",
+      "size": 7536,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/b25078384ab04c8df3e238b4f9d80b685ba15c06"
+    },
+    {
+      "path": "packages/handlers/src/advanced/shared.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fdd66e6274b8f3d8728da3bcdb57a50f9b4c9836",
+      "size": 253,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/fdd66e6274b8f3d8728da3bcdb57a50f9b4c9836"
+    },
+    {
+      "path": "packages/handlers/src/simple",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e94053e3ebae246e7b3474caf82d54018c57608f",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/e94053e3ebae246e7b3474caf82d54018c57608f"
+    },
+    {
+      "path": "packages/handlers/src/simple/application-command.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "48d596e554016849c05ae710210ccad39f0819a7",
+      "size": 913,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/48d596e554016849c05ae710210ccad39f0819a7"
+    },
+    {
+      "path": "packages/handlers/src/simple/events.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "988e124585abe0d6b589c73cfb0f5322c355a726",
+      "size": 460,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/988e124585abe0d6b589c73cfb0f5322c355a726"
+    },
+    {
+      "path": "packages/handlers/src/simple/handler.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e963bb2f6bbde5ab4a79c81eacf1e01e9cf1979a",
+      "size": 9422,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e963bb2f6bbde5ab4a79c81eacf1e01e9cf1979a"
+    },
+    {
+      "path": "packages/handlers/src/simple/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "becb671b3e5f61a21ee7bc82729c0556ecd05bdd",
+      "size": 353,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/becb671b3e5f61a21ee7bc82729c0556ecd05bdd"
+    },
+    {
+      "path": "packages/handlers/src/simple/message-commands.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7c7870cf9ba5cffe58c349fc448702cdbce29d4",
+      "size": 340,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e7c7870cf9ba5cffe58c349fc448702cdbce29d4"
+    },
+    {
+      "path": "packages/handlers/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a0e86ba64796f569d1094552810583d22d33f713",
+      "size": 164,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a0e86ba64796f569d1094552810583d22d33f713"
+    },
+    {
+      "path": "packages/helpers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "506889e65e9f53da0ae5f5a0f7fb75ad6fd716f3",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/506889e65e9f53da0ae5f5a0f7fb75ad6fd716f3"
+    },
+    {
+      "path": "packages/helpers/.npmignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46af539c17953195b7ec79d00c431feee09e0e02",
+      "size": 5,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/46af539c17953195b7ec79d00c431feee09e0e02"
+    },
+    {
+      "path": "packages/helpers/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "625b933c2ca9305e0848330d025c6066a180c23c",
+      "size": 288,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/625b933c2ca9305e0848330d025c6066a180c23c"
+    },
+    {
+      "path": "packages/helpers/bunfig.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4645cf6714a9e8847cfb8530e66d51c6943af322",
+      "size": 194,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4645cf6714a9e8847cfb8530e66d51c6943af322"
+    },
+    {
+      "path": "packages/helpers/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "952693f167fd28aa12cb44640bfbf121373b3413",
+      "size": 72,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/952693f167fd28aa12cb44640bfbf121373b3413"
+    },
+    {
+      "path": "packages/helpers/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b8fdb82118fc1d52befc8480330c11c99fee6187",
+      "size": 1893,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/b8fdb82118fc1d52befc8480330c11c99fee6187"
+    },
+    {
+      "path": "packages/helpers/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a8c43dbce957959dfb42ce9790aa057145f41ba9",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/a8c43dbce957959dfb42ce9790aa057145f41ba9"
+    },
+    {
+      "path": "packages/helpers/src/attachment.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "740ad926602c01d6ef0f985be494508b985ab218",
+      "size": 177,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/740ad926602c01d6ef0f985be494508b985ab218"
+    },
+    {
+      "path": "packages/helpers/src/builders",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3099f8d1f4a87fa2ff1ada29638020d42c2ab9ce",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/3099f8d1f4a87fa2ff1ada29638020d42c2ab9ce"
+    },
+    {
+      "path": "packages/helpers/src/builders/command.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb13ba5ba706f5ce8f1cb5d1a87873f9d34bf493",
+      "size": 16880,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/eb13ba5ba706f5ce8f1cb5d1a87873f9d34bf493"
+    },
+    {
+      "path": "packages/helpers/src/builders/embed.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "38bbc1260bcc0b4f68b2b6940995fbf2a1b51099",
+      "size": 2526,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/38bbc1260bcc0b4f68b2b6940995fbf2a1b51099"
+    },
+    {
+      "path": "packages/helpers/src/builders/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6e51ef5418db258ec4eb397482e702ca25d8e3b8",
+      "size": 85,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/6e51ef5418db258ec4eb397482e702ca25d8e3b8"
+    },
+    {
+      "path": "packages/helpers/src/builders/poll.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "963bb6c016d55eaac0f6b06131fc919a1174f674",
+      "size": 1725,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/963bb6c016d55eaac0f6b06131fc919a1174f674"
+    },
+    {
+      "path": "packages/helpers/src/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ba8ccae8cc63e7a8a94e0c3806aefa53c00f0a05",
+      "size": 185,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/ba8ccae8cc63e7a8a94e0c3806aefa53c00f0a05"
+    },
+    {
+      "path": "packages/helpers/src/markdown.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "815f237b6956282c48f4500e32e962b3327d9f21",
+      "size": 2344,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/815f237b6956282c48f4500e32e962b3327d9f21"
+    },
+    {
+      "path": "packages/helpers/src/message-formatting.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "35f8f10e77a0792815fa8060c14474bfe1d2e013",
+      "size": 2225,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/35f8f10e77a0792815fa8060c14474bfe1d2e013"
+    },
+    {
+      "path": "packages/helpers/src/util.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f5efefdad9ac4013478a31cee692355b663986c",
+      "size": 109,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1f5efefdad9ac4013478a31cee692355b663986c"
+    },
+    {
+      "path": "packages/helpers/src/webhook.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "66491d4276bd090161b3784326c7573e698fc28b",
+      "size": 4720,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/66491d4276bd090161b3784326c7573e698fc28b"
+    },
+    {
+      "path": "packages/helpers/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a0e86ba64796f569d1094552810583d22d33f713",
+      "size": 164,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a0e86ba64796f569d1094552810583d22d33f713"
+    },
+    {
+      "path": "packages/jsx",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "dac590a667ba3e70f18c34a70a17db045dff79be",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/dac590a667ba3e70f18c34a70a17db045dff79be"
+    },
+    {
+      "path": "packages/jsx/.npmignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46af539c17953195b7ec79d00c431feee09e0e02",
+      "size": 5,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/46af539c17953195b7ec79d00c431feee09e0e02"
+    },
+    {
+      "path": "packages/jsx/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f3c39601b6f7bcc02ec8105a9cce1f39868a90f6",
+      "size": 233,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/f3c39601b6f7bcc02ec8105a9cce1f39868a90f6"
+    },
+    {
+      "path": "packages/jsx/bunfig.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4645cf6714a9e8847cfb8530e66d51c6943af322",
+      "size": 194,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4645cf6714a9e8847cfb8530e66d51c6943af322"
+    },
+    {
+      "path": "packages/jsx/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "952693f167fd28aa12cb44640bfbf121373b3413",
+      "size": 72,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/952693f167fd28aa12cb44640bfbf121373b3413"
+    },
+    {
+      "path": "packages/jsx/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "504f1f5faa07904931c15ade5267249f2c0293d0",
+      "size": 1277,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/504f1f5faa07904931c15ade5267249f2c0293d0"
+    },
+    {
+      "path": "packages/jsx/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1f47b72948198206ce303e7cebf815997a3d5802",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/1f47b72948198206ce303e7cebf815997a3d5802"
+    },
+    {
+      "path": "packages/jsx/src/attachment.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e47ee0153ea7b76e9300f2aa98ec2ae1fe812ccb",
+      "size": 395,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e47ee0153ea7b76e9300f2aa98ec2ae1fe812ccb"
+    },
+    {
+      "path": "packages/jsx/src/command.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7106d30d4ce026b6c60f00fbdfc641931c5b599",
+      "size": 5981,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e7106d30d4ce026b6c60f00fbdfc641931c5b599"
+    },
+    {
+      "path": "packages/jsx/src/components.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "014782e351be4dacaf46808d7a5e4df31ea6a357",
+      "size": 4962,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/014782e351be4dacaf46808d7a5e4df31ea6a357"
+    },
+    {
+      "path": "packages/jsx/src/embed.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e4d9c72486816c891ff65b1237a5c4273d9e896c",
+      "size": 3380,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/e4d9c72486816c891ff65b1237a5c4273d9e896c"
+    },
+    {
+      "path": "packages/jsx/src/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7ddc243a14de7fbb9366b7ad0aa70d8fda8d3c42",
+      "size": 124,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7ddc243a14de7fbb9366b7ad0aa70d8fda8d3c42"
+    },
+    {
+      "path": "packages/jsx/src/runtime",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5f0ad01ad41311366ce87828864bb50a6e968f58",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/5f0ad01ad41311366ce87828864bb50a6e968f58"
+    },
+    {
+      "path": "packages/jsx/src/runtime/index.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "794978591791e245d693b0c574b22d9785cf309d",
+      "size": 565,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/794978591791e245d693b0c574b22d9785cf309d"
+    },
+    {
+      "path": "packages/jsx/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a0e86ba64796f569d1094552810583d22d33f713",
+      "size": 164,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a0e86ba64796f569d1094552810583d22d33f713"
+    },
+    {
+      "path": "packages/redis",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3e7b38073437db0c5a27a8414cc0136d0e10b004",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/3e7b38073437db0c5a27a8414cc0136d0e10b004"
+    },
+    {
+      "path": "packages/redis/.npmignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "464a3d271c3951ceb5ef348a26e08632984a2df4",
+      "size": 21,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/464a3d271c3951ceb5ef348a26e08632984a2df4"
+    },
+    {
+      "path": "packages/redis/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "641d4a42f543579fe1e1cf528bdc601665631971",
+      "size": 274,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/641d4a42f543579fe1e1cf528bdc601665631971"
+    },
+    {
+      "path": "packages/redis/bunfig.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7caf33aef37e5990ffc5452fcacfff1a7d0a6666",
+      "size": 195,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7caf33aef37e5990ffc5452fcacfff1a7d0a6666"
+    },
+    {
+      "path": "packages/redis/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "952693f167fd28aa12cb44640bfbf121373b3413",
+      "size": 72,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/952693f167fd28aa12cb44640bfbf121373b3413"
+    },
+    {
+      "path": "packages/redis/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b89d684829bd023262a154f1897a2fa244c10fe",
+      "size": 1199,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4b89d684829bd023262a154f1897a2fa244c10fe"
+    },
+    {
+      "path": "packages/redis/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f871e5f7d20a0b64b04d71daa2fedf140f4096ca",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/f871e5f7d20a0b64b04d71daa2fedf140f4096ca"
+    },
+    {
+      "path": "packages/redis/src/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc5f7d16f6cce330958f2e7dda9a45a2fc54cbed",
+      "size": 4106,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/bc5f7d16f6cce330958f2e7dda9a45a2fc54cbed"
+    },
+    {
+      "path": "packages/redis/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a0e86ba64796f569d1094552810583d22d33f713",
+      "size": 164,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a0e86ba64796f569d1094552810583d22d33f713"
+    },
+    {
+      "path": "packages/test",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "58b7e9810f0a557ee578fa59ea3cbbb5294a480a",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/58b7e9810f0a557ee578fa59ea3cbbb5294a480a"
+    },
+    {
+      "path": "packages/test/.env",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7e2c7910ecc6f186c05e12662fd10361aa86b7a7",
+      "size": 138,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7e2c7910ecc6f186c05e12662fd10361aa86b7a7"
+    },
+    {
+      "path": "packages/test/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "952693f167fd28aa12cb44640bfbf121373b3413",
+      "size": 72,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/952693f167fd28aa12cb44640bfbf121373b3413"
+    },
+    {
+      "path": "packages/test/globals.d.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "05deb9fc5413f3566ce104177dd699f574003615",
+      "size": 186,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/05deb9fc5413f3566ce104177dd699f574003615"
+    },
+    {
+      "path": "packages/test/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4138ddabfbc3579fceaa8aa57fab7bf5979fe141",
+      "size": 452,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4138ddabfbc3579fceaa8aa57fab7bf5979fe141"
+    },
+    {
+      "path": "packages/test/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d701d4938e27733143849fcfb11104d4e7274ce9",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/d701d4938e27733143849fcfb11104d4e7274ce9"
+    },
+    {
+      "path": "packages/test/src/commands-adv",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4edb60b6e391542e0f855640a21370c449da51d6",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/4edb60b6e391542e0f855640a21370c449da51d6"
+    },
+    {
+      "path": "packages/test/src/commands-adv/bananas-poll.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c5193408b0fdadc7dbfbc9889768350703c8aec",
+      "size": 1479,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/6c5193408b0fdadc7dbfbc9889768350703c8aec"
+    },
+    {
+      "path": "packages/test/src/commands-adv/ping.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b58ef58f906245a64e629dc57cff47701896bed7",
+      "size": 393,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/b58ef58f906245a64e629dc57cff47701896bed7"
+    },
+    {
+      "path": "packages/test/src/commands-adv/search.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4cdaa2831722beb869a280128e00cfa560f30992",
+      "size": 3613,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4cdaa2831722beb869a280128e00cfa560f30992"
+    },
+    {
+      "path": "packages/test/src/commands",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "79df46ea3a1f8c03d01639202c97dd07926994ce",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/79df46ea3a1f8c03d01639202c97dd07926994ce"
+    },
+    {
+      "path": "packages/test/src/commands/bananas-poll.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f8d4966bcd3459509c888608e0305989c2c5d4f",
+      "size": 1562,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1f8d4966bcd3459509c888608e0305989c2c5d4f"
+    },
+    {
+      "path": "packages/test/src/commands/ping.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ae87c07482a70736877e2251f4df183001077c8",
+      "size": 867,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4ae87c07482a70736877e2251f4df183001077c8"
+    },
+    {
+      "path": "packages/test/src/commands/search.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7bfffc280fb8daa2ca010e38abd35d5575e213eb",
+      "size": 3352,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/7bfffc280fb8daa2ca010e38abd35d5575e213eb"
+    },
+    {
+      "path": "packages/test/src/events-adv",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "31790ae8ef4b5ecc4a3da119f47dd23edab396c7",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/31790ae8ef4b5ecc4a3da119f47dd23edab396c7"
+    },
+    {
+      "path": "packages/test/src/events-adv/ready.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb40fc0497cecbf8297a11d193c7d127cff82bfd",
+      "size": 180,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/fb40fc0497cecbf8297a11d193c7d127cff82bfd"
+    },
+    {
+      "path": "packages/test/src/events",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "166126adb1b889ece8c89e65d49da139bd48f5f8",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/166126adb1b889ece8c89e65d49da139bd48f5f8"
+    },
+    {
+      "path": "packages/test/src/events/ready.tsx",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3e98833b0552805ab254c2d28162f01ed3a436ff",
+      "size": 205,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3e98833b0552805ab254c2d28162f01ed3a436ff"
+    },
+    {
+      "path": "packages/test/src/handlers.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8a3bed79a2851e3d229de364a37812a59249ab3",
+      "size": 486,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a8a3bed79a2851e3d229de364a37812a59249ab3"
+    },
+    {
+      "path": "packages/test/src/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3c0254e461714af4b2ae2b6e95463785803e8667",
+      "size": 487,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/3c0254e461714af4b2ae2b6e95463785803e8667"
+    },
+    {
+      "path": "packages/test/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "82812b1acc1b732744be5720d43d47546f4bf248",
+      "size": 315,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/82812b1acc1b732744be5720d43d47546f4bf248"
+    },
+    {
+      "path": "packages/transformers",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4792bf8377406d2e352628185731500a4fd004a2",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/4792bf8377406d2e352628185731500a4fd004a2"
+    },
+    {
+      "path": "packages/transformers/.npmignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46af539c17953195b7ec79d00c431feee09e0e02",
+      "size": 5,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/46af539c17953195b7ec79d00c431feee09e0e02"
+    },
+    {
+      "path": "packages/transformers/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf69845a20a74847fe14636f5e1b85c7e27d2256",
+      "size": 246,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/bf69845a20a74847fe14636f5e1b85c7e27d2256"
+    },
+    {
+      "path": "packages/transformers/bunfig.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4645cf6714a9e8847cfb8530e66d51c6943af322",
+      "size": 194,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/4645cf6714a9e8847cfb8530e66d51c6943af322"
+    },
+    {
+      "path": "packages/transformers/eslint.config.js",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "952693f167fd28aa12cb44640bfbf121373b3413",
+      "size": 72,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/952693f167fd28aa12cb44640bfbf121373b3413"
+    },
+    {
+      "path": "packages/transformers/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fffe173c4a0bfcaa4d9ce807a03d3b2d3a496bde",
+      "size": 1135,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/fffe173c4a0bfcaa4d9ce807a03d3b2d3a496bde"
+    },
+    {
+      "path": "packages/transformers/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "cf5471a7d50fd24b2037f44f13f25805bb145ea3",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/cf5471a7d50fd24b2037f44f13f25805bb145ea3"
+    },
+    {
+      "path": "packages/transformers/src/factories",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "307ef7326f62708089c2031b80ad1160b18c272e",
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/trees/307ef7326f62708089c2031b80ad1160b18c272e"
+    },
+    {
+      "path": "packages/transformers/src/factories/channel.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d2cf04297dd80f8391dd01d5c54d19693beb3612",
+      "size": 14959,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/d2cf04297dd80f8391dd01d5c54d19693beb3612"
+    },
+    {
+      "path": "packages/transformers/src/factories/guild-member.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "967e041a09d80861861c3bf360dee4b7c4fa20f8",
+      "size": 3221,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/967e041a09d80861861c3bf360dee4b7c4fa20f8"
+    },
+    {
+      "path": "packages/transformers/src/factories/guild.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a2360807c69d2867cf7fefdc76ba140ef1b03a95",
+      "size": 7212,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/a2360807c69d2867cf7fefdc76ba140ef1b03a95"
+    },
+    {
+      "path": "packages/transformers/src/factories/interaction.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c84ce7ae2a4be41fa7db913b5965579153742f08",
+      "size": 28503,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/c84ce7ae2a4be41fa7db913b5965579153742f08"
+    },
+    {
+      "path": "packages/transformers/src/factories/message.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46a8c2f47b7299bb21bf4ee8891d1be2de769114",
+      "size": 14495,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/46a8c2f47b7299bb21bf4ee8891d1be2de769114"
+    },
+    {
+      "path": "packages/transformers/src/factories/poll.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "363979162901396111200332b1fce002b01026a1",
+      "size": 2352,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/363979162901396111200332b1fce002b01026a1"
+    },
+    {
+      "path": "packages/transformers/src/factories/user.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a3dbbd1c301d15eb71905f858f2610edb635617",
+      "size": 2377,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/1a3dbbd1c301d15eb71905f858f2610edb635617"
+    },
+    {
+      "path": "packages/transformers/src/index.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b09ef1051b850816ac0e5cf6f5827094f30f6d9b",
+      "size": 1998,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/b09ef1051b850816ac0e5cf6f5827094f30f6d9b"
+    },
+    {
+      "path": "packages/transformers/src/transformers.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2006f0c9bf34a08ecaef3c21f77119b1c53e7c9a",
+      "size": 3720,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/2006f0c9bf34a08ecaef3c21f77119b1c53e7c9a"
+    },
+    {
+      "path": "packages/transformers/tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2bd31d10fe9767d2780ea546988af03443a6caf5",
+      "size": 191,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/2bd31d10fe9767d2780ea546988af03443a6caf5"
+    },
+    {
+      "path": "tsconfig.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93995f6fd19e1ffb3cafa27ba6d02f75502e45cc",
+      "size": 1067,
+      "url": "https://api.github.com/repos/Didas-git/lilybird/git/blobs/93995f6fd19e1ffb3cafa27ba6d02f75502e45cc"
+    }
+  ],
+  "truncated": false
+}

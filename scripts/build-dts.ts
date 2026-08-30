@@ -5,7 +5,9 @@ const packages = ["types", "utils", "collection", "ws", "rest", "builders", "str
 const temp = ".types";
 
 await rm(temp, { recursive: true, force: true });
-const result = Bun.spawnSync(["bunx", "tsc", "--project", "tsconfig.dts.json"]);
+const result = Bun.spawnSync([
+  "bun", "run", "tsc", "--project", "tsconfig.dts.json"
+]);
 if (result.exitCode !== 0) {
   const stdout = new TextDecoder().decode(result.stdout);
   const stderr = new TextDecoder().decode(result.stderr);

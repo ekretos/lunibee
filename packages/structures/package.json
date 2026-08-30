@@ -1,10 +1,12 @@
 {
   "name": "@lunibee/structures",
-  "version": "0.1.1",
+  "version": "0.1.5",
   "type": "module",
   "module": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@lunibee/types": "file:../types"
   }

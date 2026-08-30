@@ -43,3 +43,12 @@ export {
 export { Gateway } from "@lunibee/ws";
 export type { GatewayOptions } from "@lunibee/ws";
 export { Collection, Cache } from "@lunibee/collection";
+
+export {
+  REST,
+  RESTError,
+  Routes,
+  WebhookClient,
+  type WebhookClientOptions,
+  type WebhookMessageOptions,
+} from "@lunibee/rest";

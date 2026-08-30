@@ -1,6 +1,6 @@
 {
   "name": "@lunibee/cli",
-  "version": "0.1.1",
+  "version": "0.1.5",
   "description": "Lunibee workspace and release CLI.",
   "type": "module",
   "bin": {
@@ -9,7 +9,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "files": ["src"],
+  "files": [
+    "src"
+  ],
   "engines": {
     "bun": ">=1.2.0"
   },
