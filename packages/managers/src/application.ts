@@ -98,26 +98,15 @@ export class ApplicationCommandManager {
     data: Partial<ApplicationCommandData>,
   ): Promise<APIApplicationCommand> {
     return this.#rest.patch<APIApplicationCommand>(
-      Routes.guildApplicationCommand(
-        this.#applicationId,
-        guildId,
-        commandId,
-      ),
+      Routes.guildApplicationCommand(this.#applicationId, guildId, commandId),
       data,
     );
   }
 
   /** Deletes a guild-scoped application command. @param guildId Guild identifier. @param commandId Command identifier. @returns Nothing. */
-  public async deleteGuild(
-    guildId: string,
-    commandId: string,
-  ): Promise<void> {
+  public async deleteGuild(guildId: string, commandId: string): Promise<void> {
     await this.#rest.delete(
-      Routes.guildApplicationCommand(
-        this.#applicationId,
-        guildId,
-        commandId,
-      ),
+      Routes.guildApplicationCommand(this.#applicationId, guildId, commandId),
     );
   }
 }

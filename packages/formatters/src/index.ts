@@ -28,7 +28,15 @@ export function escapeMarkdown(value: string): string {
 }
 
 function validateSnowflake(id: string, field: string): string {
-  if (!/^\d{1,20}$/.test(id))
+  const len = id.length;
+  if (len < 1 || len > 20) {
     throw new TypeError(`${field} must be a valid Discord snowflake.`);
+  }
+  for (let i = 0; i < len; i++) {
+    const code = id.charCodeAt(i);
+    if (code < 48 || code > 57) {
+      throw new TypeError(`${field} must be a valid Discord snowflake.`);
+    }
+  }
   return id;
 }

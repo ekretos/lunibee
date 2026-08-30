@@ -47,7 +47,7 @@ export class Cache<K, V> {
   public get(key: K): V | undefined {
     const entry = this.#entries.get(key);
     if (!entry) return undefined;
-    if (this.#expired(entry)) {
+    if (entry.expiresAt > 0 && entry.expiresAt <= Date.now()) {
       this.#entries.delete(key);
       return undefined;
     }

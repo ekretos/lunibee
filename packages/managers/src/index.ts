@@ -348,6 +348,4 @@ export {
   type MemberEditOptions,
   type BanOptions,
 } from "./member.js";
-export {
-  ApplicationCommandManager,
-} from "./application.js";
+export { ApplicationCommandManager } from "./application.js";

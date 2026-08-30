@@ -88,7 +88,7 @@
   "scripts": {
     "build": "bun scripts/build.ts",
     "build:dts": "bun scripts/build-dts.ts",
-    "format": "bunx prettier --write packages/*/src tests",
+    "format": "npx prettier --write packages/*/src/**/*.ts tests/**/*.ts",
     "check:deps": "bun scripts/check-dependency-graph.ts",
     "typecheck": "bunx tsc --noEmit --project tsconfig.json",
     "ci:install": "bun install --frozen-lockfile",
@@ -96,10 +96,18 @@
     "ci:typecheck": "bun run typecheck",
     "ci:test": "bun test --coverage",
     "ci": "bun run ci:deps && bun run ci:typecheck && bun run ci:test",
+    "bench": "bun benchmarks/full.ts",
+    "bench:compare": "bun benchmarks/compare.ts",
+    "bench:stress": "bun benchmarks/stress.ts",
     "prepare": "bun run build && bun run build:dts"
   },
   "devDependencies": {
+    "@discordjs/builders": "^1.14.1",
+    "@discordjs/collection": "^2.1.1",
     "@types/bun": "latest",
+    "discord.js": "^14.27.0",
+    "eris": "^0.18.0",
+    "oceanic.js": "^1.15.0",
     "typescript": "^7.0.2"
   },
   "engines": {

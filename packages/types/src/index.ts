@@ -541,4 +541,3 @@ export interface APIGuildEmojisUpdateEvent {
   guild_id: Snowflake;
   emojis: APIEmoji[];
 }
-

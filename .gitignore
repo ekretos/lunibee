@@ -20,3 +20,5 @@ coverage/
 *.temp
 *.swp
 *.lock
+
+benchmarks/
