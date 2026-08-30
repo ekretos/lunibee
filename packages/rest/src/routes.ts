@@ -1,41 +1,106 @@
 /** Type-safe Discord API v10 route builders. */
 export const Routes = {
-    /** Returns the current bot user. @returns Current-user route. */ user: () => "/users/@me",
-    /** Returns a user by ID. @param userId User identifier. @returns User route. */ userById: (userId: string) => `/users/${snowflake(userId, "User ID")}`,
-    /** Returns a guild by ID. @param guildId Guild identifier. @returns Guild route. */ guild: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}`,
-    /** Returns channels for a guild. @param guildId Guild identifier. @returns Guild-channel route. */ guildChannels: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/channels`,
-    /** Returns a guild member. @param guildId Guild identifier. @param userId User identifier. @returns Guild-member route. */ guildMember: (guildId: string, userId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/members/${snowflake(userId, "User ID")}`,
-    /** Returns all guild roles. @param guildId Guild identifier. @returns Guild-role route. */ guildRoles: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/roles`,
-    /** Returns a channel. @param channelId Channel identifier. @returns Channel route. */ channel: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}`,
-    /** Returns messages in a channel. @param channelId Channel identifier. @returns Message collection route. */ channelMessages: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/messages`,
-    /** Returns a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Message route. */ message: (channelId: string, messageId: string) => `/channels/${snowflake(channelId, "Channel ID")}/messages/${snowflake(messageId, "Message ID")}`,
-    /** Crossposts a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Crosspost route. */ crosspostMessage: (channelId: string, messageId: string) => `${Routes.message(channelId, messageId)}/crosspost`,
-    /** Returns reactions for a message and emoji. @param channelId Channel identifier. @param messageId Message identifier. @param emoji Emoji name or ID. @returns Reaction route. */ messageReactions: (channelId: string, messageId: string, emoji: string) => `${Routes.message(channelId, messageId)}/reactions/${encodeURIComponent(emoji)}`,
-    /** Removes all reactions from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Reaction collection route. */ messageReactionsAll: (channelId: string, messageId: string) => `${Routes.message(channelId, messageId)}/reactions`,
-    /** Returns pinned messages. @param channelId Channel identifier. @returns Pins route. */ channelPins: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/pins`,
-    /** Pins a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Pin route. */ channelPin: (channelId: string, messageId: string) => `${Routes.message(channelId, messageId)}/pins`,
-    /** Creates a thread from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Message-thread route. */ messageThread: (channelId: string, messageId: string) => `${Routes.message(channelId, messageId)}/threads`,
-    /** Bulk deletes messages. @param channelId Channel identifier. @returns Bulk-delete route. */ channelBulkDelete: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/messages/bulk-delete`,
-    /** Returns channel webhooks. @param channelId Channel identifier. @returns Webhook collection route. */ channelWebhooks: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/webhooks`,
-    /** Returns channel invites. @param channelId Channel identifier. @returns Invite collection route. */ channelInvites: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/invites`,
-    /** Returns a webhook. @param webhookId Webhook identifier. @param token Optional webhook token. @returns Webhook route. */ webhook: (webhookId: string, token?: string) => `/webhooks/${snowflake(webhookId, "Webhook ID")}${token ? `/${encodeURIComponent(token)}` : ""}`,
-    /** Returns application commands for an application. @param applicationId Application identifier. @returns Global command route. */ applicationCommands: (applicationId: string) => `/applications/${snowflake(applicationId, "Application ID")}/commands`,
-    /** Returns one application command. @param applicationId Application identifier. @param commandId Command identifier. @returns Command route. */ applicationCommand: (applicationId: string, commandId: string) => `/applications/${snowflake(applicationId, "Application ID")}/commands/${snowflake(commandId, "Command ID")}`,
-    /** Returns guild application commands. @param applicationId Application identifier. @param guildId Guild identifier. @returns Guild command route. */ guildApplicationCommands: (applicationId: string, guildId: string) => `/applications/${snowflake(applicationId, "Application ID")}/guilds/${snowflake(guildId, "Guild ID")}/commands`,
-    /** Returns an interaction callback endpoint. @param interactionId Interaction identifier. @param token Interaction token. @returns Interaction callback route. */ interactionCallback: (interactionId: string, token: string) => `/interactions/${snowflake(interactionId, "Interaction ID")}/${encodeURIComponent(token)}/callback`,
-    /** Returns the original interaction response endpoint. @param applicationId Application identifier. @param token Interaction token. @returns Original-response route. */ interactionOriginalResponse: (applicationId: string, token: string) => `/webhooks/${snowflake(applicationId, "Application ID")}/${encodeURIComponent(token)}/messages/@original`,
-    /** Returns guild threads that are active. @param guildId Guild identifier. @returns Active-thread route. */ guildActiveThreads: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/threads/active`,
-    /** Returns public archived threads for a channel. @param channelId Channel identifier. @returns Public-archive route. */ channelPublicArchivedThreads: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/threads/archived/public`,
-    /** Returns private archived threads for a channel. @param channelId Channel identifier. @returns Private-archive route. */ channelPrivateArchivedThreads: (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}/threads/archived/private`,
-    /** Returns a thread's members. @param threadId Thread identifier. @returns Thread-member route. */ threadMembers: (threadId: string) => `/channels/${snowflake(threadId, "Thread ID")}/thread-members`,
-    /** Returns guild scheduled events. @param guildId Guild identifier. @returns Scheduled-event collection route. */ guildScheduledEvents: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events`,
-    /** Returns one guild scheduled event. @param guildId Guild identifier. @param eventId Event identifier. @returns Scheduled-event route. */ guildScheduledEvent: (guildId: string, eventId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events/${snowflake(eventId, "Event ID")}`,
-    /** Returns guild automod rules. @param guildId Guild identifier. @returns Automod-rule collection route. */ guildAutoModerationRules: (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules`,
-    /** Returns one automod rule. @param guildId Guild identifier. @param ruleId Rule identifier. @returns Automod-rule route. */ guildAutoModerationRule: (guildId: string, ruleId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules/${snowflake(ruleId, "Rule ID")}`,
-    /** Returns current voice regions. @returns Voice-region route. */ voiceRegions: () => "/voice/regions",
-    /** Returns the generic Gateway endpoint. @returns Gateway route. */ gateway: () => "/gateway",
-    /** Returns the Gateway endpoint and recommended shard count for bots. @returns Gateway bot route. */ gatewayBot: () => "/gateway/bot"
+  /** Returns the current bot user. @returns Current-user route. */ user: () =>
+    "/users/@me",
+  /** Returns a user by ID. @param userId User identifier. @returns User route. */ userById:
+    (userId: string) => `/users/${snowflake(userId, "User ID")}`,
+  /** Returns a guild by ID. @param guildId Guild identifier. @returns Guild route. */ guild:
+    (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}`,
+  /** Returns channels for a guild. @param guildId Guild identifier. @returns Guild-channel route. */ guildChannels:
+    (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/channels`,
+  /** Returns a guild member. @param guildId Guild identifier. @param userId User identifier. @returns Guild-member route. */ guildMember:
+    (guildId: string, userId: string) =>
+      `/guilds/${snowflake(guildId, "Guild ID")}/members/${snowflake(userId, "User ID")}`,
+  /** Returns all guild roles. @param guildId Guild identifier. @returns Guild-role route. */ guildRoles:
+    (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/roles`,
+  /** Returns a channel. @param channelId Channel identifier. @returns Channel route. */ channel:
+    (channelId: string) => `/channels/${snowflake(channelId, "Channel ID")}`,
+  /** Returns messages in a channel. @param channelId Channel identifier. @returns Message collection route. */ channelMessages:
+    (channelId: string) =>
+      `/channels/${snowflake(channelId, "Channel ID")}/messages`,
+  /** Returns a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Message route. */ message:
+    (channelId: string, messageId: string) =>
+      `/channels/${snowflake(channelId, "Channel ID")}/messages/${snowflake(messageId, "Message ID")}`,
+  /** Crossposts a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Crosspost route. */ crosspostMessage:
+    (channelId: string, messageId: string) =>
+      `${Routes.message(channelId, messageId)}/crosspost`,
+  /** Returns reactions for a message and emoji. @param channelId Channel identifier. @param messageId Message identifier. @param emoji Emoji name or ID. @returns Reaction route. */ messageReactions:
+    (channelId: string, messageId: string, emoji: string) =>
+      `${Routes.message(channelId, messageId)}/reactions/${encodeURIComponent(emoji)}`,
+  /** Removes all reactions from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Reaction collection route. */ messageReactionsAll:
+    (channelId: string, messageId: string) =>
+      `${Routes.message(channelId, messageId)}/reactions`,
+  /** Returns pinned messages. @param channelId Channel identifier. @returns Pins route. */ channelPins:
+    (channelId: string) =>
+      `/channels/${snowflake(channelId, "Channel ID")}/pins`,
+  /** Pins a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Pin route. */ channelPin:
+    (channelId: string, messageId: string) =>
+      `${Routes.message(channelId, messageId)}/pins`,
+  /** Creates a thread from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Message-thread route. */ messageThread:
+    (channelId: string, messageId: string) =>
+      `${Routes.message(channelId, messageId)}/threads`,
+  /** Bulk deletes messages. @param channelId Channel identifier. @returns Bulk-delete route. */ channelBulkDelete:
+    (channelId: string) =>
+      `/channels/${snowflake(channelId, "Channel ID")}/messages/bulk-delete`,
+  /** Returns channel webhooks. @param channelId Channel identifier. @returns Webhook collection route. */ channelWebhooks:
+    (channelId: string) =>
+      `/channels/${snowflake(channelId, "Channel ID")}/webhooks`,
+  /** Returns channel invites. @param channelId Channel identifier. @returns Invite collection route. */ channelInvites:
+    (channelId: string) =>
+      `/channels/${snowflake(channelId, "Channel ID")}/invites`,
+  /** Returns a webhook. @param webhookId Webhook identifier. @param token Optional webhook token. @returns Webhook route. */ webhook:
+    (webhookId: string, token?: string) =>
+      `/webhooks/${snowflake(webhookId, "Webhook ID")}${token ? `/${encodeURIComponent(token)}` : ""}`,
+  /** Returns application commands for an application. @param applicationId Application identifier. @returns Global command route. */ applicationCommands:
+    (applicationId: string) =>
+      `/applications/${snowflake(applicationId, "Application ID")}/commands`,
+  /** Returns one application command. @param applicationId Application identifier. @param commandId Command identifier. @returns Command route. */ applicationCommand:
+    (applicationId: string, commandId: string) =>
+      `/applications/${snowflake(applicationId, "Application ID")}/commands/${snowflake(commandId, "Command ID")}`,
+  /** Returns guild application commands. @param applicationId Application identifier. @param guildId Guild identifier. @returns Guild command route. */ guildApplicationCommands:
+    (applicationId: string, guildId: string) =>
+      `/applications/${snowflake(applicationId, "Application ID")}/guilds/${snowflake(guildId, "Guild ID")}/commands`,
+  /** Returns an interaction callback endpoint. @param interactionId Interaction identifier. @param token Interaction token. @returns Interaction callback route. */ interactionCallback:
+    (interactionId: string, token: string) =>
+      `/interactions/${snowflake(interactionId, "Interaction ID")}/${encodeURIComponent(token)}/callback`,
+  /** Returns the original interaction response endpoint. @param applicationId Application identifier. @param token Interaction token. @returns Original-response route. */ interactionOriginalResponse:
+    (applicationId: string, token: string) =>
+      `/webhooks/${snowflake(applicationId, "Application ID")}/${encodeURIComponent(token)}/messages/@original`,
+  /** Returns guild threads that are active. @param guildId Guild identifier. @returns Active-thread route. */ guildActiveThreads:
+    (guildId: string) =>
+      `/guilds/${snowflake(guildId, "Guild ID")}/threads/active`,
+  /** Returns public archived threads for a channel. @param channelId Channel identifier. @returns Public-archive route. */ channelPublicArchivedThreads:
+    (channelId: string) =>
+      `/channels/${snowflake(channelId, "Channel ID")}/threads/archived/public`,
+  /** Returns private archived threads for a channel. @param channelId Channel identifier. @returns Private-archive route. */ channelPrivateArchivedThreads:
+    (channelId: string) =>
+      `/channels/${snowflake(channelId, "Channel ID")}/threads/archived/private`,
+  /** Returns a thread's members. @param threadId Thread identifier. @returns Thread-member route. */ threadMembers:
+    (threadId: string) =>
+      `/channels/${snowflake(threadId, "Thread ID")}/thread-members`,
+  /** Returns guild scheduled events. @param guildId Guild identifier. @returns Scheduled-event collection route. */ guildScheduledEvents:
+    (guildId: string) =>
+      `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events`,
+  /** Returns one guild scheduled event. @param guildId Guild identifier. @param eventId Event identifier. @returns Scheduled-event route. */ guildScheduledEvent:
+    (guildId: string, eventId: string) =>
+      `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events/${snowflake(eventId, "Event ID")}`,
+  /** Returns guild automod rules. @param guildId Guild identifier. @returns Automod-rule collection route. */ guildAutoModerationRules:
+    (guildId: string) =>
+      `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules`,
+  /** Returns one automod rule. @param guildId Guild identifier. @param ruleId Rule identifier. @returns Automod-rule route. */ guildAutoModerationRule:
+    (guildId: string, ruleId: string) =>
+      `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules/${snowflake(ruleId, "Rule ID")}`,
+  /** Returns current voice regions. @returns Voice-region route. */ voiceRegions:
+    () => "/voice/regions",
+  /** Returns the generic Gateway endpoint. @returns Gateway route. */ gateway:
+    () => "/gateway",
+  /** Returns the Gateway endpoint and recommended shard count for bots. @returns Gateway bot route. */ gatewayBot:
+    () => "/gateway/bot",
 } as const;
 
 /** Validates a Discord snowflake route parameter. @param value Candidate identifier. @param field Human-readable field name. @returns The validated identifier. @throws {TypeError} If the identifier is not a Discord snowflake. */
-function snowflake(value: string, field: string): string { if (!/^\d{1,20}$/.test(value)) throw new TypeError(`${field} must be a valid Discord snowflake.`); return value; }
+function snowflake(value: string, field: string): string {
+  if (!/^\d{1,20}$/.test(value))
+    throw new TypeError(`${field} must be a valid Discord snowflake.`);
+  return value;
+}

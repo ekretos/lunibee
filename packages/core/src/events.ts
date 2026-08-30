@@ -4,4 +4,6 @@ import type { ClientEvents } from "./index.js";
 export type ClientEvent = keyof ClientEvents;
 
 /** Listener signature for a Lunibee client event. */
-export type ClientListener<K extends ClientEvent> = (...args: ClientEvents[K]) => unknown;
+export type ClientListener<K extends ClientEvent> = (
+  ...args: ClientEvents[K]
+) => unknown;
