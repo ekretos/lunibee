@@ -1,17 +1,21 @@
 {
   "name": "@lunibee/cli",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Lunibee workspace and release CLI.",
   "type": "module",
   "bin": {
-    "lunibee": "./src/index.ts"
+    "lunibee": "./dist/index.js"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   },
   "files": [
-    "src"
+    "dist"
   ],
+  "scripts": {
+    "build": "bun build src/index.ts --outfile dist/index.js --target bun",
+    "prepublishOnly": "bun run build"
+  },
   "engines": {
     "bun": ">=1.2.0"
   },
