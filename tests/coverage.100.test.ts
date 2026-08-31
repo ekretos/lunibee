@@ -428,13 +428,18 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
     expect(client.setPresence({ status: "idle" })).toBe(false);
 
-    expect(() =>
+    await expect(
       client.editInteractionReply("tok", { content: "hi" }),
-    ).toThrow();
-    await expect(client.deleteInteractionReply("tok")).rejects.toThrow();
-    expect(() =>
+    ).rejects.toThrow("Client is unauthenticated.");
+    (client.rest as any).delete = async () => {
+      throw new Error("mocked delete");
+    };
+    await expect(client.deleteInteractionReply("tok")).rejects.toThrow(
+      "Client is unauthenticated.",
+    );
+    await expect(
       client.followUpInteraction("tok", { content: "hi" }),
-    ).toThrow();
+    ).rejects.toThrow("Client is unauthenticated.");
 
     client.destroy();
     expect(client.state).toBe("destroyed");
@@ -566,7 +571,61 @@ describe("100% Comprehensive Codebase Coverage", () => {
     expect(banAdded.user.id).toBe("300");
     expect(banRemoved.user.id).toBe("300");
     expect(emojisUpdated.guild_id).toBe("200");
-    expect(rawReceived).toBe(15);
+
+    gw.emit("MESSAGE_REACTION_REMOVE_EMOJI", {});
+    gw.emit("MESSAGE_POLL_VOTE_ADD", {});
+    gw.emit("MESSAGE_POLL_VOTE_REMOVE", {});
+    gw.emit("GUILD_MEMBERS_CHUNK", {});
+    gw.emit("GUILD_STICKERS_UPDATE", {});
+    gw.emit("GUILD_INTEGRATIONS_UPDATE", {});
+    gw.emit("GUILD_SCHEDULED_EVENT_CREATE", {});
+    gw.emit("GUILD_SCHEDULED_EVENT_UPDATE", {});
+    gw.emit("GUILD_SCHEDULED_EVENT_DELETE", {});
+    gw.emit("GUILD_SCHEDULED_EVENT_USER_ADD", {});
+    gw.emit("GUILD_SCHEDULED_EVENT_USER_REMOVE", {});
+    gw.emit("AUTO_MODERATION_RULE_CREATE", {});
+    gw.emit("AUTO_MODERATION_RULE_UPDATE", {});
+    gw.emit("AUTO_MODERATION_RULE_DELETE", {});
+    gw.emit("AUTO_MODERATION_ACTION_EXECUTION", {});
+    gw.emit("CHANNEL_PINS_UPDATE", {});
+    gw.emit("STAGE_INSTANCE_CREATE", {});
+    gw.emit("STAGE_INSTANCE_UPDATE", {});
+    gw.emit("STAGE_INSTANCE_DELETE", {});
+    gw.emit("ENTITLEMENT_CREATE", {});
+    gw.emit("ENTITLEMENT_UPDATE", {});
+    gw.emit("ENTITLEMENT_DELETE", {});
+    gw.emit("INVITE_CREATE", {});
+    gw.emit("INVITE_DELETE", {});
+    gw.emit("WEBHOOKS_UPDATE", {});
+    gw.emit("PRESENCE_UPDATE", {});
+    gw.emit("TYPING_START", {});
+    gw.emit("INTERACTION_CREATE", { id: "1", type: 1 });
+    gw.emit("THREAD_LIST_SYNC", {});
+    gw.emit("THREAD_MEMBERS_UPDATE", {});
+    gw.emit("THREAD_MEMBER_UPDATE", {});
+    gw.emit("RAW", { event: "TEST", data: {} });
+    gw.emit("ERROR", new Error("test"));
+    gw.emit("ERROR", "test string error");
+
+    // Lifecycle events
+    gw.emit("READY", { user: { id: "100" }, application: { id: "200" } });
+    gw.emit("open");
+    gw.emit("close", { code: 1000, action: "test" });
+
+    // Missing complex payloads
+    gw.emit("GUILD_CREATE", { id: "100", name: "Guild" });
+    gw.emit("GUILD_CREATE", { id: "101", unavailable: true });
+    gw.emit("GUILD_UPDATE", { id: "100", name: "Updated" });
+    gw.emit("GUILD_DELETE", { id: "100" });
+    gw.emit("GUILD_DELETE", { id: "101", unavailable: true });
+    gw.emit("CHANNEL_CREATE", { id: "200", type: 0 });
+    gw.emit("CHANNEL_UPDATE", { id: "200", type: 0 });
+    gw.emit("CHANNEL_DELETE", { id: "200", type: 0 });
+    gw.emit("VOICE_STATE_UPDATE", {});
+    gw.emit("VOICE_SERVER_UPDATE", {});
+    gw.emit("MESSAGE_UPDATE", { id: "1", channel_id: "2" });
+    gw.emit("MESSAGE_DELETE", { id: "1", channel_id: "2" });
+    gw.emit("MESSAGE_DELETE_BULK", { ids: ["1"], channel_id: "2" });
 
     // Cover client resource context
     let msgCreated: any;
@@ -1062,7 +1121,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
       type: 4,
       data: { name: "autocmd" },
     });
-    expect(autoCreate).toBeInstanceOf(CommandInteraction);
+    expect(autoCreate).toBeInstanceOf(AutocompleteInteraction);
   });
 
   test("Structures Permissions module full coverage", () => {

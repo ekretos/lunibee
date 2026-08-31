@@ -40,6 +40,34 @@ test("REST retries idempotent server errors", async () => {
   }
 });
 
+test("REST supports multipart/form-data for files", async () => {
+  const original = globalThis.fetch;
+  (globalThis as any).fetch = async () =>
+    new Response(JSON.stringify({ id: "1" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  try {
+    const rest = new REST({ token: "token" });
+    const files = [
+      {
+        name: "test.txt",
+        data: new Uint8Array([1, 2, 3]),
+        contentType: "text/plain",
+      },
+      { name: "test2.bin", data: new ArrayBuffer(4) },
+    ];
+    await expect(
+      rest.postWithFiles("/test", { hello: "world" }, files),
+    ).resolves.toEqual({ id: "1" });
+    await expect(
+      rest.patchWithFiles("/test", { hello: "world" }, files),
+    ).resolves.toEqual({ id: "1" });
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("REST exposes rate-limit errors", async () => {
   const original = globalThis.fetch;
   (globalThis as any).fetch = async () =>

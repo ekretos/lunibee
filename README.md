@@ -2,25 +2,11 @@
 
 [![npm version](https://badge.fury.io/js/lunibee.svg)](https://www.npmjs.com/package/lunibee)
 [![NPM Downloads](https://img.shields.io/npm/dt/lunibee.svg?style=flat-square)](https://www.npmjs.com/package/lunibee)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/SSADgyBpgw)
 
 [![NPM Graph](https://nodei.co/npm/lunibee.png?downloads=true&downloadRank=true&stars=true)](https://www.npmjs.com/package/lunibee)
 
 A lightweight, Bun-first Discord API library for TypeScript.
-
-## Production-readiness status
-
-Lunibee's production-readiness work is being developed on `feat/production-readiness`. **Do not use `master` for active development.**
-
-The roadmap covers:
-
-- strict package dependency boundaries and installability
-- Discord Gateway lifecycle, heartbeat ACK handling, resume/reconnect, and zombie detection
-- canonical resource caching and shared REST/Gateway hydration
-- bucket-aware REST rate limits, retries, timeouts, and `AbortSignal` cancellation
-- typed permissions and ergonomic interaction APIs
-- compile-time-safe component and embed builders
-- graceful client and shard shutdown
-- public API documentation
 
 ## Requirements
 
@@ -41,6 +27,10 @@ For application usage, install the published `lunibee` package when a release is
 ```bash
 bun add lunibee
 ```
+
+## Documentation
+
+Full documentation, practical guides, and API references are available at **[lunibee.js.org](https://lunibee.js.org)**.
 
 ## Getting started
 
@@ -168,13 +158,12 @@ Available lifecycle methods include `reply()`, `deferReply()`, `editReply()`, `d
 
 ## Builders
 
-Lunibee provides strict builders for Discord payloads, including:
+Lunibee provides strict builders for Discord payloads (Discord.js V2 compatible), including:
 
-- `EmbedBuilder`
-- `ButtonBuilder`
 - `ActionRowBuilder`
-- `StringSelectBuilder`
-- `EntitySelectBuilder`
+- `ButtonBuilder`
+- `StringSelectMenuBuilder`
+- `EmbedBuilder`
 - `ModalBuilder`
 - `TextInputBuilder`
 
@@ -223,11 +212,11 @@ bun install
 bunx tsc --noEmit
 ```
 
-Keep production-readiness work on the active feature branch and commit each completed phase separately. Changes must not be made directly on `master`.
+## Documentation & API Reference
 
-## API reference
+The full, official API reference and practical guides are available at **[lunibee.js.org](https://lunibee.js.org)**. 
 
-The source is the authoritative API surface while Lunibee remains pre-1.0. Public exports are intentionally split by responsibility so applications can import either the high-level `lunibee` package or individual packages when appropriate.
+The source remains the authoritative API surface while Lunibee is pre-1.0. Public exports are intentionally split by responsibility so applications can import either the high-level `lunibee` package or individual packages when appropriate.
 
 ## Status
 

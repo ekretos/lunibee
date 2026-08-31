@@ -374,6 +374,8 @@ export class Gateway {
       this.#setState(GatewayState.Ready);
       this.#emit("ready", data);
     }
+    this.#emit("RAW", { event: event ?? "UNKNOWN", data });
+    if (this.#closed) return;
     this.#emit(event ?? "dispatch", data);
   }
   #handleHello(data: unknown): void {

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 const PACKAGES_DIR = join(import.meta.dir, "../packages");
 const ROOT_DIR = join(import.meta.dir, "..");
-const NEW_VERSION = "0.1.5";
+const NEW_VERSION = "0.1.6";
 
 async function bumpVersions() {
   const dirs = await readdir(PACKAGES_DIR, { withFileTypes: true });

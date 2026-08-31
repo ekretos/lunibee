@@ -142,6 +142,28 @@ export class Collection<K, V> extends Map<K, V> {
     for (const item of this) entry = [item[0], item[1]];
     return entry;
   }
+  /** Returns a new Collection containing elements from both collections. */
+  public union(other: Collection<K, V>): Collection<K, V> {
+    const result = this.clone();
+    for (const [key, value] of other) result.set(key, value);
+    return result;
+  }
+  /** Returns a new Collection containing only elements present in both collections. */
+  public intersection(other: Collection<K, V>): Collection<K, V> {
+    const result = new Collection<K, V>();
+    for (const [key, value] of this) {
+      if (other.has(key)) result.set(key, value);
+    }
+    return result;
+  }
+  /** Returns a new Collection containing elements present in this collection but not the other. */
+  public difference(other: Collection<K, V>): Collection<K, V> {
+    const result = new Collection<K, V>();
+    for (const [key, value] of this) {
+      if (!other.has(key)) result.set(key, value);
+    }
+    return result;
+  }
 }
 
 export { Cache } from "./cache.js";

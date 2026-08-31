@@ -3,7 +3,7 @@ title: "@lunibee/voice"
 description: Discord Voice Gateway connection and audio streaming abstractions.
 ---
 
-The `@lunibee/voice` package manages Discord Voice WebSocket and UDP encryption handshakes for connecting bots to voice channels.
+The `@lunibee/voice` package provides the low-level pieces needed to connect to Discord voice channels and manage the voice WebSocket/UDP lifecycle.
 
 ## Installation
 
@@ -11,9 +11,7 @@ The `@lunibee/voice` package manages Discord Voice WebSocket and UDP encryption 
 bun add @lunibee/voice
 ```
 
----
-
-## `VoiceConnection`
+## Connect to Voice
 
 ```ts
 import { VoiceConnection } from "@lunibee/voice";
@@ -25,7 +23,13 @@ const voice = new VoiceConnection({
   selfMute: false,
 });
 
-voice.on("stateChange", (oldState, newState) => {
-  console.log(`Voice state transitioned from ${oldState} to ${newState}`);
+voice.on("stateChange", (newState, oldState) => {
+  console.log(`Voice state: ${oldState} → ${newState}`);
 });
 ```
+
+The connection handles the Discord voice handshake and UDP encryption setup, but does not transmit or decode audio itself. Listen for state changes so your application can react to connection, reconnect, and disconnect transitions.
+
+## When to use this package
+
+Use `@lunibee/voice` when you need direct control over the voice connection or audio pipeline. If your application only needs text channels, messages, commands, or interactions, you do not need this package.

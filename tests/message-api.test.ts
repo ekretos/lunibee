@@ -22,11 +22,11 @@ function manager() {
   const rest = {
     get: async <T>(path: string): Promise<T> => {
       calls.push({ method: "GET", path });
-      return (
-        path.includes("/reactions/")
-          ? [{ id: userId, username: "user" }]
-          : [message]
-      ) as T;
+      if (path.includes("/reactions/"))
+        return [{ id: userId, username: "user" }] as T;
+      if (path.includes("?")) return [message] as T; // query params usually mean fetchMany
+      if (path.split("/").length > 4) return message as T; // /channels/:id/messages/:id
+      return [message] as T;
     },
     post: async <T>(path: string, body?: unknown): Promise<T> => {
       calls.push({ method: "POST", path, body });

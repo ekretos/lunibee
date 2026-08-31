@@ -51,11 +51,20 @@ export class Cache<K, V> {
       this.#entries.delete(key);
       return undefined;
     }
+    // LRU Promotion: move to end of insertion order
+    this.#entries.delete(key);
+    this.#entries.set(key, entry);
     return entry.value;
   }
   /** Returns whether a live entry exists. */
   public has(key: K): boolean {
-    return this.get(key) !== undefined;
+    const entry = this.#entries.get(key);
+    if (!entry) return false;
+    if (entry.expiresAt > 0 && entry.expiresAt <= Date.now()) {
+      this.#entries.delete(key);
+      return false;
+    }
+    return true;
   }
   /** Stores an entry and evicts the oldest entries when the bound is exceeded. */
   public set(key: K, value: V): this {

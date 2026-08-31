@@ -1,6 +1,5 @@
 import { Manager, ResourceManager } from "./base.js";
 export { Manager, ResourceManager } from "./base.js";
-/** Collection-backed generic resource manager. */
 import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
 import {
@@ -10,88 +9,48 @@ import {
   Guild,
   type ResourceContext,
 } from "@lunibee/structures";
-import { MessageManager } from "./message.js";
+import {
+  MessageManager,
+  type MessageCreateOptions as ManagerMessageCreateOptions,
+} from "./message.js";
 import { ThreadManager } from "./thread.js";
 
-/** Manages users. */
-export class UserManager extends ResourceManager<string, User> {
-  /** Creates a user manager. @param rest REST transport. */ public constructor(
-    rest: REST,
-  ) {
-    super(
-      async (id) =>
-        new User(
-          await rest.get<ConstructorParameters<typeof User>[0]>(
-            Routes.userById(id),
-          ),
-        ),
-      (user) => user.id,
-    );
-  }
-}
-/** Manages guilds. */
-export class GuildManager extends ResourceManager<string, Guild> {
-  /** Creates a guild manager. @param rest REST transport. */ public constructor(
-    rest: REST,
-  ) {
-    super(
-      async (id) =>
-        new Guild(
-          await rest.get<ConstructorParameters<typeof Guild>[0]>(
-            Routes.guild(id),
-          ),
-        ),
-      (guild) => guild.id,
-    );
-  }
-}
-/** Message creation options. */
-export interface MessageCreateOptions {
-  /** Message content. */ content?: string;
-}
-/** Message edit options. */
-export interface MessageEditOptions {
-  /** New message content. */ content?: string;
-}
-/** Message fetch options. */
-export interface MessageFetchOptions {
-  /** Whether to use cache. */ cache?: boolean;
-}
-/** Message list query options. */
-export interface MessageQueryOptions {
-  /** Message before this ID. */ before?: string;
-  /** Message after this ID. */ after?: string;
-  /** Message around this ID. */ around?: string;
-  /** Maximum number of messages. */ limit?: number;
-}
-/** Message thread creation options. */
-export interface MessageThreadOptions {
-  /** Thread name. */ name: string;
-  /** Auto archive duration. */ autoArchiveDuration?: 60 | 1440 | 4320 | 10080;
-  /** Slowmode duration. */ rateLimitPerUser?: number;
-}
-/** Reaction list options. */
-export interface ReactionFetchOptions {
-  /** Maximum reactions. */ limit?: number;
-  /** Reaction pagination cursor. */ after?: string;
-}
-/** Runtime compatibility placeholders for legacy value imports. */
-export const MessageCreateOptions = undefined;
-/** Runtime compatibility placeholder. */
-export const MessageEditOptions = undefined;
-/** Runtime compatibility placeholder. */
-export const MessageFetchOptions = undefined;
-/** Runtime compatibility placeholder. */
-export const MessageThreadOptions = undefined;
-/** Runtime compatibility placeholder. */
-export const ReactionFetchOptions = undefined;
+export { UserManager } from "./user.js";
+export { GuildManager } from "./guild.js";
 
-/** Manages Discord channels and their message APIs. */
+export type MessageCreateOptions = ManagerMessageCreateOptions;
+export type MessageEditOptions = Record<string, unknown> & { content?: string };
+export interface MessageFetchOptions {
+  cache?: boolean;
+}
+export interface MessageQueryOptions {
+  before?: string;
+  after?: string;
+  around?: string;
+  limit?: number;
+}
+export interface MessageThreadOptions {
+  name: string;
+  autoArchiveDuration?: 60 | 1440 | 4320 | 10080;
+  rateLimitPerUser?: number;
+}
+export interface ReactionFetchOptions {
+  limit?: number;
+  after?: string;
+}
+
+export interface ChannelCreateOptions extends Record<string, unknown> {
+  name: string;
+  type: number;
+  guild_id?: string;
+  parent_id?: string | null;
+}
+export type ChannelEditOptions = Record<string, unknown>;
+
 export class ChannelManager extends Manager<string, Channel> {
   readonly #rest: REST;
   readonly #context: ResourceContext;
   readonly #messageManagers = new Map<string, MessageManager>();
-  /** Creates a channel manager. @param rest REST transport. */
   public constructor(rest: REST) {
     super();
     this.#rest = rest;
@@ -103,11 +62,23 @@ export class ChannelManager extends Manager<string, Channel> {
         this.deleteMessage(channelId, messageId),
       crosspostMessage: (channelId, messageId) =>
         this.crosspostMessage(channelId, messageId),
+      editChannel: (channelId, options) => this.edit(channelId, options),
+      deleteChannel: (channelId) => this.deleteChannel(channelId),
+      addReaction: (channelId, messageId, emoji) =>
+        this.addReaction(channelId, messageId, emoji),
+      removeOwnReaction: (channelId, messageId, emoji) =>
+        this.removeOwnReaction(channelId, messageId, emoji),
+      removeReaction: (channelId, messageId, emoji, userId) =>
+        this.removeReaction(channelId, messageId, emoji, userId),
+      removeAllReactions: (channelId, messageId) =>
+        this.removeAllReactions(channelId, messageId),
+      pinMessage: (channelId, messageId) =>
+        this.pinMessage(channelId, messageId),
+      unpinMessage: (channelId, messageId) =>
+        this.unpinMessage(channelId, messageId),
     };
   }
-  /** Gets the canonical message manager for a channel. @param channelId Channel ID. @returns Message manager. */ public messages(
-    channelId: string,
-  ): MessageManager {
+  public messages(channelId: string): MessageManager {
     let manager = this.#messageManagers.get(channelId);
     if (!manager) {
       manager = new MessageManager(this.#rest, this.#context, channelId);
@@ -115,27 +86,20 @@ export class ChannelManager extends Manager<string, Channel> {
     }
     return manager;
   }
-  /** Creates a thread manager. @param channelId Channel ID. @returns Thread manager. */ public threads(
-    channelId: string,
-  ): ThreadManager {
+  public threads(channelId: string): ThreadManager {
     return new ThreadManager(this.#rest, this.#context, channelId);
   }
-  /** Fetches a channel. @param channelId Channel ID. @returns Channel. */ public async fetch(
-    channelId: string,
-  ): Promise<Channel> {
-    const data = await this.#rest.get<ConstructorParameters<typeof Channel>[0]>(
-      Routes.channel(channelId),
+  public async fetch(channelId: string): Promise<Channel> {
+    return this.upsert(
+      await this.#rest.get<ConstructorParameters<typeof Channel>[0]>(
+        Routes.channel(channelId),
+      ),
     );
-    return this.upsert(data);
   }
-  /** Resolves a channel. @param channelId Channel ID. @returns Canonical channel. */ public async resolve(
-    channelId: string,
-  ): Promise<Channel> {
+  public async resolve(channelId: string): Promise<Channel> {
     return this.get(channelId) ?? this.fetch(channelId);
   }
-  /** Inserts or updates a channel. @param data Channel payload. @returns Canonical channel. */ public upsert(
-    data: ConstructorParameters<typeof Channel>[0],
-  ): Channel {
+  public upsert(data: ConstructorParameters<typeof Channel>[0]): Channel {
     const existing = this.get(data.id);
     const channel = new Channel(data, this.#context);
     if (existing) {
@@ -145,24 +109,50 @@ export class ChannelManager extends Manager<string, Channel> {
     this.set(channel.id, channel);
     return channel;
   }
-  /** Updates a channel. @param channel Channel. @returns This manager. */ public update(
-    channel: Channel,
-  ): this {
+  public update(channel: Channel): this {
     return this.set(channel.id, channel);
   }
-  /** Sends a message. @param channelId Channel ID. @param options Message options. @returns Created message. */ public send(
+  public async create(
+    guildId: string,
+    options: ChannelCreateOptions,
+  ): Promise<Channel> {
+    return this.upsert(
+      await this.#rest.post<ConstructorParameters<typeof Channel>[0]>(
+        Routes.guildChannels(guildId),
+        options,
+      ),
+    );
+  }
+  public async edit(
+    channelId: string,
+    options: ChannelEditOptions,
+  ): Promise<Channel> {
+    return this.upsert(
+      await this.#rest.patch<ConstructorParameters<typeof Channel>[0]>(
+        Routes.channel(channelId),
+        options,
+      ),
+    );
+  }
+
+  public async deleteChannel(channelId: string): Promise<void> {
+    await this.#rest.delete(Routes.channel(channelId));
+    this.#messageManagers.delete(channelId);
+    super.delete(channelId);
+  }
+  public send(
     channelId: string,
     options: MessageCreateOptions,
   ): Promise<Message> {
     return this.messages(channelId).send(options);
   }
-  /** Alias for send. @param channelId Channel ID. @param options Message options. @returns Created message. */ public sendMessage(
+  public sendMessage(
     channelId: string,
     options: MessageCreateOptions,
   ): Promise<Message> {
     return this.send(channelId, options);
   }
-  /** Fetches one message. @param channelId Channel ID. @param messageId Message ID. @param options Fetch options. @returns Message. */ public async fetchMessage(
+  public async fetchMessage(
     channelId: string,
     messageId: string,
     options: MessageFetchOptions = {},
@@ -170,7 +160,7 @@ export class ChannelManager extends Manager<string, Channel> {
     void options;
     return this.messages(channelId).fetch(messageId);
   }
-  /** Fetches messages by query or by iterable IDs. @param channelId Channel ID. @param query Query options or message IDs. @returns Messages. */ public fetchMessages(
+  public fetchMessages(
     channelId: string,
     query: MessageQueryOptions | Iterable<string>,
   ): Promise<Message[]> {
@@ -191,44 +181,44 @@ export class ChannelManager extends Manager<string, Channel> {
     }
     return this.messages(channelId).fetchMany(query);
   }
-  /** Inserts a message through the canonical cache path. @param data Message payload. @returns Canonical message. */ public upsertMessage(
+  public upsertMessage(
     data: ConstructorParameters<typeof Message>[0],
   ): Message {
     return this.messages(data.channel_id).upsert(data);
   }
-  /** Edits a message. @param channelId Channel ID. @param messageId Message ID. @param options Edit options. @returns Updated message. */ public async editMessage(
+  public async editMessage(
     channelId: string,
     messageId: string,
     options: MessageEditOptions,
   ): Promise<Message> {
-    const data = await this.#rest.patch<
-      ConstructorParameters<typeof Message>[0]
-    >(Routes.message(channelId, messageId), options);
-    return this.messages(channelId).upsert(data);
+    return this.messages(channelId).upsert(
+      await this.#rest.patch<ConstructorParameters<typeof Message>[0]>(
+        Routes.message(channelId, messageId),
+        options,
+      ),
+    );
   }
-  /** Deletes a message. @param channelId Channel ID. @param messageId Message ID. @returns Nothing. */ public async deleteMessage(
+  public async deleteMessage(
     channelId: string,
     messageId: string,
   ): Promise<void> {
     await this.#rest.delete(Routes.message(channelId, messageId));
     this.messages(channelId).delete(messageId);
   }
-  /** Deletes a cached message. @param channelId Channel ID. @param messageId Message ID. @returns Whether removed. */ public deleteCachedMessage(
-    channelId: string,
-    messageId: string,
-  ): boolean {
+  public deleteCachedMessage(channelId: string, messageId: string): boolean {
     return this.messages(channelId).delete(messageId);
   }
-  /** Crossposts a message. @param channelId Channel ID. @param messageId Message ID. @returns Crossposted message. */ public async crosspostMessage(
+  public async crosspostMessage(
     channelId: string,
     messageId: string,
   ): Promise<Message> {
-    const data = await this.#rest.post<
-      ConstructorParameters<typeof Message>[0]
-    >(Routes.crosspostMessage(channelId, messageId));
-    return this.messages(channelId).upsert(data);
+    return this.messages(channelId).upsert(
+      await this.#rest.post<ConstructorParameters<typeof Message>[0]>(
+        Routes.crosspostMessage(channelId, messageId),
+      ),
+    );
   }
-  /** Bulk deletes messages. @param channelId Channel ID. @param messageIds Message IDs. @returns Nothing. */ public async bulkDeleteMessages(
+  public async bulkDeleteMessages(
     channelId: string,
     messageIds: Iterable<string>,
   ): Promise<void> {
@@ -238,14 +228,14 @@ export class ChannelManager extends Manager<string, Channel> {
     });
     for (const id of ids) this.messages(channelId).delete(id);
   }
-  /** Adds a reaction. @param channelId Channel ID. @param messageId Message ID. @param emoji Emoji identifier. @returns Nothing. */ public async addReaction(
+  public async addReaction(
     channelId: string,
     messageId: string,
     emoji: string,
   ): Promise<void> {
     await this.#rest.put(Routes.messageReactions(channelId, messageId, emoji));
   }
-  /** Fetches users who reacted. @param channelId Channel ID. @param messageId Message ID. @param emoji Emoji identifier. @param options Query options. @returns Users. */ public async fetchReactions(
+  public async fetchReactions(
     channelId: string,
     messageId: string,
     emoji: string,
@@ -260,16 +250,16 @@ export class ChannelManager extends Manager<string, Channel> {
     );
     return data.map((user) => new User(user));
   }
-  /** Removes the current bot user's reaction. @param channelId Channel ID. @param messageId Message ID. @param emoji Emoji identifier. @returns Nothing. */ public async removeOwnReaction(
+  public async removeOwnReaction(
     channelId: string,
     messageId: string,
     emoji: string,
   ): Promise<void> {
     await this.#rest.delete(
-      Routes.messageReactions(channelId, messageId, emoji) + "/@me",
+      `${Routes.messageReactions(channelId, messageId, emoji)}/@me`,
     );
   }
-  /** Removes a user's reaction. @param channelId Channel ID. @param messageId Message ID. @param emoji Emoji identifier. @param userId User ID. @returns Nothing. */ public async removeReaction(
+  public async removeReaction(
     channelId: string,
     messageId: string,
     emoji: string,
@@ -279,51 +269,44 @@ export class ChannelManager extends Manager<string, Channel> {
       `${Routes.messageReactions(channelId, messageId, emoji)}/${userId}`,
     );
   }
-  /** Removes all reactions. @param channelId Channel ID. @param messageId Message ID. @returns Nothing. */ public async removeAllReactions(
+  public async removeAllReactions(
     channelId: string,
     messageId: string,
   ): Promise<void> {
     await this.#rest.delete(Routes.messageReactionsAll(channelId, messageId));
   }
-  /** Fetches pinned messages. @param channelId Channel ID. @returns Pinned messages. */ public async fetchPinnedMessages(
-    channelId: string,
-  ): Promise<Message[]> {
+  public async fetchPinnedMessages(channelId: string): Promise<Message[]> {
     const data = await this.#rest.get<
       ConstructorParameters<typeof Message>[0][]
     >(Routes.channelPins(channelId));
     return data.map((item) => this.messages(channelId).upsert(item));
   }
-  /** Pins a message. @param channelId Channel ID. @param messageId Message ID. @returns Nothing. */ public async pinMessage(
-    channelId: string,
-    messageId: string,
-  ): Promise<void> {
+  public async pinMessage(channelId: string, messageId: string): Promise<void> {
     await this.#rest.put(Routes.channelPin(channelId, messageId));
   }
-  /** Unpins a message. @param channelId Channel ID. @param messageId Message ID. @returns Nothing. */ public async unpinMessage(
+  public async unpinMessage(
     channelId: string,
     messageId: string,
   ): Promise<void> {
     await this.#rest.delete(Routes.channelPin(channelId, messageId));
   }
-  /** Creates a thread from a message. @param channelId Channel ID. @param messageId Message ID. @param options Thread options. @returns Created thread channel. */ public createThreadFromMessage(
+  public createThreadFromMessage(
     channelId: string,
     messageId: string,
     options: MessageThreadOptions,
   ): Promise<Channel> {
     return this.threads(channelId).createFromMessage(messageId, options);
   }
-  /** Deletes a channel and its message manager. @param channelId Channel ID. @returns Whether removed. */ public delete(
-    channelId: string,
-  ): boolean {
+  public delete(channelId: string): boolean {
     this.#messageManagers.delete(channelId);
     return super.delete(channelId);
   }
-  /** Clears all channels and message managers. @returns Nothing. */ public clear(): void {
+  public clear(): void {
     this.#messageManagers.clear();
     super.clear();
   }
 }
-/** Determines whether a message query object was supplied. @param value Candidate query. @returns True when it is a query object. */
+
 function isMessageQuery(
   value: MessageQueryOptions | Iterable<string>,
 ): value is MessageQueryOptions {
@@ -331,13 +314,9 @@ function isMessageQuery(
     typeof value === "object" && value !== null && !(Symbol.iterator in value)
   );
 }
-/** Backward-compatible message option alias. */
 export type CreateMessageOptions = MessageCreateOptions;
-/** Exposes the message manager class. */
 export { MessageManager } from "./message.js";
-/** Exposes the thread manager class. */
 export { ThreadManager } from "./thread.js";
-
 export {
   RoleManager,
   type RoleCreateOptions,

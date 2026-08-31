@@ -26,11 +26,23 @@ export class RESTError extends Error {
   }
 }
 
+/** Library version and source URL used for the Discord-compliant User-Agent. */
+import packageJson from "../package.json" with { type: "json" };
+const LIBRARY_VERSION = packageJson.version;
+const LIBRARY_URL = "https://github.com/Ekretos/lunibee";
+const USER_AGENT = `DiscordBot (${LIBRARY_URL}, ${packageJson.version})`;
+
 /** Internal state shared by requests mapped to one Discord rate-limit bucket. */
 type Bucket = { remaining: number; resetAt: number; queue: Promise<void> };
 /** Options controlling an individual REST request. */
 export interface RESTRequestOptions {
   /** Abort signal used to cancel the request and any queued wait. */ signal?: AbortSignal;
+}
+
+export interface RESTFileAttachment {
+  name: string;
+  data: Blob | Uint8Array | ArrayBuffer;
+  contentType?: string;
 }
 
 /** Configures which REST failures may be retried. */
@@ -100,7 +112,15 @@ export class REST {
     if (!token.trim()) throw new TypeError("A Discord bot token is required.");
     this.#token = token;
   }
-  /** Executes an HTTP request with Discord bucket/global rate limits, retry handling, and AbortSignal support. @param method HTTP method. @param path API path. @param body Optional JSON body. @param options Cancellation options. @returns Decoded response body. @throws {RESTError} If Discord or transport rejects the request. */
+  /** Executes an HTTP request with Discord bucket/global rate limits, retry handling, and AbortSignal support.
+   * Accepts a JSON body, a FormData body (for file uploads), or undefined.
+   * @param method HTTP method.
+   * @param path API path.
+   * @param body Optional JSON body, FormData for file uploads, or undefined.
+   * @param options Cancellation options.
+   * @returns Decoded response body.
+   * @throws {RESTError} If Discord or transport rejects the request.
+   */
   public async request<T>(
     method: string,
     path: string,
@@ -145,15 +165,24 @@ export class REST {
             ),
           this.#timeout,
         );
+        // Build headers and body based on whether this is a multipart request
+        const isFormData =
+          typeof FormData !== "undefined" && body instanceof FormData;
+        const headers: Record<string, string> = {
+          ...(this.#token ? { Authorization: `Bot ${this.#token}` } : {}),
+          "User-Agent": USER_AGENT,
+        };
+        if (!isFormData) headers["Content-Type"] = "application/json";
+        const fetchBody = isFormData
+          ? (body as FormData)
+          : body === undefined
+            ? undefined
+            : JSON.stringify(body);
         try {
           const response = await fetch(`${this.#baseURL}${path}`, {
             method: normalizedMethod,
-            headers: {
-              ...(this.#token ? { Authorization: `Bot ${this.#token}` } : {}),
-              "Content-Type": "application/json",
-              "User-Agent": "Lunibee/0.1.0",
-            },
-            body: body === undefined ? undefined : JSON.stringify(body),
+            headers,
+            body: fetchBody,
             signal: controller.signal,
           });
           bucket = this.#update(response, bucket, route, bucketKey);
@@ -256,6 +285,61 @@ export class REST {
     T,
   >(path: string, options?: RESTRequestOptions): Promise<T> {
     return this.request<T>("DELETE", path, undefined, options);
+  }
+  /**
+   * Builds a multipart form with a JSON payload and file attachments.
+   */
+  #fileForm(payload: unknown, files: RESTFileAttachment[]): FormData {
+    const form = new FormData();
+    form.append("payload_json", JSON.stringify(payload));
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]!;
+      const blob =
+        file.data instanceof Blob
+          ? file.data
+          : new Blob([file.data as ArrayBuffer], {
+              type: file.contentType ?? "application/octet-stream",
+            });
+      form.append(`files[${i}]`, blob, file.name);
+    }
+    return form;
+  }
+
+  /**
+   * Sends a multipart/form-data POST request for file uploads.
+   * Attaches a JSON payload as `payload_json` and files as additional fields.
+   * @param path API path.
+   * @param payload JSON payload (e.g. message content, embeds).
+   * @param files Array of file attachments.
+   * @param options Cancellation options.
+   * @returns Decoded response.
+   * @throws {RESTError} When the request fails.
+   */
+  public postWithFiles<T>(
+    path: string,
+    payload: unknown,
+    files: RESTFileAttachment[],
+    options?: RESTRequestOptions,
+  ): Promise<T> {
+    return this.request<T>("POST", path, this.#fileForm(payload, files), options);
+  }
+
+  /**
+   * Sends a multipart/form-data PATCH request for editing messages with files.
+   * @param path API path.
+   * @param payload JSON payload.
+   * @param files Array of file attachments.
+   * @param options Cancellation options.
+   * @returns Decoded response.
+   * @throws {RESTError} When the request fails.
+   */
+  public patchWithFiles<T>(
+    path: string,
+    payload: unknown,
+    files: RESTFileAttachment[],
+    options?: RESTRequestOptions,
+  ): Promise<T> {
+    return this.request<T>("PATCH", path, this.#fileForm(payload, files), options);
   }
   /** Waits for a route bucket while respecting cancellation. @param bucket Bucket state. @param signal Optional cancellation signal. @param path Request path for error context. @returns Promise fulfilled when sending is permitted. @throws {RESTError} If the request is aborted. */
   async #wait(
