@@ -2,7 +2,9 @@ import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
 import { Message, type ResourceContext } from "@lunibee/structures";
 
-export type MessageCreateOptions = Record<string, unknown> & { content?: string };
+export type MessageCreateOptions = Record<string, unknown> & {
+  content?: string;
+};
 export type MessageEditOptions = Record<string, unknown> & { content?: string };
 
 export class MessageManager {
@@ -21,15 +23,21 @@ export class MessageManager {
     return this.cache.get(messageId) ?? this.fetch(messageId);
   }
   public async send(options: MessageCreateOptions): Promise<Message> {
-    const data = await this.#rest.post<ConstructorParameters<typeof Message>[0]>(Routes.channelMessages(this.#channelId), options);
+    const data = await this.#rest.post<
+      ConstructorParameters<typeof Message>[0]
+    >(Routes.channelMessages(this.#channelId), options);
     return this.upsert(data);
   }
   public async fetch(messageId: string): Promise<Message> {
-    const data = await this.#rest.get<ConstructorParameters<typeof Message>[0]>(Routes.message(this.#channelId, messageId));
+    const data = await this.#rest.get<ConstructorParameters<typeof Message>[0]>(
+      Routes.message(this.#channelId, messageId),
+    );
     return this.upsert(data);
   }
   public fetchMany(messageIds: Iterable<string>): Promise<Message[]> {
-    return Promise.all(Array.from(messageIds, (messageId) => this.fetch(messageId)));
+    return Promise.all(
+      Array.from(messageIds, (messageId) => this.fetch(messageId)),
+    );
   }
   public upsert(data: ConstructorParameters<typeof Message>[0]): Message {
     const existing = this.cache.get(data.id);

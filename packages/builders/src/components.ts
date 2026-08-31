@@ -8,6 +8,14 @@ export const ComponentType = {
   RoleSelect: 6,
   MentionableSelect: 7,
   ChannelSelect: 8,
+  Section: 9,
+  TextDisplay: 10,
+  Thumbnail: 11,
+  MediaGallery: 12,
+  File: 13,
+  Separator: 14,
+  ContentInventoryEntry: 16,
+  Container: 17,
 } as const;
 export const ButtonStyle = {
   Primary: 1,
@@ -87,6 +95,57 @@ export interface APIActionRowComponent {
   type: typeof ComponentType.ActionRow;
   components: APIActionRowChild[];
 }
+export interface APISectionComponent {
+  type: typeof ComponentType.Section;
+  components?: APIComponent[]; // text displays
+  accessory?: APIComponent; // buttons, thumbnails, etc.
+}
+export interface APITextDisplayComponent {
+  type: typeof ComponentType.TextDisplay;
+  content: string;
+}
+export interface APIMediaGalleryComponent {
+  type: typeof ComponentType.MediaGallery;
+  items: { media: { url: string; description?: string } }[];
+}
+export interface APIFileComponent {
+  type: typeof ComponentType.File;
+  filename: string;
+}
+export interface APISeparatorComponent {
+  type: typeof ComponentType.Separator;
+  spacing?: "small" | "large";
+}
+export interface APIThumbnailComponent {
+  type: typeof ComponentType.Thumbnail;
+  url: string;
+  proxy_url?: string;
+  width?: number;
+  height?: number;
+}
+export interface APIContentInventoryEntryComponent {
+  type: typeof ComponentType.ContentInventoryEntry;
+  id: string;
+}
+export interface APIContainerComponent {
+  type: typeof ComponentType.Container;
+  components: APIComponent[];
+  accent_color?: number;
+}
+export type APIComponent =
+  | APIActionRowComponent
+  | APIButtonComponent
+  | APIStringSelectComponent
+  | APIEntitySelectComponent
+  | APITextInputComponent
+  | APISectionComponent
+  | APITextDisplayComponent
+  | APIThumbnailComponent
+  | APIMediaGalleryComponent
+  | APIFileComponent
+  | APISeparatorComponent
+  | APIContentInventoryEntryComponent
+  | APIContainerComponent;
 
 export class ActionRowBuilder<
   T extends { toJSON(): APIActionRowChild } = { toJSON(): APIActionRowChild },
@@ -353,6 +412,149 @@ export class TextInputBuilder {
     return structuredClone(this.#data);
   }
 }
+
+export class ContainerBuilder {
+  readonly #components: { toJSON(): APIComponent }[] = [];
+  #accentColor?: number;
+  public addComponents(...components: { toJSON(): APIComponent }[]): this {
+    if (!components.length)
+      throw new TypeError("At least one component is required.");
+    this.#components.push(...components);
+    return this;
+  }
+  public setAccentColor(color: number): this {
+    if (!Number.isInteger(color) || color < 0 || color > 0xffffff) {
+      throw new RangeError(
+        "Accent color must be an integer between 0 and 16777215 (0xFFFFFF).",
+      );
+    }
+    this.#accentColor = color;
+    return this;
+  }
+  public toJSON(): APIContainerComponent {
+    return {
+      type: ComponentType.Container,
+      components: this.#components.map((c) => c.toJSON()),
+      accent_color: this.#accentColor,
+    };
+  }
+}
+
+export class SectionBuilder {
+  readonly #components: { toJSON(): APIComponent }[] = [];
+  #accessory?: { toJSON(): APIComponent };
+  public addComponents(...components: { toJSON(): APIComponent }[]): this {
+    if (!components.length)
+      throw new TypeError("At least one component is required.");
+    this.#components.push(...components);
+    return this;
+  }
+  public setAccessory(accessory: { toJSON(): APIComponent }): this {
+    this.#accessory = accessory;
+    return this;
+  }
+  public toJSON(): APISectionComponent {
+    return {
+      type: ComponentType.Section,
+      components: this.#components.length
+        ? this.#components.map((c) => c.toJSON())
+        : undefined,
+      accessory: this.#accessory?.toJSON(),
+    };
+  }
+}
+
+export class TextDisplayBuilder {
+  #content = "";
+  public setContent(content: string): this {
+    validateText(content, 4000, "Text display content");
+    this.#content = content;
+    return this;
+  }
+  public toJSON(): APITextDisplayComponent {
+    return {
+      type: ComponentType.TextDisplay,
+      content: this.#content,
+    };
+  }
+}
+
+export class MediaGalleryBuilder {
+  readonly #items: { media: { url: string; description?: string } }[] = [];
+  public addItems(...items: { url: string; description?: string }[]): this {
+    if (this.#items.length + items.length > 10) {
+      throw new RangeError("MediaGallery can only contain up to 10 items.");
+    }
+    this.#items.push(...items.map((item) => ({ media: item })));
+    return this;
+  }
+  public toJSON(): APIMediaGalleryComponent {
+    return {
+      type: ComponentType.MediaGallery,
+      items: structuredClone(this.#items),
+    };
+  }
+}
+
+export class FileComponentBuilder {
+  #filename = "";
+  public setFilename(filename: string): this {
+    validateText(filename, 255, "File component filename");
+    this.#filename = filename;
+    return this;
+  }
+  public toJSON(): APIFileComponent {
+    return {
+      type: ComponentType.File,
+      filename: this.#filename,
+    };
+  }
+}
+
+export class SeparatorBuilder {
+  #spacing?: "small" | "large";
+  public setSpacing(spacing: "small" | "large"): this {
+    this.#spacing = spacing;
+    return this;
+  }
+  public toJSON(): APISeparatorComponent {
+    return {
+      type: ComponentType.Separator,
+      spacing: this.#spacing,
+    };
+  }
+}
+
+export class ThumbnailBuilder {
+  #url = "";
+  public setUrl(url: string): this {
+    validateText(url, 2048, "Thumbnail URL");
+    this.#url = url;
+    return this;
+  }
+  public toJSON(): APIThumbnailComponent {
+    return {
+      type: ComponentType.Thumbnail,
+      url: this.#url,
+    };
+  }
+}
+
+export class ContentInventoryEntryBuilder {
+  #id = "";
+  public setId(id: string): this {
+    validateText(id, 100, "Content inventory entry ID");
+    this.#id = id;
+    return this;
+  }
+  public toJSON(): APIContentInventoryEntryComponent {
+    return {
+      type: ComponentType.ContentInventoryEntry,
+      id: this.#id,
+    };
+  }
+}
+
 function validateText(value: string, max: number, field: string): void {
   if (typeof value !== "string")
     throw new TypeError(`${field} must be a string.`);

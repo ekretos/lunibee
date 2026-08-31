@@ -51,6 +51,9 @@ export class Cache<K, V> {
       this.#entries.delete(key);
       return undefined;
     }
+    // LRU Promotion: move to end of insertion order
+    this.#entries.delete(key);
+    this.#entries.set(key, entry);
     return entry.value;
   }
   /** Returns whether a live entry exists. */

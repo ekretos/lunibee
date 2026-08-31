@@ -40,8 +40,13 @@ export class GuildMember {
       throw new RangeError("Member joined_at must be a valid date.");
     this.permissions = new PermissionsBitField(data.permissions ?? 0n);
   }
-  /** Effective member display name. @returns Nickname or user display name. */ public get displayName(): string {
+  /** Effective member display name. @returns Nickname or user display name. */
+  public get displayName(): string {
     return this.nickname ?? this.user.displayName;
+  }
+  /** Returns the Discord user mention for this member. */
+  public toString(): string {
+    return this.user.toString();
   }
 }
 
@@ -72,26 +77,29 @@ export class Role extends BaseStructure {
     this.managed = data.managed ?? false;
     this.mentionable = data.mentionable ?? false;
   }
-  /** Discord role mention string. @returns Role mention. */ public toString(): string {
+  /** Discord role mention string. Used automatically in template literals. */
+  public override toString(): string {
     return `<@&${this.id}>`;
   }
 }
 
 /** A Discord text-capable channel. */
 export class TextChannel extends Channel {
-  /** Parent category ID. */ public parentId?: string | null;
   /** Creates a text channel from Discord data. @param data Discord channel payload. */
-  public constructor(data: {
-    id: string;
-    type: number;
-    name?: string;
-    parent_id?: string | null;
-    guild_id?: string;
-  }) {
-    super(data);
-    this.parentId = data.parent_id;
+  public constructor(
+    data: {
+      id: string;
+      type: number;
+      name?: string;
+      parent_id?: string | null;
+      guild_id?: string;
+    },
+    context?: import("./base.js").ResourceContext,
+  ) {
+    super(data, context);
   }
-  /** Discord channel mention string. @returns Channel mention. */ public toString(): string {
+  /** Discord channel mention string. Used automatically in template literals. */
+  public override toString(): string {
     return `<#${this.id}>`;
   }
 }

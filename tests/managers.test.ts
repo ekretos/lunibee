@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { Manager, ResourceManager } from "../packages/managers/src/base.ts";
 import { RoleManager } from "../packages/managers/src/role.ts";
 import { GuildMemberManager } from "../packages/managers/src/member.ts";
+import { GuildManager } from "../packages/managers/src/guild.ts";
+import { UserManager } from "../packages/managers/src/user.ts";
 import { REST } from "@lunibee/rest";
 
 describe("Managers Coverage", () => {
@@ -143,5 +145,108 @@ describe("Managers Coverage", () => {
     } finally {
       globalThis.fetch = original;
     }
+  });
+
+  test("GuildManager executes REST operations", async () => {
+    const rest = new REST({ token: "test" });
+    const guildMgr = new GuildManager(rest);
+    let lastUrl = "";
+    let lastOpts: any;
+
+    (rest as any).get = async (url: string) => {
+      lastUrl = url;
+      if (url === "/guilds/1") return { id: "1", name: "Guild 1" };
+      return [];
+    };
+    (rest as any).post = async (url: string, opts: any) => {
+      lastUrl = url;
+      lastOpts = opts;
+      return { id: "2", name: opts.name };
+    };
+    (rest as any).patch = async (url: string, opts: any) => {
+      lastUrl = url;
+      lastOpts = opts;
+      return { id: "1", name: opts.name };
+    };
+    (rest as any).delete = async (url: string) => {
+      lastUrl = url;
+    };
+
+    const created = await guildMgr.create({ name: "New Guild" });
+    expect(created.id).toBe("2");
+    expect(lastUrl).toBe("/guilds");
+
+    const edited = await guildMgr.edit("1", { name: "Edited Guild" });
+    expect(edited.id).toBe("1");
+    expect(lastUrl).toBe("/guilds/1");
+    expect(lastOpts.name).toBe("Edited Guild");
+
+    await guildMgr.deleteGuild("1");
+    expect(lastUrl).toBe("/guilds/1");
+
+    await guildMgr.fetchPreview("1");
+    expect(lastUrl).toBe("/guilds/1/preview");
+
+    await guildMgr.fetchActiveThreads("1");
+    expect(lastUrl).toBe("/guilds/1/threads/active");
+
+    await guildMgr.fetchWebhooks("1");
+    expect(lastUrl).toBe("/guilds/1/webhooks");
+
+    await guildMgr.fetchInvites("1");
+    expect(lastUrl).toBe("/guilds/1/invites");
+
+    // Also cover the fetch in constructor (ResourceManager.fetch)
+    const fetched = await guildMgr.fetch("1");
+    expect(fetched.id).toBe("1");
+  });
+
+  test("UserManager executes REST operations", async () => {
+    const rest = new REST({ token: "test" });
+    const userMgr = new UserManager(rest);
+    let lastUrl = "";
+    let lastOpts: any;
+
+    (rest as any).get = async (url: string) => {
+      lastUrl = url;
+      if (url === "/users/@me")
+        return { id: "123456789012345679", username: "bot" };
+      if (url === "/users/1") return { id: "1", username: "user1" };
+      return {};
+    };
+    (rest as any).post = async (url: string, opts: any) => {
+      lastUrl = url;
+      lastOpts = opts;
+      return { id: "ch1" };
+    };
+    (rest as any).patch = async (url: string, opts: any) => {
+      lastUrl = url;
+      lastOpts = opts;
+      return { id: "123456789012345679", username: opts.username };
+    };
+    (rest as any).delete = async (url: string) => {
+      lastUrl = url;
+    };
+
+    const me = await userMgr.fetchMe();
+    expect(me.id).toBe("123456789012345679");
+    expect(lastUrl).toBe("/users/@me");
+
+    const edited = await userMgr.editMe({ username: "newbot" });
+    expect(edited.username).toBe("newbot");
+    expect(lastUrl).toBe("/users/@me");
+    expect(lastOpts.username).toBe("newbot");
+
+    await userMgr.leaveGuild("guild1");
+    expect(lastUrl).toBe("/users/@me/guilds/guild1");
+
+    const dm = await userMgr.createDM("1");
+    expect(dm.id).toBe("ch1");
+    expect(lastUrl).toBe("/users/@me/channels");
+    expect(lastOpts.recipient_id).toBe("1");
+
+    const fetched = await userMgr.fetch("1");
+    expect(fetched.id).toBe("1");
+    expect(lastUrl).toBe("/users/1");
   });
 });

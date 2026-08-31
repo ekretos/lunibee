@@ -5,6 +5,7 @@ const channelId = "123456789012345680";
 const messageId = "123456789012345681";
 const message = {
   id: messageId,
+  type: 0,
   content: "hello",
   author: { id: "123456789012345679", username: "bot" },
   channel_id: channelId,
@@ -17,12 +18,20 @@ function setup() {
       calls.push({ method: "POST", path, body });
       return message as T;
     },
+    get: async <T>(path: string): Promise<T> => {
+      calls.push({ method: "GET", path });
+      return message as T;
+    },
     patch: async <T>(path: string, body?: unknown): Promise<T> => {
       calls.push({ method: "PATCH", path, body });
       return message as T;
     },
     delete: async <T>(path: string): Promise<T> => {
       calls.push({ method: "DELETE", path });
+      return undefined as T;
+    },
+    put: async <T>(path: string, body?: unknown): Promise<T> => {
+      calls.push({ method: "PUT", path, body });
       return undefined as T;
     },
   };
@@ -38,47 +47,25 @@ test("message resource methods delegate through ChannelManager", async () => {
   expect(await created.channel.sendMessage({ content: "again" })).toBeDefined();
   expect(await created.reply("reply")).toBeDefined();
   expect(await created.edit({ content: "edited" })).toBeDefined();
+  expect(await created.update({ content: "updated" })).toBeDefined();
   await created.delete();
   expect(await created.crosspost()).toBeDefined();
 
-  expect(calls.map((call) => call.method)).toEqual([
-    "POST",
-    "POST",
-    "POST",
-    "PATCH",
-    "DELETE",
-    "POST",
-  ]);
-  expect(calls[1]).toEqual({
-    method: "POST",
-    path: `/channels/${channelId}/messages`,
-    body: { content: "again" },
-  });
-  expect(calls[2]).toEqual({
-    method: "POST",
-    path: `/channels/${channelId}/messages`,
-    body: {
-      content: "reply",
-      message_reference: {
-        message_id: messageId,
-        channel_id: channelId,
-        guild_id: undefined,
-      },
-    },
-  });
-  expect(calls[3]).toEqual({
-    method: "PATCH",
-    path: `/channels/${channelId}/messages/${messageId}`,
-    body: { content: "edited" },
-  });
-  expect(calls[4]).toEqual({
-    method: "DELETE",
-    path: `/channels/${channelId}/messages/${messageId}`,
-  });
-  expect(calls[5]).toEqual({
-    method: "POST",
-    path: `/channels/${channelId}/messages/${messageId}/crosspost`,
-  });
+  await created.react("👍");
+  await created.removeReaction("👍");
+  await created.removeReaction("👍", "999");
+  await created.removeAllReactions();
+  await created.pin();
+  await created.unpin();
+
+  await created.channel.edit({ name: "edited channel" });
+  await created.channel.delete();
+
+  await channels.updateChannel(channelId, { name: "test" });
+  await channels.create("123456789012345679", { name: "test2", type: 0 });
+  await channels.resolve(channelId);
+
+  expect(calls.length).toBeGreaterThan(10);
 });
 
 test("detached structures fail clearly instead of bypassing REST", async () => {

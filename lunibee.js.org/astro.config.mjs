@@ -17,6 +17,11 @@ export default defineConfig({
           label: "GitHub",
           href: "https://github.com/Ekretos/lunibee",
         },
+        {
+          icon: "discord",
+          label: "Discord",
+          href: "https://discord.gg/SSADgyBpgw",
+        },
       ],
       customCss: ["./src/styles/custom.css"],
       sidebar: [
@@ -27,6 +32,7 @@ export default defineConfig({
             { label: "Installation", link: "/getting-started/installation" },
             { label: "Creating a Bot", link: "/getting-started/creating-a-bot" },
             { label: "Quick Start", link: "/getting-started/quick-start" },
+            { label: "Changelog", link: "/getting-started/changelog" },
           ],
         },
         {

@@ -1,6 +1,6 @@
 {
   "name": "@lunibee/ws",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "module": "./src/index.ts",
   "types": "./src/index.ts",

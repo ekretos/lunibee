@@ -1,6 +1,8 @@
 /** Discord API snowflake identifier. */
 export type Snowflake = string;
 
+// ─── Gateway Intents ─────────────────────────────────────────────────────────
+
 /** Gateway intent bit flags supported by Discord (PascalCase). */
 export const GatewayIntentBits = {
   Guilds: 1 << 0,
@@ -92,6 +94,8 @@ export function resolveGatewayIntents(
   return 0;
 }
 
+// ─── Gateway Config ───────────────────────────────────────────────────────────
+
 /** Gateway connection properties (OS, browser, device). */
 export interface GatewayProperties {
   os?: string;
@@ -139,6 +143,9 @@ export interface RESTOptions {
   retries?: number;
   baseURL?: string;
 }
+
+// ─── Core Discord Objects ─────────────────────────────────────────────────────
+
 /** Discord user object. */
 export interface UserData {
   id: Snowflake;
@@ -165,6 +172,9 @@ export interface APIError {
   message?: string;
   errors?: Record<string, unknown>;
 }
+
+// ─── Discord Flags & Enums ────────────────────────────────────────────────────
+
 /** Discord message flags. */
 export const MessageFlags = {
   Crossposted: 1,
@@ -177,6 +187,7 @@ export const MessageFlags = {
   Loading: 128,
   IsComponentsV2: 32768,
 } as const;
+
 /** Discord channel types. */
 export const ChannelType = {
   GuildText: 0,
@@ -194,6 +205,117 @@ export const ChannelType = {
   GuildMedia: 16,
 } as const;
 
+/** Discord component types. */
+export const ComponentType = {
+  ActionRow: 1,
+  Button: 2,
+  StringSelect: 3,
+  TextInput: 4,
+  UserSelect: 5,
+  RoleSelect: 6,
+  MentionableSelect: 7,
+  ChannelSelect: 8,
+  Section: 9,
+  TextDisplay: 10,
+  Thumbnail: 11,
+  MediaGallery: 12,
+  File: 13,
+  Separator: 14,
+  ContentInventoryEntry: 16,
+  Container: 17,
+} as const;
+
+/** Discord button style types. */
+export const ButtonStyle = {
+  Primary: 1,
+  Secondary: 2,
+  Success: 3,
+  Danger: 4,
+  Link: 5,
+  Premium: 6,
+} as const;
+
+/** Discord text input style types. */
+export const TextInputStyle = {
+  Short: 1,
+  Paragraph: 2,
+} as const;
+
+/** Discord interaction response types. */
+export const InteractionResponseType = {
+  Pong: 1,
+  ChannelMessage: 4,
+  DeferredChannelMessage: 5,
+  DeferredMessageUpdate: 6,
+  MessageUpdate: 7,
+  Autocomplete: 8,
+  Modal: 9,
+} as const;
+
+/** Discord sticker format types. */
+export const StickerFormatType = {
+  PNG: 1,
+  APNG: 2,
+  Lottie: 3,
+  GIF: 4,
+} as const;
+
+/** Discord sticker types. */
+export const StickerType = {
+  Standard: 1,
+  Guild: 2,
+} as const;
+
+/** Discord verification levels. */
+export const VerificationLevel = {
+  None: 0,
+  Low: 1,
+  Medium: 2,
+  High: 3,
+  VeryHigh: 4,
+} as const;
+
+/** Discord premium tiers. */
+export const PremiumTier = {
+  None: 0,
+  Tier1: 1,
+  Tier2: 2,
+  Tier3: 3,
+} as const;
+
+// ─── Embeds ───────────────────────────────────────────────────────────────────
+
+/** Raw Discord embed footer object. */
+export interface APIEmbedFooter {
+  text: string;
+  icon_url?: string;
+  proxy_icon_url?: string;
+}
+/** Raw Discord embed image/thumbnail/video object. */
+export interface APIEmbedMedia {
+  url: string;
+  proxy_url?: string;
+  height?: number;
+  width?: number;
+}
+/** Raw Discord embed provider object. */
+export interface APIEmbedProvider {
+  name?: string;
+  url?: string;
+}
+/** Raw Discord embed author object. */
+export interface APIEmbedAuthor {
+  name: string;
+  url?: string;
+  icon_url?: string;
+  proxy_icon_url?: string;
+}
+/** Raw Discord embed field object. */
+export interface APIEmbedField {
+  name: string;
+  value: string;
+  inline?: boolean;
+}
 /** Raw Discord embed object. */
 export interface APIEmbed {
   title?: string;
@@ -202,14 +324,79 @@ export interface APIEmbed {
   url?: string;
   timestamp?: string;
   color?: number;
-  footer?: Record<string, unknown>;
-  image?: Record<string, unknown>;
-  thumbnail?: Record<string, unknown>;
-  video?: Record<string, unknown>;
-  provider?: Record<string, unknown>;
-  author?: Record<string, unknown>;
-  fields?: Array<Record<string, unknown>>;
+  footer?: APIEmbedFooter;
+  image?: APIEmbedMedia;
+  thumbnail?: APIEmbedMedia;
+  video?: APIEmbedMedia;
+  provider?: APIEmbedProvider;
+  author?: APIEmbedAuthor;
+  fields?: APIEmbedField[];
 }
+
+// ─── Message Components ───────────────────────────────────────────────────────
+
+/** Raw Discord select menu option. */
+export interface APISelectMenuOption {
+  label: string;
+  value: string;
+  description?: string;
+  emoji?: APIPartialEmoji;
+  default?: boolean;
+}
+/** Raw Discord emoji (partial, as used in components). */
+export interface APIPartialEmoji {
+  id?: Snowflake | null;
+  name?: string | null;
+  animated?: boolean;
+}
+/** Raw Discord button component. */
+export interface APIButtonComponent {
+  type: 2;
+  style: number;
+  label?: string;
+  emoji?: APIPartialEmoji;
+  custom_id?: string;
+  url?: string;
+  sku_id?: string;
+  disabled?: boolean;
+}
+/** Raw Discord select menu component. */
+export interface APISelectMenuComponent {
+  type: 3 | 5 | 6 | 7 | 8;
+  custom_id: string;
+  options?: APISelectMenuOption[];
+  channel_types?: number[];
+  placeholder?: string;
+  min_values?: number;
+  max_values?: number;
+  disabled?: boolean;
+}
+/** Raw Discord text input component. */
+export interface APITextInputComponent {
+  type: 4;
+  custom_id: string;
+  style: number;
+  label: string;
+  min_length?: number;
+  max_length?: number;
+  required?: boolean;
+  value?: string;
+  placeholder?: string;
+}
+/** Union of all raw message component types. */
+export type APIMessageActionRowComponent =
+  APIButtonComponent | APISelectMenuComponent | APITextInputComponent;
+/** Raw Discord action row component. */
+export interface APIActionRowComponent {
+  type: 1;
+  id?: number;
+  components: APIMessageActionRowComponent[];
+}
+/** Union including action rows (top-level component). */
+export type APIMessageComponent = APIActionRowComponent;
+
+// ─── Attachments ─────────────────────────────────────────────────────────────
+
 /** Raw Discord attachment object. */
 export interface APIAttachment {
   id: Snowflake;
@@ -226,19 +413,32 @@ export interface APIAttachment {
   waveform?: string;
   flags?: number;
 }
-/** Raw Discord message component object. */
-export interface APIMessageComponent {
-  type: number;
-  id?: number;
-  custom_id?: string;
-  style?: number;
-  label?: string;
-  disabled?: boolean;
-  emoji?: Record<string, unknown>;
-  url?: string;
-  options?: Array<Record<string, unknown>>;
-  components?: APIMessageComponent[];
+
+// ─── Stickers ────────────────────────────────────────────────────────────────
+
+/** Compact sticker item as included in messages. */
+export interface APIStickerItem {
+  id: Snowflake;
+  name: string;
+  format_type: number;
 }
+/** Full Discord sticker object. */
+export interface APISticker {
+  id: Snowflake;
+  pack_id?: Snowflake;
+  name: string;
+  description?: string | null;
+  tags?: string;
+  type: number;
+  format_type: number;
+  available?: boolean;
+  guild_id?: Snowflake;
+  user?: UserData;
+  sort_value?: number;
+}
+
+// ─── Messages ────────────────────────────────────────────────────────────────
+
 /** Raw Discord message reference. */
 export interface APIMessageReference {
   type?: number;
@@ -253,7 +453,7 @@ export interface APIMessageReaction {
   count_details?: Record<string, number>;
   me?: boolean;
   me_burst?: boolean;
-  emoji: Record<string, unknown>;
+  emoji: APIPartialEmoji;
   burst_colors?: string[];
 }
 /** Raw Discord message object. */
@@ -285,12 +485,17 @@ export interface APIMessage {
   interaction_metadata?: Record<string, unknown>;
   thread?: Record<string, unknown>;
   components?: APIMessageComponent[];
+  sticker_items?: APIStickerItem[];
+  stickers?: APISticker[];
   position?: number;
   role_subscription_data?: Record<string, unknown>;
   purchase_notification?: Record<string, unknown>;
   poll?: Record<string, unknown>;
   guild_id?: Snowflake;
 }
+
+// ─── Channels ────────────────────────────────────────────────────────────────
+
 /** Raw Discord channel object. */
 export interface APIChannel {
   id: Snowflake;
@@ -315,16 +520,79 @@ export interface APIChannel {
   video_quality_mode?: number;
   message_count?: number;
   member_count?: number;
-  thread_metadata?: Record<string, unknown>;
+  thread_metadata?: APIThreadMetadata;
   default_auto_archive_duration?: number;
   flags?: number;
   total_message_sent?: number;
-  available_tags?: Array<Record<string, unknown>>;
-  default_reaction_emoji?: Record<string, unknown> | null;
+  available_tags?: APIForumTag[];
+  default_reaction_emoji?: APIPartialEmoji | null;
   default_thread_rate_limit_per_user?: number;
   default_sort_order?: number | null;
   default_forum_layout?: number;
 }
+
+/** Raw Discord thread metadata. */
+export interface APIThreadMetadata {
+  archived: boolean;
+  auto_archive_duration: number;
+  archive_timestamp: string;
+  locked: boolean;
+  invitable?: boolean;
+  create_timestamp?: string | null;
+}
+
+/** Raw Discord forum tag. */
+export interface APIForumTag {
+  id: Snowflake;
+  name: string;
+  moderated: boolean;
+  emoji_id?: Snowflake | null;
+  emoji_name?: string | null;
+}
+
+/** Raw Discord thread member. */
+export interface APIThreadMember {
+  id?: Snowflake;
+  user_id?: Snowflake;
+  join_timestamp: string;
+  flags: number;
+  member?: APIGuildMember;
+}
+
+// ─── Roles ────────────────────────────────────────────────────────────────────
+
+/** Raw Discord role object. */
+export interface APIRole {
+  id: Snowflake;
+  name: string;
+  color: number;
+  hoist: boolean;
+  icon?: string | null;
+  unicode_emoji?: string | null;
+  position: number;
+  permissions: string;
+  managed: boolean;
+  mentionable: boolean;
+  tags?: Record<string, unknown>;
+  flags?: number;
+}
+
+// ─── Emoji ────────────────────────────────────────────────────────────────────
+
+/** Raw Discord emoji object. */
+export interface APIEmoji {
+  id: Snowflake | null;
+  name: string | null;
+  roles?: Snowflake[];
+  user?: UserData;
+  require_colons?: boolean;
+  managed?: boolean;
+  animated?: boolean;
+  available?: boolean;
+}
+
+// ─── Guilds ───────────────────────────────────────────────────────────────────
+
 /** Raw Discord guild object. */
 export interface APIGuild {
   id: Snowflake;
@@ -333,7 +601,9 @@ export interface APIGuild {
   icon_hash?: string | null;
   splash?: string | null;
   discovery_splash?: string | null;
+  owner?: boolean;
   owner_id?: Snowflake;
+  permissions?: string;
   afk_channel_id?: Snowflake | null;
   afk_timeout?: number;
   widget_enabled?: boolean;
@@ -341,8 +611,9 @@ export interface APIGuild {
   verification_level?: number;
   default_message_notifications?: number;
   explicit_content_filter?: number;
-  roles?: Array<Record<string, unknown>>;
-  emojis?: Array<Record<string, unknown>>;
+  roles?: APIRole[];
+  emojis?: APIEmoji[];
+  stickers?: APISticker[];
   features?: string[];
   mfa_level?: number;
   application_id?: Snowflake | null;
@@ -355,6 +626,7 @@ export interface APIGuild {
   description?: string | null;
   banner?: string | null;
   premium_tier?: number;
+  premium_subscription_count?: number;
   preferred_locale?: string;
   public_updates_channel_id?: Snowflake | null;
   max_video_channel_users?: number;
@@ -362,7 +634,9 @@ export interface APIGuild {
   approximate_presence_count?: number;
   nsfw_level?: number;
   safety_alerts_channel_id?: Snowflake | null;
+  member_count?: number;
 }
+
 /** Raw Discord guild member object. */
 export interface APIGuildMember {
   user: UserData;
@@ -379,52 +653,195 @@ export interface APIGuildMember {
   communication_disabled_until?: string | null;
   guild_id?: Snowflake;
 }
-/** Raw Discord reaction event payload. */
-export interface APIMessageReactionEvent {
+
+// ─── Voice ────────────────────────────────────────────────────────────────────
+
+/** Raw Discord voice state object. */
+export interface APIVoiceState {
+  guild_id?: Snowflake;
+  channel_id?: Snowflake | null;
   user_id: Snowflake;
-  channel_id: Snowflake;
-  message_id: Snowflake;
-  guild_id?: Snowflake;
   member?: APIGuildMember;
-  emoji: Record<string, unknown>;
-  message_author_id?: Snowflake;
-  burst?: boolean;
-  type?: number;
-}
-/** Raw Discord message deletion event payload. */
-export interface APIMessageDeleteEvent {
-  id: Snowflake;
-  channel_id: Snowflake;
-  guild_id?: Snowflake;
-}
-/** Raw Discord bulk message deletion event payload. */
-export interface APIMessageDeleteBulkEvent {
-  ids: Snowflake[];
-  channel_id: Snowflake;
-  guild_id?: Snowflake;
-}
-/** Raw Discord channel deletion event payload. */
-export interface APIChannelDeleteEvent extends APIChannel {}
-/** Raw Discord guild deletion event payload. */
-export interface APIGuildDeleteEvent {
-  id: Snowflake;
-  unavailable?: boolean;
-}
-/** Raw Discord thread lifecycle payload. */
-export interface APIThreadEvent extends APIChannel {
-  guild_id: Snowflake;
-  member?: Record<string, unknown>;
-}
-/** Raw Discord READY event payload. */
-export interface APIReadyEvent {
-  v: number;
-  user: UserData;
-  guilds: Array<{ id: Snowflake; unavailable?: boolean }>;
   session_id: string;
-  resume_gateway_url: string;
-  shard?: [number, number];
-  application?: { id: Snowflake; flags: number; [key: string]: unknown };
+  deaf: boolean;
+  mute: boolean;
+  self_deaf: boolean;
+  self_mute: boolean;
+  self_stream?: boolean;
+  self_video: boolean;
+  suppress: boolean;
+  request_to_speak_timestamp?: string | null;
 }
+
+/** Raw Discord voice server update event. */
+export interface APIVoiceServerUpdate {
+  token: string;
+  guild_id: Snowflake;
+  endpoint?: string | null;
+}
+
+// ─── Presence ────────────────────────────────────────────────────────────────
+
+/** Raw Discord activity object. */
+export interface APIActivity {
+  name: string;
+  type: number;
+  url?: string | null;
+  created_at: number;
+  state?: string | null;
+  details?: string | null;
+  emoji?: APIPartialEmoji | null;
+}
+
+/** Raw Discord presence update event. */
+export interface APIPresenceUpdate {
+  user: { id: Snowflake } & Partial<UserData>;
+  guild_id: Snowflake;
+  status: string;
+  activities: APIActivity[];
+  client_status: { desktop?: string; mobile?: string; web?: string };
+}
+
+// ─── Typing ───────────────────────────────────────────────────────────────────
+
+/** Raw Discord typing start event. */
+export interface APITypingStart {
+  channel_id: Snowflake;
+  guild_id?: Snowflake;
+  user_id: Snowflake;
+  timestamp: number;
+  member?: APIGuildMember;
+}
+
+// ─── Invites ─────────────────────────────────────────────────────────────────
+
+/** Raw Discord invite create event. */
+export interface APIInviteCreate {
+  channel_id: Snowflake;
+  code: string;
+  created_at: string;
+  guild_id?: Snowflake;
+  inviter?: UserData;
+  max_age: number;
+  max_uses: number;
+  target_type?: number;
+  target_user?: UserData;
+  temporary: boolean;
+  uses: number;
+}
+
+/** Raw Discord invite delete event. */
+export interface APIInviteDelete {
+  channel_id: Snowflake;
+  guild_id?: Snowflake;
+  code: string;
+}
+
+// ─── Webhooks ────────────────────────────────────────────────────────────────
+
+/** Raw Discord webhooks update event. */
+export interface APIWebhooksUpdate {
+  guild_id: Snowflake;
+  channel_id: Snowflake;
+}
+
+/** Raw Discord webhook object. */
+export interface APIWebhook {
+  id: Snowflake;
+  type: number;
+  guild_id?: Snowflake | null;
+  channel_id?: Snowflake | null;
+  user?: UserData;
+  name?: string | null;
+  avatar?: string | null;
+  token?: string;
+  application_id?: Snowflake | null;
+  url?: string;
+}
+
+// ─── AutoMod ─────────────────────────────────────────────────────────────────
+
+/** Raw Discord AutoMod action. */
+export interface APIAutoModerationAction {
+  type: number;
+  metadata?: {
+    channel_id?: Snowflake;
+    duration_seconds?: number;
+    custom_message?: string;
+  };
+}
+
+/** Raw Discord AutoMod rule object. */
+export interface APIAutoModerationRule {
+  id: Snowflake;
+  guild_id: Snowflake;
+  name: string;
+  creator_id: Snowflake;
+  event_type: number;
+  trigger_type: number;
+  trigger_metadata: Record<string, unknown>;
+  actions: APIAutoModerationAction[];
+  enabled: boolean;
+  exempt_roles: Snowflake[];
+  exempt_channels: Snowflake[];
+}
+
+/** Raw Discord AutoMod action execution event. */
+export interface APIAutoModerationActionExecution {
+  guild_id: Snowflake;
+  action: APIAutoModerationAction;
+  rule_id: Snowflake;
+  rule_trigger_type: number;
+  user_id: Snowflake;
+  channel_id?: Snowflake;
+  message_id?: Snowflake;
+  alert_system_message_id?: Snowflake;
+  content: string;
+  matched_keyword?: string | null;
+  matched_content?: string | null;
+}
+
+// ─── Scheduled Events ─────────────────────────────────────────────────────────
+
+/** Raw Discord guild scheduled event entity metadata. */
+export interface APIGuildScheduledEventEntityMetadata {
+  location?: string;
+}
+
+/** Raw Discord guild scheduled event object. */
+export interface APIGuildScheduledEvent {
+  id: Snowflake;
+  guild_id: Snowflake;
+  channel_id?: Snowflake | null;
+  creator_id?: Snowflake | null;
+  name: string;
+  description?: string | null;
+  scheduled_start_time: string;
+  scheduled_end_time?: string | null;
+  privacy_level: number;
+  status: number;
+  entity_type: number;
+  entity_id?: Snowflake | null;
+  entity_metadata?: APIGuildScheduledEventEntityMetadata | null;
+  creator?: UserData;
+  user_count?: number;
+  image?: string | null;
+}
+
+// ─── Stage Instances ─────────────────────────────────────────────────────────
+
+/** Raw Discord stage instance object. */
+export interface APIStageInstance {
+  id: Snowflake;
+  guild_id: Snowflake;
+  channel_id: Snowflake;
+  topic: string;
+  privacy_level: number;
+  discoverable_disabled?: boolean;
+  guild_scheduled_event_id?: Snowflake | null;
+}
+
+// ─── Application Commands ─────────────────────────────────────────────────────
 
 /** Discord application command option types. */
 export const ApplicationCommandOptionType = {
@@ -490,20 +907,84 @@ export interface ApplicationCommandData {
   nsfw?: boolean;
 }
 
-/** Raw Discord role object. */
-export interface APIRole {
+// ─── Gateway Events ───────────────────────────────────────────────────────────
+
+/** Raw Discord READY event payload. */
+export interface APIReadyEvent {
+  v: number;
+  user: UserData;
+  guilds: Array<{ id: Snowflake; unavailable?: boolean }>;
+  session_id: string;
+  resume_gateway_url: string;
+  shard?: [number, number];
+  application?: { id: Snowflake; flags: number; [key: string]: unknown };
+}
+
+/** Raw Discord reaction event payload. */
+export interface APIMessageReactionEvent {
+  user_id: Snowflake;
+  channel_id: Snowflake;
+  message_id: Snowflake;
+  guild_id?: Snowflake;
+  member?: APIGuildMember;
+  emoji: APIPartialEmoji;
+  message_author_id?: Snowflake;
+  burst?: boolean;
+  type?: number;
+}
+
+/** Raw Discord reaction remove emoji event payload. */
+export interface APIMessageReactionRemoveEmojiEvent {
+  channel_id: Snowflake;
+  guild_id?: Snowflake;
+  message_id: Snowflake;
+  emoji: APIPartialEmoji;
+}
+
+/** Raw Discord message deletion event payload. */
+export interface APIMessageDeleteEvent {
   id: Snowflake;
-  name: string;
-  color: number;
-  hoist: boolean;
-  icon?: string | null;
-  unicode_emoji?: string | null;
-  position: number;
-  permissions: string;
-  managed: boolean;
-  mentionable: boolean;
-  tags?: Record<string, unknown>;
-  flags?: number;
+  channel_id: Snowflake;
+  guild_id?: Snowflake;
+}
+
+/** Raw Discord bulk message deletion event payload. */
+export interface APIMessageDeleteBulkEvent {
+  ids: Snowflake[];
+  channel_id: Snowflake;
+  guild_id?: Snowflake;
+}
+
+/** Raw Discord channel deletion event payload. */
+export interface APIChannelDeleteEvent extends APIChannel {}
+
+/** Raw Discord guild deletion event payload. */
+export interface APIGuildDeleteEvent {
+  id: Snowflake;
+  unavailable?: boolean;
+}
+
+/** Raw Discord thread lifecycle payload. */
+export interface APIThreadEvent extends APIChannel {
+  guild_id: Snowflake;
+  member?: APIThreadMember;
+}
+
+/** Raw Discord thread list sync event. */
+export interface APIThreadListSync {
+  guild_id: Snowflake;
+  channel_ids?: Snowflake[];
+  threads: APIChannel[];
+  members: APIThreadMember[];
+}
+
+/** Raw Discord thread members update event. */
+export interface APIThreadMembersUpdate {
+  id: Snowflake;
+  guild_id: Snowflake;
+  member_count: number;
+  added_members?: APIThreadMember[];
+  removed_member_ids?: Snowflake[];
 }
 
 /** Raw Discord guild role event payload. */
@@ -524,20 +1005,48 @@ export interface APIGuildBanEvent {
   user: UserData;
 }
 
-/** Raw Discord emoji object. */
-export interface APIEmoji {
-  id: Snowflake | null;
-  name: string | null;
-  roles?: Snowflake[];
-  user?: UserData;
-  require_colons?: boolean;
-  managed?: boolean;
-  animated?: boolean;
-  available?: boolean;
-}
-
 /** Raw Discord guild emojis update event payload. */
 export interface APIGuildEmojisUpdateEvent {
   guild_id: Snowflake;
   emojis: APIEmoji[];
+}
+
+/** Raw Discord guild stickers update event payload. */
+export interface APIGuildStickersUpdateEvent {
+  guild_id: Snowflake;
+  stickers: APISticker[];
+}
+
+/** Raw Discord channel pins update event. */
+export interface APIChannelPinsUpdate {
+  guild_id?: Snowflake;
+  channel_id: Snowflake;
+  last_pin_timestamp?: string | null;
+}
+
+/** Raw Discord guild members chunk event. */
+export interface APIGuildMembersChunk {
+  guild_id: Snowflake;
+  members: APIGuildMember[];
+  chunk_index: number;
+  chunk_count: number;
+  not_found?: Snowflake[];
+  presences?: APIPresenceUpdate[];
+  nonce?: string;
+}
+
+/** Raw Discord guild scheduled event user add/remove event. */
+export interface APIGuildScheduledEventUserEvent {
+  guild_scheduled_event_id: Snowflake;
+  user_id: Snowflake;
+  guild_id: Snowflake;
+}
+
+/** Raw Discord message poll vote add/remove event. */
+export interface APIMessagePollVoteEvent {
+  user_id: Snowflake;
+  channel_id: Snowflake;
+  message_id: Snowflake;
+  guild_id?: Snowflake;
+  answer_id: number;
 }

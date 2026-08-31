@@ -38,5 +38,40 @@ describe("Collection Full Coverage", () => {
     const swept = col.sweep((item) => item.num === 1);
     expect(swept).toBe(1);
     expect(col.size).toBe(2);
+
+    // Negative/Empty path coverage
+    const emptyCol = new Collection<string, any>();
+    expect(emptyCol.first()).toBeUndefined();
+    expect(emptyCol.firstKey()).toBeUndefined();
+    expect(emptyCol.last()).toBeUndefined();
+    expect(emptyCol.lastKey()).toBeUndefined();
+    expect(emptyCol.firstEntry()).toBeUndefined();
+    expect(emptyCol.lastEntry()).toBeUndefined();
+    expect(col.find((i) => i.num === 999)).toBeUndefined();
+    expect(col.findKey((i) => i.num === 999)).toBeUndefined();
+    expect(col.some((i) => i.num === 999)).toBe(false);
+    expect(col.every((i) => i.num === 999)).toBe(false);
+    expect(col.hasAll("a", "b", "z")).toBe(false);
+    expect(col.hasAny("x", "y", "z")).toBe(false);
+
+    // Set operations coverage (union, intersection, difference)
+    const colA = new Collection<string, number>();
+    colA.set("x", 1);
+    colA.set("y", 2);
+    const colB = new Collection<string, number>();
+    colB.set("y", 2);
+    colB.set("z", 3);
+
+    const union = colA.union(colB);
+    expect(union.size).toBe(3);
+    expect(union.hasAll("x", "y", "z")).toBe(true);
+
+    const intersection = colA.intersection(colB);
+    expect(intersection.size).toBe(1);
+    expect(intersection.has("y")).toBe(true);
+
+    const difference = colA.difference(colB);
+    expect(difference.size).toBe(1);
+    expect(difference.has("x")).toBe(true);
   });
 });

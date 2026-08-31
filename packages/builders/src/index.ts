@@ -10,6 +10,14 @@ export {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  ContainerBuilder,
+  SectionBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  FileComponentBuilder,
+  SeparatorBuilder,
+  ThumbnailBuilder,
+  ContentInventoryEntryBuilder,
 } from "./components.js";
 export {
   SlashCommandBuilder,
