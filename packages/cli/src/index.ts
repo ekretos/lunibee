@@ -2,94 +2,47 @@
 
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { ClientEvent } from "@lunibee/core";
 
 const root = resolve(import.meta.dir, "../..", "..");
 const packagesDir = join(root, "packages");
+type Manifest = { name: string; version: string; private?: boolean; publishConfig?: { access?: string } };
 
-/** Discord client events supported by the handler generator. */
-export enum ClientEvent {
-  Ready = "ready",
-  Raw = "raw",
-  Error = "error",
-  Open = "open",
-  Close = "close",
-  MessageCreate = "messageCreate",
-  MessageUpdate = "messageUpdate",
-  MessageDelete = "messageDelete",
-  MessageDeleteBulk = "messageDeleteBulk",
-  GuildCreate = "guildCreate",
-  GuildUpdate = "guildUpdate",
-  GuildDelete = "guildDelete",
-  ChannelCreate = "channelCreate",
-  ChannelUpdate = "channelUpdate",
-  ChannelDelete = "channelDelete",
-  ThreadCreate = "threadCreate",
-  ThreadUpdate = "threadUpdate",
-  ThreadDelete = "threadDelete",
-  GuildMemberAdd = "guildMemberAdd",
-  GuildMemberUpdate = "guildMemberUpdate",
-  GuildMemberRemove = "guildMemberRemove",
-  MessageReactionAdd = "messageReactionAdd",
-  MessageReactionRemove = "messageReactionRemove",
-  MessageReactionRemoveAll = "messageReactionRemoveAll",
-  InteractionCreate = "interactionCreate",
-  GuildRoleCreate = "guildRoleCreate",
-  GuildRoleUpdate = "guildRoleUpdate",
-  GuildRoleDelete = "guildRoleDelete",
-  GuildBanAdd = "guildBanAdd",
-  GuildBanRemove = "guildBanRemove",
-  GuildEmojisUpdate = "guildEmojisUpdate",
-}
-
-type PublishConfig = { access?: string; registry?: string };
-type PackageManifest = { name: string; version: string; private?: boolean; publishConfig?: PublishConfig };
-type PublishablePackage = { directory: string; manifest: PackageManifest };
-
-/** Reads a package manifest when it exists and is valid JSON. */
-async function readManifest(directory: string): Promise<PackageManifest | null> {
+async function manifest(dir: string): Promise<Manifest | null> {
   try {
-    const file = Bun.file(join(directory, "package.json"));
-    if (!(await file.exists())) return null;
-    return (await file.json()) as PackageManifest;
+    const file = Bun.file(join(dir, "package.json"));
+    return (await file.exists()) ? await file.json() as Manifest : null;
   } catch { return null; }
 }
 
-/** Finds all non-private workspace packages that can be published. */
-async function getPublishablePackages(): Promise<PublishablePackage[]> {
-  const entries = await readdir(packagesDir, { withFileTypes: true });
-  const result: PublishablePackage[] = [];
-  for (const entry of entries) {
+async function packages(): Promise<Array<{ dir: string; manifest: Manifest }>> {
+  const result: Array<{ dir: string; manifest: Manifest }> = [];
+  for (const entry of await readdir(packagesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const directory = join(packagesDir, entry.name);
-    const manifest = await readManifest(directory);
-    if (!manifest?.name || !manifest.version || manifest.private) continue;
-    result.push({ directory, manifest });
+    const dir = join(packagesDir, entry.name);
+    const pkg = await manifest(dir);
+    if (pkg?.name && pkg.version && !pkg.private) result.push({ dir, manifest: pkg });
   }
   return result.sort((a, b) => a.manifest.name.localeCompare(b.manifest.name));
 }
 
-/** Runs a child process and forwards its standard streams. */
 async function run(command: string[], cwd = process.cwd()): Promise<void> {
-  const child = Bun.spawn(command, { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit", env: globalThis.process.env });
+  const child = Bun.spawn(command, { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit", env: process.env });
   const code = await child.exited;
   if (code !== 0) throw new Error(`Command failed (${code}): ${command.join(" ")}`);
 }
 
-/** Publishes every public workspace package in deterministic order. */
 async function publish(): Promise<void> {
-  const packages = await getPublishablePackages();
-  if (!packages.length) return void console.log("No publishable packages found.");
-  console.log(`Publishing ${packages.length} Lunibee packages...`);
-  for (const { directory, manifest } of packages) {
-    console.log(`\n→ ${manifest.name}@${manifest.version}`);
-    await run(["bun", "publish", "--access", manifest.publishConfig?.access ?? "public"], directory);
+  const list = await packages();
+  if (!list.length) return void console.log("No publishable packages found.");
+  for (const { dir, manifest } of list) {
+    console.log(`→ ${manifest.name}@${manifest.version}`);
+    await run(["bun", "publish", "--access", manifest.publishConfig?.access ?? "public"], dir);
   }
-  console.log("\n✓ Lunibee packages published successfully.");
 }
 
-/** Prints all publishable workspace packages. */
 async function status(): Promise<void> {
-  for (const { manifest } of await getPublishablePackages()) console.log(`${manifest.name}@${manifest.version}`);
+  for (const { manifest } of await packages()) console.log(`${manifest.name}@${manifest.version}`);
 }
 
 function identifier(value: string): string {
@@ -103,155 +56,148 @@ function fileName(value: string): string {
   return normalized.endsWith(".ts") ? normalized : `${normalized}.ts`;
 }
 
-/** Creates a strongly typed event handler using Lunibee's ClientEvents map. */
-function handlerSource(event: ClientEvent, handler: string): string {
-  const name = identifier(handler.replace(/\.ts$/, ""));
-  return `import type { ClientEvents } from "lunibee";\n\n/** Handles the ${event} event. */\nexport default async function ${name}(...args: ClientEvents["${event}"]): Promise<void> {\n  const [payload] = args;\n\n  // Add your ${event} logic here.\n  void payload;\n}\n`;
+function eventMember(event: ClientEvent): string {
+  const entry = Object.entries(ClientEvent).find(([, value]) => value === event);
+  if (!entry) throw new Error(`Unknown client event: ${event}`);
+  return entry[0];
 }
 
-interface HandlerEntry { event: ClientEvent; path: string; importName: string; }
+function handlerSource(event: ClientEvent, name: string): string {
+  const identifierName = identifier(name.replace(/\.ts$/, ""));
+  return `import type { ClientEvents } from "lunibee";\n\n/** Handles the ${event} event. */\nexport default async function ${identifierName}(...args: ClientEvents["${event}"]): Promise<void> {\n  const [payload] = args;\n\n  // Add your ${event} logic here.\n  void payload;\n}\n`;
+}
 
-/** Discovers every generated handler below src/events/<event>/. */
-async function discoverHandlers(eventsDir: string): Promise<HandlerEntry[]> {
-  const result: HandlerEntry[] = [];
-  let events: import("node:fs").Dirent[];
-  try { events = await readdir(eventsDir, { withFileTypes: true }); } catch { return result; }
-  for (const eventEntry of events) {
-    if (!eventEntry.isDirectory() || !Object.values(ClientEvent).includes(eventEntry.name as ClientEvent)) continue;
-    const event = eventEntry.name as ClientEvent;
-    let handlers: import("node:fs").Dirent[];
-    try { handlers = await readdir(join(eventsDir, event), { withFileTypes: true }); } catch { continue; }
-    for (const entry of handlers) {
-      if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
-      const handler = entry.name.slice(0, -3);
-      result.push({ event, path: `../events/${event}/${handler}`, importName: identifier(`${event}_${handler}`) });
+type Handler = { event: ClientEvent; path: string; importName: string };
+
+async function discover(eventsDir: string): Promise<Handler[]> {
+  const result: Handler[] = [];
+  let eventDirs;
+  try { eventDirs = await readdir(eventsDir, { withFileTypes: true }); } catch { return result; }
+  for (const dir of eventDirs) {
+    if (!dir.isDirectory() || !Object.values(ClientEvent).includes(dir.name as ClientEvent)) continue;
+    const event = dir.name as ClientEvent;
+    for (const file of await readdir(join(eventsDir, dir.name), { withFileTypes: true })) {
+      if (!file.isFile() || !file.name.endsWith(".ts")) continue;
+      const name = file.name.slice(0, -3);
+      result.push({ event, path: `../events/${event}/${name}`, importName: identifier(`${event}_${name}`) });
     }
   }
   return result.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-/** Regenerates handlers/event.ts from every handler under src/events/. */
-async function updateEventBinder(eventsDir: string, handlersDir: string): Promise<void> {
-  const handlers = await discoverHandlers(eventsDir);
+async function updateBinder(eventsDir: string, handlersDir: string): Promise<void> {
+  const handlers = await discover(eventsDir);
   await mkdir(handlersDir, { recursive: true });
-  const imports = handlers.map(({ path, importName }) => `import ${importName} from "${path}";`).join("\n");
-  const bindings = handlers.map(({ event, importName }) => `  client.on(ClientEvent.${Object.entries(ClientEvent).find(([, value]) => value === event)?.[0] ?? ""}, ${importName});`).join("\n");
-  const content = `import type { Client } from "lunibee";\nimport { ClientEvent } from "@lunibee/cli";\n${imports ? `\n${imports}` : ""}\n\n/** Registers every handler found under src/events with a Lunibee client. */\nexport function registerEvents(client: Client): void {\n${bindings}\n}\n`;
+  const imports = handlers.map((h) => `import ${h.importName} from "${h.path}";`).join("\n");
+  const bindings = handlers.map((h) => `  client.on(ClientEvent.${eventMember(h.event)}, ${h.importName});`).join("\n");
+  const content = `import type { Client } from "lunibee";\nimport { ClientEvent } from "lunibee";\n${imports ? `\n${imports}` : ""}\n\n/** Registers every handler found under src/events with a Lunibee client. */\nexport function registerEvents(client: Client): void {\n${bindings}\n}\n`;
   await writeFile(join(handlersDir, "event.ts"), content);
-  console.log(`  ✓ updated handlers/event.ts (${handlers.length} handler${handlers.length === 1 ? "" : "s"})`);
-}
-
-async function createHandlerFile(eventsDir: string, event: ClientEvent, handler: string): Promise<void> {
-  const directory = join(eventsDir, event);
-  const targetName = fileName(handler);
-  const target = join(directory, targetName);
-  await mkdir(directory, { recursive: true });
-  if (await Bun.file(target).exists()) {
-    console.log(`  ↳ skipped ${event}/${targetName} (already exists)`);
-    return;
-  }
-  await writeFile(target, handlerSource(event, handler));
-  console.log(`  ✓ created events/${event}/${targetName}`);
 }
 
 async function createHandler(): Promise<void> {
   console.log("\n🐝 Lunibee Handler Generator\n");
-  console.log("Select events by number (comma-separated), or type 'all':\n");
   const events = Object.values(ClientEvent);
-  events.forEach((event, index) => console.log(`  ${String(index + 1).padStart(2, " ")}. ${event}`));
-  const answer = prompt("\nEvents: ")?.trim().toLowerCase();
-  if (!answer) return void console.log("No events selected.");
-  const selected = answer === "all" ? events : [...new Set(answer.split(",").map((v) => Number.parseInt(v.trim(), 10) - 1))]
-    .filter((i) => Number.isInteger(i) && i >= 0 && i < events.length).map((i) => events[i]);
+  events.forEach((event, i) => console.log(`  ${i + 1}. ${event}`));
+  const answer = prompt("\nEvents (comma-separated numbers or all): ")?.trim().toLowerCase();
+  if (!answer) return;
+  const selected = answer === "all"
+    ? events
+    : [...new Set(answer.split(",").map((v) => Number.parseInt(v.trim(), 10) - 1))]
+      .filter((i) => Number.isInteger(i) && i >= 0 && i < events.length)
+      .map((i) => events[i]);
   if (!selected.length) throw new Error("No valid events were selected.");
 
   const eventsDir = join(process.cwd(), "src", "events");
   const handlersDir = join(process.cwd(), "src", "handlers");
   await mkdir(eventsDir, { recursive: true });
   for (const event of selected) {
-    const existing = await discoverHandlers(join(eventsDir, event));
-    if (existing.length) console.log(`\n${event} already has: ${existing.map((h) => h.path.split("/").pop()).join(", ")}`);
+    const directory = join(eventsDir, event);
+    await mkdir(directory, { recursive: true });
+    const existing = (await discover(eventsDir)).filter((h) => h.event === event);
+    if (existing.length) console.log(`\n${event} already has ${existing.length} handler(s).`);
     const defaultName = existing.length ? "handler" : event;
-    const handler = prompt(`Handler name for ${event} [${defaultName}]: `)?.trim() || defaultName;
-    await createHandlerFile(eventsDir, event, handler);
+    const name = prompt(`Handler name for ${event} [${defaultName}]: `)?.trim() || defaultName;
+    const target = join(directory, fileName(name));
+    if (await Bun.file(target).exists()) {
+      console.log(`↳ skipped ${event}/${fileName(name)} (already exists)`);
+      continue;
+    }
+    await writeFile(target, handlerSource(event, name));
+    console.log(`✓ created events/${event}/${fileName(name)}`);
   }
-  await updateEventBinder(eventsDir, handlersDir);
-  console.log("\n✓ Handler generation complete.");
+  await updateBinder(eventsDir, handlersDir);
+  console.log("✓ updated handlers/event.ts");
 }
 
 async function createCommand(): Promise<void> {
-  console.log("\n🐝 Lunibee Command Generator\n");
   const name = prompt("Command name: ")?.trim();
-  if (!name) return void console.log("No command created.");
+  if (!name) return;
   const description = prompt("Description: ")?.trim() || "A Lunibee command.";
-  const commandsDir = join(process.cwd(), "src", "commands");
-  const target = join(commandsDir, fileName(name));
-  await mkdir(commandsDir, { recursive: true });
-  if (await Bun.file(target).exists()) throw new Error(`Command already exists: ${target}`);
-  await writeFile(target, `import { SlashCommandBuilder } from "lunibee";\n\n/** ${description} */\nexport default new SlashCommandBuilder()\n  .setName("${name.replace(/\.ts$/, "")}")\n  .setDescription("${description.replace(/"/g, '\\"')}");\n`);
-  console.log(`✓ created commands/${fileName(name)}`);
+  const dir = join(process.cwd(), "src", "commands");
+  const file = fileName(name);
+  const target = join(dir, file);
+  await mkdir(dir, { recursive: true });
+  if (await Bun.file(target).exists()) throw new Error(`Command already exists: ${file}`);
+  await writeFile(target, `import { SlashCommandBuilder } from "lunibee";\n\nexport default new SlashCommandBuilder()\n  .setName("${name.replace(/\.ts$/, "")}")\n  .setDescription("${description.replace(/"/g, '\\"')}");\n`);
+  console.log(`✓ created commands/${file}`);
 }
 
 async function createComponent(): Promise<void> {
-  console.log("\n🐝 Lunibee Component Generator\n\n1. Button\n2. String Select\n3. Modal");
-  const type = prompt("Component: ")?.trim();
-  const types: Record<string, string> = { "1": "button", "2": "select", "3": "modal", button: "button", select: "select", modal: "modal" };
-  const selected = types[type ?? ""];
-  if (!selected) throw new Error("Unknown component type.");
+  console.log("\n1. Button\n2. String Select\n3. Modal");
+  const value = prompt("Component: ")?.trim();
+  const type = ({ "1": "button", "2": "select", "3": "modal", button: "button", select: "select", modal: "modal" } as Record<string, string>)[value ?? ""];
+  if (!type) throw new Error("Unknown component type.");
   const name = prompt("Component name: ")?.trim();
-  if (!name) return void console.log("No component created.");
-  const directory = join(process.cwd(), "src", "components");
-  const target = join(directory, fileName(name));
-  await mkdir(directory, { recursive: true });
-  if (await Bun.file(target).exists()) throw new Error(`Component already exists: ${target}`);
-  await writeFile(target, `/** ${selected} component: ${name}. */\nexport const ${identifier(name)} = {\n  type: "${selected}",\n  customId: "${name}",\n};\n`);
-  console.log(`✓ created components/${fileName(name)}`);
+  if (!name) return;
+  const dir = join(process.cwd(), "src", "components");
+  const file = fileName(name);
+  const target = join(dir, file);
+  await mkdir(dir, { recursive: true });
+  if (await Bun.file(target).exists()) throw new Error(`Component already exists: ${file}`);
+  await writeFile(target, `/** ${type} component: ${name}. */\nexport const ${identifier(name)} = {\n  type: "${type}",\n  customId: "${name}",\n};\n`);
+  console.log(`✓ created components/${file}`);
 }
 
-async function listResources(kind: "handlers" | "commands"): Promise<void> {
-  const base = kind === "handlers" ? join(process.cwd(), "src", "events") : join(process.cwd(), "src", "commands");
+async function list(kind: "handlers" | "commands"): Promise<void> {
+  const dir = join(process.cwd(), "src", kind === "handlers" ? "events" : "commands");
   try {
-    const entries = await readdir(base, { withFileTypes: true });
-    if (kind === "handlers") for (const event of entries.filter((e) => e.isDirectory())) {
-      const files = await readdir(join(base, event.name), { withFileTypes: true });
-      console.log(`${event.name}${files.length ? `\n  └─ ${files.filter((f) => f.isFile()).map((f) => f.name).join("\n  └─ ")}` : ""}`);
+    const entries = await readdir(dir, { withFileTypes: true });
+    if (kind === "commands") for (const entry of entries.filter((e) => e.isFile() && e.name.endsWith(".ts"))) console.log(entry.name.slice(0, -3));
+    else for (const event of entries.filter((e) => e.isDirectory())) {
+      const handlers = await readdir(join(dir, event.name), { withFileTypes: true });
+      console.log(`${event.name}${handlers.length ? `\n  └─ ${handlers.filter((h) => h.isFile()).map((h) => h.name).join("\n  └─ ")}` : ""}`);
     }
-    else for (const entry of entries.filter((e) => e.isFile() && e.name.endsWith(".ts"))) console.log(entry.name.replace(/\.ts$/, ""));
   } catch { console.log(`No ${kind} found.`); }
 }
 
 async function check(): Promise<void> {
-  console.log("\n🐝 Lunibee Project Check\n");
   const packageFile = Bun.file(join(process.cwd(), "package.json"));
   if (!(await packageFile.exists())) return void console.log("⚠ package.json not found");
-  const packageJson = await packageFile.json() as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-  const deps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-  const installed = "lunibee" in deps || Object.keys(deps).some((name) => name.startsWith("@lunibee/"));
-  console.log(`${installed ? "✓" : "⚠"} Lunibee dependency ${installed ? "found" : "not found"}`);
-  for (const directory of ["src", "src/events", "src/commands"]) console.log(`${await Bun.file(join(process.cwd(), directory)).exists() ? "✓" : "•"} ${directory}`);
-  const env = Bun.file(join(process.cwd(), ".env"));
-  console.log(`${await env.exists() ? "✓" : "⚠"} .env ${await env.exists() ? "found" : "not found"}`);
+  const pkg = await packageFile.json() as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  console.log(`${deps.lunibee || Object.keys(deps).some((x) => x.startsWith("@lunibee/")) ? "✓" : "⚠"} Lunibee dependency`);
+  for (const dir of ["src", "src/events", "src/commands"]) console.log(`${await Bun.file(join(process.cwd(), dir)).exists() ? "✓" : "•"} ${dir}`);
+  console.log(`${await Bun.file(join(process.cwd(), ".env")).exists() ? "✓" : "⚠"} .env`);
 }
 
 async function doctor(): Promise<void> {
-  console.log("\n🐝 Lunibee Doctor\n");
   const packageFile = Bun.file(join(process.cwd(), "package.json"));
   if (!(await packageFile.exists())) return void console.log("✗ package.json is missing. Run: bun init");
-  const packageJson = await packageFile.json() as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-  const deps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-  if (!deps.lunibee && !Object.keys(deps).some((name) => name.startsWith("@lunibee/"))) console.log("✗ No Lunibee package is installed. Run: bun add lunibee");
+  const pkg = await packageFile.json() as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  if (!deps.lunibee && !Object.keys(deps).some((x) => x.startsWith("@lunibee/"))) console.log("✗ No Lunibee package installed. Run: bun add lunibee");
   else console.log("✓ Lunibee package detected");
   console.log(`${await Bun.file(join(process.cwd(), ".env")).exists() ? "✓" : "⚠"} .env`);
 }
 
 async function info(): Promise<void> {
-  const packageFile = Bun.file(join(process.cwd(), "package.json"));
-  const project = await packageFile.exists() ? ((await packageFile.json()) as { name?: string }).name ?? "unknown" : "unknown";
-  console.log(`🐝 Lunibee\n\nProject: ${project}\nRuntime: Bun ${Bun.version}\nCLI: @lunibee/cli@0.1.6`);
+  const file = Bun.file(join(process.cwd(), "package.json"));
+  const pkg = await file.exists() ? await file.json() as { name?: string } : {};
+  console.log(`🐝 Lunibee\n\nProject: ${pkg.name ?? "unknown"}\nRuntime: Bun ${Bun.version}\nCLI: @lunibee/cli@0.1.6`);
 }
 
 function help(): void {
-  console.log(`Lunibee CLI\n\nCommands:\n  lunibee create handler     Create one or more event handlers\n  lunibee create command     Create a command module\n  lunibee create component   Create a component scaffold\n  lunibee list handlers      List event handlers\n  lunibee list commands      List commands\n  lunibee check              Check project setup\n  lunibee doctor             Diagnose common setup problems\n  lunibee info               Show project and CLI information\n  lunibee publish            Publish all public workspace packages\n  lunibee status             List publishable packages and versions`);
+  console.log(`Lunibee CLI\n\nCommands:\n  lunibee create handler\n  lunibee create command\n  lunibee create component\n  lunibee list handlers\n  lunibee list commands\n  lunibee check\n  lunibee doctor\n  lunibee info\n  lunibee publish\n  lunibee status`);
 }
 
 const command = Bun.argv[2] ?? "help";
@@ -260,16 +206,14 @@ try {
   if (command === "create" && subcommand === "handler") await createHandler();
   else if (command === "create" && subcommand === "command") await createCommand();
   else if (command === "create" && subcommand === "component") await createComponent();
-  else if (command === "list" && (subcommand === "handlers" || subcommand === "commands")) await listResources(subcommand);
+  else if (command === "list" && (subcommand === "handlers" || subcommand === "commands")) await list(subcommand);
   else if (command === "check") await check();
   else if (command === "doctor") await doctor();
   else if (command === "info") await info();
-  else switch (command) {
-    case "publish": await publish(); break;
-    case "status": await status(); break;
-    case "help": case "--help": case "-h": help(); break;
-    default: console.error(`Unknown command: ${Bun.argv.slice(2).join(" ")}`); process.exit(1);
-  }
+  else if (command === "publish") await publish();
+  else if (command === "status") await status();
+  else if (["help", "--help", "-h"].includes(command)) help();
+  else throw new Error(`Unknown command: ${Bun.argv.slice(2).join(" ")}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
