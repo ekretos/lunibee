@@ -14,6 +14,7 @@ export interface ResourceContext {
   deleteMessage(channelId: string, messageId: string): Promise<void>;
   crosspostMessage(channelId: string, messageId: string): Promise<import("./index.js").Message>;
   editChannel?(channelId: string, options: Record<string, unknown>): Promise<import("./base.js").Channel>;
+  deleteChannel?(channelId: string): Promise<void>;
 }
 
 export class User extends BaseStructure {
@@ -47,6 +48,8 @@ export class Channel extends BaseStructure {
   public type: number;
   public name?: string | null;
   public guildId?: string;
+  public topic?: string | null;
+  public parentId?: string | null;
   readonly #context?: ResourceContext;
   public constructor(data: import("@lunibee/types").APIChannel, context?: ResourceContext) {
     super(data.id);
@@ -54,15 +57,34 @@ export class Channel extends BaseStructure {
     this.type = data.type;
     this.name = data.name;
     this.guildId = data.guild_id;
+    this.topic = data.topic;
+    this.parentId = data.parent_id;
     this.#context = context;
   }
   public sendMessage(options: Record<string, unknown> & { content?: string }): Promise<import("./index.js").Message> {
     if (!this.#context) throw new Error("This channel is not attached to a client.");
     return this.#context.sendMessage(this.id, options);
   }
+  public send(options: Record<string, unknown> & { content?: string }): Promise<import("./index.js").Message> {
+    return this.sendMessage(options);
+  }
   public edit(options: Record<string, unknown>): Promise<Channel> {
     if (!this.#context?.editChannel) throw new Error("This channel is not attached to a client.");
     return this.#context.editChannel(this.id, options);
+  }
+  public editName(name: string): Promise<Channel> {
+    if (!name.trim()) throw new TypeError("Channel name cannot be empty.");
+    return this.edit({ name });
+  }
+  public editTopic(topic: string | null): Promise<Channel> {
+    return this.edit({ topic });
+  }
+  public editParent(parentId: string | null): Promise<Channel> {
+    return this.edit({ parent_id: parentId });
+  }
+  public delete(): Promise<void> {
+    if (!this.#context?.deleteChannel) throw new Error("This channel is not attached to a client.");
+    return this.#context.deleteChannel(this.id);
   }
   public update(options: Record<string, unknown>): Promise<Channel> {
     return this.edit(options);
