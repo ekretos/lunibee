@@ -1,3 +1,4 @@
+/** Resource structures for Discord messages and related entities. */
 import { BaseStructure, Channel, User } from "./base.js";
 import type { ResourceContext } from "./base.js";
 
@@ -22,6 +23,8 @@ export class Message extends BaseStructure {
   public readonly reference?: import("@lunibee/types").APIMessageReference;
   public readonly referencedMessage?: Message | null;
   readonly #context?: ResourceContext;
+
+  /** Creates a message structure from Discord message data. */
   public constructor(data: import("@lunibee/types").APIMessage, context?: ResourceContext) {
     super(data.id);
     if (!/^\d{1,20}$/.test(data.channel_id)) throw new TypeError("Message channel_id must be a valid snowflake.");
@@ -43,44 +46,66 @@ export class Message extends BaseStructure {
     this.#context = context;
     this.channel = new Channel({ id: data.channel_id, type: 0, guild_id: data.guild_id }, context);
   }
+
+  /** Whether embeds are suppressed on this message. */
   public get embedsSuppressed(): boolean { return (this.flags & 4) !== 0; }
+
+  /** Edits this message. @param options Message fields to change. @returns The updated message. @throws {Error} If the message is not attached to a client. */
   public edit(options: Record<string, unknown> & { content?: string }): Promise<Message> {
     if (!this.#context) throw new Error("This message is not attached to a client.");
     return this.#context.editMessage(this.channelId, this.id, options);
   }
+
+  /** Updates this message using the same resource operation as edit. @param options Message fields to change. @returns The updated message. @throws {Error} If the message is not attached to a client. */
   public update(options: Record<string, unknown> & { content?: string }): Promise<Message> { return this.edit(options); }
+
+  /** Deletes this message. @returns A promise fulfilled when Discord confirms deletion. @throws {Error} If the message is not attached to a client. */
   public delete(): Promise<void> {
     if (!this.#context) throw new Error("This message is not attached to a client.");
     return this.#context.deleteMessage(this.channelId, this.id);
   }
+
+  /** Replies to this message. @param options Message content or payload. @returns The created reply message. @throws {Error} If the message is not attached to a client. */
   public reply(options: string | (Record<string, unknown> & { content?: string })): Promise<Message> {
     if (!this.#context) throw new Error("This message is not attached to a client.");
     const payload = typeof options === "string" ? { content: options } : { ...options };
     payload.message_reference = { message_id: this.id, channel_id: this.channelId, guild_id: this.guildId };
     return this.#context.sendMessage(this.channelId, payload);
   }
+
+  /** Crossposts this message. @returns The resulting message. @throws {Error} If the message is not attached to a client. */
   public crosspost(): Promise<Message> {
     if (!this.#context) throw new Error("This message is not attached to a client.");
     return this.#context.crosspostMessage(this.channelId, this.id);
   }
+
+  /** Adds a reaction to this message. @param emoji Emoji identifier. @returns A promise fulfilled when the reaction is added. @throws {Error} If reactions are unavailable. */
   public react(emoji: string): Promise<void> {
     if (!this.#context?.addReaction) throw new Error("This message is not attached to a client.");
     return this.#context.addReaction(this.channelId, this.id, emoji);
   }
+
+  /** Removes a reaction from this message. @param emoji Emoji identifier. @param userId User whose reaction should be removed; omit to remove the current user's reaction. @returns A promise fulfilled when the reaction is removed. @throws {Error} If reaction operations are unavailable. */
   public removeReaction(emoji: string, userId?: string): Promise<void> {
     if (!this.#context) throw new Error("This message is not attached to a client.");
     return userId
       ? this.#context.removeReaction?.(this.channelId, this.id, emoji, userId) ?? Promise.reject(new Error("Reaction operations are unavailable."))
       : this.#context.removeOwnReaction?.(this.channelId, this.id, emoji) ?? Promise.reject(new Error("Reaction operations are unavailable."));
   }
+
+  /** Removes all reactions from this message. @returns A promise fulfilled when reactions are removed. @throws {Error} If reaction operations are unavailable. */
   public removeAllReactions(): Promise<void> {
     if (!this.#context?.removeAllReactions) throw new Error("This message is not attached to a client.");
     return this.#context.removeAllReactions(this.channelId, this.id);
   }
+
+  /** Pins this message. @returns A promise fulfilled when the message is pinned. @throws {Error} If pin operations are unavailable. */
   public pin(): Promise<void> {
     if (!this.#context?.pinMessage) throw new Error("This message is not attached to a client.");
     return this.#context.pinMessage(this.channelId, this.id);
   }
+
+  /** Unpins this message. @returns A promise fulfilled when the message is unpinned. @throws {Error} If pin operations are unavailable. */
   public unpin(): Promise<void> {
     if (!this.#context?.unpinMessage) throw new Error("This message is not attached to a client.");
     return this.#context.unpinMessage(this.channelId, this.id);
