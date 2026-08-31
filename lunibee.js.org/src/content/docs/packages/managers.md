@@ -85,7 +85,9 @@ The manager also provides `fetch()`, `edit()`, `delete()`, `fetchGuild()`, `setG
 ## `GuildMemberManager`
 
 ```ts
-const members = client.guilds.get(guildId)?.members;
+const guild = client.guilds.get(guildId);
+if (!guild) throw new Error("Guild not cached");
+const members = guild.members;
 
 await members.kick(userId, "Rule violation");
 await members.ban(userId, {

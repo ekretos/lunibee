@@ -428,18 +428,18 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
     expect(client.setPresence({ status: "idle" })).toBe(false);
 
-    expect(() =>
+    await expect(
       client.editInteractionReply("tok", { content: "hi" }),
-    ).toThrow();
+    ).rejects.toThrow("Client is unauthenticated.");
     (client.rest as any).delete = async () => {
       throw new Error("mocked delete");
     };
     await expect(client.deleteInteractionReply("tok")).rejects.toThrow(
-      "mocked delete",
+      "Client is unauthenticated.",
     );
-    expect(() =>
+    await expect(
       client.followUpInteraction("tok", { content: "hi" }),
-    ).toThrow();
+    ).rejects.toThrow("Client is unauthenticated.");
 
     client.destroy();
     expect(client.state).toBe("destroyed");

@@ -27,15 +27,22 @@ export class RESTError extends Error {
 }
 
 /** Library version and source URL used for the Discord-compliant User-Agent. */
-const LIBRARY_VERSION = "0.1.6";
+import packageJson from "../package.json" with { type: "json" };
+const LIBRARY_VERSION = packageJson.version;
 const LIBRARY_URL = "https://github.com/Ekretos/lunibee";
-const USER_AGENT = `DiscordBot (${LIBRARY_URL}, ${LIBRARY_VERSION})`;
+const USER_AGENT = `DiscordBot (${LIBRARY_URL}, ${packageJson.version})`;
 
 /** Internal state shared by requests mapped to one Discord rate-limit bucket. */
 type Bucket = { remaining: number; resetAt: number; queue: Promise<void> };
 /** Options controlling an individual REST request. */
 export interface RESTRequestOptions {
   /** Abort signal used to cancel the request and any queued wait. */ signal?: AbortSignal;
+}
+
+export interface RESTFileAttachment {
+  name: string;
+  data: Blob | Uint8Array | ArrayBuffer;
+  contentType?: string;
 }
 
 /** Configures which REST failures may be retried. */
@@ -280,6 +287,25 @@ export class REST {
     return this.request<T>("DELETE", path, undefined, options);
   }
   /**
+   * Builds a multipart form with a JSON payload and file attachments.
+   */
+  #fileForm(payload: unknown, files: RESTFileAttachment[]): FormData {
+    const form = new FormData();
+    form.append("payload_json", JSON.stringify(payload));
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]!;
+      const blob =
+        file.data instanceof Blob
+          ? file.data
+          : new Blob([file.data as ArrayBuffer], {
+              type: file.contentType ?? "application/octet-stream",
+            });
+      form.append(`files[${i}]`, blob, file.name);
+    }
+    return form;
+  }
+
+  /**
    * Sends a multipart/form-data POST request for file uploads.
    * Attaches a JSON payload as `payload_json` and files as additional fields.
    * @param path API path.
@@ -292,27 +318,12 @@ export class REST {
   public postWithFiles<T>(
     path: string,
     payload: unknown,
-    files: Array<{
-      name: string;
-      data: Blob | Uint8Array | ArrayBuffer;
-      contentType?: string;
-    }>,
+    files: RESTFileAttachment[],
     options?: RESTRequestOptions,
   ): Promise<T> {
-    const form = new FormData();
-    form.append("payload_json", JSON.stringify(payload));
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!;
-      const blob =
-        file.data instanceof Blob
-          ? file.data
-          : new Blob([file.data as ArrayBuffer], {
-              type: file.contentType ?? "application/octet-stream",
-            });
-      form.append(`files[${i}]`, blob, file.name);
-    }
-    return this.request<T>("POST", path, form, options);
+    return this.request<T>("POST", path, this.#fileForm(payload, files), options);
   }
+
   /**
    * Sends a multipart/form-data PATCH request for editing messages with files.
    * @param path API path.
@@ -325,26 +336,10 @@ export class REST {
   public patchWithFiles<T>(
     path: string,
     payload: unknown,
-    files: Array<{
-      name: string;
-      data: Blob | Uint8Array | ArrayBuffer;
-      contentType?: string;
-    }>,
+    files: RESTFileAttachment[],
     options?: RESTRequestOptions,
   ): Promise<T> {
-    const form = new FormData();
-    form.append("payload_json", JSON.stringify(payload));
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!;
-      const blob =
-        file.data instanceof Blob
-          ? file.data
-          : new Blob([file.data as ArrayBuffer], {
-              type: file.contentType ?? "application/octet-stream",
-            });
-      form.append(`files[${i}]`, blob, file.name);
-    }
-    return this.request<T>("PATCH", path, form, options);
+    return this.request<T>("PATCH", path, this.#fileForm(payload, files), options);
   }
   /** Waits for a route bucket while respecting cancellation. @param bucket Bucket state. @param signal Optional cancellation signal. @param path Request path for error context. @returns Promise fulfilled when sending is permitted. @throws {RESTError} If the request is aborted. */
   async #wait(

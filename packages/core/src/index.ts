@@ -211,6 +211,20 @@ export class Client
         this.channels.deleteMessage(channelId, messageId),
       crosspostMessage: (channelId, messageId) =>
         this.channels.crosspostMessage(channelId, messageId),
+      editChannel: (channelId, options) => this.channels.edit(channelId, options),
+      deleteChannel: (channelId) => this.channels.deleteChannel(channelId),
+      addReaction: (channelId, messageId, emoji) =>
+        this.channels.addReaction(channelId, messageId, emoji),
+      removeOwnReaction: (channelId, messageId, emoji) =>
+        this.channels.removeOwnReaction(channelId, messageId, emoji),
+      removeReaction: (channelId, messageId, emoji, userId) =>
+        this.channels.removeReaction(channelId, messageId, emoji, userId),
+      removeAllReactions: (channelId, messageId) =>
+        this.channels.removeAllReactions(channelId, messageId),
+      pinMessage: (channelId, messageId) =>
+        this.channels.pinMessage(channelId, messageId),
+      unpinMessage: (channelId, messageId) =>
+        this.channels.unpinMessage(channelId, messageId),
     };
     this.#gateway = new Gateway({
       token: options.token,
@@ -314,7 +328,7 @@ export class Client
         unavailable?: boolean;
       };
       if (payload.unavailable) {
-        this.emit(ClientEvent.GuildAvailable, payload);
+        this.emit(ClientEvent.GuildUnavailable, payload);
         return;
       }
       const guild = new Guild(payload);
@@ -573,11 +587,8 @@ export class Client
     this.#gateway.on("RAW", (data) =>
       this.emit(ClientEvent.Raw, data as { event: string; data: unknown }),
     );
-    this.#gateway.on("ERROR", (error) =>
-      this.emit(
-        ClientEvent.Error,
-        error instanceof Error ? error : new Error(String(error)),
-      ),
+    this.#gateway.on("error", (error) =>
+      this.emit(ClientEvent.Error, error as Error),
     );
   }
 
@@ -627,21 +638,24 @@ export class Client
     token: string,
     data: Record<string, unknown>,
   ): Promise<unknown> {
+    if (!this.user) return Promise.reject(new Error("Client is unauthenticated."));
     return this.rest.patch(
-      Routes.interactionOriginalResponse(this.user?.id ?? "0", token),
+      Routes.interactionOriginalResponse(this.user.id, token),
       data,
     );
   }
   public deleteInteractionReply(token: string): Promise<void> {
+    if (!this.user) return Promise.reject(new Error("Client is unauthenticated."));
     return this.rest.delete(
-      Routes.interactionOriginalResponse(this.user?.id ?? "0", token),
+      Routes.interactionOriginalResponse(this.user.id, token),
     );
   }
   public followUpInteraction(
     token: string,
     data: Record<string, unknown>,
   ): Promise<unknown> {
-    return this.rest.post(`/webhooks/${this.user?.id ?? "0"}/${token}`, data);
+    if (!this.user) return Promise.reject(new Error("Client is unauthenticated."));
+    return this.rest.post(`/webhooks/${this.user.id}/${token}`, data);
   }
 }
 

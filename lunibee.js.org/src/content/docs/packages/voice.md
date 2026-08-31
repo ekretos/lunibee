@@ -23,12 +23,12 @@ const voice = new VoiceConnection({
   selfMute: false,
 });
 
-voice.on("stateChange", (oldState, newState) => {
+voice.on("stateChange", (newState, oldState) => {
   console.log(`Voice state: ${oldState} → ${newState}`);
 });
 ```
 
-The connection handles the Discord voice handshake and UDP encryption setup. Listen for state changes so your application can react to connection, reconnect, and disconnect transitions.
+The connection handles the Discord voice handshake and UDP encryption setup, but does not transmit or decode audio itself. Listen for state changes so your application can react to connection, reconnect, and disconnect transitions.
 
 ## When to use this package
 

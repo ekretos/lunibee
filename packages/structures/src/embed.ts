@@ -16,6 +16,7 @@ export class Embed {
   /** Creates an Embed from raw Discord API data, or starts a blank embed. */
   public constructor(data: APIEmbed = {}) {
     this.#data = { ...data };
+    if (this.#data.fields) this.#data.fields = [...this.#data.fields];
   }
 
   // ── Read accessors ───────────────────────────────────────────────────────
@@ -174,9 +175,17 @@ export class Embed {
     deleteCount: number,
     ...fields: APIEmbedField[]
   ): this {
-    const existing = this.#data.fields ?? [];
-    existing.splice(index, deleteCount, ...fields);
-    this.#data.fields = existing;
+    const next = [...(this.#data.fields ?? [])];
+    next.splice(index, deleteCount, ...fields);
+    if (next.length > 25)
+      throw new TypeError("Embeds cannot have more than 25 fields.");
+    for (const field of fields) {
+      if (field.name.length > 256)
+        throw new TypeError("Embed field name must not exceed 256 characters.");
+      if (field.value.length > 1024)
+        throw new TypeError("Embed field value must not exceed 1024 characters.");
+    }
+    this.#data.fields = next;
     return this;
   }
 
@@ -184,7 +193,9 @@ export class Embed {
 
   /** Returns the raw Discord API embed payload. */
   public toJSON(): APIEmbed {
-    return { ...this.#data };
+    const json = { ...this.#data };
+    if (json.fields) json.fields = [...json.fields];
+    return json;
   }
 
   /** Creates an Embed from an existing raw API embed object. */

@@ -392,8 +392,8 @@ export interface APIActionRowComponent {
   id?: number;
   components: APIMessageActionRowComponent[];
 }
-/** Union including action rows (top-level component). */
-export type APIMessageComponent = APIActionRowComponent;
+/** Union including action rows and V2 components. */
+export type APIMessageComponent = APIActionRowComponent | { type: Exclude<number, 1>; [key: string]: any };
 
 // ─── Attachments ─────────────────────────────────────────────────────────────
 
@@ -713,7 +713,36 @@ export interface APITypingStart {
   member?: APIGuildMember;
 }
 
+// ─── Guilds ──────────────────────────────────────────────────────────────────
+
+/** Raw Discord guild preview. */
+export interface APIGuildPreview {
+  id: Snowflake;
+  name: string;
+  icon: string | null;
+  splash: string | null;
+  discovery_splash: string | null;
+  emojis: unknown[];
+  features: string[];
+  approximate_member_count: number;
+  approximate_presence_count: number;
+  description: string | null;
+  stickers: unknown[];
+}
+
 // ─── Invites ─────────────────────────────────────────────────────────────────
+
+/** Raw Discord invite. */
+export interface APIInvite {
+  code: string;
+  guild?: Partial<APIGuild>;
+  channel: Partial<APIChannel>;
+  inviter?: UserData;
+  target_type?: number;
+  target_user?: UserData;
+  approximate_presence_count?: number;
+  approximate_member_count?: number;
+}
 
 /** Raw Discord invite create event. */
 export interface APIInviteCreate {

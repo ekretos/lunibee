@@ -35,13 +35,13 @@ Use `ShardBus` when shards need to send application-level messages to each other
 ```ts
 import { ShardBus } from "@lunibee/sharding";
 
-const bus = new ShardBus();
+const bus = new ShardBus(0, "lunibee-bot");
 
 bus.on("RELOAD_CONFIG", (message) => {
-  console.log("Reload requested by shard", message.sourceShardId);
+  console.log("Reload requested by shard", message.source);
 });
 
-bus.broadcast({ type: "RELOAD_CONFIG" });
+bus.broadcast("RELOAD_CONFIG", { reason: "admin_request" });
 ```
 
 ## When do I need sharding?

@@ -103,6 +103,10 @@ describe("Structures & Interactions Full Coverage", () => {
       member_count: 10,
       vanity_url_code: "vanity",
       nsfw_level: 1,
+      discovery_splash: "dsplash",
+      roles: [],
+      emojis: [],
+      mfa_level: 0,
     });
     expect(guild.name).toBe("MyGuild");
     expect(guild.createdAt.getFullYear()).toBeDefined();
@@ -115,7 +119,7 @@ describe("Structures & Interactions Full Coverage", () => {
     expect(guild.bannerURL()).toBe(
       "https://cdn.discordapp.com/banners/300/banner1.png",
     );
-    expect(guild.discoverySplashURL("dsplash")).toBe(
+    expect(guild.discoverySplashURL()).toBe(
       "https://cdn.discordapp.com/discovery-splashes/300/dsplash.png",
     );
 
@@ -131,7 +135,7 @@ describe("Structures & Interactions Full Coverage", () => {
     expect(noImageGuild.iconURL()).toBeNull();
     expect(noImageGuild.splashURL()).toBeNull();
     expect(noImageGuild.bannerURL()).toBeNull();
-    expect(noImageGuild.discoverySplashURL(null)).toBeNull();
+    expect(noImageGuild.discoverySplashURL()).toBeNull();
 
     // Base checks
     expect(() => new User({ id: "invalid", username: "u" })).toThrow(TypeError);
@@ -206,18 +210,28 @@ describe("Structures & Interactions Full Coverage", () => {
       CommandOptions,
     } = require("../packages/structures/src/interactions.ts");
     const optionsData = [
-      { type: 1, name: "sub" },
-      { type: 2, name: "group" },
-      { type: 3, name: "str", value: "hello" },
-      { type: 4, name: "int", value: 42 },
-      { type: 5, name: "bool", value: true },
-      { type: 6, name: "user", value: "100" },
-      { type: 7, name: "channel", value: "200" },
-      { type: 8, name: "role", value: "300" },
-      { type: 9, name: "mentionable", value: "400" },
-      { type: 10, name: "num", value: 3.14 },
-      { type: 11, name: "attach", value: "500" },
-      { type: 11, name: "attach2", value: "600" },
+      {
+        type: 2,
+        name: "group",
+        options: [
+          {
+            type: 1,
+            name: "sub",
+            options: [
+              { type: 3, name: "str", value: "hello" },
+              { type: 4, name: "int", value: 42 },
+              { type: 5, name: "bool", value: true },
+              { type: 6, name: "user", value: "100" },
+              { type: 7, name: "channel", value: "200" },
+              { type: 8, name: "role", value: "300" },
+              { type: 9, name: "mentionable", value: "400" },
+              { type: 10, name: "num", value: 3.14 },
+              { type: 11, name: "attach", value: "500" },
+              { type: 11, name: "attach2", value: "600" },
+            ],
+          },
+        ],
+      },
     ];
     const resolvedData = {
       users: { "100": { id: "100", username: "U" } },

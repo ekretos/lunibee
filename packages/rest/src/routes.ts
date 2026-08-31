@@ -6,6 +6,14 @@ export const Routes = {
     (userId: string) => `/users/${snowflake(userId, "User ID")}`,
   /** Returns a guild. @param guildId Guild identifier. @returns Guild route. */ guild:
     (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}`,
+  /** Returns a guild preview. @param guildId Guild identifier. */ guildPreview:
+    (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/preview`,
+  /** Returns active threads for a guild. @param guildId Guild identifier. */ guildActiveThreads:
+    (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/threads/active`,
+  /** Returns webhooks for a guild. @param guildId Guild identifier. */ guildWebhooks:
+    (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/webhooks`,
+  /** Returns invites for a guild. @param guildId Guild identifier. */ guildInvites:
+    (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/invites`,
   /** Returns channels in a guild. @param guildId Guild identifier. @returns Channel collection route. */ guildChannels:
     (guildId: string) => `/guilds/${snowflake(guildId, "Guild ID")}/channels`,
   /** Returns a guild member. @param guildId Guild identifier. @param userId User identifier. @returns Guild-member route. */ guildMember:
@@ -93,9 +101,7 @@ export const Routes = {
   /** Returns the original interaction response endpoint. @param applicationId Application identifier. @param token Interaction token. @returns Original-response route. */ interactionOriginalResponse:
     (applicationId: string, token: string) =>
       `/webhooks/${snowflake(applicationId, "Application ID")}/${encodeURIComponent(token)}/messages/@original`,
-  /** Returns guild threads that are active. @param guildId Guild identifier. @returns Active-thread route. */ guildActiveThreads:
-    (guildId: string) =>
-      `/guilds/${snowflake(guildId, "Guild ID")}/threads/active`,
+
   /** Returns public archived threads for a channel. @param channelId Channel identifier. @returns Public-archive route. */ channelPublicArchivedThreads:
     (channelId: string) =>
       `/channels/${snowflake(channelId, "Channel ID")}/threads/archived/public`,

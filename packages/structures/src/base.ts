@@ -88,6 +88,7 @@ export class User extends BaseStructure {
   public bot: boolean;
   public system: boolean;
   public flags: number;
+  public discriminator: string | null;
   public constructor(data: import("@lunibee/types").UserData) {
     super(data.id);
     if (!data.username)
@@ -98,6 +99,7 @@ export class User extends BaseStructure {
     this.bot = data.bot ?? false;
     this.system = data.system ?? false;
     this.flags = data.public_flags ?? 0;
+    this.discriminator = data.discriminator && data.discriminator !== "0" ? data.discriminator : null;
   }
   /** Effective display name — global name, falling back to username. */
   public get displayName(): string {
@@ -110,7 +112,10 @@ export class User extends BaseStructure {
   }
   /** Returns the default avatar URL based on the user's discriminator/snowflake. */
   public defaultAvatarURL(): string {
-    return `${CDN_BASE}/embed/avatars/${Number(BigInt(this.id) % 5n)}.png`;
+    const index = this.discriminator
+      ? Number(this.discriminator) % 5
+      : Number((BigInt(this.id) >> 22n) % 6n);
+    return `${CDN_BASE}/embed/avatars/${index}.png`;
   }
   /** Returns the avatar URL if available, falling back to the default avatar URL. */
   public displayAvatarURL(options: ImageURLOptions = {}): string {
@@ -230,6 +235,7 @@ export class Guild extends BaseStructure {
   public approximatePresenceCount?: number;
   public vanityUrlCode: string | null;
   public nsfwLevel: number;
+  public discoverySplash: string | null;
 
   public constructor(data: import("@lunibee/types").APIGuild) {
     super(data.id);
@@ -250,6 +256,7 @@ export class Guild extends BaseStructure {
     this.approximatePresenceCount = data.approximate_presence_count;
     this.vanityUrlCode = data.vanity_url_code ?? null;
     this.nsfwLevel = data.nsfw_level ?? 0;
+    this.discoverySplash = data.discovery_splash ?? null;
   }
 
   /** Returns the guild icon URL, or null if no icon is set. */
@@ -272,11 +279,10 @@ export class Guild extends BaseStructure {
 
   /** Returns the guild discovery splash URL, or null if none. */
   public discoverySplashURL(
-    splash: string | null,
     options: ImageURLOptions = {},
   ): string | null {
-    if (!splash) return null;
-    return cdnURL(`/discovery-splashes/${this.id}`, splash, options);
+    if (!this.discoverySplash) return null;
+    return cdnURL(`/discovery-splashes/${this.id}`, this.discoverySplash, options);
   }
 
   /** Whether the guild has a given feature flag. @param feature Feature string, e.g. "COMMUNITY". */

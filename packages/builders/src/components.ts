@@ -110,11 +110,13 @@ export interface APIMediaGalleryComponent {
 }
 export interface APIFileComponent {
   type: typeof ComponentType.File;
-  filename: string;
+  file: { url: string };
+  spoiler?: boolean;
 }
 export interface APISeparatorComponent {
   type: typeof ComponentType.Separator;
-  spacing?: "small" | "large";
+  spacing?: 1 | 2;
+  divider?: boolean;
 }
 export interface APIThumbnailComponent {
   type: typeof ComponentType.Thumbnail;
@@ -482,6 +484,9 @@ export class TextDisplayBuilder {
 export class MediaGalleryBuilder {
   readonly #items: { media: { url: string; description?: string } }[] = [];
   public addItems(...items: { url: string; description?: string }[]): this {
+    if (!items.length) {
+      throw new TypeError("At least one media gallery item is required.");
+    }
     if (this.#items.length + items.length > 10) {
       throw new RangeError("MediaGallery can only contain up to 10 items.");
     }
@@ -497,31 +502,46 @@ export class MediaGalleryBuilder {
 }
 
 export class FileComponentBuilder {
-  #filename = "";
-  public setFilename(filename: string): this {
-    validateText(filename, 255, "File component filename");
-    this.#filename = filename;
+  #url = "";
+  #spoiler?: boolean;
+  public setUrl(url: string): this {
+    validateText(url, 2048, "File component URL");
+    this.#url = url;
+    return this;
+  }
+  public setSpoiler(spoiler = true): this {
+    this.#spoiler = spoiler;
     return this;
   }
   public toJSON(): APIFileComponent {
-    return {
+    if (!this.#url) throw new Error("File component must have a URL.");
+    const data: APIFileComponent = {
       type: ComponentType.File,
-      filename: this.#filename,
+      file: { url: this.#url },
     };
+    if (this.#spoiler !== undefined) data.spoiler = this.#spoiler;
+    return data;
   }
 }
 
 export class SeparatorBuilder {
-  #spacing?: "small" | "large";
-  public setSpacing(spacing: "small" | "large"): this {
+  #spacing?: 1 | 2;
+  #divider?: boolean;
+  public setSpacing(spacing: 1 | 2): this {
     this.#spacing = spacing;
     return this;
   }
+  public setDivider(divider = true): this {
+    this.#divider = divider;
+    return this;
+  }
   public toJSON(): APISeparatorComponent {
-    return {
+    const data: APISeparatorComponent = {
       type: ComponentType.Separator,
-      spacing: this.#spacing,
     };
+    if (this.#spacing !== undefined) data.spacing = this.#spacing;
+    if (this.#divider !== undefined) data.divider = this.#divider;
+    return data;
   }
 }
 

@@ -61,7 +61,7 @@ test("message resource methods delegate through ChannelManager", async () => {
   await created.channel.edit({ name: "edited channel" });
   await created.channel.delete();
 
-  await channels.updateChannel(channelId, { name: "test" });
+  await channels.edit(channelId, { name: "test" });
   await channels.create("123456789012345679", { name: "test2", type: 0 });
   await channels.resolve(channelId);
 

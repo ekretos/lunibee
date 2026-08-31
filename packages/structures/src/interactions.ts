@@ -92,9 +92,32 @@ export class CommandOptions {
     options: APIInteractionDataOption[],
     resolved: Record<string, unknown> = {},
   ) {
-    this.#options = options;
+    let currentOptions = options;
+    let group: string | null = null;
+    let sub: string | null = null;
+    
+    // Drill down to the deepest options level for nested subcommands
+    while (currentOptions.length === 1) {
+      const opt = currentOptions[0]!;
+      if (opt.type === OptionType.SubCommandGroup) {
+        group = opt.name;
+        currentOptions = opt.options ?? [];
+      } else if (opt.type === OptionType.SubCommand) {
+        sub = opt.name;
+        currentOptions = opt.options ?? [];
+      } else {
+        break;
+      }
+    }
+    
+    this.#options = currentOptions;
     this.#resolved = resolved;
+    this.#subcommandGroup = group;
+    this.#subcommand = sub;
   }
+  
+  readonly #subcommandGroup: string | null;
+  readonly #subcommand: string | null;
 
   /** Finds a raw option by name (case-insensitive). */
   #get(name: string): APIInteractionDataOption | undefined {
@@ -109,26 +132,20 @@ export class CommandOptions {
   public getSubcommand(required?: false): string | null;
   public getSubcommand(required: true): string;
   public getSubcommand(required = false): string | null {
-    const opt = this.#options.find((o) => o.type === OptionType.SubCommand);
-    if (!opt) {
-      if (required) throw new TypeError("No subcommand was provided.");
-      return null;
+    if (!this.#subcommand && required) {
+      throw new TypeError("No subcommand was provided.");
     }
-    return opt.name;
+    return this.#subcommand;
   }
 
   /** Returns the invoked subcommand group name, or null if none. */
   public getSubcommandGroup(required?: false): string | null;
   public getSubcommandGroup(required: true): string;
   public getSubcommandGroup(required = false): string | null {
-    const opt = this.#options.find(
-      (o) => o.type === OptionType.SubCommandGroup,
-    );
-    if (!opt) {
-      if (required) throw new TypeError("No subcommand group was provided.");
-      return null;
+    if (!this.#subcommandGroup && required) {
+      throw new TypeError("No subcommand group was provided.");
     }
-    return opt.name;
+    return this.#subcommandGroup;
   }
 
   // ── Primitive value options ────────────────────────────────────────────────

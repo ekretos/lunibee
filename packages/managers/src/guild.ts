@@ -1,7 +1,12 @@
 import { ResourceManager } from "./base.js";
 import { Guild } from "@lunibee/structures";
 import { type REST, Routes } from "@lunibee/rest";
-import type { APIChannel, APIWebhook } from "@lunibee/types";
+import {
+  type APIChannel,
+  type APIGuildPreview,
+  type APIInvite,
+  type APIWebhook,
+} from "@lunibee/types";
 
 type GuildData = ConstructorParameters<typeof Guild>[0];
 
@@ -38,22 +43,26 @@ export class GuildManager extends ResourceManager<string, Guild> {
   }
 
   /** Fetches a guild's preview (even if the bot is not in the guild). */
-  public async fetchPreview(id: string): Promise<unknown> {
-    return this.#rest.get(`${Routes.guild(id)}/preview`);
+  public async fetchPreview(id: string): Promise<APIGuildPreview> {
+    return this.#rest.get<APIGuildPreview>(Routes.guildPreview(id));
   }
 
   /** Fetches all active threads in the guild. */
-  public async fetchActiveThreads(id: string): Promise<unknown> {
-    return this.#rest.get(`${Routes.guild(id)}/threads/active`);
+  public async fetchActiveThreads(
+    id: string,
+  ): Promise<{ threads: APIChannel[]; members: unknown[] }> {
+    return this.#rest.get<{ threads: APIChannel[]; members: unknown[] }>(
+      Routes.guildActiveThreads(id),
+    );
   }
 
   /** Fetches all webhooks in the guild. */
-  public async fetchWebhooks(id: string): Promise<unknown> {
-    return this.#rest.get(`${Routes.guild(id)}/webhooks`);
+  public async fetchWebhooks(id: string): Promise<APIWebhook[]> {
+    return this.#rest.get<APIWebhook[]>(Routes.guildWebhooks(id));
   }
 
   /** Fetches all invites in the guild. */
-  public async fetchInvites(id: string): Promise<unknown> {
-    return this.#rest.get(`${Routes.guild(id)}/invites`);
+  public async fetchInvites(id: string): Promise<APIInvite[]> {
+    return this.#rest.get<APIInvite[]>(Routes.guildInvites(id));
   }
 }

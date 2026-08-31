@@ -35,6 +35,9 @@ const flags = MessageFlags.Ephemeral;
 Gateway intents control which events and data your bot receives. Only request the intents your bot needs.
 
 ```ts
+import { Client } from "lunibee";
+import { IntentBits } from "@lunibee/types";
+
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
   intents: IntentBits.guilds | IntentBits.guildMessages,

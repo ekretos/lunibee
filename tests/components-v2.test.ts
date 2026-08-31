@@ -17,8 +17,8 @@ test("Components V2 Builders > all builders serialize correctly and validate", (
     .addComponents(
       new SectionBuilder()
         .addComponents(new TextDisplayBuilder().setContent("Hello world"))
-        .setAccessory(new FileComponentBuilder().setFilename("test.png")),
-      new SeparatorBuilder().setSpacing("large"),
+        .setAccessory(new FileComponentBuilder().setUrl("attachment://test.png")),
+      new SeparatorBuilder().setSpacing(2),
       new MediaGalleryBuilder().addItems({
         url: "https://example.com/image.png",
         description: "test",
@@ -41,12 +41,12 @@ test("Components V2 Builders > all builders serialize correctly and validate", (
         ],
         accessory: {
           type: ComponentType.File,
-          filename: "test.png",
+          file: { url: "attachment://test.png" },
         },
       },
       {
         type: ComponentType.Separator,
-        spacing: "large",
+        spacing: 2,
       },
       {
         type: ComponentType.MediaGallery,
@@ -79,7 +79,7 @@ test("Components V2 Builders > all builders serialize correctly and validate", (
   expect(() =>
     gallery.addItems(...new Array(11).fill({ url: "test" })),
   ).toThrow();
-  expect(() => new FileComponentBuilder().setFilename("")).toThrow();
+  expect(() => new FileComponentBuilder().setUrl("")).toThrow();
   expect(() => new ThumbnailBuilder().setUrl("")).toThrow();
   expect(() => new ContentInventoryEntryBuilder().setId("")).toThrow();
 });

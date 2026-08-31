@@ -38,11 +38,6 @@ export interface ReactionFetchOptions {
   limit?: number;
   after?: string;
 }
-export const MessageCreateOptions = undefined;
-export const MessageEditOptions = undefined;
-export const MessageFetchOptions = undefined;
-export const MessageThreadOptions = undefined;
-export const ReactionFetchOptions = undefined;
 
 export interface ChannelCreateOptions extends Record<string, unknown> {
   name: string;
@@ -50,9 +45,7 @@ export interface ChannelCreateOptions extends Record<string, unknown> {
   guild_id?: string;
   parent_id?: string | null;
 }
-export interface ChannelEditOptions extends Record<string, unknown> {}
-export const ChannelCreateOptions = undefined;
-export const ChannelEditOptions = undefined;
+export type ChannelEditOptions = Record<string, unknown>;
 
 export class ChannelManager extends Manager<string, Channel> {
   readonly #rest: REST;
@@ -141,12 +134,7 @@ export class ChannelManager extends Manager<string, Channel> {
       ),
     );
   }
-  public async updateChannel(
-    channelId: string,
-    options: ChannelEditOptions,
-  ): Promise<Channel> {
-    return this.edit(channelId, options);
-  }
+
   public async deleteChannel(channelId: string): Promise<void> {
     await this.#rest.delete(Routes.channel(channelId));
     this.#messageManagers.delete(channelId);

@@ -69,8 +69,15 @@ async function status(): Promise<void> {
     console.log(`${manifest.name}@${manifest.version}`);
 }
 
+const RESERVED = new Set([
+  "default", "class", "function", "export", "import", "const", "let", "var",
+  "if", "else", "switch", "case", "for", "while", "do", "return", "new",
+  "try", "catch", "finally", "throw", "typeof", "instanceof", "void", "delete",
+]);
+
 function identifier(value: string): string {
-  const result = value.replace(/[^a-zA-Z0-9_$]/g, "_");
+  let result = value.replace(/[^a-zA-Z0-9_$]/g, "_");
+  if (RESERVED.has(result)) result = `_${result}`;
   return /^[a-zA-Z_$]/.test(result) ? result : `handler_${result}`;
 }
 
@@ -203,7 +210,7 @@ async function createCommand(): Promise<void> {
     throw new Error(`Command already exists: ${file}`);
   await writeFile(
     target,
-    `import { SlashCommandBuilder } from "lunibee";\n\nexport default new SlashCommandBuilder()\n  .setName("${name.replace(/\.ts$/, "")}")\n  .setDescription("${description.replace(/"/g, '\\"')}");\n`,
+    `import { SlashCommandBuilder } from "lunibee";\n\nexport default new SlashCommandBuilder()\n  .setName(${JSON.stringify(name.replace(/\.ts$/, ""))})\n  .setDescription(${JSON.stringify(description)});\n`,
   );
   console.log(`✓ created commands/${file}`);
 }
@@ -232,7 +239,7 @@ async function createComponent(): Promise<void> {
     throw new Error(`Component already exists: ${file}`);
   await writeFile(
     target,
-    `/** ${type} component: ${name}. */\nexport const ${identifier(name)} = {\n  type: "${type}",\n  customId: "${name}",\n};\n`,
+    `/** ${type} component: ${name}. */\nexport const ${identifier(name.replace(/\.ts$/, ""))} = {\n  type: "${type}",\n  customId: ${JSON.stringify(name.replace(/\.ts$/, ""))},\n};\n`,
   );
   console.log(`✓ created components/${file}`);
 }

@@ -64,7 +64,7 @@ await client.login();
 Lunibee command registration is built around Discord's application-command REST endpoints. Build your command payload with `@lunibee/builders`, then register it through the command/application registration API exposed by your client or REST layer. If you need an endpoint that is not covered by a high-level helper, use `client.rest` with the corresponding route.
 
 ```ts
-import { SlashCommandBuilder } from "@lunibee/builders";
+import { SlashCommandBuilder } from "lunibee";
 
 const command = new SlashCommandBuilder()
   .setName("ping")
