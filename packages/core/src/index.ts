@@ -7,6 +7,8 @@ export {
   PermissionOverwriteType,
   type PermissionName,
 } from "./permissions.js";
+export { ClientEvent, type ClientEventName, type ClientListener } from "./events.js";
+
 import { Collection } from "@lunibee/collection";
 import {
   ApplicationCommandManager,
@@ -43,488 +45,146 @@ import type {
   ClientOptions,
   ClientUser,
 } from "@lunibee/types";
+import type { ClientEvents } from "./events.js";
+export type { ClientEvents } from "./events.js";
 
-/** Events emitted by the Lunibee client. */
-export interface ClientEvents {
-  /** Client is ready. */ ready: [ClientUser];
-  /** Raw gateway dispatch envelope. */ raw: [{ event: string; data: unknown }];
-  /** Normalized client error. */ error: [Error];
-  /** Gateway opened. */ open: [];
-  /** Gateway closed. */ close: [{ code: number; action: string }];
-  /** Message created. */ messageCreate: [Message];
-  /** Message updated. */ messageUpdate: [Message];
-  /** Message deleted. */ messageDelete: [APIMessageDeleteEvent];
-  /** Messages deleted in bulk. */ messageDeleteBulk: [
-    APIMessageDeleteBulkEvent,
-  ];
-  /** Guild became available. */ guildCreate: [APIGuild];
-  /** Guild updated. */ guildUpdate: [APIGuild];
-  /** Guild became unavailable or was removed. */ guildDelete: [
-    { id: string; unavailable?: boolean },
-  ];
-  /** Channel created. */ channelCreate: [Channel];
-  /** Channel updated. */ channelUpdate: [Channel];
-  /** Channel deleted. */ channelDelete: [APIChannel];
-  /** Thread created. */ threadCreate: [Channel];
-  /** Thread updated. */ threadUpdate: [Channel];
-  /** Thread deleted. */ threadDelete: [APIThreadEvent];
-  /** Guild member added. */ guildMemberAdd: [APIGuildMember];
-  /** Guild member updated. */ guildMemberUpdate: [APIGuildMember];
-  /** Guild member removed. */ guildMemberRemove: [APIGuildMember];
-  /** Reaction added. */ messageReactionAdd: [APIMessageReactionEvent];
-  /** Reaction removed. */ messageReactionRemove: [APIMessageReactionEvent];
-  /** All reactions removed. */ messageReactionRemoveAll: [
-    APIMessageDeleteEvent,
-  ];
-  /** Interaction created. */ interactionCreate: [Interaction];
-  /** Guild role created. */ guildRoleCreate: [APIGuildRoleEvent];
-  /** Guild role updated. */ guildRoleUpdate: [APIGuildRoleEvent];
-  /** Guild role deleted. */ guildRoleDelete: [APIGuildRoleDeleteEvent];
-  /** Guild ban added. */ guildBanAdd: [APIGuildBanEvent];
-  /** Guild ban removed. */ guildBanRemove: [APIGuildBanEvent];
-  /** Guild emojis updated. */ guildEmojisUpdate: [APIGuildEmojisUpdateEvent];
-}
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
 type Listener<T extends unknown[]> = (...args: T) => unknown;
+
 /** Minimal typed event emitter used by the client. */
 class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
   readonly #listeners = new Map<keyof Events, Set<Listener<any>>>();
-  /** Registers a listener. @param event Event name. @param listener Listener callback. @returns This emitter. */ public on<
-    K extends keyof Events,
-  >(event: K, listener: Listener<Events[K]>): this {
-    if (typeof listener !== "function")
-      throw new TypeError("Event listener must be a function.");
+  public on<K extends keyof Events>(event: K, listener: Listener<Events[K]>): this {
+    if (typeof listener !== "function") throw new TypeError("Event listener must be a function.");
     let listeners = this.#listeners.get(event);
     if (!listeners) this.#listeners.set(event, (listeners = new Set()));
     listeners.add(listener);
     return this;
   }
-  /** Registers a one-shot listener. @param event Event name. @param listener Listener callback. @returns This emitter. */ public once<
-    K extends keyof Events,
-  >(event: K, listener: Listener<Events[K]>): this {
-    const wrapped: Listener<Events[K]> = (...args) => {
-      this.off(event, wrapped);
-      return listener(...args);
-    };
+  public once<K extends keyof Events>(event: K, listener: Listener<Events[K]>): this {
+    const wrapped: Listener<Events[K]> = (...args) => { this.off(event, wrapped); return listener(...args); };
     return this.on(event, wrapped);
   }
-  /** Removes a listener. @param event Event name. @param listener Listener callback. @returns This emitter. */ public off<
-    K extends keyof Events,
-  >(event: K, listener: Listener<Events[K]>): this {
+  public off<K extends keyof Events>(event: K, listener: Listener<Events[K]>): this {
     this.#listeners.get(event)?.delete(listener);
     return this;
   }
-  /** Removes listeners. @param event Optional event name. @returns This emitter. */ public removeAllListeners<
-    K extends keyof Events,
-  >(event?: K): this {
-    if (event === undefined) this.#listeners.clear();
-    else this.#listeners.delete(event);
+  public removeAllListeners<K extends keyof Events>(event?: K): this {
+    if (event === undefined) this.#listeners.clear(); else this.#listeners.delete(event);
     return this;
   }
-  /** Emits an event. @param event Event name. @param args Event arguments. @returns Whether listeners were invoked. */ protected emit<
-    K extends keyof Events,
-  >(event: K, ...args: Events[K]): boolean {
+  protected emit<K extends keyof Events>(event: K, ...args: Events[K]): boolean {
     const listeners = this.#listeners.get(event);
     if (!listeners?.size) return false;
     for (const listener of [...listeners]) {
       try {
         const result = listener(...args);
-        if (
-          result &&
-          typeof (result as PromiseLike<unknown>).then === "function"
-        )
-          void Promise.resolve(result).catch((error) =>
-            this.#handleError(event, error),
-          );
-      } catch (error) {
-        this.#handleError(event, error);
-      }
+        if (result && typeof (result as PromiseLike<unknown>).then === "function")
+          void Promise.resolve(result).catch((error) => this.#handleError(event, error));
+      } catch (error) { this.#handleError(event, error); }
     }
     return true;
   }
-  /** Forwards listener failures to error handlers. @param event Event whose listener failed. @param error Failure. @returns Nothing. */ #handleError(
-    event: keyof Events,
-    error: unknown,
-  ): void {
-    if (event === "error") return;
-    const normalized =
-      error instanceof Error
-        ? error
-        : new Error(String(error), { cause: error });
-    for (const listener of [
-      ...(this.#listeners.get("error" as keyof Events) ?? []),
-    ]) {
-      try {
-        void listener(normalized);
-      } catch {}
+  #handleError(event: keyof Events, error: unknown): void {
+    if (event === ClientEvent.Error) return;
+    const normalized = error instanceof Error ? error : new Error(String(error), { cause: error });
+    for (const listener of [...(this.#listeners.get(ClientEvent.Error as keyof Events) ?? [])]) {
+      try { void listener(normalized); } catch {}
     }
   }
 }
+
 /** Main Lunibee Discord client. */
-export class Client
-  extends EventEmitter<ClientEvents>
-  implements InteractionClient
-{
-  /** REST transport used by all managers. */ public readonly rest: REST;
-  /** User resource manager. */ public readonly users: UserManager;
-  /** Guild resource manager. */ public readonly guilds: GuildManager;
-  /** Channel and message resource manager. */ public readonly channels: ChannelManager;
-  /** Application command manager (available after login). */ public readonly application: {
-    /** Application command registration API. */ commands: ApplicationCommandManager;
-  };
-  /** Underlying WebSocket Gateway connection. */ public get ws(): Gateway {
-    return this.#gateway;
-  }
-  /** Underlying WebSocket Gateway connection. */ public get gateway(): Gateway {
-    return this.#gateway;
-  }
-  /** Current authenticated bot user. */ public user?: ClientUser;
-  /** Time at which the gateway became ready. */ public readyAt?: Date;
-  /** Current client lifecycle state. */ public state: ClientState = "idle";
-  /** Time in milliseconds since the client became ready, or null if not ready. */
-  public get uptime(): number | null {
-    return this.readyAt ? Date.now() - this.readyAt.getTime() : null;
-  }
+export class Client extends EventEmitter<ClientEvents> implements InteractionClient {
+  public readonly rest: REST;
+  public readonly users: UserManager;
+  public readonly guilds: GuildManager;
+  public readonly channels: ChannelManager;
+  public readonly application: { commands: ApplicationCommandManager };
+  public get ws(): Gateway { return this.#gateway; }
+  public get gateway(): Gateway { return this.#gateway; }
+  public user?: ClientUser;
+  public readyAt?: Date;
+  public state: ClientState = "idle";
+  public get uptime(): number | null { return this.readyAt ? Date.now() - this.readyAt.getTime() : null; }
   readonly #gateway: Gateway;
   readonly #resourceContext: ResourceContext;
-  /** Creates a client. @param options Client configuration. @throws {TypeError} If no token is supplied. */ public constructor(
-    public readonly options: ClientOptions,
-  ) {
+  public constructor(public readonly options: ClientOptions) {
     super();
-    if (!options.token?.trim())
-      throw new TypeError("Client token is required.");
+    if (!options.token?.trim()) throw new TypeError("Client token is required.");
     this.rest = new REST({ token: options.token, ...options.rest });
     this.users = new UserManager(this.rest);
     this.guilds = new GuildManager(this.rest);
     this.channels = new ChannelManager(this.rest);
-    // application.commands is lazily re-pointed to the real app ID after READY;
-    // a placeholder is created now so the property is always accessible.
-    const placeholderAppCommands = new ApplicationCommandManager(
-      this.rest,
-      "0",
-    );
+    const placeholderAppCommands = new ApplicationCommandManager(this.rest, "0");
     this.application = { commands: placeholderAppCommands };
     this.#resourceContext = {
-      sendMessage: (channelId, options) =>
-        this.channels.send(channelId, options),
-      editMessage: (channelId, messageId, options) =>
-        this.channels.editMessage(channelId, messageId, options),
-      deleteMessage: (channelId, messageId) =>
-        this.channels.deleteMessage(channelId, messageId),
-      crosspostMessage: (channelId, messageId) =>
-        this.channels.crosspostMessage(channelId, messageId),
+      sendMessage: (channelId, options) => this.channels.send(channelId, options),
+      editMessage: (channelId, messageId, options) => this.channels.editMessage(channelId, messageId, options),
+      deleteMessage: (channelId, messageId) => this.channels.deleteMessage(channelId, messageId),
+      crosspostMessage: (channelId, messageId) => this.channels.crosspostMessage(channelId, messageId),
     };
-    this.#gateway = new Gateway({
-      token: options.token,
-      intents: options.intents,
-      ...options.gateway,
-    });
+    this.#gateway = new Gateway({ token: options.token, intents: options.intents, ...options.gateway });
     this.#gateway.on("READY", (data) => {
       const ready = data as APIReadyEvent;
       this.user = ready.user;
       this.users.set(this.user.id, new User(this.user));
       this.readyAt = new Date();
       this.state = "ready";
-      // Reinitialise application.commands with the real application ID from READY
       const appId = ready.application?.id ?? this.user.id;
-      (this.application as { commands: ApplicationCommandManager }).commands =
-        new ApplicationCommandManager(this.rest, appId);
-      this.emit("ready", this.user);
+      (this.application as { commands: ApplicationCommandManager }).commands = new ApplicationCommandManager(this.rest, appId);
+      this.emit(ClientEvent.Ready, this.user);
     });
-    this.#gateway.on("open", () => this.emit("open"));
+    this.#gateway.on("open", () => this.emit(ClientEvent.Open));
     this.#gateway.on("close", (data) => {
       if (this.state !== "destroyed") this.state = "idle";
-      this.emit("close", data as { code: number; action: string });
+      this.emit(ClientEvent.Close, data as { code: number; action: string });
     });
     this.#gateway.on("MESSAGE_CREATE", (data) => {
-      const message = new Message(
-        data as import("@lunibee/types").APIMessage,
-        this.#resourceContext,
-      );
+      const message = new Message(data as import("@lunibee/types").APIMessage, this.#resourceContext);
       this.channels.set(message.channelId, message.channel);
       this.users.set(message.author.id, message.author);
-      this.emit("messageCreate", message);
+      this.emit(ClientEvent.MessageCreate, message);
     });
     this.#gateway.on("MESSAGE_UPDATE", (data) => {
-      const message = new Message(
-        data as import("@lunibee/types").APIMessage,
-        this.#resourceContext,
-      );
+      const message = new Message(data as import("@lunibee/types").APIMessage, this.#resourceContext);
       this.channels.set(message.channelId, message.channel);
       this.users.set(message.author.id, message.author);
-      this.emit("messageUpdate", message);
+      this.emit(ClientEvent.MessageUpdate, message);
     });
-    this.#gateway.on("MESSAGE_DELETE", (data) =>
-      this.emit("messageDelete", data as APIMessageDeleteEvent),
-    );
-    this.#gateway.on("MESSAGE_DELETE_BULK", (data) =>
-      this.emit("messageDeleteBulk", data as APIMessageDeleteBulkEvent),
-    );
+    this.#gateway.on("MESSAGE_DELETE", (data) => this.emit(ClientEvent.MessageDelete, data as APIMessageDeleteEvent));
+    this.#gateway.on("MESSAGE_DELETE_BULK", (data) => this.emit(ClientEvent.MessageDeleteBulk, data as APIMessageDeleteBulkEvent));
     this.#gateway.on("GUILD_CREATE", (data) => {
       const guild = new Guild(data as APIGuild);
       this.guilds.set(guild.id, guild);
-      const payload = data as APIGuild & {
-        members?: APIGuildMember[];
-        channels?: APIChannel[];
-        threads?: APIChannel[];
-      };
-      for (const member of payload.members ?? [])
-        this.users.set(member.user.id, new User(member.user));
-      for (const channelData of [
-        ...(payload.channels ?? []),
-        ...(payload.threads ?? []),
-      ]) {
-        const channel = new Channel(channelData, this.#resourceContext);
-        this.channels.set(channel.id, channel);
-      }
-      this.emit("guildCreate", data as APIGuild);
+      const payload = data as APIGuild & { members?: APIGuildMember[]; channels?: APIChannel[]; threads?: APIChannel[] };
+      for (const member of payload.members ?? []) this.users.set(member.user.id, new User(member.user));
+      for (const channelData of [...(payload.channels ?? []), ...(payload.threads ?? [])]) this.channels.set(channelData.id, new Channel(channelData, this.#resourceContext));
+      this.emit(ClientEvent.GuildCreate, data as APIGuild);
     });
-    this.#gateway.on("GUILD_UPDATE", (data) => {
-      const guild = new Guild(data as APIGuild);
-      this.guilds.update(guild);
-      this.emit("guildUpdate", data as APIGuild);
-    });
-    this.#gateway.on("GUILD_DELETE", (data) => {
-      const payload = data as { id: string; unavailable?: boolean };
-      if (!payload.unavailable) this.guilds.delete(payload.id);
-      this.emit("guildDelete", payload);
-    });
-    this.#gateway.on("CHANNEL_CREATE", (data) => {
-      const channel = new Channel(data as APIChannel, this.#resourceContext);
-      this.channels.update(channel);
-      this.emit("channelCreate", channel);
-    });
-    this.#gateway.on("CHANNEL_UPDATE", (data) => {
-      const channel = new Channel(data as APIChannel, this.#resourceContext);
-      this.channels.update(channel);
-      this.emit("channelUpdate", channel);
-    });
-    this.#gateway.on("CHANNEL_DELETE", (data) => {
-      const payload = data as APIChannel;
-      this.channels.delete(payload.id);
-      this.emit("channelDelete", payload);
-    });
-    this.#gateway.on("THREAD_CREATE", (data) => {
-      const channel = new Channel(
-        data as APIThreadEvent,
-        this.#resourceContext,
-      );
-      this.channels.update(channel);
-      this.emit("threadCreate", channel);
-    });
-    this.#gateway.on("THREAD_UPDATE", (data) => {
-      const channel = new Channel(
-        data as APIThreadEvent,
-        this.#resourceContext,
-      );
-      this.channels.update(channel);
-      this.emit("threadUpdate", channel);
-    });
-    this.#gateway.on("THREAD_DELETE", (data) => {
-      const payload = data as APIThreadEvent;
-      this.channels.delete(payload.id);
-      this.emit("threadDelete", payload);
-    });
-    this.#gateway.on("GUILD_MEMBER_ADD", (data) => {
-      const member = data as APIGuildMember;
-      this.users.set(member.user.id, new User(member.user));
-      this.emit("guildMemberAdd", member);
-    });
-    this.#gateway.on("GUILD_MEMBER_UPDATE", (data) => {
-      const member = data as APIGuildMember;
-      this.users.set(member.user.id, new User(member.user));
-      this.emit("guildMemberUpdate", member);
-    });
-    this.#gateway.on("GUILD_MEMBER_REMOVE", (data) =>
-      this.emit("guildMemberRemove", data as APIGuildMember),
-    );
-    this.#gateway.on("MESSAGE_REACTION_ADD", (data) =>
-      this.emit("messageReactionAdd", data as APIMessageReactionEvent),
-    );
-    this.#gateway.on("MESSAGE_REACTION_REMOVE", (data) =>
-      this.emit("messageReactionRemove", data as APIMessageReactionEvent),
-    );
-    this.#gateway.on("MESSAGE_REACTION_REMOVE_ALL", (data) =>
-      this.emit("messageReactionRemoveAll", data as APIMessageDeleteEvent),
-    );
-    this.#gateway.on("INTERACTION_CREATE", (data) =>
-      this.emit("interactionCreate", createInteraction(this, data as any)),
-    );
-    // Phase 1.4 — Guild role / ban / emoji events
-    this.#gateway.on("GUILD_ROLE_CREATE", (data) =>
-      this.emit("guildRoleCreate", data as APIGuildRoleEvent),
-    );
-    this.#gateway.on("GUILD_ROLE_UPDATE", (data) =>
-      this.emit("guildRoleUpdate", data as APIGuildRoleEvent),
-    );
-    this.#gateway.on("GUILD_ROLE_DELETE", (data) =>
-      this.emit("guildRoleDelete", data as APIGuildRoleDeleteEvent),
-    );
-    this.#gateway.on("GUILD_BAN_ADD", (data) =>
-      this.emit("guildBanAdd", data as APIGuildBanEvent),
-    );
-    this.#gateway.on("GUILD_BAN_REMOVE", (data) =>
-      this.emit("guildBanRemove", data as APIGuildBanEvent),
-    );
-    this.#gateway.on("GUILD_EMOJIS_UPDATE", (data) =>
-      this.emit("guildEmojisUpdate", data as APIGuildEmojisUpdateEvent),
-    );
-    for (const event of [
-      "READY",
-      "MESSAGE_CREATE",
-      "MESSAGE_UPDATE",
-      "MESSAGE_DELETE",
-      "MESSAGE_DELETE_BULK",
-      "GUILD_CREATE",
-      "GUILD_UPDATE",
-      "GUILD_DELETE",
-      "CHANNEL_CREATE",
-      "CHANNEL_UPDATE",
-      "CHANNEL_DELETE",
-      "THREAD_CREATE",
-      "THREAD_UPDATE",
-      "THREAD_DELETE",
-      "GUILD_MEMBER_ADD",
-      "GUILD_MEMBER_UPDATE",
-      "GUILD_MEMBER_REMOVE",
-      "MESSAGE_REACTION_ADD",
-      "MESSAGE_REACTION_REMOVE",
-      "MESSAGE_REACTION_REMOVE_ALL",
-      "INTERACTION_CREATE",
-      "GUILD_ROLE_CREATE",
-      "GUILD_ROLE_UPDATE",
-      "GUILD_ROLE_DELETE",
-      "GUILD_BAN_ADD",
-      "GUILD_BAN_REMOVE",
-      "GUILD_EMOJIS_UPDATE",
-    ])
-      this.#gateway.on(event, (data) => this.emit("raw", { event, data }));
-    this.#gateway.on("error", (data) => this.emit("error", data as Error));
-  }
-  /** Indicates whether the client has completed gateway readiness. @returns True when ready. */ public isReady(): this is Client & {
-    user: ClientUser;
-    readyAt: Date;
-  } {
-    return (
-      this.state === "ready" &&
-      this.user !== undefined &&
-      this.readyAt !== undefined
-    );
-  }
-  /** Connects the REST and gateway clients. @returns A promise fulfilled after the gateway socket opens. @throws {Error} If the client is destroyed or connection fails. */ public async login(): Promise<void> {
-    if (this.state === "destroyed")
-      throw new Error("Cannot login a destroyed client.");
-    if (this.state === "connecting" || this.state === "ready") return;
-    this.state = "connecting";
-    try {
-      this.user = await this.rest.get<ClientUser>(Routes.user());
-      this.users.set(this.user.id, new User(this.user));
-      await this.#gateway.connect();
-    } catch (error) {
-      this.state = "idle";
-      throw error;
-    }
-  }
-  /** Closes the gateway and destroys cached resources. @returns Nothing. */ public destroy(): void {
-    if (this.state === "destroyed") return;
-    this.#gateway.close();
-    this.users.clear();
-    this.guilds.clear();
-    this.channels.clear();
-    this.state = "destroyed";
-    this.readyAt = undefined;
-    this.user = undefined;
-  }
-  /** Posts an interaction callback through REST. @param id Interaction identifier. @param token Interaction token. @param response Interaction response. @returns REST response. */ public postInteractionResponse(
-    id: string,
-    token: string,
-    response: import("@lunibee/structures").InteractionResponse,
-  ): Promise<unknown> {
-    return this.rest.post(
-      Routes.interactionCallback(id, token),
-      response.toJSON(),
-    );
-  }
-  /** Edits the original interaction response. @param token Interaction token. @param data Reply payload. @returns REST response. */ public editInteractionReply(
-    token: string,
-    data: import("@lunibee/structures").InteractionReplyOptions,
-  ): Promise<unknown> {
-    if (!this.user?.id)
-      throw new Error("Client user is unavailable; login is required.");
-    return this.rest.patch(
-      Routes.interactionOriginalResponse(this.user.id, token),
-      data,
-    );
-  }
-  /** Deletes the original interaction response. @param token Interaction token. @returns Nothing. */ public async deleteInteractionReply(
-    token: string,
-  ): Promise<void> {
-    if (!this.user?.id)
-      throw new Error("Client user is unavailable; login is required.");
-    await this.rest.delete(
-      Routes.interactionOriginalResponse(this.user.id, token),
-    );
-  }
-  /** Sets the client gateway presence. @param presence Presence options. @returns Whether the presence update was sent. */
-  public setPresence(
-    presence: import("@lunibee/types").GatewayPresence,
-  ): boolean {
-    return this.#gateway.setPresence(presence);
-  }
-  /** Sends a follow-up interaction webhook message. @param token Interaction token. @param data Follow-up payload. @returns REST response. */ public followUpInteraction(
-    token: string,
-    data: import("@lunibee/structures").InteractionReplyOptions,
-  ): Promise<unknown> {
-    if (!this.user?.id)
-      throw new Error("Client user is unavailable; login is required.");
-    return this.rest.post(Routes.webhook(this.user.id, token), data);
+    this.#gateway.on("GUILD_UPDATE", (data) => { const guild = new Guild(data as APIGuild); this.guilds.update(guild); this.emit(ClientEvent.GuildUpdate, data as APIGuild); });
+    this.#gateway.on("GUILD_DELETE", (data) => { const payload = data as { id: string; unavailable?: boolean }; if (!payload.unavailable) this.guilds.delete(payload.id); this.emit(ClientEvent.GuildDelete, payload); });
+    this.#gateway.on("CHANNEL_CREATE", (data) => { const channel = new Channel(data as APIChannel, this.#resourceContext); this.channels.update(channel); this.emit(ClientEvent.ChannelCreate, channel); });
+    this.#gateway.on("CHANNEL_UPDATE", (data) => { const channel = new Channel(data as APIChannel, this.#resourceContext); this.channels.update(channel); this.emit(ClientEvent.ChannelUpdate, channel); });
+    this.#gateway.on("CHANNEL_DELETE", (data) => { const payload = data as APIChannel; this.channels.delete(payload.id); this.emit(ClientEvent.ChannelDelete, payload); });
+    this.#gateway.on("THREAD_CREATE", (data) => { const channel = new Channel(data as APIThreadEvent, this.#resourceContext); this.channels.update(channel); this.emit(ClientEvent.ThreadCreate, channel); });
+    this.#gateway.on("THREAD_UPDATE", (data) => { const channel = new Channel(data as APIThreadEvent, this.#resourceContext); this.channels.update(channel); this.emit(ClientEvent.ThreadUpdate, channel); });
+    this.#gateway.on("THREAD_DELETE", (data) => { const payload = data as APIThreadEvent; this.channels.delete(payload.id); this.emit(ClientEvent.ThreadDelete, payload); });
+    this.#gateway.on("GUILD_MEMBER_ADD", (data) => { const member = data as APIGuildMember; this.users.set(member.user.id, new User(member.user)); this.emit(ClientEvent.GuildMemberAdd, member); });
+    this.#gateway.on("GUILD_MEMBER_UPDATE", (data) => { const member = data as APIGuildMember; this.users.set(member.user.id, new User(member.user)); this.emit(ClientEvent.GuildMemberUpdate, member); });
+    this.#gateway.on("GUILD_MEMBER_REMOVE", (data) => this.emit(ClientEvent.GuildMemberRemove, data as APIGuildMember));
+    this.#gateway.on("MESSAGE_REACTION_ADD", (data) => this.emit(ClientEvent.MessageReactionAdd, data as APIMessageReactionEvent));
+    this.#gateway.on("MESSAGE_REACTION_REMOVE", (data) => this.emit(ClientEvent.MessageReactionRemove, data as APIMessageReactionEvent));
+    this.#gateway.on("MESSAGE_REACTION_REMOVE_ALL", (data) => this.emit(ClientEvent.MessageReactionRemoveAll, data as APIMessageDeleteEvent));
+    this.#gateway.on("INTERACTION_CREATE", (data) => this.emit(ClientEvent.InteractionCreate, createInteraction(this, data as any)));
+    this.#gateway.on("GUILD_ROLE_CREATE", (data) => this.emit(ClientEvent.GuildRoleCreate, data as APIGuildRoleEvent));
+    this.#gateway.on("GUILD_ROLE_UPDATE", (data) => this.emit(ClientEvent.GuildRoleUpdate, data as APIGuildRoleEvent));
+    this.#gateway.on("GUILD_ROLE_DELETE", (data) => this.emit(ClientEvent.GuildRoleDelete, data as APIGuildRoleDeleteEvent));
+    this.#gateway.on("GUILD_BAN_ADD", (data) => this.emit(ClientEvent.GuildBanAdd, data as APIGuildBanEvent));
+    this.#gateway.on("GUILD_BAN_REMOVE", (data) => this.emit(ClientEvent.GuildBanRemove, data as APIGuildBanEvent));
+    this.#gateway.on("GUILD_EMOJIS_UPDATE", (data) => this.emit(ClientEvent.GuildEmojisUpdate, data as APIGuildEmojisUpdateEvent));
+    this.#gateway.on("RAW", (data) => this.emit(ClientEvent.Raw, data as { event: string; data: unknown }));
+    this.#gateway.on("ERROR", (error) => this.emit(ClientEvent.Error, error instanceof Error ? error : new Error(String(error))));
   }
 }
-
-export { Collection } from "@lunibee/collection";
-export { REST, RESTError, Routes } from "@lunibee/rest";
-export { Gateway, GatewayError, GatewayOpcodes } from "@lunibee/ws";
-export {
-  User,
-  Guild,
-  Channel,
-  Message,
-  type ResourceContext,
-} from "@lunibee/structures";
-export {
-  EmbedBuilder,
-  ButtonBuilder,
-  ActionRowBuilder,
-  StringSelectBuilder,
-  SlashCommandBuilder,
-  StringOptionBuilder,
-} from "@lunibee/builders";
-export * from "@lunibee/types";
-export {
-  Manager,
-  ResourceManager,
-  UserManager,
-  GuildManager,
-  ChannelManager,
-  MessageCreateOptions,
-  MessageEditOptions,
-  MessageFetchOptions,
-  MessageThreadOptions,
-  ReactionFetchOptions,
-} from "@lunibee/managers";
-
-export { Collector, type CollectorOptions } from "./collector.js";
-export { ApplicationCommandManager } from "@lunibee/managers";
-export type {
-  APIApplicationCommand,
-  ApplicationCommandData,
-  APIRole,
-  APIGuildRoleEvent,
-  APIGuildRoleDeleteEvent,
-  APIGuildBanEvent,
-  APIEmoji,
-  APIGuildEmojisUpdateEvent,
-  ApplicationCommandOptionType,
-  ApplicationCommandType,
-} from "@lunibee/types";
