@@ -67,3 +67,56 @@ client.on("messageCreate", async (message) => {
 });
 await client.login();
 ```
+
+## Looking for something?
+
+You do not need to know Lunibee's internals before using it. Start with the task you want to accomplish, then follow the relevant guide.
+
+- **Create your first bot** → [Getting Started](/getting-started/introduction/)
+- **Listen for events** → [Core](/packages/core/)
+- **Send, edit, or delete messages** → [Structures](/packages/structures/)
+- **Create and manage channels** → [Structures](/packages/structures/)
+- **Build embeds, buttons, and other payloads** → [Builders](/packages/builders/)
+- **Handle collections and cached resources** → [Collection](/packages/collection/)
+- **Use Discord's REST API directly** → [REST](/packages/rest/)
+- **Work with gateway and sharding** → [WebSocket / Sharding](/packages/sharding/)
+
+### A few common examples
+
+**Send a message**
+
+```ts
+await channel.send({ content: "Hello! 🐝" });
+```
+
+**Edit a message**
+
+```ts
+await message.edit({ content: "Updated!" });
+```
+
+**Get the channel from a message**
+
+```ts
+const channel = message.channel;
+```
+
+**Change a channel name**
+
+```ts
+await channel.editName("support");
+```
+
+**Change a channel topic**
+
+```ts
+await channel.editTopic("Support and help");
+```
+
+**Move a channel to another category**
+
+```ts
+await channel.editParent(categoryId);
+```
+
+The package pages below keep the same documentation structure, but each guide should answer the practical question first and then explain the underlying API.
