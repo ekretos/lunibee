@@ -57,6 +57,8 @@ export class Channel extends BaseStructure {
   public topic?: string | null;
   public parentId?: string | null;
   readonly #context?: ResourceContext;
+
+  /** Creates a channel structure from Discord channel data. */
   public constructor(data: import("@lunibee/types").APIChannel, context?: ResourceContext) {
     super(data.id);
     if (!Number.isInteger(data.type) || data.type < 0) throw new RangeError("A Discord channel requires a valid channel type.");
@@ -67,31 +69,47 @@ export class Channel extends BaseStructure {
     this.parentId = data.parent_id;
     this.#context = context;
   }
+
+  /** Sends a message to this channel. @param options Message payload. @returns The created message. @throws {Error} If the channel is not attached to a client. */
   public sendMessage(options: Record<string, unknown> & { content?: string }): Promise<import("./index.js").Message> {
     if (!this.#context) throw new Error("This channel is not attached to a client.");
     return this.#context.sendMessage(this.id, options);
   }
+
+  /** Sends a message using Lunibee's concise channel API. @param options Message payload. @returns The created message. @throws {Error} If the channel is not attached to a client. */
   public send(options: Record<string, unknown> & { content?: string }): Promise<import("./index.js").Message> {
     return this.sendMessage(options);
   }
+
+  /** Edits this channel. @param options Channel fields to change. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
   public edit(options: Record<string, unknown>): Promise<Channel> {
     if (!this.#context?.editChannel) throw new Error("This channel is not attached to a client.");
     return this.#context.editChannel(this.id, options);
   }
+
+  /** Changes only this channel's name. @param name New channel name. @returns The updated channel. @throws {TypeError} If the name is empty. @throws {Error} If the channel is not attached to a client. */
   public editName(name: string): Promise<Channel> {
     if (!name.trim()) throw new TypeError("Channel name cannot be empty.");
     return this.edit({ name });
   }
+
+  /** Changes only this channel's topic. @param topic New topic, or null to clear it. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
   public editTopic(topic: string | null): Promise<Channel> {
     return this.edit({ topic });
   }
+
+  /** Moves this channel to another parent category. @param parentId Parent category ID, or null to remove the parent. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
   public editParent(parentId: string | null): Promise<Channel> {
     return this.edit({ parent_id: parentId });
   }
+
+  /** Deletes this channel. @returns A promise fulfilled when Discord confirms deletion. @throws {Error} If the channel is not attached to a client. */
   public delete(): Promise<void> {
     if (!this.#context?.deleteChannel) throw new Error("This channel is not attached to a client.");
     return this.#context.deleteChannel(this.id);
   }
+
+  /** Updates this channel using the same resource operation as edit. @param options Channel fields to change. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
   public update(options: Record<string, unknown>): Promise<Channel> {
     return this.edit(options);
   }
