@@ -3,15 +3,13 @@ title: "@lunibee/sharding"
 description: Gateway ShardManager and cross-shard communication bus.
 ---
 
-The `@lunibee/sharding` package provides multi-shard management and inter-process messaging for large-scale Discord bots.
+The `@lunibee/sharding` package helps large Discord bots split Gateway connections across multiple shards and communicate between them.
 
 ## Installation
 
 ```bash
 bun add @lunibee/sharding @lunibee/types
 ```
-
----
 
 ## `ShardManager`
 
@@ -28,18 +26,24 @@ const manager = new ShardManager({
 await manager.connect();
 ```
 
----
+Use automatic shard counts unless you have a reason to control the count yourself.
 
 ## `ShardBus`
+
+Use `ShardBus` when shards need to send application-level messages to each other.
 
 ```ts
 import { ShardBus } from "@lunibee/sharding";
 
 const bus = new ShardBus();
 
-bus.on("RELOAD_CONFIG", (msg) => {
-  console.log("Received reload config request from shard:", msg.sourceShardId);
+bus.on("RELOAD_CONFIG", (message) => {
+  console.log("Reload requested by shard", message.sourceShardId);
 });
 
 bus.broadcast({ type: "RELOAD_CONFIG" });
 ```
+
+## When do I need sharding?
+
+A small bot normally starts with a single `Client`. Sharding becomes useful when the bot grows enough that Discord requires multiple Gateway sessions or when you want to distribute Gateway work across processes.
