@@ -8,17 +8,11 @@ const packagesDir = join(root, "packages");
 
 /** Discord client events supported by the handler generator. */
 const gatewayEvents = [
-  "ready", "raw", "error", "open", "close",
-  "messageCreate", "messageUpdate", "messageDelete", "messageDeleteBulk",
-  "guildCreate", "guildUpdate", "guildDelete",
-  "channelCreate", "channelUpdate", "channelDelete",
-  "threadCreate", "threadUpdate", "threadDelete",
-  "guildMemberAdd", "guildMemberUpdate", "guildMemberRemove",
-  "messageReactionAdd", "messageReactionRemove", "messageReactionRemoveAll",
-  "interactionCreate", "guildRoleCreate", "guildRoleUpdate", "guildRoleDelete",
-  "guildBanAdd", "guildBanRemove", "guildEmojisUpdate",
+  "ready", "raw", "error", "open", "close", "messageCreate", "messageUpdate", "messageDelete", "messageDeleteBulk",
+  "guildCreate", "guildUpdate", "guildDelete", "channelCreate", "channelUpdate", "channelDelete", "threadCreate", "threadUpdate", "threadDelete",
+  "guildMemberAdd", "guildMemberUpdate", "guildMemberRemove", "messageReactionAdd", "messageReactionRemove", "messageReactionRemoveAll",
+  "interactionCreate", "guildRoleCreate", "guildRoleUpdate", "guildRoleDelete", "guildBanAdd", "guildBanRemove", "guildEmojisUpdate",
 ] as const;
-
 type GatewayEvent = (typeof gatewayEvents)[number];
 
 interface PublishConfig { access?: string; registry?: string; }
@@ -50,9 +44,7 @@ async function getPublishablePackages(): Promise<PublishablePackage[]> {
 
 /** Runs a child process and forwards its standard streams. */
 async function run(command: string[], cwd: string): Promise<void> {
-  const childProcess = Bun.spawn(command, {
-    cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit", env: globalThis.process.env,
-  });
+  const childProcess = Bun.spawn(command, { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit", env: globalThis.process.env });
   const exitCode = await childProcess.exited;
   if (exitCode !== 0) throw new Error(`Command failed (${exitCode}): ${command.join(" ")}`);
 }
@@ -127,8 +119,8 @@ async function updateEventBinder(eventsDir: string, handlersDir: string): Promis
 /** Creates one named handler file without overwriting an existing file. */
 async function createHandlerFile(eventsDir: string, event: GatewayEvent, handler: string): Promise<void> {
   const directory = join(eventsDir, event);
-  const target = join(directory, fileName(handler));
   const targetName = fileName(handler);
+  const target = join(directory, targetName);
   await mkdir(directory, { recursive: true });
   if (await Bun.file(target).exists()) {
     console.log(`  ↳ skipped ${event}/${targetName} (already exists)`);
@@ -136,6 +128,15 @@ async function createHandlerFile(eventsDir: string, event: GatewayEvent, handler
   }
   await writeFile(target, handlerSource(event, handler));
   console.log(`  ✓ created events/${event}/${targetName}`);
+}
+
+/** Returns the names of existing handler files for one event. */
+async function existingHandlers(eventsDir: string, event: GatewayEvent): Promise<string[]> {
+  try {
+    return (await readdir(join(eventsDir, event), { withFileTypes: true }))
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
+      .map((entry) => entry.name.slice(0, -3));
+  } catch { return []; }
 }
 
 /** Prompts for events and creates one or more named handlers for each selected event. */
@@ -158,7 +159,8 @@ async function createHandler(): Promise<void> {
   await mkdir(eventsDir, { recursive: true });
 
   for (const event of selected) {
-    const existing = await discoverHandlers(join(eventsDir, event));
+    const existing = await existingHandlers(eventsDir, event);
+    if (existing.length) console.log(`\n${event} already has: ${existing.join(", ")}`);
     const defaultName = existing.length ? "handler" : event;
     const handler = prompt(`Handler name for ${event} [${defaultName}]: `)?.trim() || defaultName;
     await createHandlerFile(eventsDir, event, handler);
