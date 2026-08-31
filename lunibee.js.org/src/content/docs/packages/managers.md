@@ -38,6 +38,50 @@ await channels.unpinMessage(channelId, messageId);
 const pins = await channels.fetchPinnedMessages(channelId);
 ```
 
+## `ApplicationCommandManager`
+
+Use this manager to register, fetch, replace, edit, and delete slash/application commands.
+
+```ts
+const commands = new ApplicationCommandManager(
+  client.rest,
+  applicationId,
+);
+
+await commands.create({
+  name: "ping",
+  description: "Replies with Pong!",
+});
+```
+
+### Register multiple commands at once
+
+```ts
+await commands.set([
+  {
+    name: "ping",
+    description: "Replies with Pong!",
+  },
+  {
+    name: "help",
+    description: "Shows help information.",
+  },
+]);
+```
+
+### Guild commands
+
+Guild commands are useful during development because they are scoped to one guild.
+
+```ts
+await commands.createGuild(guildId, {
+  name: "ping",
+  description: "Replies with Pong!",
+});
+```
+
+The manager also provides `fetch()`, `edit()`, `delete()`, `fetchGuild()`, `setGuild()`, `editGuild()`, and `deleteGuild()`.
+
 ## `GuildMemberManager`
 
 ```ts
