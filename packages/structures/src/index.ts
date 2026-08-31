@@ -48,22 +48,42 @@ export class Message extends BaseStructure {
     if (!this.#context) throw new Error("This message is not attached to a client.");
     return this.#context.editMessage(this.channelId, this.id, options);
   }
-  public update(options: Record<string, unknown> & { content?: string }): Promise<Message> {
-    return this.edit(options);
-  }
+  public update(options: Record<string, unknown> & { content?: string }): Promise<Message> { return this.edit(options); }
   public delete(): Promise<void> {
     if (!this.#context) throw new Error("This message is not attached to a client.");
     return this.#context.deleteMessage(this.channelId, this.id);
-  }
-  public crosspost(): Promise<Message> {
-    if (!this.#context) throw new Error("This message is not attached to a client.");
-    return this.#context.crosspostMessage(this.channelId, this.id);
   }
   public reply(options: string | (Record<string, unknown> & { content?: string })): Promise<Message> {
     if (!this.#context) throw new Error("This message is not attached to a client.");
     const payload = typeof options === "string" ? { content: options } : { ...options };
     payload.message_reference = { message_id: this.id, channel_id: this.channelId, guild_id: this.guildId };
     return this.#context.sendMessage(this.channelId, payload);
+  }
+  public crosspost(): Promise<Message> {
+    if (!this.#context) throw new Error("This message is not attached to a client.");
+    return this.#context.crosspostMessage(this.channelId, this.id);
+  }
+  public react(emoji: string): Promise<void> {
+    if (!this.#context?.addReaction) throw new Error("This message is not attached to a client.");
+    return this.#context.addReaction(this.channelId, this.id, emoji);
+  }
+  public removeReaction(emoji: string, userId?: string): Promise<void> {
+    if (!this.#context) throw new Error("This message is not attached to a client.");
+    return userId
+      ? this.#context.removeReaction?.(this.channelId, this.id, emoji, userId) ?? Promise.reject(new Error("Reaction operations are unavailable."))
+      : this.#context.removeOwnReaction?.(this.channelId, this.id, emoji) ?? Promise.reject(new Error("Reaction operations are unavailable."));
+  }
+  public removeAllReactions(): Promise<void> {
+    if (!this.#context?.removeAllReactions) throw new Error("This message is not attached to a client.");
+    return this.#context.removeAllReactions(this.channelId, this.id);
+  }
+  public pin(): Promise<void> {
+    if (!this.#context?.pinMessage) throw new Error("This message is not attached to a client.");
+    return this.#context.pinMessage(this.channelId, this.id);
+  }
+  public unpin(): Promise<void> {
+    if (!this.#context?.unpinMessage) throw new Error("This message is not attached to a client.");
+    return this.#context.unpinMessage(this.channelId, this.id);
   }
 }
 
