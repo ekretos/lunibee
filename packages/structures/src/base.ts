@@ -15,6 +15,12 @@ export interface ResourceContext {
   crosspostMessage(channelId: string, messageId: string): Promise<import("./index.js").Message>;
   editChannel?(channelId: string, options: Record<string, unknown>): Promise<import("./base.js").Channel>;
   deleteChannel?(channelId: string): Promise<void>;
+  addReaction?(channelId: string, messageId: string, emoji: string): Promise<void>;
+  removeOwnReaction?(channelId: string, messageId: string, emoji: string): Promise<void>;
+  removeReaction?(channelId: string, messageId: string, emoji: string, userId: string): Promise<void>;
+  removeAllReactions?(channelId: string, messageId: string): Promise<void>;
+  pinMessage?(channelId: string, messageId: string): Promise<void>;
+  unpinMessage?(channelId: string, messageId: string): Promise<void>;
 }
 
 export class User extends BaseStructure {
