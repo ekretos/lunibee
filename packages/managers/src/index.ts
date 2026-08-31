@@ -48,6 +48,7 @@ export class ChannelManager extends Manager<string, Channel> {
       deleteMessage: (channelId, messageId) => this.deleteMessage(channelId, messageId),
       crosspostMessage: (channelId, messageId) => this.crosspostMessage(channelId, messageId),
       editChannel: (channelId, options) => this.edit(channelId, options),
+      deleteChannel: (channelId) => this.deleteChannel(channelId),
     };
   }
   public messages(channelId: string): MessageManager {
@@ -75,6 +76,11 @@ export class ChannelManager extends Manager<string, Channel> {
     return this.upsert(data);
   }
   public async updateChannel(channelId: string, options: ChannelEditOptions): Promise<Channel> { return this.edit(channelId, options); }
+  public async deleteChannel(channelId: string): Promise<void> {
+    await this.#rest.delete(Routes.channel(channelId));
+    this.#messageManagers.delete(channelId);
+    super.delete(channelId);
+  }
   public send(channelId: string, options: MessageCreateOptions): Promise<Message> { return this.messages(channelId).send(options); }
   public sendMessage(channelId: string, options: MessageCreateOptions): Promise<Message> { return this.send(channelId, options); }
   public async fetchMessage(channelId: string, messageId: string, options: MessageFetchOptions = {}): Promise<Message> { void options; return this.messages(channelId).fetch(messageId); }
