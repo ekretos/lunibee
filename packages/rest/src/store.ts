@@ -19,6 +19,14 @@ export interface RateLimitStore {
     getGlobalReset(): Promise<number> | number;
     /** Sets the global reset timestamp. */
     setGlobalReset(resetAt: number): Promise<void> | void;
+
+    /**
+     * Evicts expired bucket entries. Optional: stores with native key
+     * expiry (e.g. Redis) can omit it. `maxAge` (ms) additionally drops
+     * buckets whose reset is older than that window; defaults to 0 (only
+     * already-reset buckets are removed).
+     */
+    prune?(maxAge?: number): Promise<void> | void;
 }
 
 /** Local memory implementation of RateLimitStore. */
@@ -26,6 +34,9 @@ export class MemoryRateLimitStore implements RateLimitStore {
     readonly #buckets = new Map<string, BucketState>();
     readonly #routeBuckets = new Map<string, string>();
     #globalResetAt = 0;
+    /** Minimum interval between automatic prunes, in ms. */
+    static readonly #PRUNE_INTERVAL = 60_000;
+    #lastPruneAt = 0;
 
     public getBucketHash(route: string): string | undefined {
         return this.#routeBuckets.get(route);
@@ -38,6 +49,20 @@ export class MemoryRateLimitStore implements RateLimitStore {
     }
     public updateBucket(key: string, state: BucketState): void {
         this.#buckets.set(key, state);
+        // Amortised eviction: sweep expired buckets at most once per interval
+        // so the map cannot grow unbounded across long-lived processes.
+        const now = Date.now();
+        if (now - this.#lastPruneAt >= MemoryRateLimitStore.#PRUNE_INTERVAL) {
+            this.#lastPruneAt = now;
+            this.prune();
+        }
+    }
+    /** Removes buckets whose reset is in the past (or older than `maxAge` ms). */
+    public prune(maxAge = 0): void {
+        const cutoff = Date.now() - Math.max(0, maxAge);
+        for (const [key, state] of this.#buckets) {
+            if (state.resetAt <= cutoff) this.#buckets.delete(key);
+        }
     }
     public getGlobalReset(): number {
         return this.#globalResetAt;

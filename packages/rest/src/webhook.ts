@@ -1,6 +1,6 @@
 import { REST } from "./index.js";
 import { Routes } from "./routes.js";
-import type { APIEmbed } from "@lunibee/types";
+import type { APIEmbed, APIMessage } from "@lunibee/types";
 
 export interface WebhookClientOptions {
     id?: string;
@@ -51,19 +51,19 @@ export class WebhookClient {
     }
 
     /** Sends a message to the webhook. */
-    public async send(options: string | WebhookMessageOptions): Promise<any> {
+    public async send(
+        options: string | WebhookMessageOptions,
+    ): Promise<APIMessage> {
         const payload =
             typeof options === "string" ? { content: options } : options;
         const { thread_id, ...body } = payload;
         const query = thread_id
             ? `?thread_id=${thread_id}&wait=true`
             : `?wait=true`;
-        const formattedEmbeds = body.embeds?.map((e) =>
-            typeof e === "object" && e !== null && "toJSON" in e
-                ? (e as any).toJSON()
-                : e,
+        const formattedEmbeds: APIEmbed[] | undefined = body.embeds?.map((e) =>
+            "toJSON" in e ? e.toJSON() : e,
         );
-        return this.#rest.post(
+        return this.#rest.post<APIMessage>(
             `${Routes.webhook(this.id, this.token)}${query}`,
             {
                 ...body,

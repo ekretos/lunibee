@@ -189,7 +189,7 @@ export const Routes = {
 
 /** Validates a Discord snowflake route parameter. @param value Candidate identifier. @param field Human-readable field name. @returns The validated identifier. @throws {TypeError} If the identifier is not a Discord snowflake. */
 function snowflake(value: string, field: string): string {
-    if (!/^\d{1,20}$/.test(value))
+    if (!/^\d{17,19}$/.test(value))
         throw new TypeError(`${field} must be a valid Discord snowflake.`);
     return value;
 }
