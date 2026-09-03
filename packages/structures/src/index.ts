@@ -70,6 +70,18 @@ export class Message extends BaseStructure {
         return (this.flags & 4) !== 0;
     }
 
+    /** Unix timestamp (ms) at which the message was created — discord.js parity.
+     * Derived from the message `timestamp`, which itself falls back to the id snowflake. */
+    public get createdTimestamp(): number {
+        return this.timestamp.getTime();
+    }
+
+    /** Date at which the message was created — discord.js parity. Overrides the
+     * snowflake-only `BaseStructure.createdAt` to honour the message `timestamp`. */
+    public override get createdAt(): Date {
+        return this.timestamp;
+    }
+
     /** Edits this message. @param options Message fields to change. @returns The updated message. @throws {Error} If the message is not attached to a client. */
     public edit(
         options: Record<string, unknown> & { content?: string },
@@ -249,3 +261,7 @@ export {
 export * from "./interactions.js";
 export { Embed } from "./embed.js";
 export { AuditLog, AuditLogEntry } from "./audit-log.js";
+// KI-4: PermissionsBitField lives canonically in @lunibee/core (single source of
+// truth). Re-export it here for discord.js-style top-level access from structures,
+// replacing the former structures-local duplicate.
+export { PermissionsBitField } from "@lunibee/core";

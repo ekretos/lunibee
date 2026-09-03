@@ -1,3 +1,8 @@
+// Re-export the canonical ButtonStyle from @lunibee/types so the builders package
+// never ships a drifting duplicate (the old local copy was missing `Premium: 6`).
+import { ButtonStyle } from "@lunibee/types";
+export { ButtonStyle };
+
 /** Component type constants exposed by Lunibee. */
 export const ComponentType = {
     ActionRow: 1,
@@ -17,13 +22,6 @@ export const ComponentType = {
     ContentInventoryEntry: 16,
     Container: 17,
 } as const;
-export const ButtonStyle = {
-    Primary: 1,
-    Secondary: 2,
-    Success: 3,
-    Danger: 4,
-    Link: 5,
-} as const;
 export const TextInputStyle = { Short: 1, Paragraph: 2 } as const;
 export interface APIComponentEmoji {
     id?: string | null;
@@ -32,7 +30,7 @@ export interface APIComponentEmoji {
 }
 export interface APIButtonComponent {
     type: typeof ComponentType.Button;
-    style: 1 | 2 | 3 | 4 | 5;
+    style: 1 | 2 | 3 | 4 | 5 | 6;
     custom_id?: string;
     label?: string;
     emoji?: APIComponentEmoji;

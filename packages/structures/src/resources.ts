@@ -1,5 +1,5 @@
 import { BaseStructure, Channel, User } from "./base.js";
-import { PermissionsBitField } from "./permissions.js";
+import { PermissionsBitField } from "@lunibee/core";
 import type { ImageURLOptions } from "./base.js";
 
 const CDN_BASE = "https://cdn.discordapp.com";
