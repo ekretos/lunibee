@@ -20,6 +20,29 @@ export const GatewayOpcodes = {
     Hello: 10,
     HeartbeatAck: 11,
 } as const;
+/**
+ * Discord Gateway close codes.
+ *
+ * Discord.js-familiar names and numeric values, matching the Discord Gateway
+ * protocol. Exposed so consumers can branch on named codes instead of magic
+ * numbers; {@link Gateway} uses them internally to decide resume/identify/stop.
+ */
+export const GatewayCloseCodes = {
+    UnknownError: 4000,
+    UnknownOpcode: 4001,
+    DecodeError: 4002,
+    NotAuthenticated: 4003,
+    AuthenticationFailed: 4004,
+    AlreadyAuthenticated: 4005,
+    InvalidSeq: 4007,
+    RateLimited: 4008,
+    SessionTimedOut: 4009,
+    InvalidShard: 4010,
+    ShardingRequired: 4011,
+    InvalidAPIVersion: 4012,
+    InvalidIntents: 4013,
+    DisallowedIntents: 4014,
+} as const;
 /** Gateway connection lifecycle states. */
 export enum GatewayState {
     /** Initial connection state. */ Connect = "CONNECT",
@@ -32,6 +55,16 @@ export enum GatewayState {
     /** Reconnect in progress. */ Reconnect = "RECONNECT",
     /** Gateway is permanently closed. */ Closed = "CLOSED",
 }
+/**
+ * Discord.js-familiar alias for {@link GatewayState}.
+ *
+ * Discord.js exposes connection status via a `Status` enum. Lunibee's canonical
+ * name is {@link GatewayState}; this is an additive alias so `discord.js` users
+ * find the expected name. Note the *values* remain Lunibee's string states
+ * (e.g. `"READY"`), not Discord.js's numeric `Status` members — an intentional
+ * divergence documented in the compatibility matrix.
+ */
+export { GatewayState as Status };
 /** Gateway protocol error. */
 export class GatewayError extends Error {
     /** Gateway close/error code. */ public readonly code?: number;
@@ -385,12 +418,26 @@ export class Gateway {
             case GatewayOpcodes.Reconnect:
                 ws.close(1001, "Server requested reconnect");
                 break;
-            case GatewayOpcodes.InvalidSession:
-                this.#sessionId = undefined;
-                this.#sequence = null;
-                this.#emit("invalidSession", payload.d);
-                ws.close(1000, "Invalid session");
+            case GatewayOpcodes.InvalidSession: {
+                // Op 9 `d` is a boolean: true = the session is resumable, so we
+                // keep session state and RESUME on reconnect; false = the
+                // session is dead and we must re-IDENTIFY from scratch. Matches
+                // Discord/Discord.js semantics rather than always re-identifying.
+                const resumable = payload.d === true;
+                if (!resumable) {
+                    this.#sessionId = undefined;
+                    this.#sequence = null;
+                    this.#resumeURL = undefined;
+                }
+                this.#emit("invalidSession", resumable);
+                ws.close(
+                    resumable ? GatewayCloseCodes.UnknownError : 1000,
+                    resumable
+                        ? "Invalid session (resumable)"
+                        : "Invalid session",
+                );
                 break;
+            }
         }
     }
     #handleDispatch(event: string | null, data: unknown): void {
@@ -415,6 +462,14 @@ export class Gateway {
             this.#attempt = 0;
             this.#setState(GatewayState.Ready);
             this.#emit("ready", data);
+        } else if (event === "RESUMED") {
+            // A successful RESUME ends the reconnect cycle just like READY:
+            // reset the backoff counter so a later disconnect starts from the
+            // base delay, mark the connection READY, and surface a Discord.js-
+            // familiar `resumed` event.
+            this.#attempt = 0;
+            this.#setState(GatewayState.Ready);
+            this.#emit("resumed", data);
         }
         this.#emit("RAW", { event: event ?? "UNKNOWN", data });
         if (this.#closed) return;
@@ -562,15 +617,33 @@ export class Gateway {
             return;
         }
         if (action === "identify") {
+            // Fresh IDENTIFY: drop the resumable session AND its resume URL so
+            // the reconnect targets the main Gateway, not a stale resume host.
             this.#sequence = null;
             this.#sessionId = undefined;
+            this.#resumeURL = undefined;
         }
         this.#setState(GatewayState.Reconnect);
         this.#scheduleReconnect();
     }
     #closeAction(code: number): "resume" | "identify" | "stop" {
-        if ([4004, 4010, 4011, 4012, 4013, 4014].includes(code)) return "stop";
-        if ([4007, 4009].includes(code)) return "identify";
+        // Fatal codes: the connection cannot recover by reconnecting.
+        const fatal: number[] = [
+            GatewayCloseCodes.AuthenticationFailed,
+            GatewayCloseCodes.InvalidShard,
+            GatewayCloseCodes.ShardingRequired,
+            GatewayCloseCodes.InvalidAPIVersion,
+            GatewayCloseCodes.InvalidIntents,
+            GatewayCloseCodes.DisallowedIntents,
+        ];
+        if (fatal.includes(code)) return "stop";
+        // Sequence/session invalidated: reconnect but IDENTIFY afresh.
+        if (
+            code === GatewayCloseCodes.InvalidSeq ||
+            code === GatewayCloseCodes.SessionTimedOut
+        )
+            return "identify";
+        // Otherwise resume when we still hold a live session + sequence.
         return this.#sessionId && this.#sequence !== null
             ? "resume"
             : "identify";
