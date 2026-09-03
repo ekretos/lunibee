@@ -11,7 +11,10 @@
     "outDir": ".types",
     "types": [
       "bun"
-    ]
+    ],
+    "paths": {
+      "@lunibee/*": ["./packages/*/src/index.ts"]
+    }
   },
   "include": [
     "packages/*/src/**/*.ts"
