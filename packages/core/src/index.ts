@@ -12,6 +12,7 @@ export {
     type ClientEventName,
     type ClientListener,
 } from "./events.js";
+export { Collector, type CollectorOptions } from "./collector.js";
 export {
     GatewayIntentBits,
     IntentBits,
@@ -36,6 +37,7 @@ import {
     Interaction,
     createInteraction,
     type InteractionClient,
+    type InteractionData,
     type ResourceContext,
 } from "@lunibee/structures";
 import { Gateway } from "@lunibee/ws";
@@ -113,6 +115,13 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
         this.#listeners.get(event)?.delete(listener);
         return this;
     }
+    /** Alias of {@link off}, provided for Node.js/Discord.js familiarity. */
+    public removeListener<K extends keyof Events>(
+        event: K,
+        listener: Listener<Events[K]>,
+    ): this {
+        return this.off(event, listener);
+    }
     public removeAllListeners<K extends keyof Events>(event?: K): this {
         if (event === undefined) this.#listeners.clear();
         else this.#listeners.delete(event);
@@ -175,6 +184,15 @@ export class Client
     public user?: ClientUser;
     public readyAt?: Date;
     public state: ClientState = "idle";
+    /**
+     * The bot token this client is authenticated with, or `null` once the
+     * client has been destroyed. Mirrors `Client#token` in Discord.js.
+     */
+    public get token(): string | null {
+        return this.state === "destroyed"
+            ? null
+            : (this.options.token ?? null);
+    }
     public get uptime(): number | null {
         return this.readyAt ? Date.now() - this.readyAt.getTime() : null;
     }
@@ -362,6 +380,10 @@ export class Client
                 this.emit(ClientEvent.GuildUnavailable, payload);
                 return;
             }
+            // A guild already in cache that arrives again (e.g. after an outage
+            // or gateway resume) has become *available* rather than newly joined.
+            // Mirrors Discord.js' guildAvailable vs. guildCreate distinction.
+            const wasCached = this.guilds.has(payload.id);
             const guild = new Guild(payload);
             this.guilds.set(guild.id, guild);
             for (const member of payload.members ?? [])
@@ -374,7 +396,12 @@ export class Client
                     channelData.id,
                     new Channel(channelData, this.#resourceContext),
                 );
-            this.emit(ClientEvent.GuildCreate, payload);
+            this.emit(
+                wasCached
+                    ? ClientEvent.GuildAvailable
+                    : ClientEvent.GuildCreate,
+                payload,
+            );
         });
         this.#gateway.on("GUILD_UPDATE", (data) => {
             const guild = new Guild(data as APIGuild);
@@ -637,7 +664,7 @@ export class Client
         this.#gateway.on("INTERACTION_CREATE", (data) =>
             this.emit(
                 ClientEvent.InteractionCreate,
-                createInteraction(this, data as any),
+                createInteraction(this, data as InteractionData),
             ),
         );
 
@@ -751,13 +778,23 @@ export class Client
     }
 
     /** Fetches an invite from Discord. */
-    public fetchInvite(code: string, options?: { withCounts?: boolean; withExpiration?: boolean; guildScheduledEventId?: string }): Promise<Record<string, unknown>> {
+    public fetchInvite(
+        code: string,
+        options?: {
+            withCounts?: boolean;
+            withExpiration?: boolean;
+            guildScheduledEventId?: string;
+        },
+    ): Promise<Record<string, unknown>> {
         const query = new URLSearchParams();
         if (options?.withCounts) query.set("with_counts", "true");
         if (options?.withExpiration) query.set("with_expiration", "true");
-        if (options?.guildScheduledEventId) query.set("guild_scheduled_event_id", options.guildScheduledEventId);
+        if (options?.guildScheduledEventId)
+            query.set("guild_scheduled_event_id", options.guildScheduledEventId);
         const qs = query.toString();
-        return this.rest.get(`/invites/${code}${qs ? `?${qs}` : ""}`) as Promise<Record<string, unknown>>;
+        return this.rest.get(
+            `/invites/${code}${qs ? `?${qs}` : ""}`,
+        ) as Promise<Record<string, unknown>>;
     }
 
     /** Fetches a sticker from Discord. */

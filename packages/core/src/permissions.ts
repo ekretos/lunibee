@@ -110,58 +110,69 @@ export const Permissions = {
     UseExternalApps: 1n << 50n,
 } as const;
 
-/** Permission Flags Enum. */
-export enum PermissionFlagsBits {
-    CreateInstantInvite = "1",
-    KickMembers = "2",
-    BanMembers = "4",
-    Administrator = "8",
-    ManageChannels = "16",
-    ManageGuild = "32",
-    AddReactions = "64",
-    ViewAuditLog = "128",
-    PrioritySpeaker = "256",
-    Stream = "512",
-    ViewChannel = "1024",
-    SendMessages = "2048",
-    SendTTSMessages = "4096",
-    ManageMessages = "8192",
-    EmbedLinks = "16384",
-    AttachFiles = "32768",
-    ReadMessageHistory = "65536",
-    MentionEveryone = "131072",
-    UseExternalEmojis = "262144",
-    ViewGuildInsights = "524288",
-    Connect = "1048576",
-    Speak = "2097152",
-    MuteMembers = "4194304",
-    DeafenMembers = "8388608",
-    MoveMembers = "16777216",
-    UseVAD = "33554432",
-    ChangeNickname = "67108864",
-    ManageNicknames = "134217728",
-    ManageRoles = "268435456",
-    ManageWebhooks = "536870912",
-    ManageGuildExpressions = "1073741824",
-    UseApplicationCommands = "2147483648",
-    RequestToSpeak = "4294967296",
-    ManageEvents = "8589934592",
-    ManageThreads = "17179869184",
-    CreatePublicThreads = "34359738368",
-    CreatePrivateThreads = "68719476736",
-    UseExternalStickers = "137438953472",
-    SendMessagesInThreads = "274877906944",
-    UseEmbeddedActivities = "549755813888",
-    ModerateMembers = "1099511627776",
-    ViewCreatorMonetizationAnalytics = "2199023255552",
-    UseSoundboard = "4398046511104",
-    CreateGuildExpressions = "8796093022208",
-    CreateEvents = "17592186044416",
-    UseExternalSounds = "35184372088832",
-    SendVoiceMessages = "70368744177664",
-    SendPolls = "562949953421312",
-    UseExternalApps = "1125899906842624",
-}
+/**
+ * Permission flag bits with **bigint** values matching Discord's permission bit
+ * positions. Mirrors discord.js's `PermissionFlagsBits`, so bitwise composition
+ * (`Flags.A | Flags.B`) OR-s the bits instead of concatenating strings.
+ *
+ * Implemented as a `const` object rather than a TS `enum` because enums cannot
+ * hold bigint members; the same-named union type below preserves usage as a type.
+ */
+export const PermissionFlagsBits = {
+    CreateInstantInvite: 1n << 0n,
+    KickMembers: 1n << 1n,
+    BanMembers: 1n << 2n,
+    Administrator: 1n << 3n,
+    ManageChannels: 1n << 4n,
+    ManageGuild: 1n << 5n,
+    AddReactions: 1n << 6n,
+    ViewAuditLog: 1n << 7n,
+    PrioritySpeaker: 1n << 8n,
+    Stream: 1n << 9n,
+    ViewChannel: 1n << 10n,
+    SendMessages: 1n << 11n,
+    SendTTSMessages: 1n << 12n,
+    ManageMessages: 1n << 13n,
+    EmbedLinks: 1n << 14n,
+    AttachFiles: 1n << 15n,
+    ReadMessageHistory: 1n << 16n,
+    MentionEveryone: 1n << 17n,
+    UseExternalEmojis: 1n << 18n,
+    ViewGuildInsights: 1n << 19n,
+    Connect: 1n << 20n,
+    Speak: 1n << 21n,
+    MuteMembers: 1n << 22n,
+    DeafenMembers: 1n << 23n,
+    MoveMembers: 1n << 24n,
+    UseVAD: 1n << 25n,
+    ChangeNickname: 1n << 26n,
+    ManageNicknames: 1n << 27n,
+    ManageRoles: 1n << 28n,
+    ManageWebhooks: 1n << 29n,
+    ManageGuildExpressions: 1n << 30n,
+    UseApplicationCommands: 1n << 31n,
+    RequestToSpeak: 1n << 32n,
+    ManageEvents: 1n << 33n,
+    ManageThreads: 1n << 34n,
+    CreatePublicThreads: 1n << 35n,
+    CreatePrivateThreads: 1n << 36n,
+    UseExternalStickers: 1n << 37n,
+    SendMessagesInThreads: 1n << 38n,
+    UseEmbeddedActivities: 1n << 39n,
+    ModerateMembers: 1n << 40n,
+    ViewCreatorMonetizationAnalytics: 1n << 41n,
+    UseSoundboard: 1n << 42n,
+    CreateGuildExpressions: 1n << 43n,
+    CreateEvents: 1n << 44n,
+    UseExternalSounds: 1n << 45n,
+    SendVoiceMessages: 1n << 46n,
+    SendPolls: 1n << 49n,
+    UseExternalApps: 1n << 50n,
+} as const;
+
+/** Union of {@link PermissionFlagsBits} values (all bigint). */
+export type PermissionFlagsBits =
+    (typeof PermissionFlagsBits)[keyof typeof PermissionFlagsBits];
 
 export type PermissionName =
     | keyof typeof Permission
@@ -571,11 +582,9 @@ export class PermissionSet {
             if (permission in Permissions)
                 return (Permissions as Record<string, bigint>)[permission]!;
             if (permission in PermissionFlagsBits)
-                return BigInt(
-                    (PermissionFlagsBits as Record<string, string>)[
-                        permission
-                    ]!,
-                );
+                return (PermissionFlagsBits as Record<string, bigint>)[
+                    permission
+                ]!;
             const lower =
                 permission.charAt(0).toLowerCase() + permission.slice(1);
             if (lower in Permission)
