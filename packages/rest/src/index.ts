@@ -170,7 +170,12 @@ export interface RESTRetryContext {
 
 /**
  * Lightweight callback hooks for REST request lifecycle events.
- * All callbacks are optional and fire synchronously before/after each stage.
+ *
+ * All callbacks are optional. They are dispatched in isolation from the request
+ * path (deferred to a microtask, and any thrown error is swallowed), so a hook
+ * cannot break or reject a request. Even so, hooks **must** be fast and
+ * non-blocking: heavy synchronous work in a hook still steals event-loop time
+ * from in-flight requests. Offload anything expensive to your own queue.
  */
 export interface RESTHooks {
     /** Called just before every HTTP attempt. */
@@ -288,14 +293,16 @@ export class REST {
         const route = `${normalizedMethod}:${this.#normalizeRoute(path)}`;
         let bucketKey = (await this.#store.getBucketHash(route)) ?? route;
 
-        const previous = this.#localQueues.get(bucketKey) ?? Promise.resolve();
+        // The map is keyed by the bucket as known at enqueue time; `bucketKey`
+        // may be reassigned to the server bucket hash during the request, so we
+        // keep `queueKey` fixed for cleanup.
+        const queueKey = bucketKey;
+        const previous = this.#localQueues.get(queueKey) ?? Promise.resolve();
         let release!: () => void;
-        this.#localQueues.set(
-            bucketKey,
-            new Promise((resolve) => {
-                release = resolve;
-            }),
-        );
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        this.#localQueues.set(queueKey, gate);
         await this.#abortable(previous, options.signal, path);
         try {
             for (
@@ -341,7 +348,7 @@ export class REST {
                       ? undefined
                       : JSON.stringify(body);
                 try {
-                    this.#hooks.onRequest?.({
+                    this.#emit(this.#hooks.onRequest, {
                         method: normalizedMethod,
                         path,
                         attempt,
@@ -356,7 +363,7 @@ export class REST {
                             signal: controller.signal,
                         },
                     );
-                    this.#hooks.onResponse?.({
+                    this.#emit(this.#hooks.onResponse, {
                         method: normalizedMethod,
                         path,
                         status: response.status,
@@ -383,11 +390,13 @@ export class REST {
                             ),
                         );
                     }
-                    if (response.status === 429 && retryAfter !== undefined)
-                        this.#hooks.onRateLimit?.({
+                    // Fire for ANY 429, including a global limit that arrives
+                    // without a Retry-After header; fall back to 1s in that case.
+                    if (response.status === 429)
+                        this.#emit(this.#hooks.onRateLimit, {
                             method: normalizedMethod,
                             path,
-                            retryAfterMs: retryAfter * 1000,
+                            retryAfterMs: (retryAfter ?? 1) * 1000,
                             global: data.global ?? false,
                             bucket: await this.#store.getBucketHash(route),
                         });
@@ -402,7 +411,7 @@ export class REST {
                             attempt,
                             retryAfter,
                         );
-                        this.#hooks.onRetry?.({
+                        this.#emit(this.#hooks.onRetry, {
                             method: normalizedMethod,
                             path,
                             attempt,
@@ -464,6 +473,10 @@ export class REST {
             );
         } finally {
             release();
+            // Drop our entry so idle buckets don't accumulate. Only delete if it
+            // is still ours: a later request for the same key may have replaced it.
+            if (this.#localQueues.get(queueKey) === gate)
+                this.#localQueues.delete(queueKey);
         }
     }
     /**
@@ -602,6 +615,13 @@ export class REST {
             this.#fileForm(payload, files),
             options,
         );
+    }
+    /** Dispatches a lifecycle hook in isolation: deferred to a microtask so it
+     * cannot block the request path, with any thrown error swallowed so a faulty
+     * hook cannot reject the request. @param hook Optional callback. @param ctx Event context. */
+    #emit<C>(hook: ((ctx: C) => void) | undefined, ctx: C): void {
+        if (!hook) return;
+        Promise.resolve().then(() => hook(ctx)).catch(() => {});
     }
     /** Waits for a route bucket while respecting cancellation. @param bucketKey Bucket identifier. @param signal Optional cancellation signal. @param path Request path for error context. @returns Promise fulfilled when sending is permitted. @throws {RESTError} If the request is aborted. */
     async #wait(
