@@ -1,4 +1,9 @@
 import { Gateway } from "@lunibee/ws";
+
+/** Runtime-agnostic delay used between shard starts (works under Node and Bun). @param ms Milliseconds to wait. */
+const sleep = (ms: number): Promise<void> =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 export { ShardBus } from "./bus.js";
 export type { ShardMessage, ShardMessageHandler } from "./bus.js";
 
@@ -31,6 +36,8 @@ export class ShardManager {
     readonly #options: ShardManagerOptions;
     /** Whether the shard set has been initialized. */ #resolved = false;
     /** Whether this manager is currently destroyed. */ #destroyed = false;
+    /** Whether the manager was created in auto shard-count mode. Preserved across reshards so auto-scaling keeps running. */
+    readonly #auto: boolean;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
     /** Creates a shard manager. @param options Sharding configuration. @throws {TypeError} If token or intents are invalid. @throws {RangeError} If shard count is invalid. */
     public constructor(options: ShardManagerOptions) {
@@ -46,6 +53,7 @@ export class ShardManager {
                 : options.shardCount;
         if (!Number.isInteger(count) || count < 1)
             throw new RangeError("Shard count must be a positive integer.");
+        this.#auto = options.shardCount === "auto";
         this.#options = { ...options };
         if (options.shardCount !== "auto") this.#initialize(count);
     }
@@ -92,7 +100,7 @@ export class ShardManager {
                 this.#options.spawnDelay &&
                 this.#options.spawnDelay > 0
             )
-                await Bun.sleep(this.#options.spawnDelay);
+                await sleep(this.#options.spawnDelay);
         }
         if (this.#options.autoScaleInterval && !this.#autoScaleTimer) {
             this.#autoScaleTimer = setInterval(() => {
@@ -102,7 +110,7 @@ export class ShardManager {
     }
     /** Checks if the recommended shard count has changed and reconnects if so. */
     public async checkAutoScale(): Promise<void> {
-        if (this.#options.shardCount !== "auto") return;
+        if (!this.#auto) return;
         try {
             const recommended = await this.fetchRecommendedShardCount();
             if (recommended !== this.shardCount) {

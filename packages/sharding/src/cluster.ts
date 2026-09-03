@@ -1,6 +1,10 @@
 import { fork, type ChildProcess } from "node:child_process";
 import { cpus } from "node:os";
 
+/** Runtime-agnostic delay used to stagger cluster spawns (works under Node and Bun). @param ms Milliseconds to wait. */
+const sleep = (ms: number): Promise<void> =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 /** Configuration for managing multiple shard clusters. */
 export interface ClusterManagerOptions {
     /** Discord bot token. */
@@ -33,6 +37,8 @@ export class ClusterManager {
     public shardCount = 0;
 
     readonly #options: ClusterManagerOptions;
+    /** Whether the manager was created in auto shard-count mode. Preserved across respawns so auto-scaling keeps running. */
+    readonly #auto: boolean;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
     #spawned = false;
 
@@ -40,7 +46,8 @@ export class ClusterManager {
     public constructor(options: ClusterManagerOptions) {
         if (!options.token?.trim()) throw new TypeError("A Discord bot token is required.");
         if (!options.script?.trim()) throw new TypeError("A script path is required for clustering.");
-        
+
+        this.#auto = options.shardCount === "auto";
         this.#options = { ...options };
     }
 
@@ -100,7 +107,7 @@ export class ClusterManager {
             });
 
             // Stagger cluster creation
-            await Bun.sleep(500);
+            await sleep(500);
         }
 
         if (this.#options.autoScaleInterval && this.#options.autoScaleInterval > 0) {
@@ -112,7 +119,7 @@ export class ClusterManager {
 
     /** Checks if the recommended shard count has changed and respawns if so. */
     public async checkAutoScale(): Promise<void> {
-        if (this.#options.shardCount !== "auto") return; // Only auto-scale in auto mode
+        if (!this.#auto) return; // Only auto-scale in auto mode
         try {
             const recommended = await this.fetchRecommendedShardCount();
             if (recommended !== this.shardCount) {
