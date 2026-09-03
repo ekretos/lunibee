@@ -4,6 +4,8 @@ node_modules/
 dist/
 build/
 coverage/
+roster-backups/
+roster.json
 *.log
 .env
 .env.*

@@ -84,3 +84,54 @@ client.setPresence({
   ],
 });
 ```
+
+## Client Properties
+
+### `ping`
+Returns the current WebSocket ping in milliseconds. This value is updated continuously as heartbeats are exchanged with the gateway.
+
+```ts
+console.log(`Current ping: ${client.ping}ms`);
+```
+
+## Client Methods
+
+### Utility Fetchers
+The client exposes several top-level methods to fetch resources without needing a cached guild or channel:
+
+- `fetchWebhook(id, token?)`: Fetches a webhook.
+- `fetchGuildPreview(guildId)`: Fetches preview information for a guild.
+- `fetchVoiceRegions()`: Returns an array of available voice regions.
+- `generateInvite(options)`: Generates a bot invite link based on the provided permissions and scopes.
+- `fetchInvite(code, options?)`: Fetches an invite by its code.
+- `fetchSticker(id)`: Fetches a specific sticker by its ID.
+- `fetchPremiumStickerPacks()`: Fetches the list of premium sticker packs.
+- `fetchGuildTemplate(code)`: Fetches a guild template by its code.
+
+### `setVoiceState`
+Updates the client's voice state in a guild. Used to connect to, move between, or disconnect from voice channels.
+
+```ts
+client.setVoiceState(guildId, channelId, {
+  selfDeaf: false,
+  selfMute: true,
+});
+```
+
+### `requestGuildMembers`
+Requests offline or all members for a guild. This requires the `GuildMembers` intent.
+
+```ts
+client.requestGuildMembers(guildId, {
+  query: "",
+  limit: 0,
+});
+```
+
+## Client Events
+
+In addition to standard entity events (like `MessageCreate`), the client emits events related to the gateway session lifecycle:
+
+- `Ready`: Emitted when the client connects and identifies successfully.
+- `Resumed`: Emitted when the client successfully resumes a dropped WebSocket connection without needing to re-identify.
+- `InvalidSession`: Emitted when the gateway rejects the session. Depending on the payload, the client will either attempt to resume or start a fresh session.

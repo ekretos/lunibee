@@ -88,3 +88,25 @@ await member.kick("Reason");
 await member.ban({ reason: "Banned" });
 await member.timeout(60_000);
 ```
+
+---
+
+## `Emoji`, `Webhook`, and `Invite`
+
+Other exported structures include `Emoji`, `Webhook`, and `Invite`.
+
+```ts
+import { Emoji, Webhook, Invite } from "@lunibee/structures";
+
+// Use emoji fields and methods
+console.log(emoji.name);
+console.log(emoji.url());
+
+// Use webhook URL or avatar
+console.log(webhook.url);
+console.log(webhook.avatarURL());
+
+// Use invite fields
+console.log(invite.code);
+console.log(invite.url);
+```

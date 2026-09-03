@@ -57,7 +57,24 @@ await client.login();
 - `client.rest` — Low-level REST escape hatch.
 - `client.ws` — Gateway connection.
 - `client.uptime` — Ready uptime in milliseconds.
+- `client.ping` — Current WebSocket gateway ping in milliseconds.
 - `client.isReady()` — Whether the client is ready.
+
+## Utility Methods
+
+The Client provides several utility methods that operate at the top level:
+
+- `client.setPresence(data)` — Update the bot's presence.
+- `client.setVoiceState(data)` — Send a voice state update to the gateway.
+- `client.requestGuildMembers(data)` — Request offline guild members over the gateway.
+- `client.fetchWebhook(id, token?)` — Fetch a webhook by its ID.
+- `client.fetchGuildPreview(guildId)` — Fetch a guild's public preview.
+- `client.fetchVoiceRegions()` — Fetch available voice regions.
+- `client.generateInvite(options)` — Generate an OAuth2 invite link for the bot.
+- `client.fetchInvite(code, options?)` — Fetch an invite by its code.
+- `client.fetchSticker(id)` — Fetch a specific sticker by its ID.
+- `client.fetchPremiumStickerPacks()` — Fetch the list of premium sticker packs.
+- `client.fetchGuildTemplate(code)` — Fetch a guild template by its code.
 
 ## Commands
 
@@ -94,6 +111,14 @@ client.on("ready", (user) => {
 ```
 
 Always check the required Gateway intent for events that depend on privileged or optional data.
+
+## Lifecycle Events
+
+In addition to `ready`, the client emits several lifecycle events to help track the gateway connection state:
+
+- `resumed` — Fired when the client successfully resumes an existing session.
+- `invalidSession` — Fired when a session becomes invalid (receives `isRecoverable` boolean).
+- `open` / `close` — Fired when the underlying WebSocket opens or closes.
 
 ## Lifecycle
 

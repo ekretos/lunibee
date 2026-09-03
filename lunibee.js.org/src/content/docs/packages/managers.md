@@ -101,6 +101,28 @@ await members.addRole(userId, roleId);
 await members.removeRole(userId, roleId);
 ```
 
+## `EmojiManager`
+
+Provides methods for fetching, creating, editing, and deleting emojis in a guild.
+
+```ts
+const emojis = guild.emojis;
+
+// Create a new emoji
+await emojis.create({
+  name: "lunibee",
+  image: "data:image/png;base64,...",
+});
+
+// Edit an emoji
+await emojis.edit(emojiId, {
+  name: "new_name",
+});
+
+// Delete an emoji
+await emojis.delete(emojiId);
+```
+
 ## When should I use a manager?
 
 Use a manager when you already have IDs and want a direct operation:

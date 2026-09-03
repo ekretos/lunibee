@@ -3,3 +3,6 @@ linker = "isolated"
 
 [test]
 root = "tests"
+
+[format]
+indentWidth = 4
