@@ -7,9 +7,17 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "test:compat": "bun test ./src/compat.*.test.ts"
+  },
   "dependencies": {
     "@lunibee/rest": "file:../rest",
-    "@lunibee/managers": "file:../managers"
+    "@lunibee/managers": "file:../managers",
+    "@lunibee/builders": "file:../builders",
+    "@lunibee/structures": "file:../structures",
+    "@lunibee/collection": "file:../collection",
+    "@lunibee/core": "file:../core",
+    "@lunibee/types": "file:../types"
   },
   "devDependencies": {
     "@types/bun": "latest"
