@@ -212,22 +212,38 @@ export class Collection<K, V> extends Map<K, V> {
     public sorted(
         comparator?: (a: V, b: V, aKey: K, bKey: K) => number,
     ): Collection<K, V> {
-        const entries = [...this.entries()];
+        // Decorate with the original insertion index and use it as a tiebreaker so
+        // equal elements keep their insertion order (a stable sort independent of
+        // the engine's Array.prototype.sort stability guarantees).
+        const decorated = [...this.entries()].map((entry, index) => ({
+            entry,
+            index,
+        }));
         if (comparator)
-            entries.sort(([aKey, a], [bKey, b]) =>
-                comparator(a, b, aKey, bKey),
-            );
+            decorated.sort((x, y) => {
+                const comparison = comparator(
+                    x.entry[1],
+                    y.entry[1],
+                    x.entry[0],
+                    y.entry[0],
+                );
+                return comparison !== 0 ? comparison : x.index - y.index;
+            });
         const result = new Collection<K, V>();
-        for (const [key, value] of entries) result.set(key, value);
+        for (const { entry } of decorated) result.set(entry[0], entry[1]);
         return result;
     }
-    /** Returns a random value from the collection, or `undefined` if empty. */
+    /** Returns a random value from the collection, or `undefined` if empty.
+     * Uses `Math.random()` (fast, non-cryptographic) — do not use for security-sensitive
+     * selection such as tokens or secrets. */
     public random(): V | undefined {
         const arr = [...this.values()];
         if (!arr.length) return undefined;
         return arr[Math.floor(Math.random() * arr.length)];
     }
-    /** Returns a random key from the collection, or `undefined` if empty. */
+    /** Returns a random key from the collection, or `undefined` if empty.
+     * Uses `Math.random()` (fast, non-cryptographic) — do not use for security-sensitive
+     * selection such as tokens or secrets. */
     public randomKey(): K | undefined {
         const arr = [...this.keys()];
         if (!arr.length) return undefined;

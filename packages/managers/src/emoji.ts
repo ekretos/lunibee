@@ -2,14 +2,21 @@ import { Manager } from "./base.js";
 import { Emoji } from "@lunibee/structures";
 import { Routes, type REST } from "@lunibee/rest";
 
-export interface EmojiCreateOptions extends Record<string, unknown> {
+/** Strict payload for creating a custom guild emoji. */
+export interface EmojiCreateOptions {
+    /** Emoji name (1-32 chars, alphanumeric + underscores). */
     name: string;
+    /** Base64-encoded 128x128 image data URI. */
     image: string;
+    /** Role IDs allowed to use the emoji. */
     roles?: string[];
 }
 
-export interface EmojiEditOptions extends Record<string, unknown> {
+/** Strict payload for editing a custom guild emoji. */
+export interface EmojiEditOptions {
+    /** New emoji name. */
     name?: string;
+    /** Role IDs allowed to use the emoji. */
     roles?: string[];
 }
 
@@ -67,18 +74,19 @@ export class EmojiManager extends Manager<string, Emoji> {
         this.delete(emojiId);
     }
 
-    /** Upserts an emoji into the manager cache. */
+    /** Upserts an emoji into the manager cache. Custom emojis are keyed by their
+     * snowflake ID; unicode emojis (no ID) are keyed by `unicode:${name}` so repeated
+     * upserts reuse the same cached instance instead of allocating a new one each call. */
     public upsert(data: ConstructorParameters<typeof Emoji>[0]): Emoji {
-        const id = data.id ?? "unicode";
-        if (id === "unicode") return new Emoji(data);
-        
-        const existing = this.get(id);
+        const key =
+            data.id != null ? data.id : `unicode:${data.name ?? ""}`;
+        const existing = this.get(key);
         const emoji = new Emoji(data);
         if (existing) {
             Object.assign(existing, emoji);
             return existing;
         }
-        this.set(id, emoji);
+        this.set(key, emoji);
         return emoji;
     }
 }

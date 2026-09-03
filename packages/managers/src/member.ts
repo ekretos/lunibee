@@ -60,10 +60,9 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
         userId: string,
         options: MemberEditOptions,
     ): Promise<GuildMember> {
-        const data = await this.#rest.patch<any>(
-            Routes.guildMember(this.guildId, userId),
-            options,
-        );
+        const data = await this.#rest.patch<
+            import("@lunibee/types").APIGuildMember
+        >(Routes.guildMember(this.guildId, userId), options);
         const member = new GuildMember({ ...data, guild_id: this.guildId });
         this.set(member.user.id, member);
         return member;

@@ -2,6 +2,10 @@
 import { BaseStructure, Channel, User } from "./base.js";
 import type { ResourceContext } from "./base.js";
 
+/** discord.js user-authored (non-system) message types: Default, Reply,
+ * ChatInputCommand and ContextMenuCommand. Any other type is a system message. */
+const NON_SYSTEM_MESSAGE_TYPES = new Set([0, 19, 20, 23]);
+
 export { BaseStructure, Channel, Guild, User } from "./base.js";
 export type { ResourceContext } from "./base.js";
 
@@ -192,9 +196,11 @@ export class Message extends BaseStructure {
         return this.pinned;
     }
 
-    /** Whether this is a system-generated message (join, boost, etc). */
+    /** Whether this is a system-generated message (join, boost, etc). Mirrors
+     * discord.js: a message is "system" unless its type is one of the user-authored
+     * types — Default (0), Reply (19), ChatInputCommand (20) or ContextMenuCommand (23). */
     public get isSystemMessage(): boolean {
-        return this.type !== 0 && this.type !== 19;
+        return !NON_SYSTEM_MESSAGE_TYPES.has(this.type);
     }
 
     /** Whether this message was crossposted from an announcement channel. */
@@ -237,8 +243,13 @@ export class Message extends BaseStructure {
             author: { id: this.author.id, username: this.author.username },
             attachments: [...this.attachments],
             embeds: [...this.embeds],
+            components: [...this.components],
             mentions: this.mentions.map((u) => u.id),
             mentionRoles: [...this.mentionRoles],
+            reference: this.reference,
+            referencedMessage: this.referencedMessage
+                ? this.referencedMessage.id
+                : this.referencedMessage,
         };
     }
 }

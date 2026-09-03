@@ -221,11 +221,17 @@ export class ChannelManager extends Manager<string, Channel> {
             ),
         );
     }
+    /** Bulk-deletes messages in a channel.
+     * @throws {RangeError} If fewer than 2 or more than 100 message IDs are provided. */
     public async bulkDeleteMessages(
         channelId: string,
         messageIds: Iterable<string>,
     ): Promise<void> {
         const ids = [...messageIds];
+        if (ids.length < 2 || ids.length > 100)
+            throw new RangeError(
+                "bulkDelete requires between 2 and 100 message IDs.",
+            );
         await this.#rest.post(Routes.channelBulkDelete(channelId), {
             messages: ids,
         });
@@ -348,10 +354,7 @@ export class ChannelManager extends Manager<string, Channel> {
         channelId: string,
         messageIds: string[],
     ): Promise<void> {
-        if (messageIds.length < 2 || messageIds.length > 100)
-            throw new RangeError(
-                "bulkDelete requires between 2 and 100 message IDs.",
-            );
+        // Validation lives in bulkDeleteMessages so the public entry point is guarded too.
         return this.bulkDeleteMessages(channelId, messageIds);
     }
     public delete(channelId: string): boolean {

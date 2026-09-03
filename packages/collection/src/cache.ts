@@ -74,9 +74,13 @@ export class Cache<K, V> {
         const expiresAt = this.#ttl > 0 ? Date.now() + this.#ttl : 0;
         this.#entries.delete(key);
         this.#entries.set(key, { value, expiresAt });
-        while (this.#entries.size > this.#maxSize) {
-            const oldest = this.#entries.firstKey();
-            if (oldest !== undefined) this.#entries.delete(oldest);
+        // Skip eviction entirely for unbounded caches (maxSize === Infinity).
+        if (this.#maxSize !== Infinity) {
+            while (this.#entries.size > this.#maxSize) {
+                const oldest = this.#entries.firstKey();
+                if (oldest !== undefined) this.#entries.delete(oldest);
+                else break;
+            }
         }
         return this;
     }
