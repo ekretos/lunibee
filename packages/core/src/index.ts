@@ -37,6 +37,7 @@ import {
     Interaction,
     createInteraction,
     type InteractionClient,
+    type InteractionData,
     type ResourceContext,
 } from "@lunibee/structures";
 import { Gateway } from "@lunibee/ws";
@@ -663,7 +664,7 @@ export class Client
         this.#gateway.on("INTERACTION_CREATE", (data) =>
             this.emit(
                 ClientEvent.InteractionCreate,
-                createInteraction(this, data as any),
+                createInteraction(this, data as InteractionData),
             ),
         );
 
@@ -777,13 +778,23 @@ export class Client
     }
 
     /** Fetches an invite from Discord. */
-    public fetchInvite(code: string, options?: { withCounts?: boolean; withExpiration?: boolean; guildScheduledEventId?: string }): Promise<Record<string, unknown>> {
+    public fetchInvite(
+        code: string,
+        options?: {
+            withCounts?: boolean;
+            withExpiration?: boolean;
+            guildScheduledEventId?: string;
+        },
+    ): Promise<Record<string, unknown>> {
         const query = new URLSearchParams();
         if (options?.withCounts) query.set("with_counts", "true");
         if (options?.withExpiration) query.set("with_expiration", "true");
-        if (options?.guildScheduledEventId) query.set("guild_scheduled_event_id", options.guildScheduledEventId);
+        if (options?.guildScheduledEventId)
+            query.set("guild_scheduled_event_id", options.guildScheduledEventId);
         const qs = query.toString();
-        return this.rest.get(`/invites/${code}${qs ? `?${qs}` : ""}`) as Promise<Record<string, unknown>>;
+        return this.rest.get(
+            `/invites/${code}${qs ? `?${qs}` : ""}`,
+        ) as Promise<Record<string, unknown>>;
     }
 
     /** Fetches a sticker from Discord. */
