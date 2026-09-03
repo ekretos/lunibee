@@ -18,7 +18,7 @@ export interface ClusterManagerOptions {
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. */
     autoScaleInterval?: number;
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */
-    onAutoScaleError?: (error: unknown) => void;
+    onAutoScaleError?: (error: Error) => void;
     /** Grace period in milliseconds to await a cluster's clean exit after SIGTERM before force-killing. Defaults to 5000. */
     shutdownTimeout?: number;
 }
@@ -89,6 +89,11 @@ export class ClusterManager {
     /** Spawns all clusters. @returns A promise fulfilled after clusters have launched. */
     public async spawn(): Promise<void> {
         if (this.#spawned) return;
+        if (typeof process?.versions?.bun === "string") {
+            throw new Error(
+                "ClusterManager requires the Node.js runtime; Bun does not support child_process.fork() for this clustering mode.",
+            );
+        }
         this.#spawned = true;
 
         const count =
@@ -145,7 +150,8 @@ export class ClusterManager {
         } catch (error) {
             // Surface the failure instead of silently swallowing it; the next
             // interval tick retries.
-            this.#options.onAutoScaleError?.(error);
+            const normalized = error instanceof Error ? error : new Error(String(error));
+            this.#options.onAutoScaleError?.(normalized);
         }
     }
 
