@@ -106,23 +106,30 @@ export class EmbedBuilder {
         this.#data.image = { url: url(valueURL, "Image URL") };
         return this;
     }
-    /** Adds embed fields. @param fields Field payloads. @returns This builder. @throws {RangeError} If the 25-field limit is exceeded. */ public addFields(
-        ...fields: EmbedField[]
+    /** Adds embed fields. Accepts both the spread form `addFields(a, b)` and the
+     * single-array form `addFields([a, b])` for discord.js `RestOrArray` parity.
+     * @param fields Field payloads, spread or as a single array. @returns This builder. @throws {RangeError} If the 25-field limit is exceeded. */ public addFields(
+        ...fields: EmbedField[] | [EmbedField[]]
     ): this {
-        if (!fields.length)
+        const resolved = (
+            fields.length === 1 && Array.isArray(fields[0])
+                ? fields[0]
+                : fields
+        ) as EmbedField[];
+        if (!resolved.length)
             throw new TypeError("At least one embed field is required.");
         const current = this.#data.fields ?? [];
-        if (current.length + fields.length > 25)
+        if (current.length + resolved.length > 25)
             throw new RangeError(
                 "An embed cannot contain more than 25 fields.",
             );
-        for (const field of fields) {
+        for (const field of resolved) {
             validate(field.name, 256, "Embed field name");
             validate(field.value, 1024, "Embed field value");
         }
         this.#data.fields = [
             ...current,
-            ...fields.map((field) => ({ ...field })),
+            ...resolved.map((field) => ({ ...field })),
         ];
         return this;
     }

@@ -559,10 +559,19 @@ class ContextMenuCommandBuilder {
         this.data = { type };
     }
     /** Sets the command name (shown in the right-click menu).
-     * @param name Display name; 1-32 characters, any case allowed for context menus.
+     * Unlike CHAT_INPUT commands, USER (type 2) and MESSAGE (type 3) context-menu
+     * command names may contain uppercase letters and spaces, so no lowercase/charset
+     * validation is applied here — only Discord's 1-32 length limit and a non-empty
+     * (non-whitespace) requirement are enforced.
+     * @param name Display name; 1-32 characters, mixed case and spaces allowed.
+     * @throws {RangeError} If the name is empty/whitespace-only or exceeds 32 characters.
      */
     public setName(name: string): this {
-        if (typeof name !== "string" || name.length < 1 || name.length > 32)
+        if (
+            typeof name !== "string" ||
+            name.trim().length < 1 ||
+            name.length > 32
+        )
             throw new RangeError("Command name must contain 1-32 characters.");
         this.data.name = name;
         return this;

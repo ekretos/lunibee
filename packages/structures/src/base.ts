@@ -61,7 +61,7 @@ export interface ResourceContext {
 
 // ─── CDN helpers ──────────────────────────────────────────────────────────────
 
-const CDN_BASE = "https://cdn.discordapp.com";
+export const CDN_BASE = "https://cdn.discordapp.com";
 
 /** Options for CDN image URLs. */
 export interface ImageURLOptions {
@@ -70,7 +70,11 @@ export interface ImageURLOptions {
     forceStatic?: boolean;
 }
 
-function cdnURL(
+/** Builds a Discord CDN asset URL from a directory path and asset hash, applying
+ * animated-hash (`a_`) gif detection, extension and size options. Shared by all
+ * hash-backed asset accessors (user/member/role/webhook) to avoid duplicating the logic.
+ * @param path CDN directory path, e.g. `/role-icons/{id}`. @param hash Asset hash. @param options Image URL options. */
+export function cdnURL(
     path: string,
     hash: string,
     options: ImageURLOptions = {},
@@ -278,6 +282,11 @@ export class Guild extends BaseStructure {
         this.vanityUrlCode = data.vanity_url_code ?? null;
         this.nsfwLevel = data.nsfw_level ?? 0;
         this.discoverySplash = data.discovery_splash ?? null;
+        // NOTE (flagged to Arjun): these fields are read via a Record cast because
+        // APIGuild in @lunibee/types does not yet declare rules_channel_id,
+        // system_channel_id/flags, max_members, mfa_level, explicit_content_filter or
+        // default_message_notifications. Runtime `??` fallbacks guard missing values.
+        // Once APIGuild gains these fields (types-owner change), drop the cast.
         const d = data as unknown as Record<string, unknown>;
         this.rulesChannelId = (d.rules_channel_id as string | null) ?? null;
         this.systemChannelId = (d.system_channel_id as string | null) ?? null;

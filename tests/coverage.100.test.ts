@@ -51,10 +51,12 @@ import {
     AutocompleteInteraction,
     createInteraction,
 } from "../packages/structures/src/interactions.ts";
+// KI-4: the structures-local permissions duplicate was removed; PermissionsBitField
+// and friends now live canonically in @lunibee/core (single source of truth).
 import {
     PermissionSet as StructPermSet,
     Permissions as StructPerms,
-} from "../packages/structures/src/permissions.ts";
+} from "../packages/core/src/index.ts";
 import {
     Gateway,
     GatewayError,

@@ -1,8 +1,13 @@
-import { BaseStructure, Channel, User } from "./base.js";
-import { PermissionsBitField } from "./permissions.js";
+import { BaseStructure, Channel, User, CDN_BASE, cdnURL } from "./base.js";
+import { PermissionsBitField } from "@lunibee/core";
 import type { ImageURLOptions } from "./base.js";
 
-const CDN_BASE = "https://cdn.discordapp.com";
+/** Parses a Discord ISO timestamp into a Date, returning null for absent or invalid values. */
+function toDateOrNull(value?: string | null): Date | null {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
 
 // ─── GuildMember ───────────────────────────────────────────────────────────────
 
@@ -56,12 +61,9 @@ export class GuildMember {
             throw new RangeError("Member joined_at must be a valid date.");
         this.permissions = new PermissionsBitField(data.permissions ?? 0n);
         this.avatarHash = data.avatar ?? null;
-        this.premiumSince = data.premium_since
-            ? new Date(data.premium_since)
-            : null;
-        this.timedOutUntil = data.communication_disabled_until
-            ? new Date(data.communication_disabled_until)
-            : null;
+        // Like joinedAt, coerce malformed timestamps to null instead of an Invalid Date.
+        this.premiumSince = toDateOrNull(data.premium_since);
+        this.timedOutUntil = toDateOrNull(data.communication_disabled_until);
         this.flags = data.flags ?? 0;
     }
 
@@ -77,13 +79,13 @@ export class GuildMember {
 
     /** Returns the member-specific avatar URL, falling back to the user's avatar, or null if none. */
     public avatarURL(options: ImageURLOptions = {}): string | null {
-        if (this.avatarHash) {
-            const isAnimated =
-                this.avatarHash.startsWith("a_") && !options.forceStatic;
-            const ext = options.extension ?? (isAnimated ? "gif" : "png");
-            const size = options.size ? `?size=${options.size}` : "";
-            return `${CDN_BASE}/guilds/${this.guildId}/users/${this.user.id}/avatars/${this.avatarHash}.${ext}${size}`;
-        }
+        if (this.avatarHash)
+            return cdnURL(
+                `/guilds/${this.guildId}/users/${this.user.id}/avatars`,
+                this.avatarHash,
+                options,
+            );
+        // User always exposes avatarURL(); returns null when the user has no avatar.
         return this.user.avatarURL(options);
     }
 
@@ -154,11 +156,7 @@ export class Role extends BaseStructure {
     /** Returns the role's custom icon URL, or null if the role has no icon. */
     public iconURL(options: ImageURLOptions = {}): string | null {
         if (!this.iconHash) return null;
-        const isAnimated =
-            this.iconHash.startsWith("a_") && !options.forceStatic;
-        const ext = options.extension ?? (isAnimated ? "gif" : "png");
-        const size = options.size ? `?size=${options.size}` : "";
-        return `${CDN_BASE}/role-icons/${this.id}/${this.iconHash}.${ext}${size}`;
+        return cdnURL(`/role-icons/${this.id}`, this.iconHash, options);
     }
 
     /** Whether this is the @everyone base role (its ID equals the guild ID). */
@@ -305,11 +303,7 @@ export class Webhook extends BaseStructure {
     /** Returns the webhook avatar URL, or null if no avatar is set. */
     public avatarURL(options: ImageURLOptions = {}): string | null {
         if (!this.avatarHash) return null;
-        const isAnimated =
-            this.avatarHash.startsWith("a_") && !options.forceStatic;
-        const ext = options.extension ?? (isAnimated ? "gif" : "png");
-        const size = options.size ? `?size=${options.size}` : "";
-        return `${CDN_BASE}/avatars/${this.id}/${this.avatarHash}.${ext}${size}`;
+        return cdnURL(`/avatars/${this.id}`, this.avatarHash, options);
     }
 
     /** Returns the webhook execution URL, or null if no token is set. */
@@ -342,7 +336,7 @@ export class Emoji extends BaseStructure {
         id: string | null;
         name: string | null;
         roles?: string[];
-        user?: any;
+        user?: import("@lunibee/types").UserData;
         require_colons?: boolean;
         managed?: boolean;
         animated?: boolean;

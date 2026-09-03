@@ -2,6 +2,10 @@
 import { BaseStructure, Channel, User } from "./base.js";
 import type { ResourceContext } from "./base.js";
 
+/** discord.js user-authored (non-system) message types: Default, Reply,
+ * ChatInputCommand and ContextMenuCommand. Any other type is a system message. */
+const NON_SYSTEM_MESSAGE_TYPES = new Set([0, 19, 20, 23]);
+
 export { BaseStructure, Channel, Guild, User } from "./base.js";
 export type { ResourceContext } from "./base.js";
 
@@ -68,6 +72,18 @@ export class Message extends BaseStructure {
     /** Whether embeds are suppressed on this message. */
     public get embedsSuppressed(): boolean {
         return (this.flags & 4) !== 0;
+    }
+
+    /** Unix timestamp (ms) at which the message was created — discord.js parity.
+     * Derived from the message `timestamp`, which itself falls back to the id snowflake. */
+    public get createdTimestamp(): number {
+        return this.timestamp.getTime();
+    }
+
+    /** Date at which the message was created — discord.js parity. Overrides the
+     * snowflake-only `BaseStructure.createdAt` to honour the message `timestamp`. */
+    public override get createdAt(): Date {
+        return this.timestamp;
     }
 
     /** Edits this message. @param options Message fields to change. @returns The updated message. @throws {Error} If the message is not attached to a client. */
@@ -180,9 +196,11 @@ export class Message extends BaseStructure {
         return this.pinned;
     }
 
-    /** Whether this is a system-generated message (join, boost, etc). */
+    /** Whether this is a system-generated message (join, boost, etc). Mirrors
+     * discord.js: a message is "system" unless its type is one of the user-authored
+     * types — Default (0), Reply (19), ChatInputCommand (20) or ContextMenuCommand (23). */
     public get isSystemMessage(): boolean {
-        return this.type !== 0 && this.type !== 19;
+        return !NON_SYSTEM_MESSAGE_TYPES.has(this.type);
     }
 
     /** Whether this message was crossposted from an announcement channel. */
@@ -225,8 +243,13 @@ export class Message extends BaseStructure {
             author: { id: this.author.id, username: this.author.username },
             attachments: [...this.attachments],
             embeds: [...this.embeds],
+            components: [...this.components],
             mentions: this.mentions.map((u) => u.id),
             mentionRoles: [...this.mentionRoles],
+            reference: this.reference,
+            referencedMessage: this.referencedMessage
+                ? this.referencedMessage.id
+                : this.referencedMessage,
         };
     }
 }
@@ -249,3 +272,7 @@ export {
 export * from "./interactions.js";
 export { Embed } from "./embed.js";
 export { AuditLog, AuditLogEntry } from "./audit-log.js";
+// KI-4: PermissionsBitField lives canonically in @lunibee/core (single source of
+// truth). Re-export it here for discord.js-style top-level access from structures,
+// replacing the former structures-local duplicate.
+export { PermissionsBitField } from "@lunibee/core";

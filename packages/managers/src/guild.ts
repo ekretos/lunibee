@@ -13,6 +13,14 @@ import {
 
 type GuildData = ConstructorParameters<typeof Guild>[0];
 
+/** Appends encoded query parameters to a `Routes`-generated path so query building
+ * stays centralized and URL-encoded rather than hand-concatenated at each call site.
+ * @param path Base path from a `Routes.*` helper. @param params Query parameters (empty → path unchanged). */
+function withQuery(path: string, params: URLSearchParams): string {
+    const suffix = params.toString();
+    return suffix ? `${path}?${suffix}` : path;
+}
+
 export interface GuildCreateOptions extends Record<string, unknown> {
     name: string;
 }
@@ -100,9 +108,8 @@ export class GuildManager extends ResourceManager<string, Guild> {
                 "limit",
                 String(Math.min(100, Math.max(1, options.limit))),
             );
-        const suffix = params.toString();
         return this.#rest.get<AuditLogResponse>(
-            `${Routes.guildAuditLog(guildId)}${suffix ? `?${suffix}` : ""}`,
+            withQuery(Routes.guildAuditLog(guildId), params),
         );
     }
 
@@ -123,9 +130,8 @@ export class GuildManager extends ResourceManager<string, Guild> {
                 String(Math.min(1000, Math.max(1, options.limit))),
             );
         if (options.after) params.set("after", options.after);
-        const suffix = params.toString();
         return this.#rest.get<Record<string, unknown>[]>(
-            `${Routes.guildMembers(guildId)}${suffix ? `?${suffix}` : ""}`,
+            withQuery(Routes.guildMembers(guildId), params),
         );
     }
 
