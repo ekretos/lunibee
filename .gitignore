@@ -5,6 +5,8 @@ dist/
 build/
 coverage/
 roster-backups/
+hive/
+hive_test/
 roster.json
 *.log
 .env
