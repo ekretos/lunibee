@@ -68,6 +68,7 @@ export interface APIEntitySelectComponent {
     max_values?: number;
     required?: boolean;
     disabled?: boolean;
+    default_values?: APISelectDefaultValue[];
 }
 export interface APITextInputComponent {
     type: typeof ComponentType.TextInput;
@@ -108,6 +109,11 @@ export interface APIMediaGalleryComponent {
     type: typeof ComponentType.MediaGallery;
     items: { media: { url: string; description?: string } }[];
 }
+/** Default values accepted by an auto-populated entity select. */
+export interface APISelectDefaultValue {
+    id: string;
+    type: "user" | "role" | "channel";
+}
 export interface APIFileComponent {
     type: typeof ComponentType.File;
     file: { url: string };
@@ -124,6 +130,8 @@ export interface APIThumbnailComponent {
     proxy_url?: string;
     width?: number;
     height?: number;
+    description?: string;
+    spoiler?: boolean;
 }
 export interface APIContentInventoryEntryComponent {
     type: typeof ComponentType.ContentInventoryEntry;
@@ -133,6 +141,7 @@ export interface APIContainerComponent {
     type: typeof ComponentType.Container;
     components: APIComponent[];
     accent_color?: number;
+    spoiler?: boolean;
 }
 export type APIComponent =
     | APIActionRowComponent
@@ -330,10 +339,8 @@ export class EntitySelectBuilder {
         this.#data.disabled = value;
         return this;
     }
-    public setDefaultValues(
-        ...values: { id: string; type: "user" | "role" | "channel" }[]
-    ): this {
-        (this.#data as any).default_values = values;
+    public setDefaultValues(...values: APISelectDefaultValue[]): this {
+        this.#data.default_values = values.map((value) => ({ ...value }));
         return this;
     }
     public toJSON(): APIEntitySelectComponent {
@@ -426,6 +433,7 @@ export class TextInputBuilder {
 export class ContainerBuilder {
     readonly #components: { toJSON(): APIComponent }[] = [];
     #accentColor?: number;
+    #spoiler?: boolean;
     public addComponents(...components: { toJSON(): APIComponent }[]): this {
         if (!components.length)
             throw new TypeError("At least one component is required.");
@@ -441,12 +449,20 @@ export class ContainerBuilder {
         this.#accentColor = color;
         return this;
     }
+    /** Marks the whole container as a spoiler (blurred until clicked). */
+    public setSpoiler(spoiler = true): this {
+        this.#spoiler = spoiler;
+        return this;
+    }
     public toJSON(): APIContainerComponent {
-        return {
+        const data: APIContainerComponent = {
             type: ComponentType.Container,
             components: this.#components.map((c) => c.toJSON()),
-            accent_color: this.#accentColor,
         };
+        if (this.#accentColor !== undefined)
+            data.accent_color = this.#accentColor;
+        if (this.#spoiler !== undefined) data.spoiler = this.#spoiler;
+        return data;
     }
 }
 
@@ -557,16 +573,33 @@ export class SeparatorBuilder {
 
 export class ThumbnailBuilder {
     #url = "";
+    #description?: string;
+    #spoiler?: boolean;
     public setUrl(url: string): this {
         validateText(url, 2048, "Thumbnail URL");
         this.#url = url;
         return this;
     }
+    /** Sets the thumbnail's alt-text description. */
+    public setDescription(description: string): this {
+        validateText(description, 1024, "Thumbnail description");
+        this.#description = description;
+        return this;
+    }
+    /** Marks the thumbnail as a spoiler (blurred until clicked). */
+    public setSpoiler(spoiler = true): this {
+        this.#spoiler = spoiler;
+        return this;
+    }
     public toJSON(): APIThumbnailComponent {
-        return {
+        const data: APIThumbnailComponent = {
             type: ComponentType.Thumbnail,
             url: this.#url,
         };
+        if (this.#description !== undefined)
+            data.description = this.#description;
+        if (this.#spoiler !== undefined) data.spoiler = this.#spoiler;
+        return data;
     }
 }
 

@@ -177,16 +177,48 @@ describe("Managers Coverage", () => {
         (rest as any).get = async (url: string) => {
             lastUrl = url;
             if (url === "/guilds/1") return { id: "1", name: "Guild 1" };
+            // Single auto-moderation rule fetch returns one rule object.
+            if (/\/auto-moderation\/rules\/\d+$/.test(url))
+                return {
+                    id: "123456789012345679",
+                    guild_id: "1",
+                    name: "rule",
+                    creator_id: "1",
+                    event_type: 1,
+                    trigger_type: 1,
+                    trigger_metadata: {},
+                    actions: [],
+                    enabled: true,
+                    exempt_roles: [],
+                    exempt_channels: [],
+                };
             return [];
         };
+        const autoModRule = (id: string, name: string) => ({
+            id,
+            guild_id: "1",
+            name,
+            creator_id: "1",
+            event_type: 1,
+            trigger_type: 1,
+            trigger_metadata: {},
+            actions: [],
+            enabled: true,
+            exempt_roles: [],
+            exempt_channels: [],
+        });
         (rest as any).post = async (url: string, opts: any) => {
             lastUrl = url;
             lastOpts = opts;
+            if (/\/auto-moderation\/rules$/.test(url))
+                return autoModRule("123456789012345679", opts.name);
             return { id: "2", name: opts.name };
         };
         (rest as any).patch = async (url: string, opts: any) => {
             lastUrl = url;
             lastOpts = opts;
+            if (/\/auto-moderation\/rules\/\d+$/.test(url))
+                return autoModRule("123456789012345679", opts.name);
             return { id: "1", name: opts.name };
         };
         (rest as any).delete = async (url: string) => {
