@@ -1,6 +1,10 @@
 import { fork, type ChildProcess } from "node:child_process";
 import { cpus } from "node:os";
 
+/** Runtime-agnostic delay used to stagger cluster spawns (works under Node and Bun). @param ms Milliseconds to wait. */
+const sleep = (ms: number): Promise<void> =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 /** Configuration for managing multiple shard clusters. */
 export interface ClusterManagerOptions {
     /** Discord bot token. */
@@ -13,6 +17,10 @@ export interface ClusterManagerOptions {
     clusterCount?: number;
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. */
     autoScaleInterval?: number;
+    /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */
+    onAutoScaleError?: (error: unknown) => void;
+    /** Grace period in milliseconds to await a cluster's clean exit after SIGTERM before force-killing. Defaults to 5000. */
+    shutdownTimeout?: number;
 }
 
 /** Information about a running cluster. */
@@ -25,7 +33,14 @@ export interface ClusterInfo {
     shards: number[];
 }
 
-/** Manages multiple clusters of shards, distributing shards across child processes. */
+/**
+ * Manages multiple clusters of shards, distributing shards across child processes.
+ *
+ * **Runtime requirement:** clustering relies on Node.js `child_process.fork()`
+ * and IPC. `fork()` is not fully supported under Bun, so run the cluster
+ * manager under the Node.js runtime; `spawn()` will fail on a runtime whose
+ * `fork()` is unavailable.
+ */
 export class ClusterManager {
     /** Active clusters indexed by cluster ID. */
     public readonly clusters = new Map<number, ClusterInfo>();
@@ -33,6 +48,8 @@ export class ClusterManager {
     public shardCount = 0;
 
     readonly #options: ClusterManagerOptions;
+    /** Whether the manager was created in auto shard-count mode. Preserved across respawns so auto-scaling keeps running. */
+    readonly #auto: boolean;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
     #spawned = false;
 
@@ -40,7 +57,14 @@ export class ClusterManager {
     public constructor(options: ClusterManagerOptions) {
         if (!options.token?.trim()) throw new TypeError("A Discord bot token is required.");
         if (!options.script?.trim()) throw new TypeError("A script path is required for clustering.");
-        
+        if (
+            options.autoScaleInterval !== undefined &&
+            (!Number.isInteger(options.autoScaleInterval) || options.autoScaleInterval < 1000)
+        ) {
+            throw new RangeError("autoScaleInterval must be an integer of at least 1000 milliseconds.");
+        }
+
+        this.#auto = options.shardCount === "auto";
         this.#options = { ...options };
     }
 
@@ -100,7 +124,7 @@ export class ClusterManager {
             });
 
             // Stagger cluster creation
-            await Bun.sleep(500);
+            await sleep(500);
         }
 
         if (this.#options.autoScaleInterval && this.#options.autoScaleInterval > 0) {
@@ -112,26 +136,76 @@ export class ClusterManager {
 
     /** Checks if the recommended shard count has changed and respawns if so. */
     public async checkAutoScale(): Promise<void> {
-        if (this.#options.shardCount !== "auto") return; // Only auto-scale in auto mode
+        if (!this.#auto) return; // Only auto-scale in auto mode
         try {
             const recommended = await this.fetchRecommendedShardCount();
             if (recommended !== this.shardCount) {
                 await this.respawn(recommended);
             }
-        } catch {
-            // Suppress errors during auto-scale check
+        } catch (error) {
+            // Surface the failure instead of silently swallowing it; the next
+            // interval tick retries.
+            this.#options.onAutoScaleError?.(error);
         }
     }
 
-    /** Kills all existing clusters and respawns them with the new shard count. @param newShardCount The new total shard count. */
+    /** Gracefully shuts the existing clusters down and respawns them with the new shard count. @param newShardCount The new total shard count. */
     public async respawn(newShardCount: number): Promise<void> {
         this.#options.shardCount = newShardCount;
-        this.killAll();
+        await this.shutdownAll();
         this.#spawned = false;
         await this.spawn();
     }
 
-    /** Kills all active cluster processes and clears the cluster map. */
+    /**
+     * Gracefully stops all active clusters: sends SIGTERM, awaits each child's
+     * clean exit, and force-kills (SIGKILL) only children that outlast the
+     * shutdown timeout. Clears the auto-scale timer and cluster map.
+     * @param timeoutMs Grace period per child before force-kill. Defaults to the configured `shutdownTimeout` (5000 ms).
+     */
+    public async shutdownAll(timeoutMs = this.#options.shutdownTimeout ?? 5000): Promise<void> {
+        if (this.#autoScaleTimer) {
+            clearInterval(this.#autoScaleTimer);
+            this.#autoScaleTimer = undefined;
+        }
+        await Promise.all(
+            [...this.clusters.values()].map((cluster) =>
+                this.#shutdownCluster(cluster, timeoutMs),
+            ),
+        );
+        this.clusters.clear();
+        this.#spawned = false;
+    }
+
+    /** Gracefully terminates a single cluster child, escalating to SIGKILL after the timeout. */
+    async #shutdownCluster(cluster: ClusterInfo, timeoutMs: number): Promise<void> {
+        const child = cluster.process;
+        if (child.exitCode !== null || child.signalCode !== null) return;
+        await new Promise<void>((resolve) => {
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const finish = (): void => {
+                if (timer) clearTimeout(timer);
+                resolve();
+            };
+            child.once("exit", finish);
+            try {
+                child.kill("SIGTERM");
+            } catch {
+                child.off("exit", finish);
+                finish();
+                return;
+            }
+            timer = setTimeout(() => {
+                try {
+                    child.kill("SIGKILL");
+                } catch {
+                    // Ignore force-kill errors.
+                }
+            }, timeoutMs);
+        });
+    }
+
+    /** Immediately force-kills all active cluster processes and clears the cluster map. Prefer {@link shutdownAll} for a graceful stop. */
     public killAll(): void {
         if (this.#autoScaleTimer) {
             clearInterval(this.#autoScaleTimer);
