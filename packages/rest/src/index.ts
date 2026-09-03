@@ -32,19 +32,108 @@ const LIBRARY_VERSION = packageJson.version;
 const LIBRARY_URL = "https://github.com/Ekretos/lunibee";
 const USER_AGENT = `DiscordBot (${LIBRARY_URL}, ${packageJson.version})`;
 
-import { MemoryRateLimitStore, type RateLimitStore, type BucketState } from "./store.js";
+import {
+    MemoryRateLimitStore,
+    type RateLimitStore,
+    type BucketState,
+} from "./store.js";
 
 /** Internal state shared by requests mapped to one Discord rate-limit bucket. */
 type Bucket = { remaining: number; resetAt: number };
-/** Options controlling an individual REST request. */
-export interface RESTRequestOptions {
-    /** Abort signal used to cancel the request and any queued wait. */ signal?: AbortSignal;
-}
-
+/** A file attachment sent as part of a multipart REST request. */
 export interface RESTFileAttachment {
     name: string;
     data: Blob | Uint8Array | ArrayBuffer;
     contentType?: string;
+}
+
+/** Query-string value accepted by {@link RESTRequestOptions.query}. */
+export type RESTQuery =
+    | URLSearchParams
+    | Record<string, string | number | boolean | null | undefined>
+    | string;
+
+/**
+ * Options controlling an individual REST request.
+ *
+ * Lunibee's canonical call shape is positional (`post(path, body)`); these options
+ * add the Discord.js-`@discordjs/rest`-familiar per-request knobs (`query`, `headers`,
+ * `reason`, `auth`) additively without changing that positional default.
+ */
+export interface RESTRequestOptions {
+    /** Abort signal used to cancel the request and any queued wait. */ signal?: AbortSignal;
+    /** Query-string appended to the path (`URLSearchParams`, a record, or a raw string). */ query?: RESTQuery;
+    /** Extra request headers merged in (library headers such as `Authorization` win). */ headers?: Record<
+        string,
+        string
+    >;
+    /** Audit-log reason, sent as the `X-Audit-Log-Reason` header. */ reason?: string;
+    /** Set `false` to omit the `Authorization` header for this request. Defaults to `true`. */ auth?: boolean;
+}
+
+/**
+ * Discord.js-familiar request payload. Superset of {@link RESTRequestOptions} that also
+ * carries the `body` and `files`, matching `@discordjs/rest`'s `RequestData`. It powers the
+ * additive `method(path, { body })` overloads without breaking the positional signature.
+ */
+export interface RequestData extends RESTRequestOptions {
+    /** Request body. Encoded as JSON unless `files` are present (then multipart). */ body?: unknown;
+    /** File attachments; presence upgrades the request to `multipart/form-data`. */ files?: RESTFileAttachment[];
+}
+
+/** Keys recognised on a {@link RequestData} wrapper, used to disambiguate it from a raw body. */
+const REQUEST_DATA_KEYS = new Set([
+    "body",
+    "files",
+    "query",
+    "headers",
+    "reason",
+    "auth",
+    "signal",
+]);
+
+/**
+ * Detects a Discord.js-style `RequestData` wrapper so verb helpers can accept both
+ * `post(path, rawBody)` (Lunibee-canonical) and `post(path, { body })` (Discord.js-familiar).
+ * Conservative by design: only a plain object whose every own key is a known `RequestData`
+ * key counts — a raw Discord payload (which always carries entity keys like `content`/`name`)
+ * never matches, so existing positional callers are unaffected.
+ */
+function isRequestData(value: unknown): value is RequestData {
+    if (value === null || typeof value !== "object") return false;
+    if (Array.isArray(value)) return false;
+    if (typeof FormData !== "undefined" && value instanceof FormData)
+        return false;
+    if (
+        value instanceof Blob ||
+        value instanceof Uint8Array ||
+        value instanceof ArrayBuffer
+    )
+        return false;
+    const keys = Object.keys(value);
+    if (keys.length === 0) return false;
+    return keys.every((key) => REQUEST_DATA_KEYS.has(key));
+}
+
+/** Serialises a {@link RESTQuery} into a `?...` suffix (empty string when nothing to add). */
+function serializeQuery(query: RESTQuery | undefined): string {
+    if (query === undefined) return "";
+    if (typeof query === "string")
+        return query.length === 0 || query.startsWith("?")
+            ? query
+            : `?${query}`;
+    const params =
+        query instanceof URLSearchParams
+            ? query
+            : new URLSearchParams(
+                  Object.entries(query).flatMap(([key, value]) =>
+                      value === undefined || value === null
+                          ? []
+                          : [[key, String(value)] as [string, string]],
+                  ),
+              );
+    const serialized = params.toString();
+    return serialized.length === 0 ? "" : `?${serialized}`;
 }
 
 // ─── REST Hooks ───────────────────────────────────────────────────────────────
@@ -175,7 +264,8 @@ export class REST {
      * @param method HTTP method.
      * @param path API path.
      * @param body Optional JSON body, FormData for file uploads, or undefined.
-     * @param options Cancellation options.
+     * @param options Request options: cancellation `signal` plus the Discord.js-familiar
+     *   `query`, `headers`, `reason`, `auth`, and `files` (which upgrade to multipart).
      * @returns Decoded response body.
      * @throws {RESTError} If Discord or transport rejects the request.
      */
@@ -183,20 +273,29 @@ export class REST {
         method: string,
         path: string,
         body?: unknown,
-        options: RESTRequestOptions = {},
+        options: RequestData = {},
     ): Promise<T> {
         const normalizedMethod = method.toUpperCase();
         if (!normalizedMethod) throw new TypeError("REST method is required.");
         if (!path.startsWith("/"))
             throw new TypeError("REST paths must start with '/'.");
+        // Upgrade to multipart when file attachments are supplied via options.
+        const files = options.files;
+        if (files && files.length > 0 && !(body instanceof FormData))
+            body = this.#fileForm(body, files);
+        const query = serializeQuery(options.query);
+        const finalPath = query ? `${path}${query}` : path;
         const route = `${normalizedMethod}:${this.#normalizeRoute(path)}`;
-        let bucketKey = await this.#store.getBucketHash(route) ?? route;
-        
+        let bucketKey = (await this.#store.getBucketHash(route)) ?? route;
+
         const previous = this.#localQueues.get(bucketKey) ?? Promise.resolve();
         let release!: () => void;
-        this.#localQueues.set(bucketKey, new Promise((resolve) => {
-            release = resolve;
-        }));
+        this.#localQueues.set(
+            bucketKey,
+            new Promise((resolve) => {
+                release = resolve;
+            }),
+        );
         await this.#abortable(previous, options.signal, path);
         try {
             for (
@@ -226,12 +325,15 @@ export class REST {
                 // Build headers and body based on whether this is a multipart request
                 const isFormData =
                     typeof FormData !== "undefined" && body instanceof FormData;
-                const headers: Record<string, string> = {
-                    ...(this.#token
-                        ? { Authorization: `Bot ${this.#token}` }
-                        : {}),
-                    "User-Agent": USER_AGENT,
-                };
+                // Caller headers first; library-managed headers below take precedence.
+                const headers: Record<string, string> = { ...options.headers };
+                if (options.auth !== false && this.#token)
+                    headers["Authorization"] = `Bot ${this.#token}`;
+                headers["User-Agent"] = USER_AGENT;
+                if (options.reason !== undefined)
+                    headers["X-Audit-Log-Reason"] = encodeURIComponent(
+                        options.reason,
+                    );
                 if (!isFormData) headers["Content-Type"] = "application/json";
                 const fetchBody = isFormData
                     ? (body as FormData)
@@ -245,12 +347,15 @@ export class REST {
                         attempt,
                     });
                     const requestStart = Date.now();
-                    const response = await fetch(`${this.#baseURL}${path}`, {
-                        method: normalizedMethod,
-                        headers,
-                        body: fetchBody,
-                        signal: controller.signal,
-                    });
+                    const response = await fetch(
+                        `${this.#baseURL}${finalPath}`,
+                        {
+                            method: normalizedMethod,
+                            headers,
+                            body: fetchBody,
+                            signal: controller.signal,
+                        },
+                    );
                     this.#hooks.onResponse?.({
                         method: normalizedMethod,
                         path,
@@ -269,8 +374,14 @@ export class REST {
                             ? this.#retryAfter(response, data)
                             : undefined;
                     if (data.global && retryAfter !== undefined) {
-                        const currentGlobal = await this.#store.getGlobalReset();
-                        await this.#store.setGlobalReset(Math.max(currentGlobal, Date.now() + retryAfter * 1000));
+                        const currentGlobal =
+                            await this.#store.getGlobalReset();
+                        await this.#store.setGlobalReset(
+                            Math.max(
+                                currentGlobal,
+                                Date.now() + retryAfter * 1000,
+                            ),
+                        );
                     }
                     if (response.status === 429 && retryAfter !== undefined)
                         this.#hooks.onRateLimit?.({
@@ -355,30 +466,77 @@ export class REST {
             release();
         }
     }
-    /** Sends a GET request. @param path API path. @param options Cancellation options. @returns Decoded response. @throws {RESTError} When the request fails. */ public get<
-        T,
-    >(path: string, options?: RESTRequestOptions): Promise<T> {
-        return this.request<T>("GET", path, undefined, options);
+    /**
+     * Normalizes a verb helper's second argument into `(body, options)`.
+     * Supports both `verb(path, rawBody, options?)` (Lunibee-canonical positional) and the
+     * Discord.js-familiar `verb(path, { body, query, headers, reason, files })` wrapper.
+     */
+    #dispatch<T>(
+        method: string,
+        path: string,
+        bodyOrOptions?: unknown,
+        options?: RequestData,
+    ): Promise<T> {
+        if (options === undefined && isRequestData(bodyOrOptions))
+            return this.request<T>(
+                method,
+                path,
+                bodyOrOptions.body,
+                bodyOrOptions,
+            );
+        return this.request<T>(method, path, bodyOrOptions, options);
     }
-    /** Sends a POST request. @param path API path. @param body Optional JSON body. @param options Cancellation options. @returns Decoded response. @throws {RESTError} When the request fails. */ public post<
+    /** Sends a GET request. @param path API path. @param options Request options (`query`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */ public get<
         T,
-    >(path: string, body?: unknown, options?: RESTRequestOptions): Promise<T> {
-        return this.request<T>("POST", path, body, options);
+    >(path: string, options?: RequestData): Promise<T> {
+        return this.request<T>("GET", path, options?.body, options);
     }
-    /** Sends a PATCH request. @param path API path. @param body Optional JSON body. @param options Cancellation options. @returns Decoded response. @throws {RESTError} When the request fails. */ public patch<
-        T,
-    >(path: string, body?: unknown, options?: RESTRequestOptions): Promise<T> {
-        return this.request<T>("PATCH", path, body, options);
+    /** Sends a POST request. Accepts a raw body (`post(path, body)`) or a Discord.js-familiar `post(path, { body })`. @param path API path. @param body Optional JSON body, or a `RequestData` wrapper. @param options Request options. @returns Decoded response. @throws {RESTError} When the request fails. */
+    public post<T>(path: string, options: RequestData): Promise<T>;
+    public post<T>(
+        path: string,
+        body?: unknown,
+        options?: RequestData,
+    ): Promise<T>;
+    public post<T>(
+        path: string,
+        body?: unknown,
+        options?: RequestData,
+    ): Promise<T> {
+        return this.#dispatch<T>("POST", path, body, options);
     }
-    /** Sends a PUT request. @param path API path. @param body Optional JSON body. @param options Cancellation options. @returns Decoded response. @throws {RESTError} When the request fails. */ public put<
-        T,
-    >(path: string, body?: unknown, options?: RESTRequestOptions): Promise<T> {
-        return this.request<T>("PUT", path, body, options);
+    /** Sends a PATCH request. Accepts a raw body (`patch(path, body)`) or a Discord.js-familiar `patch(path, { body })`. @param path API path. @param body Optional JSON body, or a `RequestData` wrapper. @param options Request options. @returns Decoded response. @throws {RESTError} When the request fails. */
+    public patch<T>(path: string, options: RequestData): Promise<T>;
+    public patch<T>(
+        path: string,
+        body?: unknown,
+        options?: RequestData,
+    ): Promise<T>;
+    public patch<T>(
+        path: string,
+        body?: unknown,
+        options?: RequestData,
+    ): Promise<T> {
+        return this.#dispatch<T>("PATCH", path, body, options);
     }
-    /** Sends a DELETE request. @param path API path. @param options Cancellation options. @returns Decoded response. @throws {RESTError} When the request fails. */ public delete<
+    /** Sends a PUT request. Accepts a raw body (`put(path, body)`) or a Discord.js-familiar `put(path, { body })`. @param path API path. @param body Optional JSON body, or a `RequestData` wrapper. @param options Request options. @returns Decoded response. @throws {RESTError} When the request fails. */
+    public put<T>(path: string, options: RequestData): Promise<T>;
+    public put<T>(
+        path: string,
+        body?: unknown,
+        options?: RequestData,
+    ): Promise<T>;
+    public put<T>(
+        path: string,
+        body?: unknown,
+        options?: RequestData,
+    ): Promise<T> {
+        return this.#dispatch<T>("PUT", path, body, options);
+    }
+    /** Sends a DELETE request. @param path API path. @param options Request options (`reason`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */ public delete<
         T,
-    >(path: string, options?: RESTRequestOptions): Promise<T> {
-        return this.request<T>("DELETE", path, undefined, options);
+    >(path: string, options?: RequestData): Promise<T> {
+        return this.request<T>("DELETE", path, options?.body, options);
     }
     /**
      * Builds a multipart form with a JSON payload and file attachments.
@@ -567,18 +725,23 @@ export class REST {
             await this.#store.setBucketHash(route, serverBucket);
             currentKey = serverBucket;
         }
-        
-        let bucket = await this.#store.getBucket(currentKey) ?? { remaining: 1, resetAt: 0 };
+
+        let bucket = (await this.#store.getBucket(currentKey)) ?? {
+            remaining: 1,
+            resetAt: 0,
+        };
         const remaining = Number(response.headers.get("X-RateLimit-Remaining"));
-        const resetAfter = Number(response.headers.get("X-RateLimit-Reset-After"));
+        const resetAfter = Number(
+            response.headers.get("X-RateLimit-Reset-After"),
+        );
         const reset = Number(response.headers.get("X-RateLimit-Reset"));
-        
+
         if (Number.isFinite(remaining))
             bucket.remaining = Math.max(0, remaining);
         if (Number.isFinite(resetAfter))
             bucket.resetAt = Date.now() + Math.max(0, resetAfter) * 1000;
         else if (Number.isFinite(reset)) bucket.resetAt = reset * 1000;
-        
+
         if (response.status === 429) {
             const retryAfter = Number(response.headers.get("Retry-After"));
             if (Number.isFinite(retryAfter))
@@ -588,15 +751,17 @@ export class REST {
                 );
         }
         await this.#store.updateBucket(currentKey, bucket);
-        
+
         if (response.headers.get("X-RateLimit-Global") === "true") {
             const retryAfter = Number(response.headers.get("Retry-After"));
             if (Number.isFinite(retryAfter)) {
                 const currentGlobal = await this.#store.getGlobalReset();
-                await this.#store.setGlobalReset(Math.max(currentGlobal, Date.now() + retryAfter * 1000));
+                await this.#store.setGlobalReset(
+                    Math.max(currentGlobal, Date.now() + retryAfter * 1000),
+                );
             }
         }
-        
+
         return currentKey;
     }
 }
@@ -618,3 +783,10 @@ export {
     type WebhookClientOptions,
     type WebhookMessageOptions,
 } from "./webhook.js";
+
+/**
+ * Discord.js-familiar alias for {@link RESTError}. `@discordjs/rest` throws `DiscordAPIError`
+ * on a Discord-rejected request; Lunibee keeps `RESTError` as the canonical class and exports
+ * this alias so Discord.js-shaped `catch (err) { if (err instanceof DiscordAPIError) … }` works.
+ */
+export { RESTError as DiscordAPIError };
