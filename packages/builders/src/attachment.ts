@@ -63,6 +63,6 @@ export class AttachmentBuilder {
         if (typeof Buffer !== "undefined" && Buffer.isBuffer(this.file)) {
             return new Uint8Array(this.file);
         }
-        return new Uint8Array();
+        throw new TypeError("Attachment file must be a supported binary value or file path.");
     }
 }
