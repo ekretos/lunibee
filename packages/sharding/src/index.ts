@@ -18,7 +18,8 @@ export interface ShardManagerOptions {
         number | "auto";
     /** Gateway reconnect behavior. */ reconnect?: boolean;
     /** Delay between shard starts in milliseconds. */ spawnDelay?: number;
-    /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. */ autoScaleInterval?: number;
+    /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */ autoScaleInterval?: number;
+    /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */ onAutoScaleError?: (error: unknown) => void;
 }
 /** Runtime state for a managed shard. */
 export interface ShardInfo {
@@ -53,6 +54,14 @@ export class ShardManager {
                 : options.shardCount;
         if (!Number.isInteger(count) || count < 1)
             throw new RangeError("Shard count must be a positive integer.");
+        if (
+            options.autoScaleInterval !== undefined &&
+            (!Number.isInteger(options.autoScaleInterval) ||
+                options.autoScaleInterval < 1000)
+        )
+            throw new RangeError(
+                "autoScaleInterval must be an integer of at least 1000 milliseconds.",
+            );
         this.#auto = options.shardCount === "auto";
         this.#options = { ...options };
         if (options.shardCount !== "auto") this.#initialize(count);
@@ -85,6 +94,11 @@ export class ShardManager {
     }
     /** Connects all shards sequentially. A destroyed manager is reinitialized before connecting. @returns A promise fulfilled after all shards connect. @throws {Error} If a shard fails to connect. */
     public async connect(): Promise<void> {
+        // Clear any timer from a previous connect() so a second call cannot leak one.
+        if (this.#autoScaleTimer) {
+            clearInterval(this.#autoScaleTimer);
+            this.#autoScaleTimer = undefined;
+        }
         await this.#ensureInitialized();
         for (const [id, shard] of this.shards) {
             try {
@@ -116,8 +130,10 @@ export class ShardManager {
             if (recommended !== this.shardCount) {
                 await this.reshard(recommended);
             }
-        } catch {
-            // Suppress errors during auto-scale check
+        } catch (error) {
+            // Surface the failure instead of silently swallowing it; the next
+            // interval tick retries.
+            this.#options.onAutoScaleError?.(error);
         }
     }
     /** Forces a reshard to a new shard count, replacing all active shards. @param count New shard count. */

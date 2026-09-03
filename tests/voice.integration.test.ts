@@ -49,11 +49,13 @@ function mockUdp(): VoiceUdpTransport & {
     };
 }
 
-/** Builds a minimal RTP packet carrying the given SSRC in bytes 8..11 (big-endian). */
-function rtpPacket(ssrc: number): Uint8Array {
-    const buf = new Uint8Array(12);
+/** Builds a minimal RTP packet carrying the given SSRC in bytes 8..11 (big-endian),
+ * followed by an optional audio payload after the 12-byte fixed header. */
+function rtpPacket(ssrc: number, payload: number[] = []): Uint8Array {
+    const buf = new Uint8Array(12 + payload.length);
     const view = new DataView(buf.buffer);
     view.setUint32(8, ssrc, false);
+    buf.set(payload, 12);
     return buf;
 }
 
@@ -100,11 +102,12 @@ describe("Voice integration", () => {
         const audio = conn.receiver.subscribe("user-1");
         const reader = audio.stream.getReader();
 
-        udp.emit(rtpPacket(4242));
+        udp.emit(rtpPacket(4242, [10, 20, 30]));
         const { value, done } = await reader.read();
         expect(done).toBe(false);
         expect(value).toBeInstanceOf(Uint8Array);
-        expect(new DataView(value!.buffer).getUint32(8, false)).toBe(4242);
+        // The RTP header is stripped: subscribers receive only the audio payload.
+        expect(Array.from(value!)).toEqual([10, 20, 30]);
         await reader.cancel();
     });
 

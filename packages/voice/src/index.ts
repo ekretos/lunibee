@@ -138,8 +138,14 @@ export class VoiceConnection {
         if (this.gateway || this.udp) this.#closeTransports();
         this.gateway = gateway;
         this.udp = udp;
-        if (this.udp.onMessage) {
-            this.udp.onMessage((packet) => this.receiver.onPacket(packet));
+        // Capture the transport this listener belongs to so that packets from a
+        // later-replaced transport (whose listener cannot be unregistered — the
+        // VoiceUdpTransport interface exposes no removal API) are ignored.
+        const attachedUdp = udp;
+        if (attachedUdp.onMessage) {
+            attachedUdp.onMessage((packet) => {
+                if (this.udp === attachedUdp) this.receiver.onPacket(packet);
+            });
         }
         return this;
     }
@@ -329,6 +335,8 @@ export class AudioPlayer {
     #state: AudioPlayerState = "idle";
     #stream?: AudioStream;
     #reader?: ReadableStreamDefaultReader<Uint8Array>;
+    /** Resolves the pump's pause await when the player is resumed or stopped. */
+    #resumeSignal?: () => void;
     readonly #listeners = new Map<
         string,
         Set<AudioPlayerListener<keyof AudioPlayerEvents>>
@@ -346,11 +354,14 @@ export class AudioPlayer {
 
     /**
      * Begins playing an audio stream.
-     * If a stream is already playing, it is stopped first.
+     * If a stream is already playing, it is stopped first; the previous
+     * stream's reader cancellation is awaited before the new stream starts so
+     * the old and new pump loops cannot run concurrently.
      * @param audioStream Stream to play.
      */
-    public play(audioStream: AudioStream): void {
-        if (this.#state === "playing" || this.#state === "paused") this.stop();
+    public async play(audioStream: AudioStream): Promise<void> {
+        if (this.#state === "playing" || this.#state === "paused")
+            await this.stop();
         this.#stream = audioStream;
         this.#reader = audioStream.stream.getReader();
         this.#transition("playing");
@@ -367,16 +378,34 @@ export class AudioPlayer {
     public resume(): void {
         if (this.#state !== "paused") return;
         this.#transition("playing");
-        this.#pump().catch((err) => this.#emitError(err));
+        // Wake the existing pump loop rather than starting a second one.
+        const signal = this.#resumeSignal;
+        this.#resumeSignal = undefined;
+        signal?.();
     }
 
-    /** Stops and discards the current stream. */
-    public stop(): void {
+    /**
+     * Stops and discards the current stream. The returned promise resolves once
+     * the underlying reader's cancellation has settled, so a subsequent `play`
+     * never overlaps with the previous pump loop.
+     */
+    public async stop(): Promise<void> {
         if (this.#state === "idle" || this.#state === "stopped") return;
-        this.#reader?.cancel().catch(() => {});
+        const reader = this.#reader;
         this.#reader = undefined;
         this.#stream = undefined;
         this.#transition("stopped");
+        // Release a pump loop that is currently awaiting a resume.
+        const signal = this.#resumeSignal;
+        this.#resumeSignal = undefined;
+        signal?.();
+        if (reader) {
+            try {
+                await reader.cancel();
+            } catch {
+                /* Cancellation failures are non-fatal. */
+            }
+        }
     }
 
     /** Registers an event listener. @returns `this` for chaining. */
@@ -410,29 +439,31 @@ export class AudioPlayer {
         return this;
     }
 
+    /**
+     * Handles a decoded audio chunk. The base implementation is a no-op;
+     * subclasses override this to pipe audio to a UDP socket or other sink.
+     * @param chunk A chunk of audio bytes read from the current stream.
+     */
+    protected onChunk(chunk: Uint8Array): void {
+        void chunk;
+    }
+
     /** Reads chunks from the reader while the player is in a playing state. */
     async #pump(): Promise<void> {
         const reader = this.#reader;
         if (!reader) return;
         while (true) {
-            // Yield while paused
+            // Suspend without polling: park until resume()/stop() signals us.
             if (this.#state === "paused") {
                 await new Promise<void>((resolve) => {
-                    const check = (): void => {
-                        if (this.#state !== "paused") {
-                            resolve();
-                        } else {
-                            setTimeout(check, 25);
-                        }
-                    };
-                    setTimeout(check, 25);
+                    this.#resumeSignal = resolve;
                 });
             }
-            // Abort if stopped
+            // Abort if stopped/idle (e.g. resolved by stop()).
             if (this.#state !== "playing") return;
             const { done, value } = await reader.read();
-            if (done || this.#state !== "playing") {
-                if (this.#state === "playing") {
+            if (done) {
+                if (this.#state === "playing" || this.#state === "paused") {
                     this.#transition("idle");
                     this.#stream = undefined;
                     this.#reader = undefined;
@@ -440,9 +471,10 @@ export class AudioPlayer {
                 }
                 return;
             }
-            // value is a Uint8Array chunk — consumers attach to the stream directly
-            // or subclass AudioPlayer to pipe to a UDP socket etc.
-            void value;
+            // A stop() during the read wins — drop the chunk and exit.
+            if (this.#state !== "playing" && this.#state !== "paused") return;
+            // Deliver the chunk to the sink hook; loop back to honour pause state.
+            this.onChunk(value);
         }
     }
 
@@ -481,7 +513,12 @@ export class VoiceReceiver {
     /** The connection this receiver is attached to. */
     public readonly connection: VoiceConnection;
     readonly #ssrcMap = new Map<number, string>();
-    readonly #streams = new Map<string, ReadableStreamDefaultController<Uint8Array>>();
+    /** Active stream controllers per user; a Set so multiple subscribers to the
+     * same user all receive audio instead of the last one overwriting earlier ones. */
+    readonly #streams = new Map<
+        string,
+        Set<ReadableStreamDefaultController<Uint8Array>>
+    >();
 
     /** Creates a VoiceReceiver. @param connection Voice connection. */
     public constructor(connection: VoiceConnection) {
@@ -495,33 +532,60 @@ export class VoiceReceiver {
 
     /** Subscribes to incoming audio from a specific user. @param userId User identifier. @returns A binary readable stream of the audio. */
     public subscribe(userId: string): AudioStream {
+        let controllerRef: ReadableStreamDefaultController<Uint8Array>;
         const stream = new ReadableStream<Uint8Array>({
             start: (controller) => {
-                this.#streams.set(userId, controller);
+                controllerRef = controller;
+                let set = this.#streams.get(userId);
+                if (!set) this.#streams.set(userId, (set = new Set()));
+                set.add(controller);
             },
             cancel: () => {
-                this.#streams.delete(userId);
-            }
+                const set = this.#streams.get(userId);
+                if (set) {
+                    set.delete(controllerRef);
+                    if (set.size === 0) this.#streams.delete(userId);
+                }
+            },
         });
         return new AudioStream(stream, { title: `User ${userId} Audio` });
     }
 
-    /** Processes an incoming UDP packet, extracting SSRC and routing to the corresponding stream. */
+    /** Processes an incoming UDP packet, extracting SSRC and routing the audio
+     * payload (RTP header stripped) to every subscriber for the mapped user. */
     public onPacket(packet: Uint8Array): void {
         if (packet.length < 12) return;
-        
-        const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength);
+
+        const view = new DataView(
+            packet.buffer,
+            packet.byteOffset,
+            packet.byteLength,
+        );
         const ssrc = view.getUint32(8, false);
-        
+
         const userId = this.#ssrcMap.get(ssrc);
-        if (userId) {
-            const controller = this.#streams.get(userId);
-            if (controller) {
-                try {
-                    controller.enqueue(packet);
-                } catch {
-                    // Ignore errors on closed streams
-                }
+        if (!userId) return;
+        const controllers = this.#streams.get(userId);
+        if (!controllers || controllers.size === 0) return;
+
+        // Compute the RTP payload offset: 12-byte fixed header + CSRC list, plus
+        // the extension header when the X bit is set.
+        const csrcCount = packet[0] & 0x0f;
+        let offset = 12 + csrcCount * 4;
+        const hasExtension = (packet[0] & 0x10) !== 0;
+        if (hasExtension) {
+            if (packet.length < offset + 4) return;
+            const extWords = view.getUint16(offset + 2, false);
+            offset += 4 + extWords * 4;
+        }
+        if (packet.length < offset) return;
+        const payload = packet.slice(offset);
+
+        for (const controller of controllers) {
+            try {
+                controller.enqueue(payload);
+            } catch {
+                // Ignore errors on closed streams.
             }
         }
     }

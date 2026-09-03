@@ -122,16 +122,20 @@ describe("Voice", () => {
         let readResult: any;
         reader.read().then((res) => { readResult = res; });
 
-        // Simulate incoming UDP packet (RTP header with SSRC 12345 at byte 8)
-        const packet = new Uint8Array(12);
+        // Simulate incoming UDP packet: 12-byte RTP header (SSRC 12345 at byte 8)
+        // followed by a 4-byte audio payload.
+        const payload = new Uint8Array([1, 2, 3, 4]);
+        const packet = new Uint8Array(12 + payload.length);
         new DataView(packet.buffer).setUint32(8, 12345, false);
+        packet.set(payload, 12);
         onMessageCb!(packet);
 
         // Allow microtask queue to process
         return new Promise<void>((resolve) => {
             setTimeout(() => {
                 expect(readResult).toBeDefined();
-                expect(readResult.value).toEqual(packet);
+                // The RTP header is stripped; only the audio payload is delivered.
+                expect(readResult.value).toEqual(payload);
                 expect(readResult.done).toBe(false);
                 resolve();
             }, 10);
