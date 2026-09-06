@@ -150,18 +150,18 @@ Wraps text in a fenced code block.
 
 <Tabs>
 <TabItem label="TypeScript">
-```ts
-codeBlock("const x = 1;", "ts")  // → "
-```
+~~~~ts
+codeBlock("const x = 1;", "ts")  // → "```ts\nconst x = 1;\n```"
+codeBlock("plain text")           // → "```\nplain text\n```"
+~~~~
 </TabItem>
 <TabItem label="JavaScript">
-```js
-codeBlock("const x = 1;", "ts")  // → "
-```
-</TabItem>
-</Tabs>ts\nconst x = 1;\n```"
+~~~~js
+codeBlock("const x = 1;", "ts")  // → "```ts\nconst x = 1;\n```"
 codeBlock("plain text")           // → "```\nplain text\n```"
-```
+~~~~
+</TabItem>
+</Tabs>
 
 ### `blockQuote(text)`
 

@@ -13,7 +13,7 @@ When a Discord bot joins more than **2,500 guilds**, Discord enforces Gateway Sh
 
 Discord distributes guilds across shards using a deterministic snowflake formula:
 
-$$\text{Shard ID} = (\text{Guild ID} \gg 22) \pmod{\text{Total Shards}}$$
+`$$\text{Shard ID} = (\text{Guild ID} \gg 22) \pmod{\text{Total Shards}}$$`
 
 Lunibee handles this calculation automatically via `manager.getShardIdForGuild(guildId)`.
 
