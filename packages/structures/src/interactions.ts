@@ -562,13 +562,11 @@ export class CommandInteraction extends Interaction {
         const rawOptions =
             (data.data?.options as APIInteractionDataOption[]) ?? [];
         const resolved = (data.data?.resolved as Record<string, unknown>) ?? {};
-        // If a subcommand is present, drill into its options for the resolver
-        const sub = rawOptions.find(
-            (o) =>
-                o.type === 1 /* SubCommand */ ||
-                o.type === 2 /* SubCommandGroup */,
-        );
-        this.options = new CommandOptions(sub?.options ?? rawOptions, resolved);
+        // Hand the resolver the *top-level* options. CommandOptions performs the
+        // subcommand/group drill itself and records the names it walks through;
+        // pre-drilling here would strip those wrappers before it sees them, so
+        // getSubcommand()/getSubcommandGroup() would report null.
+        this.options = new CommandOptions(rawOptions, resolved);
     }
 }
 

@@ -1,0 +1,440 @@
+---
+title: Formatters
+description: Utility functions for Discord markdown, mentions, timestamps, and text formatting.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@lunibee/formatters` provides pure functions for generating Discord-flavoured markdown strings, mention formats, and timestamp displays.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import {
+  bold, italic, underline, strikethrough, spoiler, inlineCode, codeBlock,
+  blockQuote, heading, subtext, link, masked,
+  orderedList, bulletList, escapeMarkdown,
+  userMention, channelMention, roleMention,
+  timestamp,
+} from "lunibee";
+// or directly:
+import { bold } from "@lunibee/formatters";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import {
+  bold, italic, underline, strikethrough, spoiler, inlineCode, codeBlock,
+  blockQuote, heading, subtext, link, masked,
+  orderedList, bulletList, escapeMarkdown,
+  userMention, channelMention, roleMention,
+  timestamp,
+} from "lunibee";
+// or directly:
+import { bold } from "@lunibee/formatters";
+```
+</TabItem>
+</Tabs>
+
+---
+
+## Text Formatting
+
+### `bold(text)`
+
+Wraps text in `**...**`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+bold("Hello, World!")  // → "**Hello, World!**"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+bold("Hello, World!")  // → "**Hello, World!**"
+```
+</TabItem>
+</Tabs>
+
+### `italic(text)`
+
+Wraps text in `_..._`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+italic("Important note")  // → "_Important note_"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+italic("Important note")  // → "_Important note_"
+```
+</TabItem>
+</Tabs>
+
+### `underline(text)`
+
+Wraps text in `__...__`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+underline("Underlined")  // → "__Underlined__"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+underline("Underlined")  // → "__Underlined__"
+```
+</TabItem>
+</Tabs>
+
+### `strikethrough(text)`
+
+Wraps text in `~~...~~`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+strikethrough("Deleted")  // → "~~Deleted~~"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+strikethrough("Deleted")  // → "~~Deleted~~"
+```
+</TabItem>
+</Tabs>
+
+### `spoiler(text)`
+
+Wraps text in `||...||`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+spoiler("Secret content")  // → "||Secret content||"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+spoiler("Secret content")  // → "||Secret content||"
+```
+</TabItem>
+</Tabs>
+
+### `inlineCode(text)`
+
+Wraps text in backticks.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+inlineCode("process.env.TOKEN")  // → "`process.env.TOKEN`"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+inlineCode("process.env.TOKEN")  // → "`process.env.TOKEN`"
+```
+</TabItem>
+</Tabs>
+
+### `codeBlock(text, language?)`
+
+Wraps text in a fenced code block.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+codeBlock("const x = 1;", "ts")  // → "
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+codeBlock("const x = 1;", "ts")  // → "
+```
+</TabItem>
+</Tabs>ts\nconst x = 1;\n```"
+codeBlock("plain text")           // → "```\nplain text\n```"
+```
+
+### `blockQuote(text)`
+
+Prefixes each line with `> `.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+blockQuote("This is quoted.")  // → "> This is quoted."
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+blockQuote("This is quoted.")  // → "> This is quoted."
+```
+</TabItem>
+</Tabs>
+
+### `heading(text, level?)`
+
+Creates a markdown heading (level 1–3, default 1).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+heading("Server Status", 2)  // → "## Server Status"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+heading("Server Status", 2)  // → "## Server Status"
+```
+</TabItem>
+</Tabs>
+
+### `subtext(text)`
+
+Creates Discord-style subtext (wraps in `-# ...`).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+subtext("Last updated 3 hours ago")  // → "-# Last updated 3 hours ago"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+subtext("Last updated 3 hours ago")  // → "-# Last updated 3 hours ago"
+```
+</TabItem>
+</Tabs>
+
+### `masked(text)`
+
+Masks text using the backtick escape for display without markdown parsing.
+
+### `escapeMarkdown(value)`
+
+Escapes all Discord markdown special characters in a string. Useful for displaying user-supplied content.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+escapeMarkdown("**Bold** and ~~strikethrough~~")
+// → "\\*\\*Bold\\*\\* and \\~\\~strikethrough\\~\\~"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+escapeMarkdown("**Bold** and ~~strikethrough~~")
+// → "\\*\\*Bold\\*\\* and \\~\\~strikethrough\\~\\~"
+```
+</TabItem>
+</Tabs>
+
+---
+
+## Lists
+
+### `orderedList(...items)`
+
+Creates a numbered list.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+orderedList("First item", "Second item", "Third item")
+// → "1. First item\n2. Second item\n3. Third item"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+orderedList("First item", "Second item", "Third item")
+// → "1. First item\n2. Second item\n3. Third item"
+```
+</TabItem>
+</Tabs>
+
+### `bulletList(...items)`
+
+Creates a bulleted list.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+bulletList("Apples", "Oranges", "Bananas")
+// → "- Apples\n- Oranges\n- Bananas"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+bulletList("Apples", "Oranges", "Bananas")
+// → "- Apples\n- Oranges\n- Bananas"
+```
+</TabItem>
+</Tabs>
+
+---
+
+## Links
+
+### `link(label, url, title?)`
+
+Creates a Markdown hyperlink.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+link("Lunibee Docs", "https://lunibee.js.org")
+// → "[Lunibee Docs](https://lunibee.js.org)"
+
+link("Hover me", "https://lunibee.js.org", "Official documentation")
+// → "[Hover me](https://lunibee.js.org 'Official documentation')"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+link("Lunibee Docs", "https://lunibee.js.org")
+// → "[Lunibee Docs](https://lunibee.js.org)"
+
+link("Hover me", "https://lunibee.js.org", "Official documentation")
+// → "[Hover me](https://lunibee.js.org 'Official documentation')"
+```
+</TabItem>
+</Tabs>
+
+---
+
+## Mentions
+
+### `userMention(id)`
+
+Creates a `<@userId>` mention string.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+userMention("123456789")  // → "<@123456789>"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+userMention("123456789")  // → "<@123456789>"
+```
+</TabItem>
+</Tabs>
+
+### `channelMention(id)`
+
+Creates a `<#channelId>` mention string.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+channelMention("987654321")  // → "<#987654321>"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+channelMention("987654321")  // → "<#987654321>"
+```
+</TabItem>
+</Tabs>
+
+### `roleMention(id)`
+
+Creates a `<@&roleId>` mention string.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+roleMention("111222333")  // → "<@&111222333>"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+roleMention("111222333")  // → "<@&111222333>"
+```
+</TabItem>
+</Tabs>
+
+---
+
+## Timestamps
+
+### `timestamp(dateOrMs, style?)`
+
+Creates a Discord timestamp that renders dynamically in each user's local timezone.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+timestamp(Date.now())                  // → "<t:1700000000>"
+timestamp(new Date(), "R")             // → "<t:1700000000:R>"
+timestamp(1700000000, "F")             // → "<t:1700000000:F>"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+timestamp(Date.now())                  // → "<t:1700000000>"
+timestamp(new Date(), "R")             // → "<t:1700000000:R>"
+timestamp(1700000000, "F")             // → "<t:1700000000:F>"
+```
+</TabItem>
+</Tabs>
+
+| Style | Example output |
+|---|---|
+| `"t"` | 9:30 PM |
+| `"T"` | 9:30:00 PM |
+| `"d"` | 11/14/2023 |
+| `"D"` | November 14, 2023 |
+| `"f"` | November 14, 2023 9:30 PM |
+| `"F"` | Tuesday, November 14, 2023 9:30 PM |
+| `"R"` | 2 hours ago *(relative)* |
+
+---
+
+## Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { bold, italic, codeBlock, timestamp, userMention, bulletList } from "lunibee";
+
+await channel.send({
+  content: [
+    `${bold("Welcome")} to the server, ${userMention(userId)}!`,
+    italic("Please read the rules before chatting."),
+    "",
+    `You joined: ${timestamp(joinedAt, "R")}`,
+    "",
+    bold("Quick links:"),
+    bulletList("#rules", "#announcements", "#general"),
+  ].join("\n"),
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { bold, italic, codeBlock, timestamp, userMention, bulletList } from "lunibee";
+
+await channel.send({
+  content: [
+    `${bold("Welcome")} to the server, ${userMention(userId)}!`,
+    italic("Please read the rules before chatting."),
+    "",
+    `You joined: ${timestamp(joinedAt, "R")}`,
+    "",
+    bold("Quick links:"),
+    bulletList("#rules", "#announcements", "#general"),
+  ].join("\n"),
+});
+```
+</TabItem>
+</Tabs>

@@ -1,0 +1,144 @@
+---
+title: AttachmentBuilder
+description: Builder for file attachments to send with Discord messages.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`AttachmentBuilder` wraps raw binary data into a named attachment object for use in message sends.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { AttachmentBuilder } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { AttachmentBuilder } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new AttachmentBuilder(data: Uint8Array | ArrayBuffer | Buffer, options?: AttachmentData)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new AttachmentBuilder(data: Uint8Array | ArrayBuffer | Buffer, options?: AttachmentData)
+```
+</TabItem>
+</Tabs>
+
+| Parameter | Type | Description |
+|---|---|---|
+| `data` | `Uint8Array \| ArrayBuffer \| Buffer` | Raw file data. |
+| `options.name` | `string` | Filename including extension (e.g. `"image.png"`). |
+| `options.description` | `string` | Alt text description for the file. |
+
+## Methods
+
+### `setName(name)`
+
+Sets or changes the filename.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+attachment.setName("welcome-banner.png");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+attachment.setName("welcome-banner.png");
+```
+</TabItem>
+</Tabs>
+
+### `setDescription(description)`
+
+Sets the alt text for the file.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+attachment.setDescription("A welcome banner for new members.");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+attachment.setDescription("A welcome banner for new members.");
+```
+</TabItem>
+</Tabs>
+
+### `toJSON()`
+
+Serializes to a REST-ready attachment object.
+
+## Examples
+
+**Send a generated image**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { AttachmentBuilder } from "lunibee";
+import { readFile } from "node:fs/promises";
+
+const imageData = await readFile("./assets/welcome.png");
+const attachment = new AttachmentBuilder(imageData, {
+  name: "welcome.png",
+  description: "Welcome banner",
+});
+
+await channel.send({ files: [attachment] });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { AttachmentBuilder } from "lunibee";
+import { readFile } from "node:fs/promises";
+
+const imageData = await readFile("./assets/welcome.png");
+const attachment = new AttachmentBuilder(imageData, {
+  name: "welcome.png",
+  description: "Welcome banner",
+});
+
+await channel.send({ files: [attachment] });
+```
+</TabItem>
+</Tabs>
+
+**Send with an embed referencing the attachment**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const attachment = new AttachmentBuilder(imageData, { name: "chart.png" });
+const embed = new EmbedBuilder()
+  .setTitle("Monthly Stats")
+  .setImage("attachment://chart.png"); // reference the attachment by name
+
+await channel.send({ embeds: [embed], files: [attachment] });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const attachment = new AttachmentBuilder(imageData, { name: "chart.png" });
+const embed = new EmbedBuilder()
+  .setTitle("Monthly Stats")
+  .setImage("attachment://chart.png"); // reference the attachment by name
+
+await channel.send({ embeds: [embed], files: [attachment] });
+```
+</TabItem>
+</Tabs>

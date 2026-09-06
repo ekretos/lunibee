@@ -1,0 +1,222 @@
+---
+title: Guild
+description: Represents a Discord guild (server) with metadata, CDN image helpers, and feature checks.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Guild` wraps a Discord guild object, exposing server metadata, CDN image URL helpers, and feature flag checks.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Guild } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Guild } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | `string` | Snowflake ID. |
+| `name` | `string` | Server name. |
+| `icon` | `string \| null` | Icon hash. Use `iconURL()` to get the full URL. |
+| `splash` | `string \| null` | Invite splash hash. |
+| `banner` | `string \| null` | Banner hash. |
+| `description` | `string \| null` | Server description. |
+| `ownerId` | `string \| undefined` | Snowflake of the guild owner. |
+| `features` | `string[]` | List of guild feature flags (e.g. `"COMMUNITY"`). |
+| `verificationLevel` | `number` | Verification level (0–4). |
+| `premiumTier` | `number` | Boost level (0–3). |
+| `premiumSubscriptionCount` | `number` | Total boosts. |
+| `memberCount` | `number \| undefined` | Approximate member count. |
+| `vanityUrlCode` | `string \| null` | Custom invite slug. |
+| `preferredLocale` | `string` | Server locale (e.g. `"en-US"`). |
+| `nsfwLevel` | `number` | NSFW level (0–3). |
+| `rulesChannelId` | `string \| null` | Rules channel (Community guilds). |
+| `systemChannelId` | `string \| null` | System messages channel. |
+| `maxMembers` | `number` | Member cap. |
+| `mfaLevel` | `number` | MFA requirement for moderators. |
+
+## Boolean Getters
+
+| Getter | Description |
+|---|---|
+| `isCommunity` | `true` if the guild is a Community server. |
+| `isPartnered` | `true` if the guild is a Discord Partner. |
+| `isVerified` | `true` if the guild is Discord Verified. |
+| `isBoosted` | `true` if there are any active boosts. |
+| `hasVanityUrl` | `true` if a vanity URL is configured. |
+| `boostLevel` | Boost tier (alias of `premiumTier`). |
+| `vanityURL` | Full vanity URL string, or `null`. |
+
+## CDN Image Methods
+
+All image methods accept an optional `ImageURLOptions` object:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+interface ImageURLOptions {
+  extension?: "png" | "jpg" | "webp" | "gif" | "jpeg";
+  size?: 16 | 32 | 64 | 128 | 256 | 512 | 1024 | 2048 | 4096;
+  forceStatic?: boolean;
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+  extension?: "png" | "jpg" | "webp" | "gif" | "jpeg";
+  size?: 16 | 32 | 64 | 128 | 256 | 512 | 1024 | 2048 | 4096;
+  forceStatic?: boolean;
+}
+```
+</TabItem>
+</Tabs>
+
+### `iconURL(options?)`
+
+Returns the guild icon URL, or `null` if no icon is set.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const icon = guild.iconURL({ size: 256, extension: "png" });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const icon = guild.iconURL({ size , extension: "png" });
+```
+</TabItem>
+</Tabs>
+
+### `splashURL(options?)`
+
+Returns the invite splash URL, or `null`.
+
+### `bannerURL(options?)`
+
+Returns the banner URL, or `null`.
+
+### `discoverySplashURL(options?)`
+
+Returns the discovery splash URL, or `null`.
+
+### `widgetImageURL(style?)`
+
+Returns a guild widget image URL.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const widget = guild.widgetImageURL("banner3");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const widget = guild.widgetImageURL("banner3");
+```
+</TabItem>
+</Tabs>
+
+### `hasFeature(feature)`
+
+Returns `true` if the guild has a specific feature flag.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+if (guild.hasFeature("MONETIZATION_ENABLED")) {
+  console.log("Subscriptions are enabled!");
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (guild.hasFeature("MONETIZATION_ENABLED")) {
+  console.log("Subscriptions are enabled!");
+}
+```
+</TabItem>
+</Tabs>
+
+### `toString()`
+
+Returns the guild name.
+
+## Examples
+
+**Log guild info on join**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("guildCreate", (guild) => {
+  console.log(`Joined: ${guild.name} (${guild.id}) — ${guild.memberCount} members`);
+  if (guild.isCommunity) console.log("  → Community server");
+  if (guild.isBoosted) console.log(`  → Boost Level ${guild.boostLevel}`);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("guildCreate", (guild) => {
+  console.log(`Joined: ${guild.name} (${guild.id}) — ${guild.memberCount} members`);
+  if (guild.isCommunity) console.log("  → Community server");
+  if (guild.isBoosted) console.log(`  → Boost Level ${guild.boostLevel}`);
+});
+```
+</TabItem>
+</Tabs>
+
+**Guild info command**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "serverinfo") return;
+  const guild = client.guilds.get(interaction.guildId!);
+  if (!guild) return;
+  const embed = new EmbedBuilder()
+    .setTitle(guild.name)
+    .setThumbnail(guild.iconURL({ size: 128 }) ?? "")
+    .addFields(
+      { name: "Members", value: String(guild.memberCount ?? "?"), inline: true },
+      { name: "Boost Level", value: String(guild.boostLevel), inline: true },
+      { name: "Locale", value: guild.preferredLocale, inline: true },
+    )
+    .setColor(0xf59e0b);
+  await interaction.reply({ embeds: [embed] });
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "serverinfo") return;
+  const guild = client.guilds.get(interaction.guildId);
+  if (!guild) return;
+  const embed = new EmbedBuilder()
+    .setTitle(guild.name)
+    .setThumbnail(guild.iconURL({ size: 128 }) ?? "")
+    .addFields(
+      { name: "Members", value: String(guild.memberCount ?? "?"), inline: true },
+      { name: "Boost Level", value: String(guild.boostLevel), inline: true },
+      { name: "Locale", value: guild.preferredLocale, inline: true },
+    )
+    .setColor(0xf59e0b);
+  await interaction.reply({ embeds: [embed] });
+});
+```
+</TabItem>
+</Tabs>

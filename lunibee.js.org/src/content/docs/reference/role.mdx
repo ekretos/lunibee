@@ -1,0 +1,166 @@
+---
+title: Role
+description: Represents a Discord guild role with color, permissions, and mention formatting.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Role` wraps a Discord role payload with permission access, color helpers, and mention formatting.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Role } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Role } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | `string` | Snowflake ID. |
+| `name` | `string` | Role name. |
+| `color` | `number` | Role color as a 24-bit RGB integer. |
+| `colorHex` | `string` | Role color as `#RRGGBB` hex string. |
+| `hoist` | `boolean` | Whether this role is displayed separately in the member list. |
+| `permissions` | `PermissionsBitField` | Permission bitfield. |
+| `managed` | `boolean` | Whether this role is managed by a bot or integration. |
+| `mentionable` | `boolean` | Whether this role can be mentioned. |
+| `position` | `number` | Position in the role hierarchy. |
+| `unicodeEmoji` | `string \| null` | Unicode emoji icon. |
+| `iconHash` | `string \| null` | Custom icon image hash. |
+| `tags` | `Record<string, unknown> \| null` | Role tags (bot ID, integration ID, etc.). |
+| `createdAt` | `Date` | When the role was created (from snowflake). |
+
+## Methods
+
+### `iconURL(options?)`
+
+Returns the custom icon URL for this role, or `null` if none.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const icon = role.iconURL({ size: 64 });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const icon = role.iconURL({ size: 64 });
+```
+</TabItem>
+</Tabs>
+
+### `isEveryone(guildId)`
+
+Returns `true` if this is the `@everyone` base role (role ID equals guild ID).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+if (role.isEveryone(guildId)) {
+  console.log("This is the @everyone role.");
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (role.isEveryone(guildId)) {
+  console.log("This is the @everyone role.");
+}
+```
+</TabItem>
+</Tabs>
+
+### `toString()`
+
+Returns the Discord role mention string. Used automatically in template literals.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await channel.send({ content: `Welcome! You've been assigned ${role}.` });
+// → "Welcome! You've been assigned <@&123456789>."
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await channel.send({ content: `Welcome You've been assigned ${role}.` });
+// → "Welcome You've been assigned <@&123456789>."
+```
+</TabItem>
+</Tabs>
+
+## Examples
+
+**Assign a role on join**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("guildMemberAdd", async (memberData) => {
+  const WELCOME_ROLE_ID = "123456789012345678";
+  const guild = client.guilds.get(memberData.guild_id);
+  if (!guild) return;
+  await client.channels.members(memberData.guild_id).addRole(memberData.user.id, WELCOME_ROLE_ID);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("guildMemberAdd", async (memberData) => {
+  const WELCOME_ROLE_ID = "123456789012345678";
+  const guild = client.guilds.get(memberData.guild_id);
+  if (!guild) return;
+  await client.channels.members(memberData.guild_id).addRole(memberData.user.id, WELCOME_ROLE_ID);
+});
+```
+</TabItem>
+</Tabs>
+
+**Role info command**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "roleinfo") return;
+  const roleData = interaction.options.getRole("role", true) as any;
+  const embed = new EmbedBuilder()
+    .setTitle(roleData.name)
+    .setColor(roleData.color || 0x99aab5)
+    .addFields(
+      { name: "Color", value: `#${roleData.color.toString(16).padStart(6, "0").toUpperCase()}`, inline: true },
+      { name: "Mentionable", value: roleData.mentionable ? "Yes" : "No", inline: true },
+      { name: "Hoisted", value: roleData.hoist ? "Yes" : "No", inline: true },
+    );
+  await interaction.reply({ embeds: [embed] });
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "roleinfo") return;
+  const roleData = interaction.options.getRole("role", true) as any;
+  const embed = new EmbedBuilder()
+    .setTitle(roleData.name)
+    .setColor(roleData.color || 0x99aab5)
+    .addFields(
+      { name: "Color", value: `#${roleData.color.toString(16).padStart(6, "0").toUpperCase()}`, inline: true },
+      { name: "Mentionable", value: roleData.mentionable ? "Yes" : "No", inline: true },
+      { name: "Hoisted", value: roleData.hoist ? "Yes" : "No", inline: true },
+    );
+  await interaction.reply({ embeds: [embed] });
+});
+```
+</TabItem>
+</Tabs>

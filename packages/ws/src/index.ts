@@ -246,6 +246,16 @@ export class Gateway {
             throw new TypeError(
                 "Gateway payload must contain an integer opcode.",
             );
+        return this.#dispatch(payload, false);
+    }
+    /**
+     * Writes a payload to the socket. Heartbeats pass `privileged` so they are
+     * never starved by application traffic: the 115 budget sits below
+     * Discord's real 120/60s limit precisely to leave room for them, so
+     * spending that headroom on heartbeats is what it is reserved for. They
+     * are still recorded, keeping the true total under Discord's limit.
+     */
+    #dispatch(payload: GatewayPayload, privileged: boolean): boolean {
         if (this.#ws?.readyState !== WebSocket.OPEN) return false;
         const now = Date.now();
         while (
@@ -253,7 +263,7 @@ export class Gateway {
             now - this.#sendTimestamps[0]! >= 60000
         )
             this.#sendTimestamps.shift();
-        if (this.#sendTimestamps.length >= 115) {
+        if (!privileged && this.#sendTimestamps.length >= 115) {
             this.#emitError(
                 new GatewayError("Gateway send rate budget exhausted."),
             );
@@ -342,10 +352,14 @@ export class Gateway {
     }
     #startZombieDetection(): void {
         if (this.#zombieTimer) clearInterval(this.#zombieTimer);
+        // Poll granularity only needs to be a fraction of the staleness
+        // deadline (heartbeatInterval + heartbeatAckTimeout, ~51s in
+        // practice). A 1s ceiling keeps detection latency negligible while
+        // costing one wakeup per second per shard instead of four.
         const interval = Math.max(
             1,
             Math.min(
-                250,
+                1000,
                 this.#options.heartbeatAckTimeout,
                 this.#options.zombieTimeout / 2,
             ),
@@ -566,12 +580,15 @@ export class Gateway {
         this.#heartbeatACK = false;
         this.#heartbeatSentAt = Date.now();
         if (
-            !this.send({
-                op: GatewayOpcodes.Heartbeat,
-                d: this.#sequence,
-                s: null,
-                t: null,
-            })
+            !this.#dispatch(
+                {
+                    op: GatewayOpcodes.Heartbeat,
+                    d: this.#sequence,
+                    s: null,
+                    t: null,
+                },
+                true,
+            )
         ) {
             this.#emitError(
                 new GatewayError(
@@ -662,7 +679,10 @@ export class Gateway {
             this.#options.reconnectMaxDelay,
             this.#options.reconnectBaseDelay * 2 ** this.#attempt++,
         );
-        const jitter = Math.random() * Math.min(250, Math.max(1, delay * 0.25));
+        // Jitter must scale with the delay: a fixed ceiling would reconnect
+        // every shard inside the same narrow window after a gateway-wide
+        // restart, which is exactly when decorrelation matters.
+        const jitter = Math.random() * Math.max(1, delay * 0.25);
         this.#reconnectTimer = setTimeout(() => {
             this.#reconnectTimer = undefined;
             this.#open(

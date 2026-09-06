@@ -1,0 +1,304 @@
+---
+title: EmbedBuilder
+description: Fluent builder for Discord rich embed message payloads with validation.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`EmbedBuilder` creates Discord embed payloads using a chainable API. All limits (title length, field count, total character count) are validated before `toJSON()` is called.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { EmbedBuilder } from "lunibee";
+// or from the sub-package:
+import { EmbedBuilder } from "@lunibee/builders";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { EmbedBuilder } from "lunibee";
+// or from the sub-package:
+import { EmbedBuilder } from "@lunibee/builders";
+```
+</TabItem>
+</Tabs>
+
+## Methods
+
+All methods return `this` for chaining.
+
+### `setTitle(title)`
+
+Sets the embed title (max 256 characters).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setTitle("Server Status 🐝");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setTitle("Server Status 🐝");
+```
+</TabItem>
+</Tabs>
+
+### `setDescription(description)`
+
+Sets the embed description (max 4096 characters).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setDescription("All systems operational.");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setDescription("All systems operational.");
+```
+</TabItem>
+</Tabs>
+
+### `setColor(color)`
+
+Sets the embed accent color as a hex integer.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setColor(0xf59e0b); // amber
+embed.setColor(0x5865f2); // Discord blurple
+embed.setColor(0xed4245); // red
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setColor(0xf59e0b); // amber
+embed.setColor(0x5865f2); // Discord blurple
+embed.setColor(0xed4245); // red
+```
+</TabItem>
+</Tabs>
+
+### `setURL(url)`
+
+Makes the title a hyperlink.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setURL("https://lunibee.js.org");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setURL("https://lunibee.js.org");
+```
+</TabItem>
+</Tabs>
+
+### `setTimestamp(date?)`
+
+Adds a timestamp. Defaults to now if no date is passed.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setTimestamp();
+embed.setTimestamp(new Date("2024-01-01"));
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setTimestamp();
+embed.setTimestamp(new Date("2024-01-01"));
+```
+</TabItem>
+</Tabs>
+
+### `setAuthor(options)`
+
+Sets the embed author.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setAuthor({
+  name: "Lunibee Bot",
+  iconURL: "https://example.com/icon.png",
+  url: "https://lunibee.js.org",
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setAuthor({
+  name: "Lunibee Bot",
+  iconURL: "https://example.com/icon.png",
+  url: "https://lunibee.js.org",
+});
+```
+</TabItem>
+</Tabs>
+
+### `setFooter(options)`
+
+Sets the embed footer.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setFooter({ text: "Powered by Lunibee 🐝", iconURL: "https://example.com/icon.png" });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setFooter({ text: "Powered by Lunibee 🐝", iconURL: "https://example.com/icon.png" });
+```
+</TabItem>
+</Tabs>
+
+### `setThumbnail(url)`
+
+Sets the thumbnail (small image on the top-right).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setThumbnail(user.displayAvatarURL({ size: 128 }));
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setThumbnail(user.displayAvatarURL({ size: 128 }));
+```
+</TabItem>
+</Tabs>
+
+### `setImage(url)`
+
+Sets the large embed image.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.setImage("https://example.com/banner.png");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.setImage("https://example.com/banner.png");
+```
+</TabItem>
+</Tabs>
+
+### `addFields(...fields)`
+
+Adds one or more fields (max 25 total, each name ≤ 256 chars, value ≤ 1024 chars).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+embed.addFields(
+  { name: "Ping", value: "24ms", inline: true },
+  { name: "Uptime", value: "48h", inline: true },
+  { name: "Guilds", value: "1,234", inline: true },
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+embed.addFields(
+  { name: "Ping", value: "24ms", inline: true },
+  { name: "Uptime", value: "48h", inline: true },
+  { name: "Guilds", value: "1,234", inline: true },
+);
+```
+</TabItem>
+</Tabs>
+
+### `spliceFields(index, deleteCount, ...fields)`
+
+Replaces or removes fields at a given index.
+
+### `toJSON()`
+
+Serializes the embed to a raw Discord API-compatible object.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const payload = embed.toJSON();
+// Use in: channel.send({ embeds: [embed] })
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const payload = embed.toJSON();
+// Use in: channel.send({ embeds: [embed] })
+```
+</TabItem>
+</Tabs>
+
+## Full Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { EmbedBuilder } from "lunibee";
+
+const embed = new EmbedBuilder()
+  .setTitle("Moderation Log 🔨")
+  .setDescription("A member was banned from the server.")
+  .setColor(0xed4245)
+  .setAuthor({ name: "AutoMod", iconURL: "https://example.com/automod.png" })
+  .addFields(
+    { name: "User", value: `<@${bannedUserId}>`, inline: true },
+    { name: "Reason", value: banReason, inline: true },
+    { name: "Moderator", value: `<@${modId}>`, inline: false },
+  )
+  .setTimestamp()
+  .setFooter({ text: "Lunibee Moderation" });
+
+await logChannel.send({ embeds: [embed] });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { EmbedBuilder } from "lunibee";
+
+const embed = new EmbedBuilder()
+  .setTitle("Moderation Log 🔨")
+  .setDescription("A member was banned from the server.")
+  .setColor(0xed4245)
+  .setAuthor({ name: "AutoMod", iconURL: "https://example.com/automod.png" })
+  .addFields(
+    { name: "User", value: `<@${bannedUserId}>`, inline: true },
+    { name: "Reason", value , inline: true },
+    { name: "Moderator", value: `<@${modId}>`, inline: false },
+  )
+  .setTimestamp()
+  .setFooter({ text: "Lunibee Moderation" });
+
+await logChannel.send({ embeds: [embed] });
+```
+</TabItem>
+</Tabs>
+
+## Limits
+
+| Property | Limit |
+|---|---|
+| Title | 256 characters |
+| Description | 4,096 characters |
+| Field name | 256 characters |
+| Field value | 1,024 characters |
+| Fields | 25 |
+| Footer text | 2,048 characters |
+| Author name | 256 characters |
+| Total embed characters | 6,000 |

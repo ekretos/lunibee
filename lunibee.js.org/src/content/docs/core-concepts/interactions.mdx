@@ -3,6 +3,8 @@ title: "Interactions & Responses"
 description: Complete guide for Discord Slash Commands, Buttons, Select Menus, Modals, and Autocomplete.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 Discord Interactions provide modern, structured interfaces for user input. Lunibee offers typed structures for all interaction types with built-in response management (initial reply, deferred replies, ephemeral flags, edits, follow-ups, and modal popups).
 
 ---
@@ -36,6 +38,8 @@ sequenceDiagram
 
 Triggered when a user executes a Slash Command.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { Client, EmbedBuilder, MessageFlags } from "lunibee";
 
@@ -62,6 +66,36 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client, EmbedBuilder, MessageFlags } from "lunibee";
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const { commandName, options } = interaction;
+
+  if (commandName === "userinfo") {
+    const targetUser = options.getUser("target") ?? interaction.user;
+
+    const embed = new EmbedBuilder()
+      .setTitle(`User Info - ${targetUser.username}`)
+      .setThumbnail(`https://cdn.discordapp.com/avatars/${targetUser.id}/${targetUser.avatar}.png`)
+      .addFields(
+        { name: "User ID", value: targetUser.id, inline: true },
+        { name: "Bot Account", value: targetUser.bot ? "Yes" : "No", inline: true }
+      );
+
+    await interaction.reply({
+      embeds: [embed],
+      ephemeral , // Visible only to the command runner
+    });
+  }
+});
+```
+</TabItem>
+</Tabs>
 
 ### Reading Command Options
 - `options.getString(name, required?)`: Returns `string | null`
@@ -80,6 +114,8 @@ client.on("interactionCreate", async (interaction) => {
 
 Triggered when a user clicks a button or selects options in a dropdown.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isComponent()) return;
@@ -108,6 +144,38 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isComponent()) return;
+
+  const { customId } = interaction;
+
+  // Handle Button Clicks
+  if (customId === "btn_verify") {
+    await interaction.deferReply({ ephemeral: true });
+
+    // Assign verified role
+    await interaction.member?.roles.add("123456789012345678");
+
+    await interaction.editReply({
+      content: "✅ You have been verified and granted access!",
+    });
+  }
+
+  // Handle Select Menu Changes
+  if (customId === "select_color_roles") {
+    const selectedValues = interaction.values; // string[] array of selected choice values
+    await interaction.reply({
+      content: `Selected colors: ${selectedValues.join(", ")}`,
+      ephemeral ,
+    });
+  }
+});
+```
+</TabItem>
+</Tabs>
 
 ---
 
@@ -115,6 +183,8 @@ client.on("interactionCreate", async (interaction) => {
 
 Triggered when a user submits a modal popup.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
@@ -130,6 +200,25 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isModalSubmit()) return;
+
+  if (interaction.customId === "modal_ticket") {
+    const subject = interaction.fields.getTextInputValue("ticket_subject");
+    const description = interaction.fields.getTextInputValue("ticket_description");
+
+    await interaction.reply({
+      content: `Ticket created **Subject:** ${subject}`,
+      ephemeral ,
+    });
+  }
+});
+```
+</TabItem>
+</Tabs>
 
 ---
 
@@ -137,6 +226,8 @@ client.on("interactionCreate", async (interaction) => {
 
 Provides live suggestions as a user types into a slash command option.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isAutocomplete()) return;
@@ -153,6 +244,26 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isAutocomplete()) return;
+
+  const focusedOption = interaction.options.getFocused(true); // { name, value }
+
+  if (focusedOption.name === "tag") {
+    const allTags = ["javascript", "typescript", "bun", "discord", "rust"];
+    const filtered = allTags.filter(t => t.startsWith(focusedOption.value.toLowerCase()));
+
+    await interaction.respond(
+      filtered.map(tag => ({ name , value: tag }))
+    );
+  }
+});
+```
+</TabItem>
+</Tabs>
 
 ---
 

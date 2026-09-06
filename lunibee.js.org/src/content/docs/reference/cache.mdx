@@ -1,0 +1,298 @@
+---
+title: Cache
+description: Bounded LRU cache with TTL expiration, background sweeping, and predicate-based invalidation.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Cache<K, V>` is a bounded LRU (Least Recently Used) cache with optional TTL expiration. It is backed by `Collection` internally, exposing a subset of its API focused on lifecycle management.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Cache } from "lunibee";
+// or from the sub-package:
+import { Cache } from "@lunibee/collection";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Cache } from "lunibee";
+// or from the sub-package:
+import { Cache } from "@lunibee/collection";
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new Cache<K, V>(options?: CacheOptions)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new Cache<K, V>(options?: CacheOptions)
+```
+</TabItem>
+</Tabs>
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `maxSize` | `number` | `Infinity` | Maximum number of live entries. Evicts the oldest when exceeded. |
+| `ttl` | `number` | `0` (disabled) | Entry lifetime in milliseconds. |
+| `sweepInterval` | `number` | `min(ttl, 60_000)` | How often the background sweeper runs. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Cache } from "lunibee";
+
+const messageCache = new Cache<string, Message>({
+  maxSize: 500,
+  ttl: 5 * 60 * 1000, // 5 minutes
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Cache } from "lunibee";
+
+const messageCache = new Cache<string, Message>({
+  maxSize ,
+  ttl: 5 * 60 * 1000, // 5 minutes
+});
+```
+</TabItem>
+</Tabs>
+
+## Methods
+
+### `get(key)`
+
+Returns a live entry, or `undefined` if missing or expired. Promotes accessed entries to the "most recently used" position.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const msg = messageCache.get(messageId);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const msg = messageCache.get(messageId);
+```
+</TabItem>
+</Tabs>
+
+### `set(key, value)`
+
+Stores a value. Evicts the oldest entry when `maxSize` is exceeded.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+messageCache.set(message.id, message);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+messageCache.set(message.id, message);
+```
+</TabItem>
+</Tabs>
+
+### `has(key)`
+
+Returns `true` if a live, non-expired entry exists.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+if (!messageCache.has(id)) {
+  // fetch from API
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (!messageCache.has(id)) {
+  // fetch from API
+}
+```
+</TabItem>
+</Tabs>
+
+### `delete(key)`
+
+Removes a single entry.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+messageCache.delete(messageId);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+messageCache.delete(messageId);
+```
+</TabItem>
+</Tabs>
+
+### `clear()`
+
+Removes all entries.
+
+### `invalidate(predicate)`
+
+Removes all entries matching a predicate. Returns the number removed.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const count = messageCache.invalidate((msg, id) => msg.channelId === channelId);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const count = messageCache.invalidate((msg, id) => msg.channelId === channelId);
+```
+</TabItem>
+</Tabs>
+
+### `sweep()`
+
+Manually triggers a TTL sweep, removing expired entries. Returns the count removed.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const expired = messageCache.sweep();
+console.log(`Swept ${expired} expired messages.`);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const expired = messageCache.sweep();
+console.log(`Swept ${expired} expired messages.`);
+```
+</TabItem>
+</Tabs>
+
+### `values()`
+
+Returns an array of all live values.
+
+### `entries()`
+
+Returns an array of `[key, value]` pairs for all live entries.
+
+### `size`
+
+Property returning the count of live entries (triggers a TTL sweep).
+
+### `dispose()`
+
+Stops the background sweep timer. Call when you no longer need the cache to prevent memory leaks.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+process.on("SIGINT", () => {
+  messageCache.dispose();
+  process.exit(0);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+process.on("SIGINT", () => {
+  messageCache.dispose();
+  process.exit(0);
+});
+```
+</TabItem>
+</Tabs>
+
+## Examples
+
+**Caching API responses**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const guildPreviewCache = new Cache<string, Record<string, unknown>>({
+  maxSize: 100,
+  ttl: 10 * 60 * 1000, // 10 minutes
+});
+
+async function getGuildPreview(guildId: string) {
+  const cached = guildPreviewCache.get(guildId);
+  if (cached) return cached;
+  const preview = await client.fetchGuildPreview(guildId);
+  guildPreviewCache.set(guildId, preview);
+  return preview;
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const guildPreviewCache = new Cache<string, Record<string, unknown>>({
+  maxSize ,
+  ttl: 10 * 60 * 1000, // 10 minutes
+});
+
+async function getGuildPreview(guildId) {
+  const cached = guildPreviewCache.get(guildId);
+  if (cached) return cached;
+  const preview = await client.fetchGuildPreview(guildId);
+  guildPreviewCache.set(guildId, preview);
+  return preview;
+}
+```
+</TabItem>
+</Tabs>
+
+**Per-channel message cache**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const messageCache = new Cache<string, Message>({
+  maxSize: 1000,
+  ttl: 60 * 1000,   // 60 seconds
+  sweepInterval: 10 * 1000, // sweep every 10s
+});
+
+client.on("messageCreate", (message) => {
+  messageCache.set(message.id, message);
+});
+
+client.on("messageDelete", (data) => {
+  messageCache.delete(data.id);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const messageCache = new Cache<string, Message>({
+  maxSize ,
+  ttl: 60 * 1000,   // 60 seconds
+  sweepInterval: 10 * 1000, // sweep every 10s
+});
+
+client.on("messageCreate", (message) => {
+  messageCache.set(message.id, message);
+});
+
+client.on("messageDelete", (data) => {
+  messageCache.delete(data.id);
+});
+```
+</TabItem>
+</Tabs>

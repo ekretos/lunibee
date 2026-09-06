@@ -3,6 +3,8 @@ title: Gateway & WebSocket Guide
 description: In-depth guide to Discord's WebSocket Gateway lifecycle, intents, heartbeats, and reconnection handling.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 The Discord Gateway is a real-time, bi-directional WebSocket connection used by bots to receive events and send presences.
 
 ## Gateway Lifecycle
@@ -29,6 +31,8 @@ Lunibee exposes both camelCase and Discord-standard PascalCase intent constants:
 
 Both forms can be passed as an array or combined with bitwise OR.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { Client, IntentBits, GatewayIntentBits } from "lunibee";
 
@@ -49,6 +53,30 @@ const client2 = new Client({
     GatewayIntentBits.MessageContent,
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client, IntentBits, GatewayIntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN,
+  intents: [
+    IntentBits.guilds,
+    IntentBits.guildMessages,
+    IntentBits.messageContent,
+  ],
+});
+
+const client2 = new Client({
+  token: process.env.DISCORD_TOKEN,
+  intents:
+    GatewayIntentBits.Guilds |
+    GatewayIntentBits.GuildMessages |
+    GatewayIntentBits.MessageContent,
+});
+```
+</TabItem>
+</Tabs>
 
 ## Privileged Intents
 

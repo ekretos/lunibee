@@ -1,0 +1,239 @@
+---
+title: ButtonBuilder
+description: Fluent builder for Discord button components with style, label, emoji, and custom ID.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`ButtonBuilder` creates Discord button components for use inside `ActionRowBuilder`.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ButtonBuilder, ButtonStyle } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ButtonBuilder, ButtonStyle } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Methods
+
+All methods return `this` for chaining.
+
+### `setCustomId(id)`
+
+Sets the custom ID for interactive buttons (required for non-link buttons).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+button.setCustomId("confirm_action");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+button.setCustomId("confirm_action");
+```
+</TabItem>
+</Tabs>
+
+### `setLabel(label)`
+
+Sets the button label text (max 80 characters).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+button.setLabel("Confirm");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+button.setLabel("Confirm");
+```
+</TabItem>
+</Tabs>
+
+### `setStyle(style)`
+
+Sets the button style. Use the `ButtonStyle` enum:
+
+| Constant | Value | Appearance |
+|---|---|---|
+| `ButtonStyle.Primary` | `1` | Blue |
+| `ButtonStyle.Secondary` | `2` | Gray |
+| `ButtonStyle.Success` | `3` | Green |
+| `ButtonStyle.Danger` | `4` | Red |
+| `ButtonStyle.Link` | `5` | URL link (gray, opens in browser) |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+button.setStyle(ButtonStyle.Danger);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+button.setStyle(ButtonStyle.Danger);
+```
+</TabItem>
+</Tabs>
+
+### `setURL(url)`
+
+Sets the URL for link buttons (`ButtonStyle.Link`). Link buttons cannot have a `customId`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+button.setStyle(ButtonStyle.Link).setURL("https://lunibee.js.org");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+button.setStyle(ButtonStyle.Link).setURL("https://lunibee.js.org");
+```
+</TabItem>
+</Tabs>
+
+### `setEmoji(emoji)`
+
+Adds an emoji to the button.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+button.setEmoji("🚀");
+button.setEmoji({ id: "123456789", name: "lunibee" });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+button.setEmoji("🚀");
+button.setEmoji({ id: "123456789", name: "lunibee" });
+```
+</TabItem>
+</Tabs>
+
+### `setDisabled(disabled?)`
+
+Disables or enables the button.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+button.setDisabled(true);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+button.setDisabled(true);
+```
+</TabItem>
+</Tabs>
+
+### `toJSON()`
+
+Serializes to a raw Discord component object.
+
+## Examples
+
+**Confirmation flow with two buttons**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
+
+const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  new ButtonBuilder()
+    .setCustomId("confirm")
+    .setLabel("Confirm")
+    .setStyle(ButtonStyle.Success)
+    .setEmoji("✅"),
+  new ButtonBuilder()
+    .setCustomId("cancel")
+    .setLabel("Cancel")
+    .setStyle(ButtonStyle.Danger)
+    .setEmoji("❌"),
+);
+
+await channel.send({ content: "Are you sure?", components: [row] });
+
+// Handle the button click:
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isComponent()) return;
+  if (interaction.customId === "confirm") {
+    await interaction.update({ content: "✅ Confirmed!", components: [] });
+  } else if (interaction.customId === "cancel") {
+    await interaction.update({ content: "❌ Cancelled.", components: [] });
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
+
+const row = new ActionRowBuilder().addComponents(
+  new ButtonBuilder()
+    .setCustomId("confirm")
+    .setLabel("Confirm")
+    .setStyle(ButtonStyle.Success)
+    .setEmoji("✅"),
+  new ButtonBuilder()
+    .setCustomId("cancel")
+    .setLabel("Cancel")
+    .setStyle(ButtonStyle.Danger)
+    .setEmoji("❌"),
+);
+
+await channel.send({ content: "Are you sure?", components: [row] });
+
+// Handle the button click:
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isComponent()) return;
+  if (interaction.customId === "confirm") {
+    await interaction.update({ content: "✅ Confirmed!", components: [] });
+  } else if (interaction.customId === "cancel") {
+    await interaction.update({ content: "❌ Cancelled.", components: [] });
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+**Documentation link button**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const docsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  new ButtonBuilder()
+    .setLabel("View Docs")
+    .setStyle(ButtonStyle.Link)
+    .setURL("https://lunibee.js.org")
+    .setEmoji("📚"),
+);
+await channel.send({ content: "Need help?", components: [docsRow] });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const docsRow = new ActionRowBuilder().addComponents(
+  new ButtonBuilder()
+    .setLabel("View Docs")
+    .setStyle(ButtonStyle.Link)
+    .setURL("https://lunibee.js.org")
+    .setEmoji("📚"),
+);
+await channel.send({ content: "Need help?", components: [docsRow] });
+```
+</TabItem>
+</Tabs>

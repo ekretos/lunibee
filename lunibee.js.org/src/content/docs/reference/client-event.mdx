@@ -1,0 +1,223 @@
+---
+title: ClientEvent
+description: Enumeration of all events emitted by the Lunibee Client, with their listener signatures.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`ClientEvent` is a string enum of all events the `Client` emits. Use it with `client.on(ClientEvent.MessageCreate, ...)` for type-safe event subscriptions instead of string literals.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ClientEvent } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ClientEvent } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Usage
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on(ClientEvent.Ready, (user) => {
+  console.log(`🐝 Logged in as ${user.username}`);
+});
+
+// Equivalent string form (also valid):
+client.on("ready", (user) => { ... });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on(ClientEvent.Ready, (user) => {
+  console.log(`🐝 Logged in as ${user.username}`);
+});
+
+// Equivalent string form (also valid):
+client.on("ready", (user) => { ... });
+```
+</TabItem>
+</Tabs>
+
+## Event Reference
+
+### Lifecycle
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.Ready` | `"ready"` | `(user: ClientUser)` |
+| `ClientEvent.Resumed` | `"resumed"` | `()` |
+| `ClientEvent.InvalidSession` | `"invalidSession"` | `(isRecoverable: boolean)` |
+| `ClientEvent.Open` | `"open"` | `()` |
+| `ClientEvent.Close` | `"close"` | `({ code: number, action: string })` |
+| `ClientEvent.Error` | `"error"` | `(error: Error)` |
+| `ClientEvent.Raw` | `"raw"` | `({ event: string, data: unknown })` |
+
+### Messages
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.MessageCreate` | `"messageCreate"` | `(message: Message)` |
+| `ClientEvent.MessageUpdate` | `"messageUpdate"` | `(message: Message)` |
+| `ClientEvent.MessageDelete` | `"messageDelete"` | `(data: APIMessageDeleteEvent)` |
+| `ClientEvent.MessageDeleteBulk` | `"messageDeleteBulk"` | `(data: APIMessageDeleteBulkEvent)` |
+
+### Reactions
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.MessageReactionAdd` | `"messageReactionAdd"` | `(data: APIMessageReactionEvent)` |
+| `ClientEvent.MessageReactionRemove` | `"messageReactionRemove"` | `(data: APIMessageReactionEvent)` |
+| `ClientEvent.MessageReactionRemoveAll` | `"messageReactionRemoveAll"` | `(data: ...)` |
+| `ClientEvent.MessageReactionRemoveEmoji` | `"messageReactionRemoveEmoji"` | `(data: ...)` |
+
+### Guilds
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.GuildCreate` | `"guildCreate"` | `(guild: APIGuild)` |
+| `ClientEvent.GuildUpdate` | `"guildUpdate"` | `(guild: APIGuild)` |
+| `ClientEvent.GuildDelete` | `"guildDelete"` | `(data: { id: string })` |
+| `ClientEvent.GuildAvailable` | `"guildAvailable"` | `(guild: APIGuild)` |
+| `ClientEvent.GuildUnavailable` | `"guildUnavailable"` | `(data: ...)` |
+
+### Guild Members
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.GuildMemberAdd` | `"guildMemberAdd"` | `(member: APIGuildMember)` |
+| `ClientEvent.GuildMemberUpdate` | `"guildMemberUpdate"` | `(member: APIGuildMember)` |
+| `ClientEvent.GuildMemberRemove` | `"guildMemberRemove"` | `(member: APIGuildMember)` |
+| `ClientEvent.GuildMembersChunk` | `"guildMembersChunk"` | `(data: APIGuildMembersChunk)` |
+
+### Channels
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.ChannelCreate` | `"channelCreate"` | `(channel: Channel)` |
+| `ClientEvent.ChannelUpdate` | `"channelUpdate"` | `(channel: Channel)` |
+| `ClientEvent.ChannelDelete` | `"channelDelete"` | `(data: APIChannel)` |
+| `ClientEvent.ChannelPinsUpdate` | `"channelPinsUpdate"` | `(data: ...)` |
+
+### Roles
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.GuildRoleCreate` | `"guildRoleCreate"` | `(data: APIGuildRoleEvent)` |
+| `ClientEvent.GuildRoleUpdate` | `"guildRoleUpdate"` | `(data: APIGuildRoleEvent)` |
+| `ClientEvent.GuildRoleDelete` | `"guildRoleDelete"` | `(data: APIGuildRoleDeleteEvent)` |
+
+### Interactions
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.InteractionCreate` | `"interactionCreate"` | `(interaction: Interaction)` |
+
+### Voice
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.VoiceStateUpdate` | `"voiceStateUpdate"` | `(data: APIVoiceState)` |
+| `ClientEvent.VoiceServerUpdate` | `"voiceServerUpdate"` | `(data: APIVoiceServerUpdate)` |
+
+### Threads
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.ThreadCreate` | `"threadCreate"` | `(channel: Channel)` |
+| `ClientEvent.ThreadUpdate` | `"threadUpdate"` | `(channel: Channel)` |
+| `ClientEvent.ThreadDelete` | `"threadDelete"` | `(data: ...)` |
+| `ClientEvent.ThreadListSync` | `"threadListSync"` | `(data: ...)` |
+
+### Presence & Typing
+
+| Event | String Key | Listener Args |
+|---|---|---|
+| `ClientEvent.PresenceUpdate` | `"presenceUpdate"` | `(data: APIPresenceUpdate)` |
+| `ClientEvent.TypingStart` | `"typingStart"` | `(data: APITypingStart)` |
+
+### Scheduled Events, AutoMod, Invites, Webhooks, Polls
+
+| Event | Description |
+|---|---|
+| `GuildScheduledEventCreate/Update/Delete` | Guild scheduled event lifecycle. |
+| `AutoModerationRuleCreate/Update/Delete` | AutoMod rule changes. |
+| `AutoModerationActionExecution` | AutoMod action fired. |
+| `InviteCreate` / `InviteDelete` | Invite creation/deletion. |
+| `WebhooksUpdate` | Webhook updates. |
+| `MessagePollVoteAdd` / `MessagePollVoteRemove` | Poll vote events. |
+
+## Examples
+
+**Handle errors gracefully**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on(ClientEvent.Error, (error) => {
+  console.error("Client error:", error.message);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on(ClientEvent.Error, (error) => {
+  console.error("Client error:", error.message);
+});
+```
+</TabItem>
+</Tabs>
+
+**React to every message (read-only monitor)**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on(ClientEvent.MessageCreate, (message) => {
+  if (!message.author.bot) {
+    console.log(`[${message.guildId ?? "DM"}] ${message.author.username}: ${message.content}`);
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on(ClientEvent.MessageCreate, (message) => {
+  if (!message.author.bot) {
+    console.log(`[${message.guildId ?? "DM"}] ${message.author.username}: ${message.content}`);
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+**Log raw Gateway events**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on(ClientEvent.Raw, ({ event, data }) => {
+  if (event === "VOICE_STATE_UPDATE") {
+    console.log("Voice state:", data);
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on(ClientEvent.Raw, ({ event, data }) => {
+  if (event === "VOICE_STATE_UPDATE") {
+    console.log("Voice state:", data);
+  }
+});
+```
+</TabItem>
+</Tabs>

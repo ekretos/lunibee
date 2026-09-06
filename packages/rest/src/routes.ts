@@ -187,9 +187,14 @@ export const Routes = {
             : `/applications/${snowflake(applicationId, "Application ID")}/emojis`,
 } as const;
 
-/** Validates a Discord snowflake route parameter. @param value Candidate identifier. @param field Human-readable field name. @returns The validated identifier. @throws {TypeError} If the identifier is not a Discord snowflake. */
+/** Validates a Discord snowflake route parameter. Accepts any decimal id that fits an
+ * unsigned 64-bit integer, matching the snowflake rule `BaseStructure` applies in
+ * `@lunibee/structures`. The guarantee this provides is that no non-numeric segment can
+ * reshape the request path; it deliberately does not police id length, because Discord
+ * snowflakes are 17 digits for early 2015 ids and reach 20 digits as the epoch advances.
+ * @param value Candidate identifier. @param field Human-readable field name. @returns The validated identifier. @throws {TypeError} If the identifier is not a Discord snowflake. */
 function snowflake(value: string, field: string): string {
-    if (!/^\d{17,19}$/.test(value))
+    if (!/^\d{1,20}$/.test(value))
         throw new TypeError(`${field} must be a valid Discord snowflake.`);
     return value;
 }

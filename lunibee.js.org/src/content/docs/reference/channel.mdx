@@ -1,0 +1,249 @@
+---
+title: Channel
+description: Represents a Discord channel with methods to send messages, edit properties, and manage the channel lifecycle.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Channel` wraps a Discord channel payload and exposes resource methods for sending messages and editing channel properties.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Channel } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Channel } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | `string` | Snowflake ID. |
+| `type` | `number` | Channel type (see `ChannelType`). |
+| `name` | `string \| null \| undefined` | Channel name. |
+| `guildId` | `string \| undefined` | Guild this channel belongs to. |
+| `topic` | `string \| null \| undefined` | Channel topic. |
+| `parentId` | `string \| null \| undefined` | Parent category ID. |
+| `nsfw` | `boolean \| undefined` | Whether the channel is age-restricted. |
+| `rateLimitPerUser` | `number \| undefined` | Slowmode in seconds. |
+| `position` | `number \| undefined` | Sorting position. |
+| `createdAt` | `Date` | Timestamp derived from the snowflake. |
+
+## Methods
+
+### `send(options)` / `sendMessage(options)`
+
+Sends a message to this channel.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const msg = await channel.send({ content: "Hello! 🐝" });
+
+// With embeds and components:
+await channel.send({
+  embeds: [embed],
+  components: [row],
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const msg = await channel.send({ content: "Hello 🐝" });
+
+// With embeds and components:
+await channel.send({
+  embeds: [embed],
+  components: [row],
+});
+```
+</TabItem>
+</Tabs>
+
+### `edit(options)`
+
+Edits this channel's properties.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await channel.edit({ name: "support", topic: "Get help here." });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await channel.edit({ name: "support", topic: "Get help here." });
+```
+</TabItem>
+</Tabs>
+
+### `editName(name)`
+
+Changes only the channel name.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await channel.editName("general");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await channel.editName("general");
+```
+</TabItem>
+</Tabs>
+
+### `editTopic(topic)`
+
+Changes only the channel topic. Pass `null` to clear it.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await channel.editTopic("Community announcements and updates.");
+await channel.editTopic(null); // clears topic
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await channel.editTopic("Community announcements and updates.");
+await channel.editTopic(null); // clears topic
+```
+</TabItem>
+</Tabs>
+
+### `editParent(parentId)`
+
+Moves the channel to a different category. Pass `null` to remove the parent.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await channel.editParent(categoryId);
+await channel.editParent(null);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await channel.editParent(categoryId);
+await channel.editParent(null);
+```
+</TabItem>
+</Tabs>
+
+### `delete()`
+
+Deletes this channel.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await channel.delete();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await channel.delete();
+```
+</TabItem>
+</Tabs>
+
+### `toString()`
+
+Returns the Discord channel mention string. Automatically used in template literals.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+console.log(`Check out ${channel}`); // → "Check out <#123456789>"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+console.log(`Check out ${channel}`); // → "Check out <#123456789>"
+```
+</TabItem>
+</Tabs>
+
+## Examples
+
+**Create a support ticket channel**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "ticket") return;
+
+  const guild = client.guilds.get(interaction.guildId!);
+  const channel = await client.channels.create(interaction.guildId!, {
+    name: `ticket-${interaction.user.id}`,
+    topic: `Support ticket for ${interaction.user.username}`,
+    parent_id: TICKET_CATEGORY_ID,
+  });
+
+  await channel.send({
+    content: `Welcome ${interaction.user}! Support will be with you shortly.`,
+  });
+  await interaction.reply({ content: `Ticket created: ${channel}`, ephemeral: true });
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "ticket") return;
+
+  const guild = client.guilds.get(interaction.guildId);
+  const channel = await client.channels.create(interaction.guildId, {
+    name: `ticket-${interaction.user.id}`,
+    topic: `Support ticket for ${interaction.user.username}`,
+    parent_id ,
+  });
+
+  await channel.send({
+    content: `Welcome ${interaction.user}! Support will be with you shortly.`,
+  });
+  await interaction.reply({ content: `Ticket created: ${channel}`, ephemeral: true });
+});
+```
+</TabItem>
+</Tabs>
+
+**Rename a channel from a command**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "rename") return;
+  const name = interaction.options.getString("name", true);
+  const channel = client.channels.get(interaction.channelId);
+  if (!channel) return interaction.reply({ content: "Channel not found.", ephemeral: true });
+  await channel.editName(name);
+  await interaction.reply({ content: `✅ Renamed to **${name}**` });
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "rename") return;
+  const name = interaction.options.getString("name", true);
+  const channel = client.channels.get(interaction.channelId);
+  if (!channel) return interaction.reply({ content: "Channel not found.", ephemeral: true });
+  await channel.editName(name);
+  await interaction.reply({ content: `✅ Renamed to **${name}**` });
+});
+```
+</TabItem>
+</Tabs>

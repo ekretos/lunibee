@@ -1,0 +1,222 @@
+---
+title: Utils
+description: Lightweight general-purpose utility functions — sleep, randomInt, and isSnowflake.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@lunibee/utils` provides a small set of general-purpose helpers.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { sleep, randomInt, isSnowflake } from "lunibee";
+// or from the sub-package:
+import { sleep, randomInt, isSnowflake } from "@lunibee/utils";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { sleep, randomInt, isSnowflake } from "lunibee";
+// or from the sub-package:
+import { sleep, randomInt, isSnowflake } from "@lunibee/utils";
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `sleep(ms)`
+
+Returns a `Promise` that resolves after `ms` milliseconds.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+async function delayedGreet(channel, name: string) {
+  await channel.send({ content: `Hey ${name}, starting up...` });
+  await sleep(2000); // wait 2 seconds
+  await channel.send({ content: "Ready! 🐝" });
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+async function delayedGreet(channel, name) {
+  await channel.send({ content: `Hey ${name}, starting up...` });
+  await sleep(2000); // wait 2 seconds
+  await channel.send({ content: "Ready 🐝" });
+}
+```
+</TabItem>
+</Tabs>
+
+**Signature:**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+function sleep(ms: number): Promise<void>
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+function sleep(ms)
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `randomInt(min, max)`
+
+Returns a random integer in the inclusive range `[min, max]`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const roll = randomInt(1, 6); // dice roll: 1–6
+const item = items[randomInt(0, items.length - 1)];
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const roll = randomInt(1, 6); // dice roll: 1–6
+const item = items[randomInt(0, items.length - 1)];
+```
+</TabItem>
+</Tabs>
+
+**Signature:**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+function randomInt(min: number, max: number): number
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+function randomInt(min, max)
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `isSnowflake(value)`
+
+Returns `true` if the string is a valid Discord snowflake (1–20 digit numeric string).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+isSnowflake("123456789012345678")  // → true
+isSnowflake("not-a-snowflake")     // → false
+isSnowflake("99999999999999999999") // → true (20 digits)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+isSnowflake("123456789012345678")  // → true
+isSnowflake("not-a-snowflake")     // → false
+isSnowflake("99999999999999999999") // → true (20 digits)
+```
+</TabItem>
+</Tabs>
+
+**Signature:**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+function isSnowflake(value: string): boolean
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+function isSnowflake(value)
+```
+</TabItem>
+</Tabs>
+
+---
+
+## Examples
+
+**Validate user input before fetching**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("messageCreate", async (message) => {
+  if (!message.content.startsWith("!user ")) return;
+  const id = message.content.slice(6).trim();
+  if (!isSnowflake(id)) {
+    return message.reply("Invalid user ID.");
+  }
+  const user = await client.users.fetch(id);
+  await message.reply(`Found: ${user.displayName}`);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("messageCreate", async (message) => {
+  if (!message.content.startsWith("!user ")) return;
+  const id = message.content.slice(6).trim();
+  if (!isSnowflake(id)) {
+    return message.reply("Invalid user ID.");
+  }
+  const user = await client.users.fetch(id);
+  await message.reply(`Found: ${user.displayName}`);
+});
+```
+</TabItem>
+</Tabs>
+
+**Rate-limit friendly bulk operation with delay**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+async function sendAll(channels: Channel[], content: string) {
+  for (const channel of channels) {
+    await channel.send({ content });
+    await sleep(500); // 500ms between each send to avoid rate limits
+  }
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+async function sendAll(channels , content) {
+  for (const channel of channels) {
+    await channel.send({ content });
+    await sleep(500); // 500ms between each send to avoid rate limits
+  }
+}
+```
+</TabItem>
+</Tabs>
+
+**Random pick from a list**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const jokes = ["Why do bees hum? Because they don't know the words. 🎵", "What do you call a bee that can't make up its mind? A maybee! 🐝"];
+const joke = jokes[randomInt(0, jokes.length - 1)];
+await channel.send({ content: joke });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const jokes = ["Why do bees hum? Because they don't know the words. 🎵", "What do you call a bee that can't make up its mind? A maybee 🐝"];
+const joke = jokes[randomInt(0, jokes.length - 1)];
+await channel.send({ content: joke });
+```
+</TabItem>
+</Tabs>

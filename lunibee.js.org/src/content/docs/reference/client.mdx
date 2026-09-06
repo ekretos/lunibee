@@ -1,0 +1,253 @@
+---
+title: Client
+description: The main Lunibee Discord bot client. Connects REST, Gateway, caching, and event dispatch.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+The `Client` class is the primary entry point for building a Lunibee bot. It coordinates the REST API transport, Gateway WebSocket connection, resource caches, and event system.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Client } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+```
+new Client(options: ClientOptions)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `options.token` | `string` | **Required.** Discord bot token. |
+| `options.intents` | `GatewayIntentResolvable` | **Required.** Gateway intents to subscribe to. |
+| `options.rest` | `RESTOptions` | Optional REST client configuration. |
+| `options.gateway` | `GatewayOptions` | Optional Gateway configuration. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Client, IntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [IntentBits.guilds, IntentBits.guildMessages, IntentBits.messageContent],
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client, IntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN,
+  intents: [IntentBits.guilds, IntentBits.guildMessages, IntentBits.messageContent],
+});
+```
+</TabItem>
+</Tabs>
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `client.rest` | `REST` | Low-level REST transport. |
+| `client.ws` / `client.gateway` | `Gateway` | Active Gateway WebSocket connection. |
+| `client.users` | `UserManager` | User cache and fetcher. |
+| `client.guilds` | `GuildManager` | Guild cache and fetcher. |
+| `client.channels` | `ChannelManager` | Channel cache and fetcher. |
+| `client.application.commands` | `ApplicationCommandManager` | Application command manager. |
+| `client.user` | `ClientUser \| undefined` | Authenticated bot user (available after `ready`). |
+| `client.state` | `ClientState` | Current lifecycle state: `"idle"`, `"connecting"`, `"ready"`, or `"destroyed"`. |
+| `client.ping` | `number` | Current WebSocket heartbeat latency in ms. |
+| `client.uptime` | `number \| null` | Milliseconds since the client became ready, or `null`. |
+| `client.token` | `string \| null` | The bot token, or `null` once destroyed. |
+| `client.readyAt` | `Date \| undefined` | When the client last became ready. |
+
+## Methods
+
+### `login(token?)`
+
+Connects to Discord.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await client.login();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await client.login();
+```
+</TabItem>
+</Tabs>
+
+### `destroy()`
+
+Permanently closes the Gateway connection.
+
+```ts
+client.destroy();
+```
+
+### `isReady()`
+
+Returns `true` if the client is in the `"ready"` state.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+if (client.isReady()) {
+  console.log("Bot is online!");
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (client.isReady()) {
+  console.log("Bot is online!");
+}
+```
+</TabItem>
+</Tabs>
+
+### `setPresence(data)`
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.setPresence({
+  status: "online",
+  activities: [{ name: "custom_status", state: "🐝 Buzzing!", type: 4 }],
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.setPresence({
+  status: "online",
+  activities: [{ name: "custom_status", state: "🐝 Buzzing!", type: 4 }],
+});
+```
+</TabItem>
+</Tabs>
+
+## Events
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("ready", (user) => {
+  console.log(`🐝 Logged in as ${user.username}!`);
+});
+
+client.on("messageCreate", async (message) => {
+  if (message.content === "!ping") {
+    await message.reply("Pong! 🏓");
+  }
+});
+
+client.on("interactionCreate", async (interaction) => {
+  if (interaction.isChatInputCommand() && interaction.commandName === "hello") {
+    await interaction.reply({ content: "Hello! 👋" });
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("ready", (user) => {
+  console.log(`🐝 Logged in as ${user.username}!`);
+});
+
+client.on("messageCreate", async (message) => {
+  if (message.content === "!ping") {
+    await message.reply("Pong! 🏓");
+  }
+});
+
+client.on("interactionCreate", async (interaction) => {
+  if (interaction.isChatInputCommand() && interaction.commandName === "hello") {
+    await interaction.reply({ content: "Hello! 👋" });
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+## Full Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Client, IntentBits, EmbedBuilder } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [IntentBits.guilds, IntentBits.guildMessages, IntentBits.messageContent],
+});
+
+client.on("ready", (user) => {
+  console.log(`🐝 Ready as ${user.username}`);
+});
+
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+  if (message.content === "!status") {
+    const embed = new EmbedBuilder()
+      .setTitle("Bot Status")
+      .addFields(
+        { name: "Ping", value: `${client.ping}ms`, inline: true },
+        { name: "Uptime", value: `${Math.floor((client.uptime ?? 0) / 1000)}s`, inline: true },
+      )
+      .setColor(0xf59e0b);
+    await message.reply({ embeds: [embed] });
+  }
+});
+
+await client.login();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client, IntentBits, EmbedBuilder } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN,
+  intents: [IntentBits.guilds, IntentBits.guildMessages, IntentBits.messageContent],
+});
+
+client.on("ready", (user) => {
+  console.log(`🐝 Ready as ${user.username}`);
+});
+
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+  if (message.content === "!status") {
+    const embed = new EmbedBuilder()
+      .setTitle("Bot Status")
+      .addFields(
+        { name: "Ping", value: `${client.ping}ms`, inline: true },
+        { name: "Uptime", value: `${Math.floor((client.uptime ?? 0) / 1000)}s`, inline: true },
+      )
+      .setColor(0xf59e0b);
+    await message.reply({ embeds: [embed] });
+  }
+});
+
+await client.login();
+```
+</TabItem>
+</Tabs>

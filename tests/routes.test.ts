@@ -1,86 +1,92 @@
 import { describe, expect, test } from "bun:test";
 import { Routes } from "../packages/rest/src/routes.ts";
 
+// Discord snowflakes are 17-19 digits and `Routes` rejects anything else, so
+// route tests must use realistically shaped identifiers.
+const A = "123456789012345678";
+const B = "223456789012345678";
+const C = "323456789012345678";
+
 describe("REST Routes Full Coverage", () => {
     test("all routes produce valid endpoint strings", () => {
         expect(Routes.user()).toBe("/users/@me");
-        expect(Routes.userById("123")).toBe("/users/123");
-        expect(Routes.guild("123")).toBe("/guilds/123");
-        expect(Routes.guildChannels("123")).toBe("/guilds/123/channels");
-        expect(Routes.guildMember("123", "456")).toBe(
-            "/guilds/123/members/456",
+        expect(Routes.userById(A)).toBe(`/users/${A}`);
+        expect(Routes.guild(A)).toBe(`/guilds/${A}`);
+        expect(Routes.guildChannels(A)).toBe(`/guilds/${A}/channels`);
+        expect(Routes.guildMember(A, B)).toBe(
+            `/guilds/${A}/members/${B}`,
         );
-        expect(Routes.guildRoles("123")).toBe("/guilds/123/roles");
-        expect(Routes.guildRole("123", "789")).toBe("/guilds/123/roles/789");
-        expect(Routes.guildMemberRole("123", "456", "789")).toBe(
-            "/guilds/123/members/456/roles/789",
+        expect(Routes.guildRoles(A)).toBe(`/guilds/${A}/roles`);
+        expect(Routes.guildRole(A, C)).toBe(`/guilds/${A}/roles/${C}`);
+        expect(Routes.guildMemberRole(A, B, C)).toBe(
+            `/guilds/${A}/members/${B}/roles/${C}`,
         );
-        expect(Routes.guildBans("123")).toBe("/guilds/123/bans");
-        expect(Routes.guildBan("123", "456")).toBe("/guilds/123/bans/456");
-        expect(Routes.channel("123")).toBe("/channels/123");
-        expect(Routes.channelMessages("123")).toBe("/channels/123/messages");
-        expect(Routes.message("123", "456")).toBe("/channels/123/messages/456");
-        expect(Routes.crosspostMessage("123", "456")).toBe(
-            "/channels/123/messages/456/crosspost",
+        expect(Routes.guildBans(A)).toBe(`/guilds/${A}/bans`);
+        expect(Routes.guildBan(A, B)).toBe(`/guilds/${A}/bans/${B}`);
+        expect(Routes.channel(A)).toBe(`/channels/${A}`);
+        expect(Routes.channelMessages(A)).toBe(`/channels/${A}/messages`);
+        expect(Routes.message(A, B)).toBe(`/channels/${A}/messages/${B}`);
+        expect(Routes.crosspostMessage(A, B)).toBe(
+            `/channels/${A}/messages/${B}/crosspost`,
         );
-        expect(Routes.messageReactions("123", "456", "👍")).toBe(
-            "/channels/123/messages/456/reactions/%F0%9F%91%8D",
+        expect(Routes.messageReactions(A, B, "👍")).toBe(
+            `/channels/${A}/messages/${B}/reactions/%F0%9F%91%8D`,
         );
-        expect(Routes.messageReactionsAll("123", "456")).toBe(
-            "/channels/123/messages/456/reactions",
+        expect(Routes.messageReactionsAll(A, B)).toBe(
+            `/channels/${A}/messages/${B}/reactions`,
         );
-        expect(Routes.channelPins("123")).toBe("/channels/123/pins");
-        expect(Routes.channelPin("123", "456")).toBe("/channels/123/pins/456");
-        expect(Routes.messageThread("123", "456")).toBe(
-            "/channels/123/messages/456/threads",
+        expect(Routes.channelPins(A)).toBe(`/channels/${A}/pins`);
+        expect(Routes.channelPin(A, B)).toBe(`/channels/${A}/pins/${B}`);
+        expect(Routes.messageThread(A, B)).toBe(
+            `/channels/${A}/messages/${B}/threads`,
         );
-        expect(Routes.channelBulkDelete("123")).toBe(
-            "/channels/123/messages/bulk-delete",
+        expect(Routes.channelBulkDelete(A)).toBe(
+            `/channels/${A}/messages/bulk-delete`,
         );
-        expect(Routes.channelWebhooks("123")).toBe("/channels/123/webhooks");
-        expect(Routes.channelInvites("123")).toBe("/channels/123/invites");
-        expect(Routes.webhook("123", "token")).toBe("/webhooks/123/token");
-        expect(Routes.webhookMessage("123", "token", "456")).toBe(
-            "/webhooks/123/token/messages/456",
+        expect(Routes.channelWebhooks(A)).toBe(`/channels/${A}/webhooks`);
+        expect(Routes.channelInvites(A)).toBe(`/channels/${A}/invites`);
+        expect(Routes.webhook(A, "token")).toBe(`/webhooks/${A}/token`);
+        expect(Routes.webhookMessage(A, "token", B)).toBe(
+            `/webhooks/${A}/token/messages/${B}`,
         );
-        expect(Routes.applicationCommands("123")).toBe(
-            "/applications/123/commands",
+        expect(Routes.applicationCommands(A)).toBe(
+            `/applications/${A}/commands`,
         );
-        expect(Routes.applicationCommand("123", "456")).toBe(
-            "/applications/123/commands/456",
+        expect(Routes.applicationCommand(A, B)).toBe(
+            `/applications/${A}/commands/${B}`,
         );
-        expect(Routes.guildApplicationCommands("123", "456")).toBe(
-            "/applications/123/guilds/456/commands",
+        expect(Routes.guildApplicationCommands(A, B)).toBe(
+            `/applications/${A}/guilds/${B}/commands`,
         );
-        expect(Routes.interactionCallback("123", "token")).toBe(
-            "/interactions/123/token/callback",
+        expect(Routes.interactionCallback(A, "token")).toBe(
+            `/interactions/${A}/token/callback`,
         );
-        expect(Routes.interactionOriginalResponse("123", "token")).toBe(
-            "/webhooks/123/token/messages/@original",
+        expect(Routes.interactionOriginalResponse(A, "token")).toBe(
+            `/webhooks/${A}/token/messages/@original`,
         );
-        expect(Routes.guildActiveThreads("123")).toBe(
-            "/guilds/123/threads/active",
+        expect(Routes.guildActiveThreads(A)).toBe(
+            `/guilds/${A}/threads/active`,
         );
-        expect(Routes.channelPublicArchivedThreads("123")).toBe(
-            "/channels/123/threads/archived/public",
+        expect(Routes.channelPublicArchivedThreads(A)).toBe(
+            `/channels/${A}/threads/archived/public`,
         );
-        expect(Routes.channelPrivateArchivedThreads("123")).toBe(
-            "/channels/123/threads/archived/private",
+        expect(Routes.channelPrivateArchivedThreads(A)).toBe(
+            `/channels/${A}/threads/archived/private`,
         );
-        expect(Routes.threadMembers("123")).toBe(
-            "/channels/123/thread-members",
+        expect(Routes.threadMembers(A)).toBe(
+            `/channels/${A}/thread-members`,
         );
-        expect(Routes.guildScheduledEvents("123")).toBe(
-            "/guilds/123/scheduled-events",
+        expect(Routes.guildScheduledEvents(A)).toBe(
+            `/guilds/${A}/scheduled-events`,
         );
-        expect(Routes.guildScheduledEvent("123", "456")).toBe(
-            "/guilds/123/scheduled-events/456",
+        expect(Routes.guildScheduledEvent(A, B)).toBe(
+            `/guilds/${A}/scheduled-events/${B}`,
         );
-        expect(Routes.guildAutoModerationRules("123")).toBe(
-            "/guilds/123/auto-moderation/rules",
+        expect(Routes.guildAutoModerationRules(A)).toBe(
+            `/guilds/${A}/auto-moderation/rules`,
         );
-        expect(Routes.guildAutoModerationRule("123", "456")).toBe(
-            "/guilds/123/auto-moderation/rules/456",
+        expect(Routes.guildAutoModerationRule(A, B)).toBe(
+            `/guilds/${A}/auto-moderation/rules/${B}`,
         );
         expect(Routes.voiceRegions()).toBe("/voice/regions");
         expect(Routes.gateway()).toBe("/gateway");

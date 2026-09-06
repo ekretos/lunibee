@@ -512,46 +512,46 @@ describe("100% Comprehensive Codebase Coverage", () => {
         });
 
         const gw = client.gateway;
-        gw.emit("THREAD_CREATE", { id: "100", type: 11, guild_id: "200" });
-        gw.emit("THREAD_UPDATE", { id: "100", type: 11, guild_id: "200" });
-        gw.emit("THREAD_DELETE", { id: "100", type: 11, guild_id: "200" });
+        gw.emit("THREAD_CREATE", { id: "100000000000000000", type: 11, guild_id: "200000000000000000" });
+        gw.emit("THREAD_UPDATE", { id: "100000000000000000", type: 11, guild_id: "200000000000000000" });
+        gw.emit("THREAD_DELETE", { id: "100000000000000000", type: 11, guild_id: "200000000000000000" });
         gw.emit("GUILD_MEMBER_ADD", {
-            user: { id: "300", username: "U" },
-            guild_id: "200",
+            user: { id: "300000000000000000", username: "U" },
+            guild_id: "200000000000000000",
             roles: [],
         });
         gw.emit("GUILD_MEMBER_UPDATE", {
-            user: { id: "300", username: "U" },
-            guild_id: "200",
+            user: { id: "300000000000000000", username: "U" },
+            guild_id: "200000000000000000",
             roles: [],
         });
         gw.emit("GUILD_MEMBER_REMOVE", {
-            user: { id: "300", username: "U" },
-            guild_id: "200",
+            user: { id: "300000000000000000", username: "U" },
+            guild_id: "200000000000000000",
         });
         gw.emit("MESSAGE_REACTION_ADD", {
-            user_id: "300",
-            message_id: "400",
+            user_id: "300000000000000000",
+            message_id: "400000000000000000",
             emoji: { name: "👍" },
         });
         gw.emit("MESSAGE_REACTION_REMOVE", {
-            user_id: "300",
-            message_id: "400",
+            user_id: "300000000000000000",
+            message_id: "400000000000000000",
             emoji: { name: "👍" },
         });
         gw.emit("MESSAGE_REACTION_REMOVE_ALL", {
-            message_id: "400",
-            channel_id: "500",
+            message_id: "400000000000000000",
+            channel_id: "500000000000000000",
         });
 
-        expect(threadCreated.id).toBe("100");
-        expect(threadUpdated.id).toBe("100");
-        expect(threadDeleted.id).toBe("100");
-        expect(memberAdded.user.id).toBe("300");
-        expect(memberUpdated.user.id).toBe("300");
-        expect(memberRemoved.user.id).toBe("300");
-        expect(reactionAdded.message_id).toBe("400");
-        expect(reactionRemoved.message_id).toBe("400");
+        expect(threadCreated.id).toBe("100000000000000000");
+        expect(threadUpdated.id).toBe("100000000000000000");
+        expect(threadDeleted.id).toBe("100000000000000000");
+        expect(memberAdded.user.id).toBe("300000000000000000");
+        expect(memberUpdated.user.id).toBe("300000000000000000");
+        expect(memberRemoved.user.id).toBe("300000000000000000");
+        expect(reactionAdded.message_id).toBe("400000000000000000");
+        expect(reactionRemoved.message_id).toBe("400000000000000000");
         let roleCreated: any;
         let roleUpdated: any;
         let roleDeleted: any;
@@ -578,19 +578,19 @@ describe("100% Comprehensive Codebase Coverage", () => {
             emojisUpdated = e;
         });
 
-        gw.emit("GUILD_ROLE_CREATE", { guild_id: "200", role: { id: "1" } });
-        gw.emit("GUILD_ROLE_UPDATE", { guild_id: "200", role: { id: "1" } });
-        gw.emit("GUILD_ROLE_DELETE", { guild_id: "200", role_id: "1" });
-        gw.emit("GUILD_BAN_ADD", { guild_id: "200", user: { id: "300" } });
-        gw.emit("GUILD_BAN_REMOVE", { guild_id: "200", user: { id: "300" } });
-        gw.emit("GUILD_EMOJIS_UPDATE", { guild_id: "200", emojis: [] });
+        gw.emit("GUILD_ROLE_CREATE", { guild_id: "200000000000000000", role: { id: "1" } });
+        gw.emit("GUILD_ROLE_UPDATE", { guild_id: "200000000000000000", role: { id: "1" } });
+        gw.emit("GUILD_ROLE_DELETE", { guild_id: "200000000000000000", role_id: "1" });
+        gw.emit("GUILD_BAN_ADD", { guild_id: "200000000000000000", user: { id: "300000000000000000" } });
+        gw.emit("GUILD_BAN_REMOVE", { guild_id: "200000000000000000", user: { id: "300000000000000000" } });
+        gw.emit("GUILD_EMOJIS_UPDATE", { guild_id: "200000000000000000", emojis: [] });
 
         expect(roleCreated.role.id).toBe("1");
         expect(roleUpdated.role.id).toBe("1");
         expect(roleDeleted.role_id).toBe("1");
-        expect(banAdded.user.id).toBe("300");
-        expect(banRemoved.user.id).toBe("300");
-        expect(emojisUpdated.guild_id).toBe("200");
+        expect(banAdded.user.id).toBe("300000000000000000");
+        expect(banRemoved.user.id).toBe("300000000000000000");
+        expect(emojisUpdated.guild_id).toBe("200000000000000000");
 
         gw.emit("MESSAGE_REACTION_REMOVE_EMOJI", {});
         gw.emit("MESSAGE_POLL_VOTE_ADD", {});
@@ -628,19 +628,19 @@ describe("100% Comprehensive Codebase Coverage", () => {
         gw.emit("ERROR", "test string error");
 
         // Lifecycle events
-        gw.emit("READY", { user: { id: "100" }, application: { id: "200" } });
+        gw.emit("READY", { user: { id: "100000000000000000" }, application: { id: "200000000000000000" } });
         gw.emit("open");
         gw.emit("close", { code: 1000, action: "test" });
 
         // Missing complex payloads
-        gw.emit("GUILD_CREATE", { id: "100", name: "Guild" });
-        gw.emit("GUILD_CREATE", { id: "101", unavailable: true });
-        gw.emit("GUILD_UPDATE", { id: "100", name: "Updated" });
-        gw.emit("GUILD_DELETE", { id: "100" });
-        gw.emit("GUILD_DELETE", { id: "101", unavailable: true });
-        gw.emit("CHANNEL_CREATE", { id: "200", type: 0 });
-        gw.emit("CHANNEL_UPDATE", { id: "200", type: 0 });
-        gw.emit("CHANNEL_DELETE", { id: "200", type: 0 });
+        gw.emit("GUILD_CREATE", { id: "100000000000000000", name: "Guild" });
+        gw.emit("GUILD_CREATE", { id: "101000000000000000", unavailable: true });
+        gw.emit("GUILD_UPDATE", { id: "100000000000000000", name: "Updated" });
+        gw.emit("GUILD_DELETE", { id: "100000000000000000" });
+        gw.emit("GUILD_DELETE", { id: "101000000000000000", unavailable: true });
+        gw.emit("CHANNEL_CREATE", { id: "200000000000000000", type: 0 });
+        gw.emit("CHANNEL_UPDATE", { id: "200000000000000000", type: 0 });
+        gw.emit("CHANNEL_DELETE", { id: "200000000000000000", type: 0 });
         gw.emit("VOICE_STATE_UPDATE", {});
         gw.emit("VOICE_SERVER_UPDATE", {});
         gw.emit("MESSAGE_UPDATE", { id: "1", channel_id: "2" });
@@ -653,23 +653,23 @@ describe("100% Comprehensive Codebase Coverage", () => {
             msgCreated = m;
         });
         gw.emit("MESSAGE_CREATE", {
-            id: "500",
-            channel_id: "100",
+            id: "500000000000000000",
+            channel_id: "100000000000000000",
             content: "hi",
-            author: { id: "300", username: "U" },
+            author: { id: "300000000000000000", username: "U" },
         });
 
         (client.rest as any).post = async () => ({
-            id: "501",
-            channel_id: "100",
+            id: "501000000000000000",
+            channel_id: "100000000000000000",
             content: "reply",
-            author: { id: "300", username: "U" },
+            author: { id: "300000000000000000", username: "U" },
         });
         (client.rest as any).patch = async () => ({
-            id: "500",
-            channel_id: "100",
+            id: "500000000000000000",
+            channel_id: "100000000000000000",
             content: "edit",
-            author: { id: "300", username: "U" },
+            author: { id: "300000000000000000", username: "U" },
         });
         (client.rest as any).delete = async () => {};
 
@@ -690,83 +690,83 @@ describe("100% Comprehensive Codebase Coverage", () => {
         const rest = new REST({ token: "test.token" });
         (rest as any).get = async (path: string) => {
             if (path.includes("/users/"))
-                return { id: "101", username: "User101" };
+                return { id: "101000000000000000", username: "User101" };
             if (path.includes("/guilds/") && path.includes("/members/"))
                 return {
-                    user: { id: "401", username: "Member401" },
-                    guild_id: "201",
+                    user: { id: "401000000000000000", username: "Member401" },
+                    guild_id: "201000000000000000",
                     roles: [],
                 };
             if (path.includes("/guilds/") && path.includes("/roles/"))
-                return { id: "501", name: "Role501" };
+                return { id: "501000000000000000", name: "Role501" };
             if (path.includes("/guilds/"))
-                return { id: "201", name: "Guild201", roles: [] };
+                return { id: "201000000000000000", name: "Guild201", roles: [] };
             if (path.includes("/channels/") && path.includes("/messages/"))
                 return {
-                    id: "999",
-                    channel_id: "301",
+                    id: "999000000000000000",
+                    channel_id: "301000000000000000",
                     content: "f",
-                    author: { id: "101", username: "u" },
+                    author: { id: "101000000000000000", username: "u" },
                 };
             if (path.includes("/channels/"))
-                return { id: "301", type: 0, name: "General" };
+                return { id: "301000000000000000", type: 0, name: "General" };
             return {};
         };
 
         const userMgr = new UserManager(rest);
-        const fetchedUser = await userMgr.fetch("101");
-        expect(fetchedUser.id).toBe("101");
+        const fetchedUser = await userMgr.fetch("101000000000000000");
+        expect(fetchedUser.id).toBe("101000000000000000");
 
         const guildMgr = new GuildManager(rest);
-        const fetchedGuild = await guildMgr.fetch("201");
-        expect(fetchedGuild.id).toBe("201");
+        const fetchedGuild = await guildMgr.fetch("201000000000000000");
+        expect(fetchedGuild.id).toBe("201000000000000000");
 
         const chanMgr = new ChannelManager(rest);
-        const fetchedChan = await chanMgr.fetch("301");
-        expect(fetchedChan.id).toBe("301");
-        const resolvedChan = await chanMgr.resolve("301");
-        expect(resolvedChan.id).toBe("301");
+        const fetchedChan = await chanMgr.fetch("301000000000000000");
+        expect(fetchedChan.id).toBe("301000000000000000");
+        const resolvedChan = await chanMgr.resolve("301000000000000000");
+        expect(resolvedChan.id).toBe("301000000000000000");
 
         const updatedChan = chanMgr.upsert({
-            id: "301",
+            id: "301000000000000000",
             type: 0,
             name: "General Updated",
         });
         expect(updatedChan.name).toBe("General Updated");
         chanMgr.update(
-            new Channel({ id: "301", type: 0, name: "General Final" }),
+            new Channel({ id: "301000000000000000", type: 0, name: "General Final" }),
         );
-        expect(chanMgr.get("301")?.name).toBe("General Final");
+        expect(chanMgr.get("301000000000000000")?.name).toBe("General Final");
 
         chanMgr.upsertMessage({
-            id: "901",
-            channel_id: "301",
+            id: "901000000000000000",
+            channel_id: "301000000000000000",
             content: "Msg",
-            author: { id: "101", username: "U" },
+            author: { id: "101000000000000000", username: "U" },
         });
-        expect(chanMgr.deleteCachedMessage("301", "901")).toBe(true);
-        expect(chanMgr.delete("301")).toBe(true);
+        expect(chanMgr.deleteCachedMessage("301000000000000000", "901000000000000000")).toBe(true);
+        expect(chanMgr.delete("301000000000000000")).toBe(true);
         chanMgr.clear();
 
-        const memberMgr = new GuildMemberManager("201", rest);
-        const fetchedMember = await memberMgr.fetch("401");
-        expect(fetchedMember.user.id).toBe("401");
+        const memberMgr = new GuildMemberManager("201000000000000000", rest);
+        const fetchedMember = await memberMgr.fetch("401000000000000000");
+        expect(fetchedMember.user.id).toBe("401000000000000000");
 
-        const roleMgr = new RoleManager("201", rest);
-        const fetchedRole = await roleMgr.fetch("501");
-        expect(fetchedRole.id).toBe("501");
+        const roleMgr = new RoleManager("201000000000000000", rest);
+        const fetchedRole = await roleMgr.fetch("501000000000000000");
+        expect(fetchedRole.id).toBe("501000000000000000");
 
-        const msgMgr = new MessageManager(rest, {} as any, "301");
+        const msgMgr = new MessageManager(rest, {} as any, "301000000000000000");
         msgMgr.upsert({
-            id: "99",
-            channel_id: "301",
+            id: "990000000000000000",
+            channel_id: "301000000000000000",
             content: "pre",
-            author: { id: "101", username: "u" },
+            author: { id: "101000000000000000", username: "u" },
         });
-        const resolvedMsg = await msgMgr.resolve("99");
-        expect(resolvedMsg.id).toBe("99");
+        const resolvedMsg = await msgMgr.resolve("990000000000000000");
+        expect(resolvedMsg.id).toBe("990000000000000000");
 
-        const fetchedMany = await msgMgr.fetchMany(["999"]);
+        const fetchedMany = await msgMgr.fetchMany(["999000000000000000"]);
         expect(fetchedMany.length).toBe(1);
 
         expect(() => new MessageManager(rest, {} as any, "")).toThrow();
@@ -912,7 +912,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             sendMessage: async (cid, opts) =>
                 new Message(
                     {
-                        id: "999",
+                        id: "999000000000000000",
                         channel_id: cid,
                         content: opts.content ?? "",
                         author: { id: "1", username: "A" },
@@ -1102,7 +1102,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(() => unackInteraction.deleteReply()).toThrow();
 
         const baseInteraction = new Interaction(mockClient, {
-            id: "99",
+            id: "990000000000000000",
             application_id: "a",
             token: "t",
             type: 99,
@@ -1112,7 +1112,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(baseInteraction.replied).toBe(true);
 
         const baseInteraction2 = new Interaction(mockClient, {
-            id: "100",
+            id: "100000000000000000",
             application_id: "a",
             token: "t",
             type: 99,
@@ -1122,7 +1122,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(baseInteraction2.replied).toBe(true);
 
         const defInteraction = createInteraction(mockClient, {
-            id: "99",
+            id: "990000000000000000",
             application_id: "a",
             token: "t",
             type: 99,

@@ -1,0 +1,266 @@
+---
+title: Collector
+description: General-purpose event collector for gathering interactions or messages with filter, time limit, and max count constraints.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Collector<K, V>` collects arbitrary event items passing a filter, until a time limit, a maximum count, or a manual stop is reached. Use it to build interactive flows like confirmation dialogs or paginated responses.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Collector } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Collector } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new Collector<K, V>(options?: CollectorOptions<V>)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new Collector<K, V>(options?: CollectorOptions<V>)
+```
+</TabItem>
+</Tabs>
+
+| Option | Type | Description |
+|---|---|---|
+| `filter` | `(item: V) => boolean \| Promise<boolean>` | Accepts or rejects each item. |
+| `time` | `number` | Auto-stops after this many milliseconds. |
+| `max` | `number` | Auto-stops after collecting this many items. |
+| `maxProcessed` | `number` | Auto-stops after processing this many items (whether accepted or not). |
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `collected` | `Map<K, V>` | All collected key-value pairs. |
+| `ended` | `boolean` | Whether the collector has stopped. |
+| `endReason` | `string \| undefined` | Why the collector stopped: `"time"`, `"limit"`, `"user"`, `"processedLimit"`. |
+| `totalProcessed` | `number` | Total items seen (including rejected ones). |
+
+## Methods
+
+### `handle(key, item)`
+
+Presents a candidate item. If it passes the filter, it is added to `collected` and the `"collect"` event fires.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("messageCreate", async (message) => {
+  if (message.channelId === targetChannelId) {
+    await collector.handle(message.id, message);
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("messageCreate", async (message) => {
+  if (message.channelId === targetChannelId) {
+    await collector.handle(message.id, message);
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+### `stop(reason?)`
+
+Manually stops the collector. Fires the `"end"` event.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+collector.stop("user");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+collector.stop("user");
+```
+</TabItem>
+</Tabs>
+
+### `next()`
+
+Returns a `Promise` that resolves with the next collected item, or rejects if the collector ends first.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+try {
+  const nextMsg = await collector.next();
+  console.log("Got:", nextMsg.content);
+} catch {
+  console.log("Collector ended before next item.");
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+try {
+  const nextMsg = await collector.next();
+  console.log("Got:", nextMsg.content);
+} catch {
+  console.log("Collector ended before next item.");
+}
+```
+</TabItem>
+</Tabs>
+
+## Events
+
+Extend `EventEmitter` — use `collector.on(event, listener)`:
+
+| Event | Args | Fires when |
+|---|---|---|
+| `"collect"` | `(item: V)` | An item passes the filter. |
+| `"end"` | `(collected: Map<K,V>, reason: string)` | The collector stops for any reason. |
+
+## Examples
+
+**Collect button confirmations**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Collector } from "lunibee";
+
+async function confirmAction(channel, userId: string): Promise<boolean> {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("confirm").setLabel("Confirm").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("cancel").setLabel("Cancel").setStyle(ButtonStyle.Danger),
+  );
+  const msg = await channel.send({ content: "Are you sure?", components: [row] });
+
+  const collector = new Collector<string, ComponentInteraction>({
+    filter: (i) => i.customId === "confirm" || i.customId === "cancel",
+    time: 30_000,  // 30 seconds
+    max: 1,        // stop after one click
+  });
+
+  // Feed interactions into the collector
+  const handler = async (interaction: Interaction) => {
+    if (interaction.isComponent() && interaction.message?.id === msg.id) {
+      await collector.handle(interaction.id, interaction as ComponentInteraction);
+    }
+  };
+  client.on("interactionCreate", handler);
+
+  return new Promise((resolve) => {
+    collector.on("collect", async (interaction) => {
+      await interaction.update({ content: "Processing...", components: [] });
+    });
+    collector.on("end", (collected, reason) => {
+      client.off("interactionCreate", handler);
+      if (reason === "time") {
+        msg.edit({ content: "⏱️ Timed out.", components: [] });
+        resolve(false);
+      } else {
+        const first = [...collected.values()][0];
+        resolve(first?.customId === "confirm");
+      }
+    });
+  });
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Collector } from "lunibee";
+
+async function confirmAction(channel, userId) {
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("confirm").setLabel("Confirm").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("cancel").setLabel("Cancel").setStyle(ButtonStyle.Danger),
+  );
+  const msg = await channel.send({ content: "Are you sure?", components: [row] });
+
+  const collector = new Collector<string, ComponentInteraction>({
+    filter: (i) => i.customId === "confirm" || i.customId === "cancel",
+    time ,  // 30 seconds
+    max ,        // stop after one click
+  });
+
+  // Feed interactions into the collector
+  const handler = async (interaction ) => {
+    if (interaction.isComponent() && interaction.message?.id === msg.id) {
+      await collector.handle(interaction.id, interaction as ComponentInteraction);
+    }
+  };
+  client.on("interactionCreate", handler);
+
+  return new Promise((resolve) => {
+    collector.on("collect", async (interaction) => {
+      await interaction.update({ content: "Processing...", components: [] });
+    });
+    collector.on("end", (collected, reason) => {
+      client.off("interactionCreate", handler);
+      if (reason === "time") {
+        msg.edit({ content: "⏱️ Timed out.", components: [] });
+        resolve(false);
+      } else {
+        const first = [...collected.values()][0];
+        resolve(first?.customId === "confirm");
+      }
+    });
+  });
+}
+```
+</TabItem>
+</Tabs>
+
+**Collect 5 messages from a specific user**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const collector = new Collector<string, Message>({
+  filter: (msg) => msg.author.id === targetUserId,
+  max: 5,
+  time: 60_000,
+});
+
+client.on("messageCreate", async (message) => {
+  await collector.handle(message.id, message);
+});
+
+collector.on("end", (collected, reason) => {
+  console.log(`Collected ${collected.size} messages (${reason})`);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const collector = new Collector<string, Message>({
+  filter: (msg) => msg.author.id === targetUserId,
+  max ,
+  time ,
+});
+
+client.on("messageCreate", async (message) => {
+  await collector.handle(message.id, message);
+});
+
+collector.on("end", (collected, reason) => {
+  console.log(`Collected ${collected.size} messages (${reason})`);
+});
+```
+</TabItem>
+</Tabs>

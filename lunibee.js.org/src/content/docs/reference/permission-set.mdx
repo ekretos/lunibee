@@ -1,0 +1,301 @@
+---
+title: PermissionSet
+description: BigInt-backed permission bitfield checker. Supports named permission keys, raw bigints, and immutable set operations.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`PermissionSet` (also exported as `PermissionsBitField` for Discord.js compatibility) provides named permission checks against Discord's 64-bit permission bitfield.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { PermissionSet, Permission } from "lunibee";
+// Discord.js-style alias:
+import { PermissionsBitField } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { PermissionSet, Permission } from "lunibee";
+// Discord.js-style alias:
+import { PermissionsBitField } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new PermissionSet(bits: bigint | string | number = 0n)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new PermissionSet(bits: bigint | string | number = 0n)
+```
+</TabItem>
+</Tabs>
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const perms = new PermissionSet(member.permissions.bits);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const perms = new PermissionSet(member.permissions.bits);
+```
+</TabItem>
+</Tabs>
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `bits` | `bigint` | The raw bitfield as a BigInt. |
+
+## Methods
+
+### `has(permission)`
+
+Returns `true` if the bitfield contains the given permission. Accepts a `Permission` constant, a `bigint`, or a camelCase/PascalCase permission name string.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+if (member.permissions.has(Permission.manageMessages)) {
+  // allowed
+}
+
+// Also works with string keys:
+if (member.permissions.has("manageMessages")) {
+  // allowed
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (member.permissions.has(Permission.manageMessages)) {
+  // allowed
+}
+
+// Also works with string keys:
+if (member.permissions.has("manageMessages")) {
+  // allowed
+}
+```
+</TabItem>
+</Tabs>
+
+### `hasAll(...permissions)`
+
+Returns `true` only if **all** of the given permissions are present.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+if (member.permissions.hasAll(Permission.banMembers, Permission.kickMembers)) {
+  console.log("Has both ban and kick.");
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (member.permissions.hasAll(Permission.banMembers, Permission.kickMembers)) {
+  console.log("Has both ban and kick.");
+}
+```
+</TabItem>
+</Tabs>
+
+### `hasAny(...permissions)`
+
+Returns `true` if **at least one** of the given permissions is present.
+
+### `isAdministrator()`
+
+Returns `true` if the `administrator` permission is set.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+if (member.permissions.isAdministrator()) {
+  // full access
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (member.permissions.isAdministrator()) {
+  // full access
+}
+```
+</TabItem>
+</Tabs>
+
+### `add(...permissions)`
+
+Returns a **new** `PermissionSet` with the given permissions added (immutable).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const updated = perms.add(Permission.sendMessages, Permission.readMessageHistory);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const updated = perms.add(Permission.sendMessages, Permission.readMessageHistory);
+```
+</TabItem>
+</Tabs>
+
+### `remove(...permissions)`
+
+Returns a **new** `PermissionSet` with the given permissions removed (immutable).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const restricted = perms.remove(Permission.manageMessages);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const restricted = perms.remove(Permission.manageMessages);
+```
+</TabItem>
+</Tabs>
+
+### `toArray()`
+
+Returns an array of all active permission names.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const permNames = member.permissions.toArray();
+// → ["viewChannel", "sendMessages", "readMessageHistory", ...]
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const permNames = member.permissions.toArray();
+// → ["viewChannel", "sendMessages", "readMessageHistory", ...]
+```
+</TabItem>
+</Tabs>
+
+### `toString()`
+
+Returns the bitfield as a decimal string (useful for API payloads).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const payload = { permissions: member.permissions.toString() };
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const payload = { permissions: member.permissions.toString() };
+```
+</TabItem>
+</Tabs>
+
+## `Permission` — Full Reference
+
+All `Permission` keys use **camelCase**. A `Permissions` (PascalCase) alias is also available.
+
+| Key | Bit |
+|---|---|
+| `createInstantInvite` | `1 << 0` |
+| `kickMembers` | `1 << 1` |
+| `banMembers` | `1 << 2` |
+| `administrator` | `1 << 3` |
+| `manageChannels` | `1 << 4` |
+| `manageGuild` | `1 << 5` |
+| `addReactions` | `1 << 6` |
+| `viewAuditLog` | `1 << 7` |
+| `viewChannel` | `1 << 10` |
+| `sendMessages` | `1 << 11` |
+| `manageMessages` | `1 << 13` |
+| `embedLinks` | `1 << 14` |
+| `attachFiles` | `1 << 15` |
+| `readMessageHistory` | `1 << 16` |
+| `mentionEveryone` | `1 << 17` |
+| `connect` | `1 << 20` |
+| `speak` | `1 << 21` |
+| `muteMembers` | `1 << 22` |
+| `deafenMembers` | `1 << 23` |
+| `moveMembers` | `1 << 24` |
+| `manageRoles` | `1 << 28` |
+| `manageWebhooks` | `1 << 29` |
+| `manageEvents` | `1 << 33` |
+| `manageThreads` | `1 << 34` |
+| `moderateMembers` | `1 << 40` |
+| `sendPolls` | `1 << 49` |
+
+*(and more — see `packages/core/src/permissions.ts` for the full list)*
+
+## Examples
+
+**Permission gate in a command**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Permission } from "lunibee";
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "ban") return;
+  if (!interaction.member?.permissions.has(Permission.banMembers)) {
+    return interaction.reply({ content: "You need the Ban Members permission.", ephemeral: true });
+  }
+  // proceed with ban...
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Permission } from "lunibee";
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "ban") return;
+  if (!interaction.member?.permissions.has(Permission.banMembers)) {
+    return interaction.reply({ content: "You need the Ban Members permission.", ephemeral: true });
+  }
+  // proceed with ban...
+});
+```
+</TabItem>
+</Tabs>
+
+**Build a permissions embed**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const activePerms = member.permissions.toArray();
+const embed = new EmbedBuilder()
+  .setTitle("Your Permissions")
+  .setDescription(activePerms.map(p => `✅ ${p}`).join("\n") || "None");
+await interaction.reply({ embeds: [embed], ephemeral: true });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const activePerms = member.permissions.toArray();
+const embed = new EmbedBuilder()
+  .setTitle("Your Permissions")
+  .setDescription(activePerms.map(p => `✅ ${p}`).join("\n") || "None");
+await interaction.reply({ embeds: [embed], ephemeral: true });
+```
+</TabItem>
+</Tabs>

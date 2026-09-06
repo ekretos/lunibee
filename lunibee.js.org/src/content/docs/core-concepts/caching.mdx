@@ -3,6 +3,8 @@ title: Caching & Structures
 description: Canonical caching patterns, memory bounds, and structure identity in Lunibee.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 
 Lunibee manages Discord resources (Users, Guilds, Channels, Roles, Messages) using **Canonical Identity Caching**.
 
@@ -12,17 +14,31 @@ When a resource is received via Gateway event or fetched via REST, the resource 
 
 If it exists, Lunibee mutates the existing structure in place and returns the same object reference. This prevents subtle desynchronization bugs where two parts of your application hold different versions of the same guild or user.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 const userA = client.users.cache.get("123456789012345678");
 const userB = await client.users.fetch("123456789012345678");
 
 console.log(userA === userB); // true! Exact same instance
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const userA = client.users.cache.get("123456789012345678");
+const userB = await client.users.fetch("123456789012345678");
+
+console.log(userA === userB); // true Exact same instance
+```
+</TabItem>
+</Tabs>
 
 ## Bounded Memory & TTL Eviction
 
 `lunibee` (collection) provides a high-performance `Cache` with optional bounds and Time-To-Live (TTL):
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { Cache } from "lunibee";
 const messageCache = new Cache<string, Message>({
@@ -30,11 +46,24 @@ const messageCache = new Cache<string, Message>({
   ttl: 60 * 1000,    // Evicts unreferenced entries after 60s
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Cache } from "lunibee";
+const messageCache = new Cache<string, Message>({
+  maxSize ,     // Keeps memory predictable
+  ttl: 60 * 1000,    // Evicts unreferenced entries after 60s
+});
+```
+</TabItem>
+</Tabs>
 
 ## Structure Resource Methods
 
 Structures like `Message`, `Guild`, and `Channel` expose intuitive helper methods that automatically route through the manager's REST client:
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 client.on("messageCreate", async (message) => {
   // Directly edit the message
@@ -44,3 +73,16 @@ client.on("messageCreate", async (message) => {
   await message.delete();
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("messageCreate", async (message) => {
+  // Directly edit the message
+  await message.edit({ content: "Updated content!" });
+
+  // Or delete it
+  await message.delete();
+});
+```
+</TabItem>
+</Tabs>

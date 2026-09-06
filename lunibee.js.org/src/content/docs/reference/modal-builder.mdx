@@ -1,0 +1,216 @@
+---
+title: ModalBuilder
+description: Fluent builder for Discord modal popup dialogs with text input fields.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`ModalBuilder` creates a modal popup form that Discord displays to a user. Modals can contain 1–5 `ActionRowBuilder<TextInputBuilder>` rows.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Methods
+
+### `setCustomId(id)`
+
+Sets the custom ID used to identify this modal when submitted (max 100 characters).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+modal.setCustomId("ticket_modal");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+modal.setCustomId("ticket_modal");
+```
+</TabItem>
+</Tabs>
+
+### `setTitle(title)`
+
+Sets the modal window title (max 45 characters).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+modal.setTitle("Open a Support Ticket");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+modal.setTitle("Open a Support Ticket");
+```
+</TabItem>
+</Tabs>
+
+### `addComponents(...rows)`
+
+Adds `ActionRowBuilder<TextInputBuilder>` rows to the modal (1–5).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+modal.addComponents(
+  new ActionRowBuilder<TextInputBuilder>().addComponents(
+    new TextInputBuilder()
+      .setCustomId("subject")
+      .setLabel("Subject")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true),
+  ),
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+modal.addComponents(
+  new ActionRowBuilder().addComponents(
+    new TextInputBuilder()
+      .setCustomId("subject")
+      .setLabel("Subject")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true),
+  ),
+);
+```
+</TabItem>
+</Tabs>
+
+### `toJSON()`
+
+Serializes to a raw Discord API-compatible modal object.
+
+---
+
+## `TextInputBuilder`
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setCustomId(id)` | Unique ID for this field (used in `fields.getTextInputValue()`). |
+| `setLabel(label)` | The visible field label (max 45 chars). |
+| `setStyle(style)` | `TextInputStyle.Short` (single line) or `TextInputStyle.Paragraph` (multi-line). |
+| `setRequired(required)` | Whether the field is required. |
+| `setValue(value)` | Pre-filled default value. |
+| `setPlaceholder(text)` | Placeholder text (max 100 chars). |
+| `setMinLength(min)` | Minimum character length. |
+| `setMaxLength(max)` | Maximum character length. |
+
+## Full Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import {
+  ModalBuilder,
+  ActionRowBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} from "lunibee";
+
+// Build the modal
+const modal = new ModalBuilder()
+  .setCustomId("report_form")
+  .setTitle("Report a User")
+  .addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("reported_user")
+        .setLabel("Reported User ID or Username")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true),
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("reason")
+        .setLabel("Reason for reporting")
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(1000),
+    ),
+  );
+
+// Show the modal in response to a command
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "report") return;
+  await interaction.showModal(modal);
+});
+
+// Handle the modal submission
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isModalSubmit() || interaction.customId !== "report_form") return;
+  const userId = interaction.fields.getTextInputValue("reported_user");
+  const reason = interaction.fields.getTextInputValue("reason");
+  await interaction.reply({
+    content: `📨 Report filed for **${userId}**: ${reason}`,
+    ephemeral: true,
+  });
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import {
+  ModalBuilder,
+  ActionRowBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} from "lunibee";
+
+// Build the modal
+const modal = new ModalBuilder()
+  .setCustomId("report_form")
+  .setTitle("Report a User")
+  .addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("reported_user")
+        .setLabel("Reported User ID or Username")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true),
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("reason")
+        .setLabel("Reason for reporting")
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(1000),
+    ),
+  );
+
+// Show the modal in response to a command
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "report") return;
+  await interaction.showModal(modal);
+});
+
+// Handle the modal submission
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isModalSubmit() || interaction.customId !== "report_form") return;
+  const userId = interaction.fields.getTextInputValue("reported_user");
+  const reason = interaction.fields.getTextInputValue("reason");
+  await interaction.reply({
+    content: `📨 Report filed for **${userId}**: ${reason}`,
+    ephemeral ,
+  });
+});
+```
+</TabItem>
+</Tabs>

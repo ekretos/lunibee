@@ -132,10 +132,10 @@ REST-created and Gateway-updated resources are routed through manager cache muta
 
 ## Permissions
 
-`PermissionsBitField` provides named and raw permission checks:
+`PermissionSet` provides named and raw permission checks:
 
 ```ts
-if (member.permissions.has("ManageMessages")) {
+if (member.permissions.has(Permission.manageMessages)) {
     // permitted
 }
 ```
@@ -162,7 +162,7 @@ Lunibee provides strict builders for Discord payloads (Discord.js V2 compatible)
 
 - `ActionRowBuilder`
 - `ButtonBuilder`
-- `StringSelectMenuBuilder`
+- `StringSelectBuilder`
 - `EmbedBuilder`
 - `ModalBuilder`
 - `TextInputBuilder`

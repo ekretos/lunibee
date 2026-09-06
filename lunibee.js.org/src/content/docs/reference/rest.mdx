@@ -1,0 +1,329 @@
+---
+title: REST
+description: Bucket-aware Discord REST API client with rate limiting, retries, and AbortSignal support.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`REST` is Lunibee's HTTP client for the Discord REST API. It handles per-route rate limiting, global rate limits, exponential backoff, and cancellation via `AbortSignal`.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { REST, Routes } from "lunibee";
+// or directly:
+import { REST, Routes } from "@lunibee/rest";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { REST, Routes } from "lunibee";
+// or directly:
+import { REST, Routes } from "@lunibee/rest";
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new REST(options: RESTOptions)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new REST(options )
+```
+</TabItem>
+</Tabs>
+
+| Option | Type | Description |
+|---|---|---|
+| `token` | `string` | Discord bot token. |
+| `apiVersion` | `number` | API version (default: `10`). |
+| `baseURL` | `string` | Override the Discord base URL. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const rest = new REST({ token: process.env.DISCORD_TOKEN! });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const rest = new REST({ token: process.env.DISCORD_TOKEN });
+```
+</TabItem>
+</Tabs>
+
+## Methods
+
+All methods accept an optional `RESTRequestOptions` object as the last argument.
+
+### `get<T>(path, options?)`
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const user = await rest.get<APIUser>(Routes.user("@me"));
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const user = await rest.get<APIUser>(Routes.user("@me"));
+```
+</TabItem>
+</Tabs>
+
+### `post<T>(path, body?, options?)`
+
+Accepts the body directly or as `{ body: ... }` (Discord.js-familiar form):
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+// Direct body (Lunibee canonical):
+const message = await rest.post(Routes.channelMessages(channelId), { content: "Hello!" });
+
+// Discord.js-familiar:
+const message = await rest.post(Routes.channelMessages(channelId), { body: { content: "Hello!" } });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// Direct body (Lunibee canonical):
+const message = await rest.post(Routes.channelMessages(channelId), { content: "Hello!" });
+
+// Discord.js-familiar:
+const message = await rest.post(Routes.channelMessages(channelId), { body: { content: "Hello!" } });
+```
+</TabItem>
+</Tabs>
+
+### `patch<T>(path, body?, options?)`
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await rest.patch(Routes.channel(channelId), { name: "new-name" });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await rest.patch(Routes.channel(channelId), { name: "new-name" });
+```
+</TabItem>
+</Tabs>
+
+### `put<T>(path, body?, options?)`
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await rest.put(Routes.guildBan(guildId, userId), { delete_message_seconds: 86400 });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await rest.put(Routes.guildBan(guildId, userId), { delete_message_seconds: 86400 });
+```
+</TabItem>
+</Tabs>
+
+### `delete<T>(path, options?)`
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await rest.delete(Routes.message(channelId, messageId));
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await rest.delete(Routes.message(channelId, messageId));
+```
+</TabItem>
+</Tabs>
+
+### `postWithFiles<T>(path, body, files, options?)`
+
+Sends a multipart/form-data request with file attachments.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await rest.postWithFiles(
+  Routes.channelMessages(channelId),
+  { content: "Here is your file!" },
+  [{ name: "report.csv", data: csvBuffer, contentType: "text/csv" }],
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await rest.postWithFiles(
+  Routes.channelMessages(channelId),
+  { content: "Here is your file!" },
+  [{ name: "report.csv", data , contentType: "text/csv" }],
+);
+```
+</TabItem>
+</Tabs>
+
+### `setToken(token)`
+
+Updates the token used for subsequent requests.
+
+## `Routes` — Path Helpers
+
+`Routes` provides strongly-typed path builders for every Discord API endpoint:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+Routes.user("@me")                     // "/users/@me"
+Routes.channel(channelId)              // "/channels/{id}"
+Routes.channelMessages(channelId)      // "/channels/{id}/messages"
+Routes.message(channelId, messageId)   // "/channels/{id}/messages/{messageId}"
+Routes.guild(guildId)                  // "/guilds/{id}"
+Routes.guildChannels(guildId)          // "/guilds/{id}/channels"
+Routes.guildMember(guildId, userId)    // "/guilds/{id}/members/{userId}"
+Routes.guildBan(guildId, userId)       // "/guilds/{id}/bans/{userId}"
+Routes.guildRoles(guildId)             // "/guilds/{id}/roles"
+Routes.interactionCallback(id, token)  // "/interactions/{id}/{token}/callback"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+Routes.user("@me")                     // "/users/@me"
+Routes.channel(channelId)              // "/channels/{id}"
+Routes.channelMessages(channelId)      // "/channels/{id}/messages"
+Routes.message(channelId, messageId)   // "/channels/{id}/messages/{messageId}"
+Routes.guild(guildId)                  // "/guilds/{id}"
+Routes.guildChannels(guildId)          // "/guilds/{id}/channels"
+Routes.guildMember(guildId, userId)    // "/guilds/{id}/members/{userId}"
+Routes.guildBan(guildId, userId)       // "/guilds/{id}/bans/{userId}"
+Routes.guildRoles(guildId)             // "/guilds/{id}/roles"
+Routes.interactionCallback(id, token)  // "/interactions/{id}/{token}/callback"
+```
+</TabItem>
+</Tabs>
+
+## AbortSignal & Cancellation
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const controller = new AbortController();
+setTimeout(() => controller.abort(), 5000); // cancel after 5s
+
+try {
+  const data = await rest.get(Routes.guild(guildId), { signal: controller.signal });
+} catch (error) {
+  if (error instanceof RESTError && error.name === "AbortError") {
+    console.warn("Request was cancelled.");
+  }
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const controller = new AbortController();
+setTimeout(() => controller.abort(), 5000); // cancel after 5s
+
+try {
+  const data = await rest.get(Routes.guild(guildId), { signal: controller.signal });
+} catch (error) {
+  if (error instanceof RESTError && error.name === "AbortError") {
+    console.warn("Request was cancelled.");
+  }
+}
+```
+</TabItem>
+</Tabs>
+
+## `RESTError`
+
+Thrown when Discord returns a non-2xx response.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { RESTError } from "lunibee";
+
+try {
+  await rest.delete(Routes.message(channelId, messageId));
+} catch (error) {
+  if (error instanceof RESTError) {
+    console.error(`Discord API Error ${error.status}: ${error.message}`);
+    console.error("Code:", error.code);       // Discord error code
+    console.error("Method:", error.method);   // "DELETE"
+    console.error("Path:", error.path);       // "/channels/.../messages/..."
+  }
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { RESTError } from "lunibee";
+
+try {
+  await rest.delete(Routes.message(channelId, messageId));
+} catch (error) {
+  if (error instanceof RESTError) {
+    console.error(`Discord API Error ${error.status}: ${error.message}`);
+    console.error("Code:", error.code);       // Discord error code
+    console.error("Method:", error.method);   // "DELETE"
+    console.error("Path:", error.path);       // "/channels/.../messages/..."
+  }
+}
+```
+</TabItem>
+</Tabs>
+
+## Full Example
+
+**Fetch a user and send a DM**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { REST, Routes } from "lunibee";
+
+const rest = new REST({ token: process.env.DISCORD_TOKEN! });
+
+// Fetch a user
+const user = await rest.get(Routes.user("123456789012345678"));
+
+// Open a DM channel
+const dmChannel = await rest.post(Routes.userChannels(), { recipient_id: "123456789012345678" });
+
+// Send a message
+await rest.post(Routes.channelMessages((dmChannel as any).id), {
+  content: "Hello from Lunibee REST! 🐝",
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { REST, Routes } from "lunibee";
+
+const rest = new REST({ token: process.env.DISCORD_TOKEN });
+
+// Fetch a user
+const user = await rest.get(Routes.user("123456789012345678"));
+
+// Open a DM channel
+const dmChannel = await rest.post(Routes.userChannels(), { recipient_id: "123456789012345678" });
+
+// Send a message
+await rest.post(Routes.channelMessages((dmChannel as any).id), {
+  content: "Hello from Lunibee REST 🐝",
+});
+```
+</TabItem>
+</Tabs>

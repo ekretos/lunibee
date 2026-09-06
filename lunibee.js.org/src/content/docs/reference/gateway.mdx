@@ -1,0 +1,245 @@
+---
+title: Gateway
+description: Discord WebSocket Gateway client handling heartbeats, sessions, resume, reconnect, and sequence tracking.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Gateway` is Lunibee's low-level Discord WebSocket client. It is automatically managed by `Client`. You can also use it directly for advanced use cases like custom event routing.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Gateway } from "@lunibee/ws";
+// or via the main package:
+import { Client } from "lunibee"; // access as client.gateway / client.ws
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Gateway } from "@lunibee/ws";
+// or via the main package:
+import { Client } from "lunibee"; // access as client.gateway / client.ws
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new Gateway(options: GatewayOptions)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new Gateway(options )
+```
+</TabItem>
+</Tabs>
+
+| Option | Type | Description |
+|---|---|---|
+| `token` | `string` | Discord bot token. |
+| `intents` | `GatewayIntentResolvable` | Gateway intents. |
+| `presence` | `GatewayPresence` | Initial presence/status. |
+| `properties` | `GatewayProperties` | OS/browser/device identification. |
+| `compress` | `boolean` | Enable WebSocket compression. |
+| `largeThreshold` | `number` | Guild member threshold for large guilds (50–250). |
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `ping` | `number` | Latest heartbeat round-trip latency in ms. |
+| `state` | `GatewayState` | Current connection state. |
+| `sessionId` | `string \| undefined` | Active session ID. |
+| `resumeURL` | `string \| undefined` | Discord's recommended resume URL. |
+| `sequence` | `number \| null` | Latest event sequence number. |
+
+## Methods
+
+### `connect()`
+
+Establishes the WebSocket connection and identifies with Discord.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await gateway.connect();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await gateway.connect();
+```
+</TabItem>
+</Tabs>
+
+### `close()`
+
+Closes the WebSocket connection cleanly.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+gateway.close();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+gateway.close();
+```
+</TabItem>
+</Tabs>
+
+### `setPresence(data)`
+
+Sends an opcode 3 Presence Update.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+gateway.setPresence({
+  status: "dnd",
+  activities: [{ name: "Maintenance Mode", type: 0 }],
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+gateway.setPresence({
+  status: "dnd",
+  activities: [{ name: "Maintenance Mode", type: 0 }],
+});
+```
+</TabItem>
+</Tabs>
+
+### `setVoiceState(data)`
+
+Sends an opcode 4 Voice State Update.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+gateway.setVoiceState({ guild_id: guildId, channel_id: channelId, self_mute: false, self_deaf: false });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+gateway.setVoiceState({ guild_id , channel_id , self_mute , self_deaf: false });
+```
+</TabItem>
+</Tabs>
+
+### `requestGuildMembers(data)`
+
+Sends an opcode 8 Request Guild Members.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+gateway.requestGuildMembers({ guild_id: guildId, query: "", limit: 0 });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+gateway.requestGuildMembers({ guild_id , query: "", limit: 0 });
+```
+</TabItem>
+</Tabs>
+
+### `on(event, listener)` / `off(event, listener)`
+
+Subscribes to raw Gateway dispatch events:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+gateway.on("MESSAGE_CREATE", (data) => {
+  console.log("Raw message:", data);
+});
+
+gateway.on("READY", (data) => {
+  console.log("Session:", data.session_id);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+gateway.on("MESSAGE_CREATE", (data) => {
+  console.log("Raw message:", data);
+});
+
+gateway.on("READY", (data) => {
+  console.log("Session:", data.session_id);
+});
+```
+</TabItem>
+</Tabs>
+
+## `GatewayState`
+
+| Value | Description |
+|---|---|
+| `GatewayState.Connect` | Initial connection attempt. |
+| `GatewayState.Hello` | HELLO received, heartbeating. |
+| `GatewayState.Identify` | IDENTIFY in progress. |
+| `GatewayState.Resume` | RESUME in progress. |
+| `GatewayState.Ready` | Fully connected. |
+| `GatewayState.Reconnect` | Reconnecting after disconnect. |
+| `GatewayState.Closed` | Permanently closed. |
+
+## Direct Usage Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Gateway } from "@lunibee/ws";
+import { IntentBits } from "lunibee";
+
+const gateway = new Gateway({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
+});
+
+gateway.on("READY", (data) => {
+  console.log(`Connected as ${(data as any).user.username}`);
+});
+
+gateway.on("MESSAGE_CREATE", (data) => {
+  console.log("Message received:", (data as any).content);
+});
+
+await gateway.connect();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Gateway } from "@lunibee/ws";
+import { IntentBits } from "lunibee";
+
+const gateway = new Gateway({
+  token: process.env.DISCORD_TOKEN,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
+});
+
+gateway.on("READY", (data) => {
+  console.log(`Connected as ${(data as any).user.username}`);
+});
+
+gateway.on("MESSAGE_CREATE", (data) => {
+  console.log("Message received:", (data as any).content);
+});
+
+await gateway.connect();
+```
+</TabItem>
+</Tabs>
+
+> [!TIP]
+> Most bots should use the higher-level `Client` class instead of `Gateway` directly. `Client` handles structure creation, caching, and event dispatch automatically.

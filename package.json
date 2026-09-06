@@ -1,6 +1,6 @@
 {
   "name": "lunibee",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "A lightweight, Bun-first Discord API library.",
   "type": "module",
   "main": "./dist/index.js",
@@ -99,7 +99,7 @@
     "bench": "bun benchmarks/full.ts",
     "bench:compare": "bun benchmarks/compare.ts",
     "bench:stress": "bun benchmarks/stress.ts",
-    "prepare": "bun run build && bun run build:dts",
+    "build:all": "bun run build && bun run build:dts",
     "publish:all": "bun run scripts/publish.ts"
   },
   "dependencies": {
@@ -118,7 +118,7 @@
     "@lunibee/ws": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.0",
+    "@types/bun": "^1.4.1",
     "typescript": "^7.0.2"
   },
   "engines": {

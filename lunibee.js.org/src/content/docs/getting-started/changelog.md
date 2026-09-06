@@ -3,7 +3,27 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
+## v0.1.7
+
+### 🐛 Bug Fixes
+
+* **Managers**: Removed a duplicate `delete` override in `ChannelManager` that caused a TypeScript `TS2393` duplicate function implementation error at build time.
+
+### 🛠️ Build & Tooling
+
+* **DTS build**: Excluded `*.test.ts` files from `tsconfig.dts.json` to fix a `TS5097` error caused by `.ts` import extensions in test files (valid in Bun, not in `tsc`).
+* **`create-lunibee`**: Added a proper CLI entrypoint (`bin` field, `dist/` output), so `bun create lunibee` now scaffolds a new project correctly.
+
+### 📚 Documentation
+
+* **`quick-start.md`**: Switched intent syntax from bitwise OR (`|`) to array form to match the preferred `IntentBits` style.
+* **`sharding.md`**: Same array-form intent fix.
+* **`README.md`**: Corrected `PermissionsBitField` → `PermissionSet`, and `StringSelectMenuBuilder` → `StringSelectBuilder`.
+
+---
+
 ## v0.1.6
+
 
 ### 🎉 Major Highlights
 

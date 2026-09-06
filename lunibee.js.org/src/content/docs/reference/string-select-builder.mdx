@@ -1,0 +1,222 @@
+---
+title: StringSelectBuilder
+description: Fluent builder for Discord string select menu components with options, placeholder, and limits.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`StringSelectBuilder` creates a string-based select menu component where users pick from a predefined list of text options.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { StringSelectBuilder } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { StringSelectBuilder } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Methods
+
+All methods return `this` for chaining.
+
+### `setCustomId(id)`
+
+Sets the custom ID for this select menu.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+select.setCustomId("color_picker");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+select.setCustomId("color_picker");
+```
+</TabItem>
+</Tabs>
+
+### `setPlaceholder(text)`
+
+Sets the hint text shown when nothing is selected (max 150 characters).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+select.setPlaceholder("Choose a color…");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+select.setPlaceholder("Choose a color…");
+```
+</TabItem>
+</Tabs>
+
+### `setMinValues(min)`
+
+Sets the minimum number of values the user must select (default: 1).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+select.setMinValues(1);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+select.setMinValues(1);
+```
+</TabItem>
+</Tabs>
+
+### `setMaxValues(max)`
+
+Sets the maximum number of values the user can select (default: 1, max: 25).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+select.setMaxValues(3);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+select.setMaxValues(3);
+```
+</TabItem>
+</Tabs>
+
+### `setDisabled(disabled?)`
+
+Disables the select menu.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+select.setDisabled(true);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+select.setDisabled(true);
+```
+</TabItem>
+</Tabs>
+
+### `addOptions(...options)`
+
+Adds one or more options (max 25 total). Each option has:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | ✅ | Visible text (max 100 chars). |
+| `value` | `string` | ✅ | Submitted value (max 100 chars). |
+| `description` | `string` | — | Subtitle text (max 100 chars). |
+| `emoji` | `string \| object` | — | Emoji to display. |
+| `default` | `boolean` | — | Pre-selected state. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+select.addOptions(
+  { label: "Red", value: "red", emoji: "🔴", description: "Bold and passionate" },
+  { label: "Blue", value: "blue", emoji: "🔵", description: "Calm and collected" },
+  { label: "Green", value: "green", emoji: "🟢", description: "Fresh and energetic" },
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+select.addOptions(
+  { label: "Red", value: "red", emoji: "🔴", description: "Bold and passionate" },
+  { label: "Blue", value: "blue", emoji: "🔵", description: "Calm and collected" },
+  { label: "Green", value: "green", emoji: "🟢", description: "Fresh and energetic" },
+);
+```
+</TabItem>
+</Tabs>
+
+### `setOptions(...options)`
+
+Replaces all options with a new set.
+
+### `toJSON()`
+
+Serializes to a raw Discord API-compatible component object.
+
+## Full Example
+
+**Role selector**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ActionRowBuilder, StringSelectBuilder } from "lunibee";
+
+const row = new ActionRowBuilder<StringSelectBuilder>().addComponents(
+  new StringSelectBuilder()
+    .setCustomId("role_select")
+    .setPlaceholder("Pick up to 2 roles")
+    .setMinValues(1)
+    .setMaxValues(2)
+    .addOptions(
+      { label: "Announcements", value: "announcements", emoji: "📢" },
+      { label: "Updates", value: "updates", emoji: "🔔" },
+      { label: "Gaming", value: "gaming", emoji: "🎮" },
+      { label: "Art", value: "art", emoji: "🎨" },
+    ),
+);
+
+await channel.send({ content: "Subscribe to channels:", components: [row] });
+
+// Handle selection:
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isComponent() || interaction.customId !== "role_select") return;
+  const selected = interaction.values; // e.g. ["announcements", "gaming"]
+  await interaction.reply({
+    content: `✅ Subscribed to: ${selected.join(", ")}`,
+    ephemeral: true,
+  });
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ActionRowBuilder, StringSelectBuilder } from "lunibee";
+
+const row = new ActionRowBuilder().addComponents(
+  new StringSelectBuilder()
+    .setCustomId("role_select")
+    .setPlaceholder("Pick up to 2 roles")
+    .setMinValues(1)
+    .setMaxValues(2)
+    .addOptions(
+      { label: "Announcements", value: "announcements", emoji: "📢" },
+      { label: "Updates", value: "updates", emoji: "🔔" },
+      { label: "Gaming", value: "gaming", emoji: "🎮" },
+      { label: "Art", value: "art", emoji: "🎨" },
+    ),
+);
+
+await channel.send({ content: "Subscribe to channels:", components: [row] });
+
+// Handle selection:
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isComponent() || interaction.customId !== "role_select") return;
+  const selected = interaction.values; // e.g. ["announcements", "gaming"]
+  await interaction.reply({
+    content: `✅ Subscribed to: ${selected.join(", ")}`,
+    ephemeral ,
+  });
+});
+```
+</TabItem>
+</Tabs>

@@ -1,0 +1,188 @@
+---
+title: ActionRowBuilder
+description: Container builder that holds up to 5 interactive components in a single Discord message row.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`ActionRowBuilder` is a generic container that holds interactive components (buttons, select menus, or text inputs in modals). Each message can have up to 5 action rows.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ActionRowBuilder } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ActionRowBuilder } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Generic Type Parameter
+
+`ActionRowBuilder<T>` is typed to the component it will hold. This provides type-safe `addComponents()` calls:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ActionRowBuilder, ButtonBuilder, StringSelectBuilder } from "lunibee";
+
+const buttonRow = new ActionRowBuilder<ButtonBuilder>();
+const selectRow = new ActionRowBuilder<StringSelectBuilder>();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ActionRowBuilder, ButtonBuilder, StringSelectBuilder } from "lunibee";
+
+const buttonRow = new ActionRowBuilder();
+const selectRow = new ActionRowBuilder();
+```
+</TabItem>
+</Tabs>
+
+## Methods
+
+### `addComponents(...components)`
+
+Adds one or more components to the row (max 5 buttons or 1 select menu per row).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  new ButtonBuilder().setCustomId("a").setLabel("A").setStyle(1),
+  new ButtonBuilder().setCustomId("b").setLabel("B").setStyle(2),
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const row = new ActionRowBuilder().addComponents(
+  new ButtonBuilder().setCustomId("a").setLabel("A").setStyle(1),
+  new ButtonBuilder().setCustomId("b").setLabel("B").setStyle(2),
+);
+```
+</TabItem>
+</Tabs>
+
+### `setComponents(...components)`
+
+Replaces all components with a new set.
+
+### `toJSON()`
+
+Serializes to a raw Discord API-compatible action row object.
+
+## Examples
+
+**Three-button row**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
+
+const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  new ButtonBuilder().setCustomId("prev").setLabel("◀ Previous").setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder().setCustomId("stop").setLabel("⏹ Stop").setStyle(ButtonStyle.Danger),
+  new ButtonBuilder().setCustomId("next").setLabel("Next ▶").setStyle(ButtonStyle.Secondary),
+);
+await channel.send({ content: "Page 1 of 5", components: [row] });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
+
+const row = new ActionRowBuilder().addComponents(
+  new ButtonBuilder().setCustomId("prev").setLabel("◀ Previous").setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder().setCustomId("stop").setLabel("⏹ Stop").setStyle(ButtonStyle.Danger),
+  new ButtonBuilder().setCustomId("next").setLabel("Next ▶").setStyle(ButtonStyle.Secondary),
+);
+await channel.send({ content: "Page 1 of 5", components: [row] });
+```
+</TabItem>
+</Tabs>
+
+**Select menu row**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ActionRowBuilder, StringSelectBuilder } from "lunibee";
+
+const row = new ActionRowBuilder<StringSelectBuilder>().addComponents(
+  new StringSelectBuilder()
+    .setCustomId("pick_role")
+    .setPlaceholder("Pick a role…")
+    .addOptions(
+      { label: "Developer", value: "dev", emoji: "💻" },
+      { label: "Designer", value: "design", emoji: "🎨" },
+    ),
+);
+await channel.send({ content: "Choose your role:", components: [row] });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ActionRowBuilder, StringSelectBuilder } from "lunibee";
+
+const row = new ActionRowBuilder().addComponents(
+  new StringSelectBuilder()
+    .setCustomId("pick_role")
+    .setPlaceholder("Pick a role…")
+    .addOptions(
+      { label: "Developer", value: "dev", emoji: "💻" },
+      { label: "Designer", value: "design", emoji: "🎨" },
+    ),
+);
+await channel.send({ content: "Choose your role:", components: [row] });
+```
+</TabItem>
+</Tabs>
+
+**Modal with text input (using ActionRowBuilder)**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ActionRowBuilder, TextInputBuilder, TextInputStyle, ModalBuilder } from "lunibee";
+
+const modal = new ModalBuilder()
+  .setCustomId("feedback")
+  .setTitle("Send Feedback")
+  .addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("message")
+        .setLabel("Your feedback")
+        .setStyle(TextInputStyle.Paragraph),
+    ),
+  );
+await interaction.showModal(modal);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ActionRowBuilder, TextInputBuilder, TextInputStyle, ModalBuilder } from "lunibee";
+
+const modal = new ModalBuilder()
+  .setCustomId("feedback")
+  .setTitle("Send Feedback")
+  .addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("message")
+        .setLabel("Your feedback")
+        .setStyle(TextInputStyle.Paragraph),
+    ),
+  );
+await interaction.showModal(modal);
+```
+</TabItem>
+</Tabs>

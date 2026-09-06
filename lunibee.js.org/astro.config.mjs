@@ -69,6 +69,85 @@ export default defineConfig({
           ],
         },
         {
+          label: "Class Reference",
+          collapsed: true,
+          items: [
+            {
+              label: "Client & Core",
+              items: [
+                { label: "Client", link: "/reference/client" },
+                { label: "ClientEvent", link: "/reference/client-event" },
+                { label: "Collector", link: "/reference/collector" },
+                { label: "PermissionSet", link: "/reference/permission-set" },
+              ],
+            },
+            {
+              label: "Structures",
+              items: [
+                { label: "Message", link: "/reference/message" },
+                { label: "Channel", link: "/reference/channel" },
+                { label: "Guild", link: "/reference/guild" },
+                { label: "User", link: "/reference/user" },
+                { label: "GuildMember", link: "/reference/guild-member" },
+                { label: "Role", link: "/reference/role" },
+                { label: "Interactions", link: "/reference/interactions" },
+              ],
+            },
+            {
+              label: "Builders",
+              items: [
+                { label: "EmbedBuilder", link: "/reference/embed-builder" },
+                { label: "ActionRowBuilder", link: "/reference/action-row-builder" },
+                { label: "ButtonBuilder", link: "/reference/button-builder" },
+                { label: "StringSelectBuilder", link: "/reference/string-select-builder" },
+                { label: "ModalBuilder & TextInputBuilder", link: "/reference/modal-builder" },
+                { label: "SlashCommandBuilder", link: "/reference/slash-command-builder" },
+                { label: "AttachmentBuilder", link: "/reference/attachment-builder" },
+                { label: "Components V2", link: "/reference/components-v2" },
+              ],
+            },
+            {
+              label: "REST & Gateway",
+              items: [
+                { label: "REST & Routes", link: "/reference/rest" },
+                { label: "Gateway", link: "/reference/gateway" },
+              ],
+            },
+            {
+              label: "Collection & Cache",
+              items: [
+                { label: "Collection", link: "/reference/collection" },
+                { label: "Cache", link: "/reference/cache" },
+              ],
+            },
+            {
+              label: "Constants",
+              items: [
+                { label: "IntentBits", link: "/reference/intent-bits" },
+              ],
+            },
+            {
+              label: "Sharding",
+              items: [
+                { label: "ShardManager", link: "/reference/shard-manager" },
+              ],
+            },
+            {
+              label: "Voice",
+              items: [
+                { label: "VoiceConnection & AudioPlayer", link: "/reference/voice-connection" },
+              ],
+            },
+            {
+              label: "Utilities",
+              items: [
+                { label: "Formatters", link: "/reference/formatters" },
+                { label: "Utils", link: "/reference/utils" },
+              ],
+            },
+          ],
+        },
+        {
           label: "Guides & Recipes",
           items: [
             { label: "Slash Command Deployment", link: "/recipes/slash-commands" },

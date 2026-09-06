@@ -1,0 +1,184 @@
+---
+title: Message
+description: Represents a Discord message with resource methods for replying, editing, reacting, and more.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Message` wraps a Discord message object and exposes resource methods to interact with it directly — no manager lookups required.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Message } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Message } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | `string` | Snowflake ID of the message. |
+| `content` | `string` | Text content of the message. |
+| `author` | `User` | The user who sent the message. |
+| `channelId` | `string` | ID of the channel this message belongs to. |
+| `channel` | `Channel` | The channel this message was sent in. |
+| `guildId` | `string \| undefined` | Guild ID, if the message is in a guild. |
+| `flags` | `number` | Raw message flags bitfield. |
+| `timestamp` | `Date` | When the message was created. |
+| `createdAt` | `Date` | Alias for `timestamp`. |
+| `createdTimestamp` | `number` | Unix timestamp (ms) of creation. |
+| `attachments` | `APIAttachment[]` | File attachments on this message. |
+| `embeds` | `APIEmbed[]` | Embeds on this message. |
+| `components` | `APIMessageComponent[]` | Interactive components on this message. |
+| `mentions` | `User[]` | Users mentioned in this message. |
+| `mentionRoles` | `string[]` | Role IDs mentioned in this message. |
+| `mentionEveryone` | `boolean` | Whether `@everyone` or `@here` was used. |
+| `pinned` | `boolean` | Whether the message is pinned. |
+| `type` | `number` | Message type (0 = default, 19 = reply, etc.). |
+
+## Boolean Getters
+
+| Getter | Description |
+|---|---|
+| `isEphemeral` | `true` if the message is only visible to the recipient. |
+| `isPinned` | `true` if the message is pinned. |
+| `isSystemMessage` | `true` if this is a system message (join, boost, etc.). |
+| `isCrosspost` | `true` if crossposted from an announcement channel. |
+| `hasAttachments` | `true` if the message has file attachments. |
+| `hasEmbeds` | `true` if the message has embeds. |
+| `hasComponents` | `true` if the message has interactive components. |
+| `embedsSuppressed` | `true` if link embeds are suppressed. |
+
+## Methods
+
+### `reply(options)`
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("messageCreate", async (message) => {
+  if (message.content === "!hello") {
+    await message.reply("Hello back! 👋");
+    // or with a full payload:
+    await message.reply({ content: "Hello!", embeds: [embed] });
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("messageCreate", async (message) => {
+  if (message.content === "!hello") {
+    await message.reply("Hello back! 👋");
+    // or with a full payload:
+    await message.reply({ content: "Hello!", embeds: [embed] });
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+### `edit(options)`
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const updated = await message.edit({ content: "Edited content!" });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const updated = await message.edit({ content: "Edited content!" });
+```
+</TabItem>
+</Tabs>
+
+### `delete()` / `pin()` / `unpin()` / `crosspost()` / `suppressEmbeds()`
+
+```ts
+await message.delete();
+await message.pin();
+await message.unpin();
+await message.crosspost();
+await message.suppressEmbeds();
+```
+
+### `react(emoji)` / `removeReaction(emoji, userId?)` / `removeAllReactions()`
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await message.react("👍");
+await message.react("<:lunibee:123456789>");
+await message.removeReaction("👍");             // bot's own
+await message.removeReaction("👍", userId);    // specific user
+await message.removeAllReactions();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await message.react("👍");
+await message.react("<:lunibee:123456789>");
+await message.removeReaction("👍");
+await message.removeReaction("👍", userId);
+await message.removeAllReactions();
+```
+</TabItem>
+</Tabs>
+
+## Examples
+
+**Log every message**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("messageCreate", (message) => {
+  if (message.author.bot) return;
+  console.log(`[${message.channelId}] ${message.author.username}: ${message.content}`);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("messageCreate", (message) => {
+  if (message.author.bot) return;
+  console.log(`[${message.channelId}] ${message.author.username}: ${message.content}`);
+});
+```
+</TabItem>
+</Tabs>
+
+**Delete a message after 5 seconds**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("messageCreate", async (message) => {
+  if (message.content === "!self-destruct") {
+    const reply = await message.reply("💣 Self-destructing in 5 seconds...");
+    setTimeout(() => reply.delete(), 5000);
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("messageCreate", async (message) => {
+  if (message.content === "!self-destruct") {
+    const reply = await message.reply("💣 Self-destructing in 5 seconds...");
+    setTimeout(() => reply.delete(), 5000);
+  }
+});
+```
+</TabItem>
+</Tabs>

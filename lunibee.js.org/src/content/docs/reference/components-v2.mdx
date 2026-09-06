@@ -1,0 +1,364 @@
+---
+title: Components V2 Builders
+description: Discord Components V2 layout builders — Container, Section, TextDisplay, MediaGallery, Separator, Thumbnail, and FileComponent.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Lunibee includes builders for Discord's **Components V2** layout system, which provides richer message layouts with sections, galleries, separators, and more.
+
+> [!IMPORTANT]
+> Components V2 requires the `IS_COMPONENTS_V2` message flag. Messages using V2 components cannot also contain embeds or regular content.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import {
+  ContainerBuilder,
+  SectionBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  FileComponentBuilder,
+  SeparatorBuilder,
+  ThumbnailBuilder,
+} from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import {
+  ContainerBuilder,
+  SectionBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  FileComponentBuilder,
+  SeparatorBuilder,
+  ThumbnailBuilder,
+} from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `ContainerBuilder`
+
+The top-level V2 component that wraps other components. Set `IS_COMPONENTS_V2` flag when sending.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const container = new ContainerBuilder()
+  .addComponents(
+    new SectionBuilder()
+      .addText(new TextDisplayBuilder().setContent("**Welcome!** 🐝"))
+      .setThumbnail(new ThumbnailBuilder().setURL("https://example.com/bee.png")),
+    new SeparatorBuilder(),
+    new TextDisplayBuilder().setContent("Explore the channels below."),
+  );
+
+await channel.send({
+  components: [container],
+  flags: 1 << 15, // IS_COMPONENTS_V2
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const container = new ContainerBuilder()
+  .addComponents(
+    new SectionBuilder()
+      .addText(new TextDisplayBuilder().setContent("**Welcome!** 🐝"))
+      .setThumbnail(new ThumbnailBuilder().setURL("https://example.com/bee.png")),
+    new SeparatorBuilder(),
+    new TextDisplayBuilder().setContent("Explore the channels below."),
+  );
+
+await channel.send({
+  components: [container],
+  flags: 1 << 15, // IS_COMPONENTS_V2
+});
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `SectionBuilder`
+
+A two-column layout with text on the left and an optional accessory (thumbnail or button) on the right.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `addText(textDisplay)` | Adds a `TextDisplayBuilder` to the left column. |
+| `setThumbnail(thumbnail)` | Sets a `ThumbnailBuilder` accessory on the right. |
+| `setButton(button)` | Sets a `ButtonBuilder` accessory on the right. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const section = new SectionBuilder()
+  .addText(new TextDisplayBuilder().setContent("**Lunibee v0.1.7** is here!"))
+  .setThumbnail(
+    new ThumbnailBuilder()
+      .setURL("https://example.com/release.png")
+      .setDescription("Release banner"),
+  );
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const section = new SectionBuilder()
+  .addText(new TextDisplayBuilder().setContent("**Lunibee v0.1.7** is here!"))
+  .setThumbnail(
+    new ThumbnailBuilder()
+      .setURL("https://example.com/release.png")
+      .setDescription("Release banner"),
+  );
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `TextDisplayBuilder`
+
+Renders markdown text in a V2 layout.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setContent(text)` | Sets the markdown text content. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const text = new TextDisplayBuilder().setContent(
+  `## Server Stats\n- Members: **1,234**\n- Online: **456**`
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const text = new TextDisplayBuilder().setContent(
+  `## Server Stats\n- Members: **1,234**\n- Online: **456**`
+);
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `MediaGalleryBuilder`
+
+Displays a grid of images.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `addItems(...items)` | Adds media items. Each item: `{ url, description?, spoiler? }`. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const gallery = new MediaGalleryBuilder().addItems(
+  { url: "https://example.com/img1.png", description: "Screenshot 1" },
+  { url: "https://example.com/img2.png", description: "Screenshot 2" },
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const gallery = new MediaGalleryBuilder().addItems(
+  { url: "https://example.com/img1.png", description: "Screenshot 1" },
+  { url: "https://example.com/img2.png", description: "Screenshot 2" },
+);
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `ThumbnailBuilder`
+
+A small image accessory used in `SectionBuilder`.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setURL(url)` | Sets the image URL. |
+| `setDescription(text)` | Sets alt text for accessibility. |
+| `setSpoiler(spoiler)` | Marks as a spoiler image. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const thumb = new ThumbnailBuilder()
+  .setURL("https://example.com/avatar.png")
+  .setDescription("User avatar");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const thumb = new ThumbnailBuilder()
+  .setURL("https://example.com/avatar.png")
+  .setDescription("User avatar");
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `SeparatorBuilder`
+
+Renders a visual divider between components.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setSpacing(spacing)` | Sets the spacing size (`"small"` or `"large"`). |
+| `setDivider(show)` | Whether to show a visible line (default: `true`). |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const sep = new SeparatorBuilder().setSpacing("large");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const sep = new SeparatorBuilder().setSpacing("large");
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `FileComponentBuilder`
+
+Attaches an uploaded file component to the layout.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setURL(url)` | Sets the attachment URL (`attachment://filename`). |
+| `setSpoiler(spoiler)` | Marks as spoiler. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const file = new FileComponentBuilder().setURL("attachment://report.pdf");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const file = new FileComponentBuilder().setURL("attachment://report.pdf");
+```
+</TabItem>
+</Tabs>
+
+---
+
+## Full V2 Layout Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import {
+  ContainerBuilder,
+  SectionBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  SeparatorBuilder,
+  ThumbnailBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+} from "lunibee";
+
+const layout = new ContainerBuilder().addComponents(
+  // Header section
+  new SectionBuilder()
+    .addText(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.1.7"))
+    .setThumbnail(new ThumbnailBuilder().setURL("https://example.com/bee.png")),
+
+  new SeparatorBuilder().setSpacing("small"),
+
+  // Body text
+  new TextDisplayBuilder().setContent(
+    "This release includes bug fixes, new builders, and improved documentation.\n\n" +
+    "- Fixed duplicate `delete` in managers\n" +
+    "- Added DTS build exclusions\n" +
+    "- Overhauled `create-lunibee` CLI"
+  ),
+
+  new SeparatorBuilder(),
+
+  // Screenshots
+  new MediaGalleryBuilder().addItems(
+    { url: "https://example.com/screenshot1.png", description: "New CLI output" },
+    { url: "https://example.com/screenshot2.png", description: "Docs preview" },
+  ),
+);
+
+await channel.send({
+  components: [layout],
+  flags: 1 << 15, // IS_COMPONENTS_V2
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import {
+  ContainerBuilder,
+  SectionBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  SeparatorBuilder,
+  ThumbnailBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+} from "lunibee";
+
+const layout = new ContainerBuilder().addComponents(
+  // Header section
+  new SectionBuilder()
+    .addText(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.1.7"))
+    .setThumbnail(new ThumbnailBuilder().setURL("https://example.com/bee.png")),
+
+  new SeparatorBuilder().setSpacing("small"),
+
+  // Body text
+  new TextDisplayBuilder().setContent(
+    "This release includes bug fixes, new builders, and improved documentation.\n\n" +
+    "- Fixed duplicate `delete` in managers\n" +
+    "- Added DTS build exclusions\n" +
+    "- Overhauled `create-lunibee` CLI"
+  ),
+
+  new SeparatorBuilder(),
+
+  // Screenshots
+  new MediaGalleryBuilder().addItems(
+    { url: "https://example.com/screenshot1.png", description: "New CLI output" },
+    { url: "https://example.com/screenshot2.png", description: "Docs preview" },
+  ),
+);
+
+await channel.send({
+  components: [layout],
+  flags: 1 << 15, // IS_COMPONENTS_V2
+});
+```
+</TabItem>
+</Tabs>

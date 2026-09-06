@@ -136,6 +136,27 @@ function serializeQuery(query: RESTQuery | undefined): string {
     return serialized.length === 0 ? "" : `?${serialized}`;
 }
 
+/**
+ * Discord's *major parameters* — the resource ids that give an endpoint its own
+ * independent rate limit. Per the API documentation these are `channel_id`,
+ * `guild_id` and `webhook_id`; webhook routes are additionally scoped by
+ * their token. Any other id in a path shares its limit with sibling resources.
+ */
+function majorParameter(path: string): string {
+    const match =
+        /^\/(channels|guilds|webhooks)\/(\d+)(?:\/([^/?]+))?/.exec(path);
+    if (!match) return "@none";
+    // A webhook's limit is keyed by both its id and its token.
+    if (match[1] === "webhooks" && match[3] !== undefined)
+        return `${match[2]}:${match[3]}`;
+    return match[2]!;
+}
+
+/** Combines a bucket hash (or route) with a major parameter into a bucket key. */
+function scopeBucket(hashOrRoute: string, major: string): string {
+    return `${hashOrRoute}|${major}`;
+}
+
 // ─── REST Hooks ───────────────────────────────────────────────────────────────
 
 /** Context passed to `RESTHooks.onRequest`. */
@@ -291,7 +312,17 @@ export class REST {
         const query = serializeQuery(options.query);
         const finalPath = query ? `${path}${query}` : path;
         const route = `${normalizedMethod}:${this.#normalizeRoute(path)}`;
-        let bucketKey = (await this.#store.getBucketHash(route)) ?? route;
+        // Discord scopes a rate limit by (bucket hash, major parameter): two
+        // channels sharing an endpoint have independent limits. The hash stays
+        // cached per normalized route (Discord returns the same hash for an
+        // endpoint regardless of major parameter), but every key that gates
+        // sending must carry the major parameter, or unrelated resources
+        // serialize against one another and share one `remaining` counter.
+        const major = majorParameter(path);
+        let bucketKey = scopeBucket(
+            (await this.#store.getBucketHash(route)) ?? route,
+            major,
+        );
 
         // The map is keyed by the bucket as known at enqueue time; `bucketKey`
         // may be reassigned to the server bucket hash during the request, so we
@@ -369,7 +400,12 @@ export class REST {
                         status: response.status,
                         durationMs: Date.now() - requestStart,
                     });
-                    bucketKey = await this.#update(response, bucketKey, route);
+                    bucketKey = await this.#update(
+                        response,
+                        bucketKey,
+                        route,
+                        major,
+                    );
                     const payload = await this.#readPayload(response);
                     if (response.ok)
                         return (
@@ -733,17 +769,18 @@ export class REST {
         const routePath = queryIndex === -1 ? path : path.slice(0, queryIndex);
         return routePath.replace(/\/\d+(?=\/|$)/g, "/:id");
     }
-    /** Updates bucket state from Discord's rate-limit headers and records the server bucket hash. @param response HTTP response. @param bucket Current bucket. @param route Normalized local route key. @param bucketKey Current bucket identifier. @returns Bucket state used for subsequent attempts. */
+    /** Updates bucket state from Discord's rate-limit headers and records the server bucket hash. @param response HTTP response. @param bucket Current bucket. @param route Normalized local route key. @param bucketKey Current bucket identifier. @param major Major parameter scoping the bucket. @returns Bucket state used for subsequent attempts. */
     async #update(
         response: Response,
         bucketKey: string,
         route: string,
+        major: string,
     ): Promise<string> {
         let currentKey = bucketKey;
         const serverBucket = response.headers.get("X-RateLimit-Bucket");
         if (serverBucket) {
             await this.#store.setBucketHash(route, serverBucket);
-            currentKey = serverBucket;
+            currentKey = scopeBucket(serverBucket, major);
         }
 
         let bucket = (await this.#store.getBucket(currentKey)) ?? {

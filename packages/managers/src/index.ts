@@ -139,8 +139,16 @@ export class ChannelManager extends Manager<string, Channel> {
 
     public async deleteChannel(channelId: string): Promise<void> {
         await this.#rest.delete(Routes.channel(channelId));
+        this.delete(channelId);
+    }
+    /** Evicts a channel, dropping its per-channel message manager with it.
+     * Overrides {@link Manager.delete} so cache eviction driven by a Gateway
+     * `CHANNEL_DELETE`/`THREAD_DELETE` — which calls `delete` rather than
+     * {@link deleteChannel} — releases the message manager and its cached
+     * messages too, instead of retaining them for the client's lifetime. */
+    public override delete(channelId: string): boolean {
         this.#messageManagers.delete(channelId);
-        super.delete(channelId);
+        return super.delete(channelId);
     }
     public send(
         channelId: string,
@@ -242,8 +250,11 @@ export class ChannelManager extends Manager<string, Channel> {
         messageId: string,
         emoji: string,
     ): Promise<void> {
+        // Discord's create-reaction endpoint is
+        // PUT .../reactions/{emoji}/@me — the bare .../reactions/{emoji} path
+        // is not a valid target for PUT.
         await this.#rest.put(
-            Routes.messageReactions(channelId, messageId, emoji),
+            `${Routes.messageReactions(channelId, messageId, emoji)}/@me`,
         );
     }
     public async fetchReactions(
@@ -356,10 +367,6 @@ export class ChannelManager extends Manager<string, Channel> {
     ): Promise<void> {
         // Validation lives in bulkDeleteMessages so the public entry point is guarded too.
         return this.bulkDeleteMessages(channelId, messageIds);
-    }
-    public delete(channelId: string): boolean {
-        this.#messageManagers.delete(channelId);
-        return super.delete(channelId);
     }
     public clear(): void {
         this.#messageManagers.clear();

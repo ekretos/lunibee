@@ -1,0 +1,153 @@
+---
+title: IntentBits / GatewayIntentBits
+description: Gateway intent constants for subscribing to Discord events. Includes both camelCase and PascalCase forms.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Lunibee exports two intent constant objects to accommodate different coding styles. Both resolve to the same bitfield values.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { IntentBits, GatewayIntentBits, Intents } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { IntentBits, GatewayIntentBits, Intents } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+- **`IntentBits`** — idiomatic camelCase keys (e.g. `IntentBits.guilds`)
+- **`GatewayIntentBits`** — Discord-standard PascalCase keys (e.g. `GatewayIntentBits.Guilds`)
+- **`Intents`** — alias for `IntentBits`
+
+## Usage Styles
+
+### Array form (recommended with `IntentBits`)
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Client, IntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [
+    IntentBits.guilds,
+    IntentBits.guildMessages,
+    IntentBits.messageContent,
+  ],
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client, IntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN,
+  intents: [
+    IntentBits.guilds,
+    IntentBits.guildMessages,
+    IntentBits.messageContent,
+  ],
+});
+```
+</TabItem>
+</Tabs>
+
+### Bitwise OR form (works with either)
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Client, GatewayIntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents:
+    GatewayIntentBits.Guilds |
+    GatewayIntentBits.GuildMessages |
+    GatewayIntentBits.MessageContent,
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client, GatewayIntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN,
+  intents:
+    GatewayIntentBits.Guilds |
+    GatewayIntentBits.GuildMessages |
+    GatewayIntentBits.MessageContent,
+});
+```
+</TabItem>
+</Tabs>
+
+## Full Intent Reference
+
+| `GatewayIntentBits` (PascalCase) | `IntentBits` (camelCase) | Bit | Type |
+|---|---|---|---|
+| `Guilds` | `guilds` | `1 << 0` | Standard |
+| `GuildMembers` | `guildMembers` | `1 << 1` | **Privileged** |
+| `GuildModeration` | `guildModeration` | `1 << 2` | Standard |
+| `GuildExpressions` | `guildExpressions` | `1 << 3` | Standard |
+| `GuildIntegrations` | `guildIntegrations` | `1 << 4` | Standard |
+| `GuildWebhooks` | `guildWebhooks` | `1 << 5` | Standard |
+| `GuildInvites` | `guildInvites` | `1 << 6` | Standard |
+| `GuildVoiceStates` | `guildVoiceStates` | `1 << 7` | Standard |
+| `GuildPresences` | `guildPresences` | `1 << 8` | **Privileged** |
+| `GuildMessages` | `guildMessages` | `1 << 9` | Standard |
+| `GuildMessageReactions` | `guildMessageReactions` | `1 << 10` | Standard |
+| `GuildMessageTyping` | `guildMessageTyping` | `1 << 11` | Standard |
+| `DirectMessages` | `directMessages` | `1 << 12` | Standard |
+| `DirectMessageReactions` | `directMessageReactions` | `1 << 13` | Standard |
+| `DirectMessageTyping` | `directMessageTyping` | `1 << 14` | Standard |
+| `MessageContent` | `messageContent` | `1 << 15` | **Privileged** |
+| `GuildScheduledEvents` | `guildScheduledEvents` | `1 << 16` | Standard |
+| `AutoModerationConfiguration` | `autoModerationConfiguration` | `1 << 20` | Standard |
+| `AutoModerationExecution` | `autoModerationExecution` | `1 << 21` | Standard |
+| `GuildMessagePolls` | `guildMessagePolls` | `1 << 24` | Standard |
+| `DirectMessagePolls` | `directMessagePolls` | `1 << 25` | Standard |
+
+## Privileged Intents
+
+> [!IMPORTANT]
+> **`GuildMembers`**, **`GuildPresences`**, and **`MessageContent`** are **privileged intents**.
+> You must enable them in the [Discord Developer Portal](https://discord.com/developers/applications) under **Bot → Privileged Gateway Intents** before your bot can use them.
+
+## `resolveGatewayIntents`
+
+A utility function that converts any `GatewayIntentResolvable` to a raw integer bitfield:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { resolveGatewayIntents, IntentBits } from "lunibee";
+
+const bits = resolveGatewayIntents([IntentBits.guilds, IntentBits.guildMessages]);
+// → 513 (1 | 512)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { resolveGatewayIntents, IntentBits } from "lunibee";
+
+const bits = resolveGatewayIntents([IntentBits.guilds, IntentBits.guildMessages]);
+// → 513 (1 | 512)
+```
+</TabItem>
+</Tabs>
+
+Accepts:
+- A number: returned as-is.
+- A string key from either intent object (e.g. `"Guilds"`, `"guilds"`).
+- An array of any of the above.

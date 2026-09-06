@@ -3,6 +3,8 @@ title: "Sharding & Multi-Process Scaling"
 description: Architectural guide to Discord Gateway sharding and horizontal scaling.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 When a Discord bot joins more than **2,500 guilds**, Discord enforces Gateway Sharding. Each shard maintains its own independent WebSocket connection and handles a fraction of the bot's total servers.
 
 ---
@@ -15,14 +17,31 @@ $$\text{Shard ID} = (\text{Guild ID} \gg 22) \pmod{\text{Total Shards}}$$
 
 Lunibee handles this calculation automatically via `manager.getShardIdForGuild(guildId)`.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { ShardManager, IntentBits } from "lunibee";
 
 const manager = new ShardManager({
   token: process.env.DISCORD_TOKEN!,
-  intents: IntentBits.guilds | IntentBits.guildMessages,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
   shardCount: "auto", // Automatically requests Discord's recommended shard count
 });
 
 await manager.connect();
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ShardManager, IntentBits } from "lunibee";
+
+const manager = new ShardManager({
+  token: process.env.DISCORD_TOKEN,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
+  shardCount: "auto", // Automatically requests Discord's recommended shard count
+});
+
+await manager.connect();
+```
+</TabItem>
+</Tabs>

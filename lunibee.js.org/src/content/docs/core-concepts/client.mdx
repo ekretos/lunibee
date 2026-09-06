@@ -3,6 +3,8 @@ title: Client & Gateway Lifecycle
 description: Initializing the Lunibee Client, configuring intents, presence, and event dispatching.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 The `Client` class in `lunibee` is the primary orchestrator that connects the REST API, Gateway WebSocket, caching layers, and event dispatchers into a cohesive bot interface.
 
 ## Initialization & Intents
@@ -14,6 +16,8 @@ Lunibee supports specifying intents as arrays or bitwise OR combinations. The pu
 - `Intents` — alias for `IntentBits`.
 
 ### Using `IntentBits` (Recommended)
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { Client, IntentBits } from "lunibee";
 
@@ -26,8 +30,26 @@ const client = new Client({
   ],
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client, IntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN,
+  intents: [
+    IntentBits.guilds,
+    IntentBits.guildMessages,
+    IntentBits.messageContent,
+  ],
+});
+```
+</TabItem>
+</Tabs>
 
 ### Using `GatewayIntentBits`
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { Client, GatewayIntentBits } from "lunibee";
 
@@ -39,6 +61,21 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Client, GatewayIntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN,
+  intents:
+    GatewayIntentBits.Guilds |
+    GatewayIntentBits.GuildMessages |
+    GatewayIntentBits.MessageContent,
+});
+```
+</TabItem>
+</Tabs>
 
 ## Gateway Intents Reference
 
@@ -72,6 +109,8 @@ const client = new Client({
 
 ## Managing Bot Presence
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 client.setPresence({
   status: "online",
@@ -84,15 +123,40 @@ client.setPresence({
   ],
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.setPresence({
+  status: "online",
+  activities: [
+    {
+      name: "custom_status",
+      state: "⚡ Running on Bun & Lunibee",
+      type ,
+    },
+  ],
+});
+```
+</TabItem>
+</Tabs>
 
 ## Client Properties
 
 ### `ping`
 Returns the current WebSocket ping in milliseconds. This value is updated continuously as heartbeats are exchanged with the gateway.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 console.log(`Current ping: ${client.ping}ms`);
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+console.log(`Current ping: ${client.ping}ms`);
+```
+</TabItem>
+</Tabs>
 
 ## Client Methods
 
@@ -111,22 +175,46 @@ The client exposes several top-level methods to fetch resources without needing 
 ### `setVoiceState`
 Updates the client's voice state in a guild. Used to connect to, move between, or disconnect from voice channels.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 client.setVoiceState(guildId, channelId, {
   selfDeaf: false,
   selfMute: true,
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.setVoiceState(guildId, channelId, {
+  selfDeaf ,
+  selfMute ,
+});
+```
+</TabItem>
+</Tabs>
 
 ### `requestGuildMembers`
 Requests offline or all members for a guild. This requires the `GuildMembers` intent.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 client.requestGuildMembers(guildId, {
   query: "",
   limit: 0,
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.requestGuildMembers(guildId, {
+  query: "",
+  limit ,
+});
+```
+</TabItem>
+</Tabs>
 
 ## Client Events
 

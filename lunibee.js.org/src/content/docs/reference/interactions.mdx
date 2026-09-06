@@ -1,0 +1,443 @@
+---
+title: Interactions
+description: Typed interaction structures for slash commands, buttons, select menus, modals, and autocomplete.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Lunibee provides typed interaction classes for every Discord interaction type. All interactions share a common base with lifecycle methods for replying, deferring, and following up.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import {
+  CommandInteraction,
+  ComponentInteraction,
+  ModalSubmitInteraction,
+  AutocompleteInteraction,
+  Interaction,
+} from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import {
+  CommandInteraction,
+  ComponentInteraction,
+  ModalSubmitInteraction,
+  AutocompleteInteraction,
+  Interaction,
+} from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Common Properties (all types)
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | `string` | Interaction snowflake ID. |
+| `applicationId` | `string` | The application's ID. |
+| `token` | `string` | Interaction token (valid for 15 minutes). |
+| `guildId` | `string \| undefined` | Guild ID if the interaction happened in a server. |
+| `channelId` | `string \| undefined` | Channel ID. |
+| `user` | raw user data | The user who triggered the interaction. |
+| `member` | `GuildMember \| undefined` | The guild member who triggered it (if in a guild). |
+
+## Common Methods (all types)
+
+| Method | Description |
+|---|---|
+| `reply(options)` | Sends the initial response. Accepts `content`, `embeds`, `components`, `ephemeral`. |
+| `deferReply(options?)` | Acknowledges immediately, showing a loading state. |
+| `editReply(options)` | Edits the initial response (after `reply` or `deferReply`). |
+| `deleteReply()` | Deletes the initial response. |
+| `followUp(options)` | Sends a follow-up message. |
+
+## Type Guards
+
+Use type guard methods on the base `Interaction` to narrow to the correct subtype:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (interaction.isChatInputCommand()) {
+    // CommandInteraction
+  } else if (interaction.isComponent()) {
+    // ComponentInteraction
+  } else if (interaction.isModalSubmit()) {
+    // ModalSubmitInteraction
+  } else if (interaction.isAutocomplete()) {
+    // AutocompleteInteraction
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (interaction.isChatInputCommand()) {
+    // CommandInteraction
+  } else if (interaction.isComponent()) {
+    // ComponentInteraction
+  } else if (interaction.isModalSubmit()) {
+    // ModalSubmitInteraction
+  } else if (interaction.isAutocomplete()) {
+    // AutocompleteInteraction
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `CommandInteraction` — Slash Commands
+
+Triggered when a user runs a slash command (`/commandname`).
+
+### Additional Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `commandName` | `string` | Name of the slash command. |
+| `options` | `CommandOptions` | Typed option resolver. |
+
+### Reading Options
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  const { commandName, options } = interaction;
+
+  if (commandName === "ban") {
+    const target = options.getUser("target", true);
+    const reason = options.getString("reason") ?? "No reason provided";
+    // ...
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  const { commandName, options } = interaction;
+
+  if (commandName === "ban") {
+    const target = options.getUser("target", true);
+    const reason = options.getString("reason") ?? "No reason provided";
+    // ...
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+### `CommandOptions` Methods
+
+| Method | Returns | Description |
+|---|---|---|
+| `getString(name, required?)` | `string \| null` | Gets a string option. |
+| `getInteger(name, required?)` | `number \| null` | Gets an integer option. |
+| `getNumber(name, required?)` | `number \| null` | Gets a float option. |
+| `getBoolean(name, required?)` | `boolean \| null` | Gets a boolean option. |
+| `getUser(name, required?)` | `object \| null` | Gets the resolved user data. |
+| `getChannel(name, required?)` | `object \| null` | Gets the resolved channel data. |
+| `getRole(name, required?)` | `object \| null` | Gets the resolved role data. |
+| `getAttachment(name, required?)` | `object \| null` | Gets the attachment data. |
+| `getSubcommand(required?)` | `string \| null` | Gets the subcommand name. |
+| `getSubcommandGroup(required?)` | `string \| null` | Gets the subcommand group name. |
+
+When `required = true`, the method throws a `TypeError` if the option is missing.
+
+### Full Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === "userinfo") {
+    await interaction.deferReply();
+    const user = interaction.options.getUser("target") ?? interaction.user;
+    const embed = new EmbedBuilder()
+      .setTitle(`User Info: ${(user as any).username}`)
+      .addFields({ name: "ID", value: (user as any).id });
+    await interaction.editReply({ embeds: [embed] });
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === "userinfo") {
+    await interaction.deferReply();
+    const user = interaction.options.getUser("target") ?? interaction.user;
+    const embed = new EmbedBuilder()
+      .setTitle(`User Info: ${(user as any).username}`)
+      .addFields({ name: "ID", value: (user as any).id });
+    await interaction.editReply({ embeds: [embed] });
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `ComponentInteraction` — Buttons & Select Menus
+
+Triggered when a user clicks a button or chooses a select menu option.
+
+### Additional Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `customId` | `string` | The `customId` set on the component. |
+| `componentType` | `number` | Component type (2 = Button, 3 = String Select, etc.). |
+| `values` | `string[]` | Selected values (only for select menus). |
+| `message` | `Message` | The message containing the component. |
+
+### Additional Methods
+
+| Method | Description |
+|---|---|
+| `update(options)` | Updates the originating message instead of sending a new reply. |
+| `deferUpdate()` | Defers without showing a loading state (for components). |
+
+### Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isComponent()) return;
+
+  if (interaction.customId === "btn_confirm") {
+    await interaction.update({ content: "✅ Confirmed!", components: [] });
+  }
+
+  if (interaction.customId === "select_color") {
+    const colors = interaction.values; // e.g. ["red", "blue"]
+    await interaction.reply({ content: `You selected: ${colors.join(", ")}`, ephemeral: true });
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isComponent()) return;
+
+  if (interaction.customId === "btn_confirm") {
+    await interaction.update({ content: "✅ Confirmed!", components: [] });
+  }
+
+  if (interaction.customId === "select_color") {
+    const colors = interaction.values; // e.g. ["red", "blue"]
+    await interaction.reply({ content: `You selected: ${colors.join(", ")}`, ephemeral: true });
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `ModalSubmitInteraction` — Modal Submissions
+
+Triggered when a user submits a modal form.
+
+### Additional Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `customId` | `string` | The `customId` set on the modal. |
+| `fields` | `ModalFields` | Accessor for submitted text input values. |
+
+### Reading Field Values
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const value = interaction.fields.getTextInputValue("field_custom_id");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const value = interaction.fields.getTextInputValue("field_custom_id");
+```
+</TabItem>
+</Tabs>
+
+### Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isModalSubmit()) return;
+
+  if (interaction.customId === "feedback_modal") {
+    const subject = interaction.fields.getTextInputValue("subject");
+    const body = interaction.fields.getTextInputValue("body");
+    await interaction.reply({
+      content: `📨 Feedback received!\n**${subject}**\n${body}`,
+      ephemeral: true,
+    });
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isModalSubmit()) return;
+
+  if (interaction.customId === "feedback_modal") {
+    const subject = interaction.fields.getTextInputValue("subject");
+    const body = interaction.fields.getTextInputValue("body");
+    await interaction.reply({
+      content: `📨 Feedback received!\n**${subject}**\n${body}`,
+      ephemeral ,
+    });
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `AutocompleteInteraction` — Live Suggestions
+
+Triggered as a user types in a slash command option with `autocomplete: true`.
+
+> [!IMPORTANT]
+> Autocomplete interactions **cannot** use `reply()`. Use `respond()` to send choices.
+
+### Additional Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `commandName` | `string` | The slash command name. |
+| `options` | `CommandOptions` | Resolved options (use `getFocused` for the active field). |
+
+### `respond(choices)`
+
+Sends up to 25 autocomplete choice objects:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await interaction.respond([
+  { name: "Option A", value: "a" },
+  { name: "Option B", value: "b" },
+]);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await interaction.respond([
+  { name: "Option A", value: "a" },
+  { name: "Option B", value: "b" },
+]);
+```
+</TabItem>
+</Tabs>
+
+### Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isAutocomplete()) return;
+
+  const focused = interaction.options.getFocused(true);
+  if (focused.name === "tag") {
+    const tags = ["typescript", "javascript", "bun", "discord"];
+    const filtered = tags.filter(t => t.startsWith(focused.value.toLowerCase()));
+    await interaction.respond(filtered.map(t => ({ name: t, value: t })));
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isAutocomplete()) return;
+
+  const focused = interaction.options.getFocused(true);
+  if (focused.name === "tag") {
+    const tags = ["typescript", "javascript", "bun", "discord"];
+    const filtered = tags.filter(t => t.startsWith(focused.value.toLowerCase()));
+    await interaction.respond(filtered.map(t => ({ name , value: t })));
+  }
+});
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `showModal(modal)` — Opening a Modal
+
+Any non-autocomplete interaction can show a modal as its initial response:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "report") return;
+
+  const modal = new ModalBuilder()
+    .setCustomId("report_modal")
+    .setTitle("Report a User")
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("reason")
+          .setLabel("Reason")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true),
+      ),
+    );
+
+  await interaction.showModal(modal);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "report") return;
+
+  const modal = new ModalBuilder()
+    .setCustomId("report_modal")
+    .setTitle("Report a User")
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("reason")
+          .setLabel("Reason")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true),
+      ),
+    );
+
+  await interaction.showModal(modal);
+});
+```
+</TabItem>
+</Tabs>

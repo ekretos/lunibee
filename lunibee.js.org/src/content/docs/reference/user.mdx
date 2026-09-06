@@ -1,0 +1,200 @@
+---
+title: User
+description: Represents a Discord user account with display name, avatar URL helpers, and mention formatting.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`User` wraps a Discord user object, providing display name resolution, avatar URL helpers, and automatic mention formatting in template literals.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { User } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { User } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | `string` | Snowflake ID. |
+| `username` | `string` | Discord username (unique handle). |
+| `globalName` | `string \| null` | Display name set by the user. |
+| `avatar` | `string \| null` | Avatar hash. Use `avatarURL()` for the full URL. |
+| `discriminator` | `string \| null` | Legacy `#XXXX` tag, or `null` for new username system users. |
+| `bot` | `boolean` | Whether this user is a bot account. |
+| `system` | `boolean` | Whether this is an official Discord System account. |
+| `flags` | `number` | Public user flags bitfield. |
+| `displayName` | `string` | Global name if set, otherwise username. |
+| `createdAt` | `Date` | Account creation timestamp from snowflake. |
+
+## Methods
+
+### `avatarURL(options?)`
+
+Returns the user's avatar URL, or `null` if they have no avatar.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const url = user.avatarURL({ size: 256 });
+// → "https://cdn.discordapp.com/avatars/123/abc.png?size=256"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const url = user.avatarURL({ size: 256 });
+// → "https://cdn.discordapp.com/avatars/123/abc.png?size=256"
+```
+</TabItem>
+</Tabs>
+
+Options:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+interface ImageURLOptions {
+  extension?: "png" | "jpg" | "webp" | "gif" | "jpeg";
+  size?: 16 | 32 | 64 | 128 | 256 | 512 | 1024 | 2048 | 4096;
+  forceStatic?: boolean; // prevent animated GIFs
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+  extension?: "png" | "jpg" | "webp" | "gif" | "jpeg";
+  size?: 16 | 32 | 64 | 128 | 256 | 512 | 1024 | 2048 | 4096;
+  forceStatic?: boolean; // prevent animated GIFs
+}
+```
+</TabItem>
+</Tabs>
+
+### `defaultAvatarURL()`
+
+Returns the default avatar URL based on the user's discriminator or snowflake.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const fallback = user.defaultAvatarURL();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const fallback = user.defaultAvatarURL();
+```
+</TabItem>
+</Tabs>
+
+### `displayAvatarURL(options?)`
+
+Returns the avatar URL if one is set, otherwise the default avatar URL. Always returns a string.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const avatar = user.displayAvatarURL({ size: 128 });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const avatar = user.displayAvatarURL({ size: 128 });
+```
+</TabItem>
+</Tabs>
+
+### `toString()`
+
+Returns the Discord user mention string. Used automatically in template literals.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+console.log(`Hello ${user}!`); // → "Hello <@123456789>!"
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+console.log(`Hello ${user}!`); // → "Hello <@123456789>!"
+```
+</TabItem>
+</Tabs>
+
+## Examples
+
+**User info embed**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "whois") return;
+  const target = interaction.options.getUser("user") ?? interaction.user;
+  const embed = new EmbedBuilder()
+    .setTitle(target.displayName)
+    .setThumbnail(target.displayAvatarURL({ size: 256 }))
+    .addFields(
+      { name: "Username", value: target.username, inline: true },
+      { name: "ID", value: target.id, inline: true },
+      { name: "Bot", value: target.bot ? "Yes" : "No", inline: true },
+      { name: "Account Created", value: `<t:${Math.floor(target.createdAt.getTime() / 1000)}:R>`, inline: true },
+    )
+    .setColor(0x5865f2);
+  await interaction.reply({ embeds: [embed] });
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand() || interaction.commandName !== "whois") return;
+  const target = interaction.options.getUser("user") ?? interaction.user;
+  const embed = new EmbedBuilder()
+    .setTitle(target.displayName)
+    .setThumbnail(target.displayAvatarURL({ size: 256 }))
+    .addFields(
+      { name: "Username", value: target.username, inline: true },
+      { name: "ID", value: target.id, inline: true },
+      { name: "Bot", value: target.bot ? "Yes" : "No", inline: true },
+      { name: "Account Created", value: `<t:${Math.floor(target.createdAt.getTime() / 1000)}:R>`, inline: true },
+    )
+    .setColor(0x5865f2);
+  await interaction.reply({ embeds: [embed] });
+});
+```
+</TabItem>
+</Tabs>
+
+**Mention a user in a message**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+client.on("messageCreate", async (message) => {
+  if (message.content === "!me") {
+    await message.reply(`You are ${message.author} — ID: \`${message.author.id}\``);
+  }
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+client.on("messageCreate", async (message) => {
+  if (message.content === "!me") {
+    await message.reply(`You are ${message.author} — ID: \`${message.author.id}\``);
+  }
+});
+```
+</TabItem>
+</Tabs>

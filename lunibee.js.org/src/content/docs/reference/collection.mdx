@@ -1,0 +1,349 @@
+---
+title: Collection
+description: Extended Map with functional utilities like filter, map, find, reduce, and more.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Collection<K, V>` extends JavaScript's built-in `Map` with higher-order functional methods for querying and transforming data. All resource caches in Lunibee use `Collection`.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Collection } from "lunibee";
+// or from the sub-package:
+import { Collection } from "@lunibee/collection";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Collection } from "lunibee";
+// or from the sub-package:
+import { Collection } from "@lunibee/collection";
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const col = new Collection<string, User>();
+// From entries:
+const col = new Collection([["id1", user1], ["id2", user2]]);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const col = new Collection<string, User>();
+// From entries:
+const col = new Collection([["id1", user1], ["id2", user2]]);
+```
+</TabItem>
+</Tabs>
+
+## Inherited `Map` Methods
+
+All standard `Map` methods are available: `get`, `set`, `delete`, `has`, `clear`, `size`, `forEach`, `keys`, `values`, `entries`.
+
+## Additional Methods
+
+### `find(predicate)`
+
+Returns the **first value** matching the predicate, or `undefined`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const admin = client.users.cache.find(u => u.username === "admin");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const admin = client.users.cache.find(u => u.username === "admin");
+```
+</TabItem>
+</Tabs>
+
+### `findKey(predicate)`
+
+Returns the **first key** matching the predicate, or `undefined`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const adminId = client.users.cache.findKey(u => u.username === "admin");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const adminId = client.users.cache.findKey(u => u.username === "admin");
+```
+</TabItem>
+</Tabs>
+
+### `filter(predicate)`
+
+Returns a **new Collection** containing only entries where the predicate returns `true`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const bots = client.users.cache.filter(u => u.bot);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const bots = client.users.cache.filter(u => u.bot);
+```
+</TabItem>
+</Tabs>
+
+### `map(fn)`
+
+Returns an **array** of the results of calling `fn` on every value.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const usernames = client.users.cache.map(u => u.username);
+// → ["alice", "bob", "lunibee_bot", ...]
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const usernames = client.users.cache.map(u => u.username);
+// → ["alice", "bob", "lunibee_bot", ...]
+```
+</TabItem>
+</Tabs>
+
+### `flatMap(fn)`
+
+Returns a flat array from a function that returns arrays.
+
+### `reduce(fn, initialValue)`
+
+Reduces the collection to a single value.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const totalBoosters = client.guilds.cache.reduce(
+  (acc, guild) => acc + guild.premiumSubscriptionCount,
+  0,
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const totalBoosters = client.guilds.cache.reduce(
+  (acc, guild) => acc + guild.premiumSubscriptionCount,
+  0,
+);
+```
+</TabItem>
+</Tabs>
+
+### `some(predicate)`
+
+Returns `true` if **any** entry matches the predicate.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const hasBot = client.users.cache.some(u => u.bot);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const hasBot = client.users.cache.some(u => u.bot);
+```
+</TabItem>
+</Tabs>
+
+### `every(predicate)`
+
+Returns `true` if **all** entries match the predicate.
+
+### `first(amount?)`
+
+Returns the first value, or the first `n` values as an array.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const firstUser = client.users.cache.first();
+const firstThree = client.users.cache.first(3);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const firstUser = client.users.cache.first();
+const firstThree = client.users.cache.first(3);
+```
+</TabItem>
+</Tabs>
+
+### `last(amount?)`
+
+Returns the last value, or the last `n` values as an array.
+
+### `firstKey(amount?)` / `lastKey(amount?)`
+
+Returns the first or last key(s).
+
+### `at(index)`
+
+Returns the value at a numeric index (supports negative for reverse).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const lastUser = client.users.cache.at(-1);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const lastUser = client.users.cache.at(-1);
+```
+</TabItem>
+</Tabs>
+
+### `keyAt(index)`
+
+Returns the key at a numeric index.
+
+### `random(amount?)`
+
+Returns a random value, or `n` random values as an array.
+
+### `randomKey(amount?)`
+
+Returns a random key.
+
+### `sweep(predicate)`
+
+Removes all entries where the predicate returns `true`. Returns the number removed.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const removed = collection.sweep(u => u.bot);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const removed = collection.sweep(u => u.bot);
+```
+</TabItem>
+</Tabs>
+
+### `partition(predicate)`
+
+Splits the collection into two: `[matching, notMatching]`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const [bots, humans] = client.users.cache.partition(u => u.bot);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const [bots, humans] = client.users.cache.partition(u => u.bot);
+```
+</TabItem>
+</Tabs>
+
+### `sorted(compareFn?)`
+
+Returns a **new Collection** sorted by the comparator.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const byName = client.guilds.cache.sorted((a, b) => a.name.localeCompare(b.name));
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const byName = client.guilds.cache.sorted((a, b) => a.name.localeCompare(b.name));
+```
+</TabItem>
+</Tabs>
+
+### `sort(compareFn?)`
+
+Sorts the collection **in place**.
+
+### `concat(...collections)`
+
+Returns a new Collection merging this with others.
+
+### `difference(other)`
+
+Returns entries that are in this collection but not in `other`.
+
+### `intersect(other)`
+
+Returns entries that are in both collections.
+
+### `mapValues(fn)`
+
+Returns a new Collection with transformed values.
+
+### `groupBy(fn, collection?)`
+
+Groups values by the return value of `fn`.
+
+### `toJSON()`
+
+Returns an array of values.
+
+## Example
+
+**Filter and display online guild members**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const onlineMembers = client.guilds.cache
+  .filter(g => g.isCommunity)
+  .map(g => g.name);
+
+console.log("Community guilds:", onlineMembers.join(", "));
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const onlineMembers = client.guilds.cache
+  .filter(g => g.isCommunity)
+  .map(g => g.name);
+
+console.log("Community guilds:", onlineMembers.join(", "));
+```
+</TabItem>
+</Tabs>
+
+**Get the 5 most recently joined users**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const newest = client.users.cache
+  .sorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  .first(5);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const newest = client.users.cache
+  .sorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  .first(5);
+```
+</TabItem>
+</Tabs>

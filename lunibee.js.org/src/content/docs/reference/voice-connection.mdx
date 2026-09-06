@@ -1,0 +1,338 @@
+---
+title: VoiceConnection & AudioPlayer
+description: Discord Voice Gateway connection and audio playback abstractions in @lunibee/voice.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@lunibee/voice` provides low-level Discord voice support. `VoiceConnection` manages the Voice Gateway session, while `AudioPlayer` drives audio streaming into a voice channel.
+
+> [!NOTE]
+> Voice support is at a lower abstraction level than the main `Client`. You must wire UDP transport yourself or use a higher-level adapter.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import {
+  VoiceConnection,
+  VoiceConnectionState,
+  AudioPlayer,
+  AudioStream,
+  VoiceReceiver,
+  SpeakingFlags,
+} from "@lunibee/voice";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import {
+  VoiceConnection,
+  VoiceConnectionState,
+  AudioPlayer,
+  AudioStream,
+  VoiceReceiver,
+  SpeakingFlags,
+} from "@lunibee/voice";
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `VoiceConnection`
+
+Manages the Discord Voice Gateway WebSocket session for a single guild.
+
+### Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new VoiceConnection(guildId: string)
+// or with full options:
+new VoiceConnection({ guildId, endpoint, token, sessionId, selfDeaf, selfMute })
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new VoiceConnection(guildId)
+// or with full options:
+new VoiceConnection({ guildId, endpoint, token, sessionId, selfDeaf, selfMute })
+```
+</TabItem>
+</Tabs>
+
+### Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `state` | `VoiceConnectionState` | Current connection state. |
+| `guildId` | `string` | The guild this connection belongs to. |
+
+### `VoiceConnectionState` Values
+
+| State | Description |
+|---|---|
+| `Disconnected` | Not connected. |
+| `Connecting` | Waiting for READY/SESSION_DESCRIPTION. |
+| `Ready` | Fully connected, audio can be played. |
+| `Destroyed` | Permanently closed. |
+
+### Methods
+
+#### `connect(endpoint, token, sessionId)`
+
+Starts the Voice WebSocket connection.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await connection.connect(voiceEndpoint, voiceToken, sessionId);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await connection.connect(voiceEndpoint, voiceToken, sessionId);
+```
+</TabItem>
+</Tabs>
+
+#### `attachUdp(transport)`
+
+Attaches a `VoiceUdpTransport` for sending audio packets.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+connection.attachUdp(myUdpTransport);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+connection.attachUdp(myUdpTransport);
+```
+</TabItem>
+</Tabs>
+
+#### `setSpeaking(flags)`
+
+Updates the speaking state.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+connection.setSpeaking(SpeakingFlags.Microphone);
+connection.setSpeaking(0); // stop speaking
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+connection.setSpeaking(SpeakingFlags.Microphone);
+connection.setSpeaking(0); // stop speaking
+```
+</TabItem>
+</Tabs>
+
+#### `destroy()`
+
+Closes and destroys the connection.
+
+#### `on(event, listener)` / `off(event, listener)`
+
+| Event | Args | Description |
+|---|---|---|
+| `"ready"` | `(ssrc: number)` | Connection is fully established. |
+| `"stateChange"` | `(prev, next)` | State transition. |
+| `"sessionDescription"` | `(data)` | Encryption key/mode received. |
+
+---
+
+## `AudioPlayer`
+
+Drives audio from a `ReadableStream<Uint8Array>` into the voice connection.
+
+### Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new AudioPlayer()
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new AudioPlayer()
+```
+</TabItem>
+</Tabs>
+
+### Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `state` | `AudioPlayerState` | `"idle"`, `"playing"`, `"paused"`, `"stopped"`. |
+
+### Methods
+
+#### `play(stream)`
+
+Starts playing an `AudioStream`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const stream = new AudioStream(readableStream, { frameSize: 960 });
+player.play(stream);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const stream = new AudioStream(readableStream, { frameSize: 960 });
+player.play(stream);
+```
+</TabItem>
+</Tabs>
+
+#### `pause()`
+
+Pauses playback.
+
+#### `resume()`
+
+Resumes from paused state.
+
+#### `stop()`
+
+Stops playback and enters `"stopped"` state.
+
+### Events
+
+| Event | Args | Description |
+|---|---|---|
+| `"start"` | `()` | Playback began. |
+| `"pause"` | `()` | Playback paused. |
+| `"resume"` | `()` | Playback resumed. |
+| `"finish"` | `()` | Audio stream finished naturally. |
+| `"stop"` | `()` | Manually stopped. |
+| `"error"` | `(error)` | Playback error. |
+
+---
+
+## `AudioStream`
+
+Wraps a `ReadableStream<Uint8Array>` for use with `AudioPlayer`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { AudioStream } from "@lunibee/voice";
+import { createReadStream } from "node:fs";
+
+const fileStream = createReadStream("./music.pcm");
+const audio = new AudioStream(Readable.toWeb(fileStream), { frameSize: 960 });
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { AudioStream } from "@lunibee/voice";
+import { createReadStream } from "node:fs";
+
+const fileStream = createReadStream("./music.pcm");
+const audio = new AudioStream(Readable.toWeb(fileStream), { frameSize: 960 });
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `VoiceReceiver`
+
+Receives and demultiplexes incoming voice audio by SSRC/user ID.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const receiver = new VoiceReceiver(connection);
+
+const userStream = await receiver.subscribe(userId);
+// userStream: ReadableStream<Uint8Array>
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const receiver = new VoiceReceiver(connection);
+
+const userStream = await receiver.subscribe(userId);
+// userStream: ReadableStream<Uint8Array>
+```
+</TabItem>
+</Tabs>
+
+---
+
+## `SpeakingFlags`
+
+| Flag | Value | Description |
+|---|---|---|
+| `SpeakingFlags.Microphone` | `1` | Normal microphone speaking. |
+| `SpeakingFlags.Soundshare` | `2` | Application audio (screen share). |
+| `SpeakingFlags.Priority` | `4` | Priority speaker. |
+
+---
+
+## Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { VoiceConnection, AudioPlayer, AudioStream, SpeakingFlags } from "@lunibee/voice";
+
+// Get voice state from a Gateway event:
+client.on(ClientEvent.VoiceStateUpdate, async (data) => {
+  // Use VoiceStateUpdate + VoiceServerUpdate to get endpoint/token/sessionId...
+});
+
+// Once you have voice credentials:
+const connection = new VoiceConnection({ guildId });
+await connection.connect(endpoint, token, sessionId);
+
+connection.on("ready", async (ssrc) => {
+  const player = new AudioPlayer();
+  const stream = new AudioStream(audioReadableStream, { frameSize: 960 });
+  connection.setSpeaking(SpeakingFlags.Microphone);
+  player.play(stream);
+  player.on("finish", () => {
+    connection.setSpeaking(0);
+    connection.destroy();
+  });
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { VoiceConnection, AudioPlayer, AudioStream, SpeakingFlags } from "@lunibee/voice";
+
+// Get voice state from a Gateway event:
+client.on(ClientEvent.VoiceStateUpdate, async (data) => {
+  // Use VoiceStateUpdate + VoiceServerUpdate to get endpoint/token/sessionId...
+});
+
+// Once you have voice credentials:
+const connection = new VoiceConnection({ guildId });
+await connection.connect(endpoint, token, sessionId);
+
+connection.on("ready", async (ssrc) => {
+  const player = new AudioPlayer();
+  const stream = new AudioStream(audioReadableStream, { frameSize: 960 });
+  connection.setSpeaking(SpeakingFlags.Microphone);
+  player.play(stream);
+  player.on("finish", () => {
+    connection.setSpeaking(0);
+    connection.destroy();
+  });
+});
+```
+</TabItem>
+</Tabs>

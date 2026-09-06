@@ -3,6 +3,8 @@ title: Voice
 description: Discord Voice server connections, UDP audio streaming, and voice encryption.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 
 `lunibee` (voice) implements the Discord Voice Gateway protocol, encryption, and audio streaming.
 
@@ -10,6 +12,8 @@ description: Discord Voice server connections, UDP audio streaming, and voice en
 
 You do not need to pass your bot token to voice connections. The client manages the voice handshake and receives a temporary session token from Discord's `VOICE_SERVER_UPDATE` event automatically.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { VoiceConnection } from "lunibee";
 const voice = new VoiceConnection({
@@ -20,11 +24,27 @@ const voice = new VoiceConnection({
 });
 voice.connect();
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { VoiceConnection } from "lunibee";
+const voice = new VoiceConnection({
+  guildId: "123456789012345678",
+  channelId: "987654321098765432",
+  selfMute ,
+  selfDeaf ,
+});
+voice.connect();
+```
+</TabItem>
+</Tabs>
 
 ## Voice Connection Lifecycle
 
 `VoiceConnection` manages the connection state machine (`disconnected`, `connecting`, `connected`, `destroyed`) and provides lifecycle hooks:
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 voice.on("stateChange", (newState, oldState) => {
   console.log(`Voice state changed from ${oldState} to ${newState}`);
@@ -34,6 +54,19 @@ voice.on("speaking", (flags, ssrc) => {
   console.log(`Speaking state changed: ${flags}`);
 });
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+voice.on("stateChange", (newState, oldState) => {
+  console.log(`Voice state changed from ${oldState} to ${newState}`);
+});
+
+voice.on("speaking", (flags, ssrc) => {
+  console.log(`Speaking state changed: ${flags}`);
+});
+```
+</TabItem>
+</Tabs>
 
 ## Features
 

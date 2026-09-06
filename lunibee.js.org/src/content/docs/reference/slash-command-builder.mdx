@@ -1,0 +1,255 @@
+---
+title: SlashCommandBuilder
+description: Fluent builder for Discord application slash command payloads with options, subcommands, and groups.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`SlashCommandBuilder` creates the JSON payload needed to register a slash command with Discord. It does not send any network requests — use the `ApplicationCommandManager` or `client.rest` to register the payload.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { SlashCommandBuilder } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { SlashCommandBuilder } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Methods
+
+### `setName(name)`
+
+Sets the command name (1–32 chars, lowercase, no spaces — use hyphens).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+command.setName("ban");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+command.setName("ban");
+```
+</TabItem>
+</Tabs>
+
+### `setDescription(description)`
+
+Sets the command description (1–100 characters).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+command.setDescription("Bans a member from the server.");
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+command.setDescription("Bans a member from the server.");
+```
+</TabItem>
+</Tabs>
+
+### `setDefaultMemberPermissions(permissions)`
+
+Sets the default member permissions required to see and use the command.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { Permission } from "lunibee";
+command.setDefaultMemberPermissions(Permission.banMembers);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Permission } from "lunibee";
+command.setDefaultMemberPermissions(Permission.banMembers);
+```
+</TabItem>
+</Tabs>
+
+### `setDMPermission(allowed)`
+
+Whether the command can be used in DMs.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+command.setDMPermission(false);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+command.setDMPermission(false);
+```
+</TabItem>
+</Tabs>
+
+## Option Builders
+
+Each option type has a corresponding method. All return `this`.
+
+| Method | Option Type |
+|---|---|
+| `addStringOption(fn)` | Text input |
+| `addIntegerOption(fn)` | Whole number |
+| `addNumberOption(fn)` | Float |
+| `addBooleanOption(fn)` | True/false |
+| `addUserOption(fn)` | Discord user picker |
+| `addChannelOption(fn)` | Channel picker |
+| `addRoleOption(fn)` | Role picker |
+| `addMentionableOption(fn)` | User or role picker |
+| `addAttachmentOption(fn)` | File attachment |
+| `addSubcommand(fn)` | Subcommand |
+| `addSubcommandGroup(fn)` | Subcommand group |
+
+### Option method signature
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+command.addStringOption(option =>
+  option
+    .setName("reason")
+    .setDescription("Why you're banning this user")
+    .setRequired(true)
+    .setMaxLength(500)
+);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+command.addStringOption(option =>
+  option
+    .setName("reason")
+    .setDescription("Why you're banning this user")
+    .setRequired(true)
+    .setMaxLength(500)
+);
+```
+</TabItem>
+</Tabs>
+
+### `toJSON()`
+
+Returns the Discord API-compatible command payload object.
+
+## Examples
+
+**Simple ping command**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { SlashCommandBuilder } from "lunibee";
+
+const ping = new SlashCommandBuilder()
+  .setName("ping")
+  .setDescription("Replies with Pong!");
+
+await client.application.commands.create(ping.toJSON());
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { SlashCommandBuilder } from "lunibee";
+
+const ping = new SlashCommandBuilder()
+  .setName("ping")
+  .setDescription("Replies with Pong!");
+
+await client.application.commands.create(ping.toJSON());
+```
+</TabItem>
+</Tabs>
+
+**Ban command with options**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const ban = new SlashCommandBuilder()
+  .setName("ban")
+  .setDescription("Bans a member from the server")
+  .addUserOption(option =>
+    option.setName("target").setDescription("User to ban").setRequired(true)
+  )
+  .addStringOption(option =>
+    option.setName("reason").setDescription("Reason for the ban")
+  )
+  .addIntegerOption(option =>
+    option
+      .setName("delete_days")
+      .setDescription("Days of messages to delete (0-7)")
+      .setMinValue(0)
+      .setMaxValue(7)
+  );
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const ban = new SlashCommandBuilder()
+  .setName("ban")
+  .setDescription("Bans a member from the server")
+  .addUserOption(option =>
+    option.setName("target").setDescription("User to ban").setRequired(true)
+  )
+  .addStringOption(option =>
+    option.setName("reason").setDescription("Reason for the ban")
+  )
+  .addIntegerOption(option =>
+    option
+      .setName("delete_days")
+      .setDescription("Days of messages to delete (0-7)")
+      .setMinValue(0)
+      .setMaxValue(7)
+  );
+```
+</TabItem>
+</Tabs>
+
+**Command with subcommands**
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const settings = new SlashCommandBuilder()
+  .setName("settings")
+  .setDescription("Manage bot settings")
+  .addSubcommand(sub =>
+    sub
+      .setName("prefix")
+      .setDescription("Change the bot prefix")
+      .addStringOption(opt => opt.setName("value").setDescription("New prefix").setRequired(true))
+  )
+  .addSubcommand(sub =>
+    sub.setName("reset").setDescription("Reset all settings to defaults")
+  );
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const settings = new SlashCommandBuilder()
+  .setName("settings")
+  .setDescription("Manage bot settings")
+  .addSubcommand(sub =>
+    sub
+      .setName("prefix")
+      .setDescription("Change the bot prefix")
+      .addStringOption(opt => opt.setName("value").setDescription("New prefix").setRequired(true))
+  )
+  .addSubcommand(sub =>
+    sub.setName("reset").setDescription("Reset all settings to defaults")
+  );
+```
+</TabItem>
+</Tabs>

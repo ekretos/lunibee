@@ -3,10 +3,14 @@ title: "Permissions & Bitfields"
 description: Complete guide for Discord permissions, bitwise calculations, and camelCase getters in Lunibee.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 Lunibee provides simple permission checks for everyday bot code while still exposing immutable permission sets when you need more control.
 
 ## Check a permission
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 if (member.permissions.administrator) {
   console.log("Member is an administrator.");
@@ -16,11 +20,26 @@ if (member.permissions.manageMessages) {
   console.log("Member can manage messages.");
 }
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (member.permissions.administrator) {
+  console.log("Member is an administrator.");
+}
+
+if (member.permissions.manageMessages) {
+  console.log("Member can manage messages.");
+}
+```
+</TabItem>
+</Tabs>
 
 ## Check multiple permissions
 
 Use `.has()` when **all** permissions are required:
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { Permission } from "lunibee";
 
@@ -31,9 +50,25 @@ if (member.permissions.has(
   console.log("Member can kick and ban.");
 }
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { Permission } from "lunibee";
+
+if (member.permissions.has(
+  Permission.kickMembers,
+  Permission.banMembers,
+)) {
+  console.log("Member can kick and ban.");
+}
+```
+</TabItem>
+</Tabs>
 
 Use `.any()` when at least one permission is enough:
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 if (member.permissions.any(
   Permission.kickMembers,
@@ -42,11 +77,25 @@ if (member.permissions.any(
   console.log("Member can perform at least one moderation action.");
 }
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+if (member.permissions.any(
+  Permission.kickMembers,
+  Permission.banMembers,
+)) {
+  console.log("Member can perform at least one moderation action.");
+}
+```
+</TabItem>
+</Tabs>
 
 ## Build a permission set
 
 `PermissionSet` is immutable. Methods return a new set instead of changing the original.
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { PermissionSet, Permission } from "lunibee";
 
@@ -62,20 +111,53 @@ const elevated = base.add(
 
 const restricted = elevated.remove(Permission.sendMessages);
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { PermissionSet, Permission } from "lunibee";
+
+const base = new PermissionSet([
+  Permission.viewChannel,
+  Permission.sendMessages,
+]);
+
+const elevated = base.add(
+  Permission.embedLinks,
+  Permission.attachFiles,
+);
+
+const restricted = elevated.remove(Permission.sendMessages);
+```
+</TabItem>
+</Tabs>
 
 ## Inspect permissions
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 console.log(elevated.viewChannel);      // true
 console.log(elevated.sendMessages);     // true
 console.log(restricted.sendMessages);   // false
 console.log(elevated.toArray());
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+console.log(elevated.viewChannel);      // true
+console.log(elevated.sendMessages);     // true
+console.log(restricted.sendMessages);   // false
+console.log(elevated.toArray());
+```
+</TabItem>
+</Tabs>
 
 ## Permission constants
 
 Use Lunibee's `Permission` constants instead of manually calculating Discord permission bits:
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 Permission.viewChannel
 Permission.sendMessages
@@ -84,6 +166,18 @@ Permission.manageMessages
 Permission.manageRoles
 Permission.administrator
 ```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+Permission.viewChannel
+Permission.sendMessages
+Permission.manageChannels
+Permission.manageMessages
+Permission.manageRoles
+Permission.administrator
+```
+</TabItem>
+</Tabs>
 
 This keeps permission logic readable and avoids duplicating bit-shift calculations throughout your application.
 

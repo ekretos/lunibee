@@ -1,0 +1,268 @@
+---
+title: ShardManager
+description: Manages multiple Gateway connections (shards) for large bots, with auto-shard count and reconnect support.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`ShardManager` from `@lunibee/sharding` manages multiple `Gateway` connections (shards) for bots serving more than 2,500 guilds. It supports automatic shard count discovery, per-shard info, and horizontal reconnect logic.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ShardManager } from "@lunibee/sharding";
+// or via the main package:
+import { ShardManager } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ShardManager } from "@lunibee/sharding";
+// or via the main package:
+import { ShardManager } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+new ShardManager(options: ShardManagerOptions)
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+new ShardManager(options )
+```
+</TabItem>
+</Tabs>
+
+| Option | Type | Description |
+|---|---|---|
+| `token` | `string` | Discord bot token. |
+| `intents` | `GatewayIntentResolvable` | Gateway intents for all shards. |
+| `shardCount` | `number \| "auto"` | Number of shards. `"auto"` fetches Discord's recommendation. |
+| `presence` | `GatewayPresence` | Initial presence for all shards. |
+| `autoScale` | `boolean` | Automatically rescale shards over time. |
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `shards` | `Map<number, Gateway>` | Map of shard ID to `Gateway` instance. |
+
+## Methods
+
+### `connect()`
+
+Starts all shards. Uses `shardCount: "auto"` to query Discord for the recommended count.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+await manager.connect();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+await manager.connect();
+```
+</TabItem>
+</Tabs>
+
+### `destroy()`
+
+Closes all shard connections and clears the shard map.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+manager.destroy();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+manager.destroy();
+```
+</TabItem>
+</Tabs>
+
+### `fetchRecommendedShardCount()`
+
+Fetches the recommended shard count from Discord's `/gateway/bot` endpoint.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const count = await manager.fetchRecommendedShardCount();
+console.log(`Recommended shards: ${count}`);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const count = await manager.fetchRecommendedShardCount();
+console.log(`Recommended shards: ${count}`);
+```
+</TabItem>
+</Tabs>
+
+### `getShardIdForGuild(guildId)`
+
+Calculates which shard handles a given guild ID using Discord's formula:
+
+```
+shardId = (guildId >> 22) % totalShards
+```
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const shardId = manager.getShardIdForGuild("123456789012345678");
+console.log(`Guild is on shard ${shardId}`);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const shardId = manager.getShardIdForGuild("123456789012345678");
+console.log(`Guild is on shard ${shardId}`);
+```
+</TabItem>
+</Tabs>
+
+### `broadcast(payload)`
+
+Sends a raw Gateway payload to all shards.
+
+### `info()`
+
+Returns an array of `ShardInfo` objects:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const info = manager.info();
+for (const shard of info) {
+  console.log(`Shard ${shard.id}: ${shard.state} — ping ${shard.ping}ms`);
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const info = manager.info();
+for (const shard of info) {
+  console.log(`Shard ${shard.id}: ${shard.state} — ping ${shard.ping}ms`);
+}
+```
+</TabItem>
+</Tabs>
+
+`ShardInfo` shape:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+interface ShardInfo {
+  id: number;
+  state: GatewayState;
+  ping: number;
+  guilds: number; // only available if guild count tracking is enabled
+}
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+  id;
+  state: GatewayState;
+  ping;
+  guilds; // only available if guild count tracking is enabled
+}
+```
+</TabItem>
+</Tabs>
+
+## Example
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ShardManager, IntentBits } from "lunibee";
+
+const manager = new ShardManager({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
+  shardCount: "auto",
+});
+
+await manager.connect();
+console.log(`Running ${manager.shards.size} shards.`);
+
+// Graceful shutdown
+process.on("SIGINT", () => {
+  manager.destroy();
+  process.exit(0);
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ShardManager, IntentBits } from "lunibee";
+
+const manager = new ShardManager({
+  token: process.env.DISCORD_TOKEN,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
+  shardCount: "auto",
+});
+
+await manager.connect();
+console.log(`Running ${manager.shards.size} shards.`);
+
+// Graceful shutdown
+process.on("SIGINT", () => {
+  manager.destroy();
+  process.exit(0);
+});
+```
+</TabItem>
+</Tabs>
+
+> [!NOTE]
+> Sharding is only required for bots in **2,500+ guilds**. For smaller bots, use `Client` directly.
+
+## `ClusterManager`
+
+For very large bots (100k+ guilds), use `ClusterManager` from `@lunibee/sharding` to distribute shards across multiple processes:
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ClusterManager } from "@lunibee/sharding";
+
+const cluster = new ClusterManager({
+  token: process.env.DISCORD_TOKEN!,
+  script: "./dist/bot.js",  // worker script path
+  shardCount: "auto",
+  clusterCount: 4,          // number of CPU worker processes
+});
+
+await cluster.connect();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ClusterManager } from "@lunibee/sharding";
+
+const cluster = new ClusterManager({
+  token: process.env.DISCORD_TOKEN,
+  script: "./dist/bot.js",  // worker script path
+  shardCount: "auto",
+  clusterCount ,          // number of CPU worker processes
+});
+
+await cluster.connect();
+```
+</TabItem>
+</Tabs>

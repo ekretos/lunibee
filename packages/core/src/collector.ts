@@ -36,9 +36,25 @@ export class Collector<K, V> extends EventEmitter {
         if (this.ended) return false;
         this.totalProcessed++;
 
-        if (this.options.filter) {
-            const passed = await this.options.filter(item);
-            if (!passed) return false;
+        // `maxProcessed` counts every item the collector *sees*, so it has to be
+        // evaluated whether or not the filter accepts this one — checking it only
+        // on the accepted path means a collector whose filter rejects everything
+        // never reaches its processed limit and runs until `time`/`stop()`.
+        const reachedProcessed =
+            !!this.options.maxProcessed &&
+            this.totalProcessed >= this.options.maxProcessed;
+
+        let passed = true;
+        if (this.options.filter) passed = !!(await this.options.filter(item));
+
+        // The filter may be async, so the collector can have been stopped while
+        // it was pending. Anything decided before that stop is discarded rather
+        // than collected (and emitted) after "end".
+        if (this.ended) return false;
+
+        if (!passed) {
+            if (reachedProcessed) this.stop("processedLimit");
+            return false;
         }
 
         this.collected.set(key, item);
@@ -49,10 +65,7 @@ export class Collector<K, V> extends EventEmitter {
             return true;
         }
 
-        if (
-            this.options.maxProcessed &&
-            this.totalProcessed >= this.options.maxProcessed
-        ) {
+        if (reachedProcessed) {
             this.stop("processedLimit");
             return true;
         }
