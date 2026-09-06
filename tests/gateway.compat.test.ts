@@ -5,7 +5,7 @@ import {
     GatewayOpcodes,
     GatewayState,
     Status,
-} from "./index.ts";
+} from "../packages/ws/src/index.ts";
 
 /**
  * Discord.js-familiarity + reconnect/resume regression suite for the Gateway.
