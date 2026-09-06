@@ -130,9 +130,12 @@ describe("Collector — Discord.js-familiar collection primitive", () => {
     test("is exported from the public API and collects up to max", async () => {
         const collector = new Collector<string, number>({ max: 2 });
         const ended: unknown[] = [];
-        collector.on("end", (collected: Map<string, number>, reason: string) => {
-            ended.push([collected.size, reason]);
-        });
+        collector.on(
+            "end",
+            (collected: Map<string, number>, reason: string) => {
+                ended.push([collected.size, reason]);
+            },
+        );
         await collector.handle("a", 1);
         await collector.handle("b", 2);
         expect(collector.ended).toBe(true);

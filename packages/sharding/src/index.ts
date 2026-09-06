@@ -19,7 +19,9 @@ export interface ShardManagerOptions {
     /** Gateway reconnect behavior. */ reconnect?: boolean;
     /** Delay between shard starts in milliseconds. */ spawnDelay?: number;
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */ autoScaleInterval?: number;
-    /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */ onAutoScaleError?: (error: unknown) => void;
+    /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */ onAutoScaleError?: (
+        error: unknown,
+    ) => void;
 }
 /** Runtime state for a managed shard. */
 export interface ShardInfo {

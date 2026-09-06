@@ -189,9 +189,7 @@ export class Client
      * client has been destroyed. Mirrors `Client#token` in Discord.js.
      */
     public get token(): string | null {
-        return this.state === "destroyed"
-            ? null
-            : (this.options.token ?? null);
+        return this.state === "destroyed" ? null : (this.options.token ?? null);
     }
     public get uptime(): number | null {
         return this.readyAt ? Date.now() - this.readyAt.getTime() : null;
@@ -790,7 +788,10 @@ export class Client
         if (options?.withCounts) query.set("with_counts", "true");
         if (options?.withExpiration) query.set("with_expiration", "true");
         if (options?.guildScheduledEventId)
-            query.set("guild_scheduled_event_id", options.guildScheduledEventId);
+            query.set(
+                "guild_scheduled_event_id",
+                options.guildScheduledEventId,
+            );
         const qs = query.toString();
         return this.rest.get(
             `/invites/${code}${qs ? `?${qs}` : ""}`,
@@ -799,17 +800,23 @@ export class Client
 
     /** Fetches a sticker from Discord. */
     public fetchSticker(id: string): Promise<Record<string, unknown>> {
-        return this.rest.get(`/stickers/${id}`) as Promise<Record<string, unknown>>;
+        return this.rest.get(`/stickers/${id}`) as Promise<
+            Record<string, unknown>
+        >;
     }
 
     /** Fetches premium sticker packs from Discord. */
     public fetchPremiumStickerPacks(): Promise<Record<string, unknown>> {
-        return this.rest.get(`/sticker-packs`) as Promise<Record<string, unknown>>;
+        return this.rest.get(`/sticker-packs`) as Promise<
+            Record<string, unknown>
+        >;
     }
 
     /** Fetches a guild template from Discord. */
     public fetchGuildTemplate(code: string): Promise<Record<string, unknown>> {
-        return this.rest.get(`/guilds/templates/${code}`) as Promise<Record<string, unknown>>;
+        return this.rest.get(`/guilds/templates/${code}`) as Promise<
+            Record<string, unknown>
+        >;
     }
 
     /** Generates an invite link for this client. */
@@ -817,7 +824,8 @@ export class Client
         scopes?: string[];
         permissions?: string | bigint;
     }): string {
-        if (!this.user) throw new Error("Client must be ready to generate invite.");
+        if (!this.user)
+            throw new Error("Client must be ready to generate invite.");
         const params = new URLSearchParams({
             client_id: this.user.id,
             scopes: (options?.scopes ?? ["bot"]).join(" "),

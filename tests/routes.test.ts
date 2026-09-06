@@ -13,9 +13,7 @@ describe("REST Routes Full Coverage", () => {
         expect(Routes.userById(A)).toBe(`/users/${A}`);
         expect(Routes.guild(A)).toBe(`/guilds/${A}`);
         expect(Routes.guildChannels(A)).toBe(`/guilds/${A}/channels`);
-        expect(Routes.guildMember(A, B)).toBe(
-            `/guilds/${A}/members/${B}`,
-        );
+        expect(Routes.guildMember(A, B)).toBe(`/guilds/${A}/members/${B}`);
         expect(Routes.guildRoles(A)).toBe(`/guilds/${A}/roles`);
         expect(Routes.guildRole(A, C)).toBe(`/guilds/${A}/roles/${C}`);
         expect(Routes.guildMemberRole(A, B, C)).toBe(
@@ -73,9 +71,7 @@ describe("REST Routes Full Coverage", () => {
         expect(Routes.channelPrivateArchivedThreads(A)).toBe(
             `/channels/${A}/threads/archived/private`,
         );
-        expect(Routes.threadMembers(A)).toBe(
-            `/channels/${A}/thread-members`,
-        );
+        expect(Routes.threadMembers(A)).toBe(`/channels/${A}/thread-members`);
         expect(Routes.guildScheduledEvents(A)).toBe(
             `/guilds/${A}/scheduled-events`,
         );

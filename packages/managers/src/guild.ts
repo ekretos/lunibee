@@ -1,5 +1,10 @@
 import { ResourceManager } from "./base.js";
-import { Guild, AutoModerationRule, GuildWelcomeScreen, GuildOnboarding } from "@lunibee/structures";
+import {
+    Guild,
+    AutoModerationRule,
+    GuildWelcomeScreen,
+    GuildOnboarding,
+} from "@lunibee/structures";
 import { type REST, Routes } from "@lunibee/rest";
 import {
     type APIChannel,
@@ -136,32 +141,59 @@ export class GuildManager extends ResourceManager<string, Guild> {
     }
 
     /** Fetches a list of all auto moderation rules currently configured for guild. */
-    public async fetchAutoModerationRules(guildId: string): Promise<AutoModerationRule[]> {
-        const rules = await this.#rest.get<APIAutoModerationRule[]>(Routes.guildAutoModerationRules(guildId));
+    public async fetchAutoModerationRules(
+        guildId: string,
+    ): Promise<AutoModerationRule[]> {
+        const rules = await this.#rest.get<APIAutoModerationRule[]>(
+            Routes.guildAutoModerationRules(guildId),
+        );
         return rules.map((r) => new AutoModerationRule(r));
     }
 
     /** Fetches a single auto moderation rule. */
-    public async fetchAutoModerationRule(guildId: string, ruleId: string): Promise<AutoModerationRule> {
-        const rule = await this.#rest.get<APIAutoModerationRule>(Routes.guildAutoModerationRule(guildId, ruleId));
+    public async fetchAutoModerationRule(
+        guildId: string,
+        ruleId: string,
+    ): Promise<AutoModerationRule> {
+        const rule = await this.#rest.get<APIAutoModerationRule>(
+            Routes.guildAutoModerationRule(guildId, ruleId),
+        );
         return new AutoModerationRule(rule);
     }
 
     /** Creates a new auto moderation rule. */
-    public async createAutoModerationRule(guildId: string, options: Record<string, unknown>): Promise<AutoModerationRule> {
-        const rule = await this.#rest.post<APIAutoModerationRule>(Routes.guildAutoModerationRules(guildId), options);
+    public async createAutoModerationRule(
+        guildId: string,
+        options: Record<string, unknown>,
+    ): Promise<AutoModerationRule> {
+        const rule = await this.#rest.post<APIAutoModerationRule>(
+            Routes.guildAutoModerationRules(guildId),
+            options,
+        );
         return new AutoModerationRule(rule);
     }
 
     /** Modifies an existing auto moderation rule. */
-    public async editAutoModerationRule(guildId: string, ruleId: string, options: Record<string, unknown>): Promise<AutoModerationRule> {
-        const rule = await this.#rest.patch<APIAutoModerationRule>(Routes.guildAutoModerationRule(guildId, ruleId), options);
+    public async editAutoModerationRule(
+        guildId: string,
+        ruleId: string,
+        options: Record<string, unknown>,
+    ): Promise<AutoModerationRule> {
+        const rule = await this.#rest.patch<APIAutoModerationRule>(
+            Routes.guildAutoModerationRule(guildId, ruleId),
+            options,
+        );
         return new AutoModerationRule(rule);
     }
 
     /** Deletes an auto moderation rule. */
-    public async deleteAutoModerationRule(guildId: string, ruleId: string): Promise<void> {
-        await this.#rest.delete(Routes.guildAutoModerationRule(guildId, ruleId));
+    public async deleteAutoModerationRule(
+        guildId: string,
+        ruleId: string,
+    ): Promise<void> {
+        await this.#rest.delete(
+            Routes.guildAutoModerationRule(guildId, ruleId),
+        );
     }
 }
 

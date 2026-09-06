@@ -112,9 +112,7 @@ export class EmbedBuilder {
         ...fields: EmbedField[] | [EmbedField[]]
     ): this {
         const resolved = (
-            fields.length === 1 && Array.isArray(fields[0])
-                ? fields[0]
-                : fields
+            fields.length === 1 && Array.isArray(fields[0]) ? fields[0] : fields
         ) as EmbedField[];
         if (!resolved.length)
             throw new TypeError("At least one embed field is required.");

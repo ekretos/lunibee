@@ -512,9 +512,21 @@ describe("100% Comprehensive Codebase Coverage", () => {
         });
 
         const gw = client.gateway;
-        gw.emit("THREAD_CREATE", { id: "100000000000000000", type: 11, guild_id: "200000000000000000" });
-        gw.emit("THREAD_UPDATE", { id: "100000000000000000", type: 11, guild_id: "200000000000000000" });
-        gw.emit("THREAD_DELETE", { id: "100000000000000000", type: 11, guild_id: "200000000000000000" });
+        gw.emit("THREAD_CREATE", {
+            id: "100000000000000000",
+            type: 11,
+            guild_id: "200000000000000000",
+        });
+        gw.emit("THREAD_UPDATE", {
+            id: "100000000000000000",
+            type: 11,
+            guild_id: "200000000000000000",
+        });
+        gw.emit("THREAD_DELETE", {
+            id: "100000000000000000",
+            type: 11,
+            guild_id: "200000000000000000",
+        });
         gw.emit("GUILD_MEMBER_ADD", {
             user: { id: "300000000000000000", username: "U" },
             guild_id: "200000000000000000",
@@ -578,12 +590,30 @@ describe("100% Comprehensive Codebase Coverage", () => {
             emojisUpdated = e;
         });
 
-        gw.emit("GUILD_ROLE_CREATE", { guild_id: "200000000000000000", role: { id: "1" } });
-        gw.emit("GUILD_ROLE_UPDATE", { guild_id: "200000000000000000", role: { id: "1" } });
-        gw.emit("GUILD_ROLE_DELETE", { guild_id: "200000000000000000", role_id: "1" });
-        gw.emit("GUILD_BAN_ADD", { guild_id: "200000000000000000", user: { id: "300000000000000000" } });
-        gw.emit("GUILD_BAN_REMOVE", { guild_id: "200000000000000000", user: { id: "300000000000000000" } });
-        gw.emit("GUILD_EMOJIS_UPDATE", { guild_id: "200000000000000000", emojis: [] });
+        gw.emit("GUILD_ROLE_CREATE", {
+            guild_id: "200000000000000000",
+            role: { id: "1" },
+        });
+        gw.emit("GUILD_ROLE_UPDATE", {
+            guild_id: "200000000000000000",
+            role: { id: "1" },
+        });
+        gw.emit("GUILD_ROLE_DELETE", {
+            guild_id: "200000000000000000",
+            role_id: "1",
+        });
+        gw.emit("GUILD_BAN_ADD", {
+            guild_id: "200000000000000000",
+            user: { id: "300000000000000000" },
+        });
+        gw.emit("GUILD_BAN_REMOVE", {
+            guild_id: "200000000000000000",
+            user: { id: "300000000000000000" },
+        });
+        gw.emit("GUILD_EMOJIS_UPDATE", {
+            guild_id: "200000000000000000",
+            emojis: [],
+        });
 
         expect(roleCreated.role.id).toBe("1");
         expect(roleUpdated.role.id).toBe("1");
@@ -628,16 +658,25 @@ describe("100% Comprehensive Codebase Coverage", () => {
         gw.emit("ERROR", "test string error");
 
         // Lifecycle events
-        gw.emit("READY", { user: { id: "100000000000000000" }, application: { id: "200000000000000000" } });
+        gw.emit("READY", {
+            user: { id: "100000000000000000" },
+            application: { id: "200000000000000000" },
+        });
         gw.emit("open");
         gw.emit("close", { code: 1000, action: "test" });
 
         // Missing complex payloads
         gw.emit("GUILD_CREATE", { id: "100000000000000000", name: "Guild" });
-        gw.emit("GUILD_CREATE", { id: "101000000000000000", unavailable: true });
+        gw.emit("GUILD_CREATE", {
+            id: "101000000000000000",
+            unavailable: true,
+        });
         gw.emit("GUILD_UPDATE", { id: "100000000000000000", name: "Updated" });
         gw.emit("GUILD_DELETE", { id: "100000000000000000" });
-        gw.emit("GUILD_DELETE", { id: "101000000000000000", unavailable: true });
+        gw.emit("GUILD_DELETE", {
+            id: "101000000000000000",
+            unavailable: true,
+        });
         gw.emit("CHANNEL_CREATE", { id: "200000000000000000", type: 0 });
         gw.emit("CHANNEL_UPDATE", { id: "200000000000000000", type: 0 });
         gw.emit("CHANNEL_DELETE", { id: "200000000000000000", type: 0 });
@@ -700,7 +739,11 @@ describe("100% Comprehensive Codebase Coverage", () => {
             if (path.includes("/guilds/") && path.includes("/roles/"))
                 return { id: "501000000000000000", name: "Role501" };
             if (path.includes("/guilds/"))
-                return { id: "201000000000000000", name: "Guild201", roles: [] };
+                return {
+                    id: "201000000000000000",
+                    name: "Guild201",
+                    roles: [],
+                };
             if (path.includes("/channels/") && path.includes("/messages/"))
                 return {
                     id: "999000000000000000",
@@ -734,7 +777,11 @@ describe("100% Comprehensive Codebase Coverage", () => {
         });
         expect(updatedChan.name).toBe("General Updated");
         chanMgr.update(
-            new Channel({ id: "301000000000000000", type: 0, name: "General Final" }),
+            new Channel({
+                id: "301000000000000000",
+                type: 0,
+                name: "General Final",
+            }),
         );
         expect(chanMgr.get("301000000000000000")?.name).toBe("General Final");
 
@@ -744,7 +791,12 @@ describe("100% Comprehensive Codebase Coverage", () => {
             content: "Msg",
             author: { id: "101000000000000000", username: "U" },
         });
-        expect(chanMgr.deleteCachedMessage("301000000000000000", "901000000000000000")).toBe(true);
+        expect(
+            chanMgr.deleteCachedMessage(
+                "301000000000000000",
+                "901000000000000000",
+            ),
+        ).toBe(true);
         expect(chanMgr.delete("301000000000000000")).toBe(true);
         chanMgr.clear();
 
@@ -756,7 +808,11 @@ describe("100% Comprehensive Codebase Coverage", () => {
         const fetchedRole = await roleMgr.fetch("501000000000000000");
         expect(fetchedRole.id).toBe("501000000000000000");
 
-        const msgMgr = new MessageManager(rest, {} as any, "301000000000000000");
+        const msgMgr = new MessageManager(
+            rest,
+            {} as any,
+            "301000000000000000",
+        );
         msgMgr.upsert({
             id: "990000000000000000",
             channel_id: "301000000000000000",

@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { ShardManager, ClusterManager } from "../packages/sharding/src/index.ts";
+import {
+    ShardManager,
+    ClusterManager,
+} from "../packages/sharding/src/index.ts";
 
 /**
  * Integration coverage for the sharding lifecycle and the auto-scale regression

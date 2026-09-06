@@ -9,17 +9,25 @@ import { REST } from "@lunibee/rest";
 describe("Managers Coverage", () => {
     test("Manager basic collection methods", () => {
         const mgr = new Manager<string, { id: string; name: string }>();
-        mgr.set("111111111111111111", { id: "111111111111111111", name: "Alpha" });
+        mgr.set("111111111111111111", {
+            id: "111111111111111111",
+            name: "Alpha",
+        });
         expect(mgr.get("111111111111111111")?.name).toBe("Alpha");
         expect(mgr.has("111111111111111111")).toBe(true);
         expect(mgr.size).toBe(1);
         expect(mgr.first()?.name).toBe("Alpha");
         expect(mgr.values().length).toBe(1);
-        expect(mgr.find((v) => v.name === "Alpha")?.id).toBe("111111111111111111");
+        expect(mgr.find((v) => v.name === "Alpha")?.id).toBe(
+            "111111111111111111",
+        );
         expect([...mgr].length).toBe(1);
         mgr.delete("111111111111111111");
         expect(mgr.size).toBe(0);
-        mgr.set("222222222222222222", { id: "222222222222222222", name: "Beta" });
+        mgr.set("222222222222222222", {
+            id: "222222222222222222",
+            name: "Beta",
+        });
         mgr.clear();
         expect(mgr.size).toBe(0);
     });
@@ -176,7 +184,8 @@ describe("Managers Coverage", () => {
 
         (rest as any).get = async (url: string) => {
             lastUrl = url;
-            if (url === "/guilds/111111111111111111") return { id: "111111111111111111", name: "Guild 1" };
+            if (url === "/guilds/111111111111111111")
+                return { id: "111111111111111111", name: "Guild 1" };
             // Single auto-moderation rule fetch returns one rule object.
             if (/\/auto-moderation\/rules\/\d+$/.test(url))
                 return {
@@ -229,7 +238,9 @@ describe("Managers Coverage", () => {
         expect(created.id).toBe("222222222222222222");
         expect(lastUrl).toBe("/guilds");
 
-        const edited = await guildMgr.edit("111111111111111111", { name: "Edited Guild" });
+        const edited = await guildMgr.edit("111111111111111111", {
+            name: "Edited Guild",
+        });
         expect(edited.id).toBe("111111111111111111");
         expect(lastUrl).toBe("/guilds/111111111111111111");
         expect(lastOpts.name).toBe("Edited Guild");
@@ -250,21 +261,43 @@ describe("Managers Coverage", () => {
         expect(lastUrl).toBe("/guilds/111111111111111111/invites");
 
         await guildMgr.fetchAutoModerationRules("111111111111111111");
-        expect(lastUrl).toBe("/guilds/111111111111111111/auto-moderation/rules");
+        expect(lastUrl).toBe(
+            "/guilds/111111111111111111/auto-moderation/rules",
+        );
 
-        await guildMgr.fetchAutoModerationRule("111111111111111111", "123456789012345679");
-        expect(lastUrl).toBe("/guilds/111111111111111111/auto-moderation/rules/123456789012345679");
+        await guildMgr.fetchAutoModerationRule(
+            "111111111111111111",
+            "123456789012345679",
+        );
+        expect(lastUrl).toBe(
+            "/guilds/111111111111111111/auto-moderation/rules/123456789012345679",
+        );
 
-        await guildMgr.createAutoModerationRule("111111111111111111", { name: "rule" });
-        expect(lastUrl).toBe("/guilds/111111111111111111/auto-moderation/rules");
+        await guildMgr.createAutoModerationRule("111111111111111111", {
+            name: "rule",
+        });
+        expect(lastUrl).toBe(
+            "/guilds/111111111111111111/auto-moderation/rules",
+        );
         expect(lastOpts.name).toBe("rule");
 
-        await guildMgr.editAutoModerationRule("111111111111111111", "123456789012345679", { name: "rule2" });
-        expect(lastUrl).toBe("/guilds/111111111111111111/auto-moderation/rules/123456789012345679");
+        await guildMgr.editAutoModerationRule(
+            "111111111111111111",
+            "123456789012345679",
+            { name: "rule2" },
+        );
+        expect(lastUrl).toBe(
+            "/guilds/111111111111111111/auto-moderation/rules/123456789012345679",
+        );
         expect(lastOpts.name).toBe("rule2");
 
-        await guildMgr.deleteAutoModerationRule("111111111111111111", "123456789012345679");
-        expect(lastUrl).toBe("/guilds/111111111111111111/auto-moderation/rules/123456789012345679");
+        await guildMgr.deleteAutoModerationRule(
+            "111111111111111111",
+            "123456789012345679",
+        );
+        expect(lastUrl).toBe(
+            "/guilds/111111111111111111/auto-moderation/rules/123456789012345679",
+        );
 
         // Also cover the fetch in constructor (ResourceManager.fetch)
         const fetched = await guildMgr.fetch("111111111111111111");
@@ -281,7 +314,8 @@ describe("Managers Coverage", () => {
             lastUrl = url;
             if (url === "/users/@me")
                 return { id: "123456789012345679", username: "bot" };
-            if (url === "/users/111111111111111111") return { id: "111111111111111111", username: "user1" };
+            if (url === "/users/111111111111111111")
+                return { id: "111111111111111111", username: "user1" };
             return {};
         };
         (rest as any).post = async (url: string, opts: any) => {
@@ -322,16 +356,18 @@ describe("Managers Coverage", () => {
 
     test("EmojiManager executes REST operations", async () => {
         const { REST } = await import("../packages/rest/src/index.ts");
-        const { EmojiManager } = await import("../packages/managers/src/emoji.ts");
+        const { EmojiManager } =
+            await import("../packages/managers/src/emoji.ts");
         const rest = new REST({ token: "test" });
         const emojiMgr = new EmojiManager(rest, "555555555555555555");
-        
+
         let lastUrl = "";
         let lastOpts: any;
-        
+
         (rest as any).get = async (url: string) => {
             lastUrl = url;
-            if (url.includes("/emojis/")) return { id: "123456789012345678", name: "test_emoji" };
+            if (url.includes("/emojis/"))
+                return { id: "123456789012345678", name: "test_emoji" };
             return [{ id: "123456789012345678", name: "test_emoji" }];
         };
         (rest as any).post = async (url: string, body: any) => {
@@ -350,21 +386,32 @@ describe("Managers Coverage", () => {
 
         const fetched = await emojiMgr.fetch("123456789012345678");
         expect(fetched.id).toBe("123456789012345678");
-        expect(lastUrl).toBe("/guilds/555555555555555555/emojis/123456789012345678");
-        
+        expect(lastUrl).toBe(
+            "/guilds/555555555555555555/emojis/123456789012345678",
+        );
+
         const all = await emojiMgr.fetchAll();
         expect(all.length).toBe(1);
         expect(lastUrl).toBe("/guilds/555555555555555555/emojis");
-        
-        const created = await emojiMgr.create({ name: "cool", image: "data:image/jpeg;base64," });
+
+        const created = await emojiMgr.create({
+            name: "cool",
+            image: "data:image/jpeg;base64,",
+        });
         expect(created.name).toBe("cool");
         expect(lastUrl).toBe("/guilds/555555555555555555/emojis");
-        
-        const edited = await emojiMgr.edit("123456789012345678", { name: "uncool" });
+
+        const edited = await emojiMgr.edit("123456789012345678", {
+            name: "uncool",
+        });
         expect(edited.name).toBe("uncool");
-        expect(lastUrl).toBe("/guilds/555555555555555555/emojis/123456789012345678");
-        
+        expect(lastUrl).toBe(
+            "/guilds/555555555555555555/emojis/123456789012345678",
+        );
+
         await emojiMgr.deleteEmoji("123456789012345678");
-        expect(lastUrl).toBe("/guilds/555555555555555555/emojis/123456789012345678");
+        expect(lastUrl).toBe(
+            "/guilds/555555555555555555/emojis/123456789012345678",
+        );
     });
 });

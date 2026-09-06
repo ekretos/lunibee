@@ -1,9 +1,9 @@
 import { BaseStructure } from "./base.js";
-import type { 
-    APIAuditLog, 
-    APIAuditLogEntry, 
-    APIAuditLogChange, 
-    APIAuditLogOptions 
+import type {
+    APIAuditLog,
+    APIAuditLogEntry,
+    APIAuditLogChange,
+    APIAuditLogOptions,
 } from "@lunibee/types";
 
 /** Represents a single entry in a Discord audit log. */
@@ -39,7 +39,7 @@ export class AuditLog {
     public readonly entries: Map<string, AuditLogEntry>;
     // Depending on what else is needed, we could parse the users, webhooks, etc.
     // However, the typical structure mainly exposes the entries.
-    
+
     /** Creates an audit log. */
     public constructor(data: APIAuditLog) {
         this.entries = new Map();

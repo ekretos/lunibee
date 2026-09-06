@@ -52,14 +52,12 @@ describe("ChannelManager integration lifecycle", () => {
             },
         });
         const manager = new ChannelManager(rest);
-        const existing = manager
-            .messages("123")
-            .upsert({
-                id: "456",
-                channel_id: "123",
-                author,
-                content: "original",
-            });
+        const existing = manager.messages("123").upsert({
+            id: "456",
+            channel_id: "123",
+            author,
+            content: "original",
+        });
         const updated = await manager.editMessage("123", "456", {
             content: "updated",
         });
@@ -71,14 +69,12 @@ describe("ChannelManager integration lifecycle", () => {
     test("delete removes the canonical message", async () => {
         const rest = new MockREST({ "/channels/123/messages/456": null });
         const manager = new ChannelManager(rest);
-        manager
-            .messages("123")
-            .upsert({
-                id: "456",
-                channel_id: "123",
-                author,
-                content: "original",
-            });
+        manager.messages("123").upsert({
+            id: "456",
+            channel_id: "123",
+            author,
+            content: "original",
+        });
         await manager.deleteMessage("123", "456");
         expect(manager.messages("123").cache.has("456")).toBe(false);
     });

@@ -447,7 +447,7 @@ describe("Gateway integration lifecycle", () => {
         const socket1 = FakeWebSocket.instances[0]!;
         socket1.open();
         await first;
-        
+
         socket1.receive({
             op: GatewayOpcodes.Dispatch,
             t: "READY",
@@ -457,25 +457,25 @@ describe("Gateway integration lifecycle", () => {
                 resume_gateway_url: "wss://resume.test",
             },
         });
-        
+
         socket1.close(1000, "network failure");
         await Bun.sleep(10);
-        
+
         const socket2 = FakeWebSocket.instances[1]!;
         expect(socket2.url).toBe("wss://resume.test");
         socket2.open();
-        
+
         socket2.receive({
             op: GatewayOpcodes.Hello,
             d: { heartbeat_interval: 100 },
         });
-        
+
         const resume = JSON.parse(socket2.sent[0]!);
         expect(resume.op).toBe(GatewayOpcodes.Resume);
         expect(resume.d.session_id).toBe("test-session");
         expect(resume.d.seq).toBe(42);
         expect(gateway.state).toBe(GatewayState.Resume);
-        
+
         gateway.close();
     });
 
@@ -491,10 +491,10 @@ describe("Gateway integration lifecycle", () => {
         expect(socket.url).toContain("compress=zlib-stream");
         socket.open();
         await promise;
-        
+
         // Test requires a valid zlib-stream deflate-raw chunk of '{"op":10,"d":{"heartbeat_interval":50}}'
         // But since we can't easily mock DecompressionStream without native zlib, we can mock DecompressionStream
-        
+
         gateway.close();
     });
 });

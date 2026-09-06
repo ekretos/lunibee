@@ -143,8 +143,9 @@ function serializeQuery(query: RESTQuery | undefined): string {
  * their token. Any other id in a path shares its limit with sibling resources.
  */
 function majorParameter(path: string): string {
-    const match =
-        /^\/(channels|guilds|webhooks)\/(\d+)(?:\/([^/?]+))?/.exec(path);
+    const match = /^\/(channels|guilds|webhooks)\/(\d+)(?:\/([^/?]+))?/.exec(
+        path,
+    );
     if (!match) return "@none";
     // A webhook's limit is keyed by both its id and its token.
     if (match[1] === "webhooks" && match[3] !== undefined)
@@ -657,7 +658,9 @@ export class REST {
      * hook cannot reject the request. @param hook Optional callback. @param ctx Event context. */
     #emit<C>(hook: ((ctx: C) => void) | undefined, ctx: C): void {
         if (!hook) return;
-        Promise.resolve().then(() => hook(ctx)).catch(() => {});
+        Promise.resolve()
+            .then(() => hook(ctx))
+            .catch(() => {});
     }
     /** Waits for a route bucket while respecting cancellation. @param bucketKey Bucket identifier. @param signal Optional cancellation signal. @param path Request path for error context. @returns Promise fulfilled when sending is permitted. @throws {RESTError} If the request is aborted. */
     async #wait(

@@ -6,12 +6,16 @@ export interface BucketState {
 /** Interface for distributed or local rate limit synchronization. */
 export interface RateLimitStore {
     /** Gets the server bucket hash for a normalized route. */
-    getBucketHash(route: string): Promise<string | undefined> | string | undefined;
+    getBucketHash(
+        route: string,
+    ): Promise<string | undefined> | string | undefined;
     /** Associates a route with a server bucket hash. */
     setBucketHash(route: string, hash: string): Promise<void> | void;
 
     /** Gets the current state for a bucket key. */
-    getBucket(key: string): Promise<BucketState | undefined> | BucketState | undefined;
+    getBucket(
+        key: string,
+    ): Promise<BucketState | undefined> | BucketState | undefined;
     /** Updates the state for a bucket key. */
     updateBucket(key: string, state: BucketState): Promise<void> | void;
 

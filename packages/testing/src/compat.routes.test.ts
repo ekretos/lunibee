@@ -39,9 +39,7 @@ describe("Channel & message routes", () => {
     test("channel, messages, single message", () => {
         expect(Routes.channel(CH)).toBe(`/channels/${CH}`);
         expect(Routes.channelMessages(CH)).toBe(`/channels/${CH}/messages`);
-        expect(Routes.message(CH, MSG)).toBe(
-            `/channels/${CH}/messages/${MSG}`,
-        );
+        expect(Routes.message(CH, MSG)).toBe(`/channels/${CH}/messages/${MSG}`);
     });
     test("reactions encode the emoji segment", () => {
         expect(Routes.messageReactions(CH, MSG, "👍")).toBe(

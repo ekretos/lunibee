@@ -73,7 +73,9 @@ export class RedisRateLimitStore implements RateLimitStore {
 
     public async getBucketHash(route: string): Promise<string | undefined> {
         try {
-            const hash = await this.#client.get(`${this.#prefix}route:${route}`);
+            const hash = await this.#client.get(
+                `${this.#prefix}route:${route}`,
+            );
             this.#markHealthy();
             return hash ?? undefined;
         } catch (error) {
@@ -119,12 +121,7 @@ export class RedisRateLimitStore implements RateLimitStore {
                 this.#markHealthy();
                 return;
             }
-            await this.#client.set(
-                bucketKey,
-                JSON.stringify(state),
-                "EX",
-                ttl,
-            );
+            await this.#client.set(bucketKey, JSON.stringify(state), "EX", ttl);
             this.#markHealthy();
         } catch (error) {
             this.#onError("updateBucket", error);
@@ -151,12 +148,7 @@ export class RedisRateLimitStore implements RateLimitStore {
                 this.#markHealthy();
                 return;
             }
-            await this.#client.set(
-                globalKey,
-                String(resetAt),
-                "EX",
-                ttl,
-            );
+            await this.#client.set(globalKey, String(resetAt), "EX", ttl);
             this.#markHealthy();
         } catch (error) {
             this.#onError("setGlobalReset", error);

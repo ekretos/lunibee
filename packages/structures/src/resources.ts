@@ -364,7 +364,7 @@ export class Emoji extends BaseStructure {
     public override toString(): string {
         return this.id !== "unicode"
             ? `<${this.animated ? "a" : ""}:${this.name}:${this.id}>`
-            : this.name ?? "";
+            : (this.name ?? "");
     }
 }
 
@@ -387,7 +387,9 @@ export class AutoModerationRule extends BaseStructure {
     public constructor(data: import("@lunibee/types").APIAutoModerationRule) {
         super(data.id);
         if (!/^\d{1,20}$/.test(data.guild_id))
-            throw new TypeError("AutoModerationRule guild_id must be a valid snowflake.");
+            throw new TypeError(
+                "AutoModerationRule guild_id must be a valid snowflake.",
+            );
         this.guildId = data.guild_id;
         this.name = data.name;
         this.creatorId = data.creator_id;
@@ -441,7 +443,9 @@ export class GuildWelcomeScreen {
 
     public constructor(data: import("@lunibee/types").APIGuildWelcomeScreen) {
         this.description = data.description;
-        this.channels = data.welcome_channels.map((c) => new WelcomeScreenChannel(c));
+        this.channels = data.welcome_channels.map(
+            (c) => new WelcomeScreenChannel(c),
+        );
     }
 }
 
@@ -455,7 +459,9 @@ export class OnboardingPromptOption extends BaseStructure {
     public title: string;
     public description: string | null;
 
-    public constructor(data: import("@lunibee/types").APIOnboardingPromptOption) {
+    public constructor(
+        data: import("@lunibee/types").APIOnboardingPromptOption,
+    ) {
         super(data.id);
         this.channelIds = data.channel_ids;
         this.roleIds = data.role_ids;

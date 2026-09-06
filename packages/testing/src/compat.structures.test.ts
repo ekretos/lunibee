@@ -89,9 +89,9 @@ describe("Message hydration", () => {
             ...base,
             timestamp: "2024-01-01T00:00:00.000Z",
         } as never);
-        expect((m as unknown as { createdTimestamp: number }).createdTimestamp).toBe(
-            Date.parse("2024-01-01T00:00:00.000Z"),
-        );
+        expect(
+            (m as unknown as { createdTimestamp: number }).createdTimestamp,
+        ).toBe(Date.parse("2024-01-01T00:00:00.000Z"));
     });
 });
 
@@ -117,6 +117,8 @@ describe("Channel hydration", () => {
 
 describe("BaseStructure snowflake validation", () => {
     test("rejects a non-snowflake id", () => {
-        expect(() => new User({ id: "nope", username: "x" } as never)).toThrow();
+        expect(
+            () => new User({ id: "nope", username: "x" } as never),
+        ).toThrow();
     });
 });

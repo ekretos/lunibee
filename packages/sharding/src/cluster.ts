@@ -55,13 +55,18 @@ export class ClusterManager {
 
     /** Creates a cluster manager. @param options Clustering configuration. @throws {TypeError} If token or script is missing. */
     public constructor(options: ClusterManagerOptions) {
-        if (!options.token?.trim()) throw new TypeError("A Discord bot token is required.");
-        if (!options.script?.trim()) throw new TypeError("A script path is required for clustering.");
+        if (!options.token?.trim())
+            throw new TypeError("A Discord bot token is required.");
+        if (!options.script?.trim())
+            throw new TypeError("A script path is required for clustering.");
         if (
             options.autoScaleInterval !== undefined &&
-            (!Number.isInteger(options.autoScaleInterval) || options.autoScaleInterval < 1000)
+            (!Number.isInteger(options.autoScaleInterval) ||
+                options.autoScaleInterval < 1000)
         ) {
-            throw new RangeError("autoScaleInterval must be an integer of at least 1000 milliseconds.");
+            throw new RangeError(
+                "autoScaleInterval must be an integer of at least 1000 milliseconds.",
+            );
         }
 
         this.#auto = options.shardCount === "auto";
@@ -70,18 +75,29 @@ export class ClusterManager {
 
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
     public async fetchRecommendedShardCount(): Promise<number> {
-        const response = await fetch("https://discord.com/api/v10/gateway/bot", {
-            headers: {
-                Authorization: `Bot ${this.#options.token}`,
-                "User-Agent": "Lunibee/0.1.0",
+        const response = await fetch(
+            "https://discord.com/api/v10/gateway/bot",
+            {
+                headers: {
+                    Authorization: `Bot ${this.#options.token}`,
+                    "User-Agent": "Lunibee/0.1.0",
+                },
             },
-        });
+        );
         if (!response.ok) {
-            throw new Error(`Gateway discovery failed with status ${response.status}`);
+            throw new Error(
+                `Gateway discovery failed with status ${response.status}`,
+            );
         }
         const data = (await response.json()) as { shards?: unknown };
-        if (typeof data.shards !== "number" || !Number.isInteger(data.shards) || data.shards < 1) {
-            throw new Error("Gateway discovery returned an invalid shard count.");
+        if (
+            typeof data.shards !== "number" ||
+            !Number.isInteger(data.shards) ||
+            data.shards < 1
+        ) {
+            throw new Error(
+                "Gateway discovery returned an invalid shard count.",
+            );
         }
         return data.shards;
     }
@@ -97,7 +113,8 @@ export class ClusterManager {
         this.#spawned = true;
 
         const count =
-            this.#options.shardCount === "auto" || this.#options.shardCount === undefined
+            this.#options.shardCount === "auto" ||
+            this.#options.shardCount === undefined
                 ? await this.fetchRecommendedShardCount()
                 : this.#options.shardCount;
 
@@ -105,7 +122,10 @@ export class ClusterManager {
         const clusterCount = this.#options.clusterCount ?? cpus().length;
 
         // Chunk shards across clusters evenly
-        const chunks = Array.from({ length: clusterCount }, () => [] as number[]);
+        const chunks = Array.from(
+            { length: clusterCount },
+            () => [] as number[],
+        );
         for (let i = 0; i < count; i++) {
             chunks[i % clusterCount].push(i);
         }
@@ -132,7 +152,10 @@ export class ClusterManager {
             await sleep(500);
         }
 
-        if (this.#options.autoScaleInterval && this.#options.autoScaleInterval > 0) {
+        if (
+            this.#options.autoScaleInterval &&
+            this.#options.autoScaleInterval > 0
+        ) {
             this.#autoScaleTimer = setInterval(() => {
                 void this.checkAutoScale();
             }, this.#options.autoScaleInterval);
@@ -150,7 +173,8 @@ export class ClusterManager {
         } catch (error) {
             // Surface the failure instead of silently swallowing it; the next
             // interval tick retries.
-            const normalized = error instanceof Error ? error : new Error(String(error));
+            const normalized =
+                error instanceof Error ? error : new Error(String(error));
             this.#options.onAutoScaleError?.(normalized);
         }
     }
@@ -169,7 +193,9 @@ export class ClusterManager {
      * shutdown timeout. Clears the auto-scale timer and cluster map.
      * @param timeoutMs Grace period per child before force-kill. Defaults to the configured `shutdownTimeout` (5000 ms).
      */
-    public async shutdownAll(timeoutMs = this.#options.shutdownTimeout ?? 5000): Promise<void> {
+    public async shutdownAll(
+        timeoutMs = this.#options.shutdownTimeout ?? 5000,
+    ): Promise<void> {
         if (this.#autoScaleTimer) {
             clearInterval(this.#autoScaleTimer);
             this.#autoScaleTimer = undefined;
@@ -184,7 +210,10 @@ export class ClusterManager {
     }
 
     /** Gracefully terminates a single cluster child, escalating to SIGKILL after the timeout. */
-    async #shutdownCluster(cluster: ClusterInfo, timeoutMs: number): Promise<void> {
+    async #shutdownCluster(
+        cluster: ClusterInfo,
+        timeoutMs: number,
+    ): Promise<void> {
         const child = cluster.process;
         if (child.exitCode !== null || child.signalCode !== null) return;
         await new Promise<void>((resolve) => {

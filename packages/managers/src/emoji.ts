@@ -35,16 +35,16 @@ export class EmojiManager extends Manager<string, Emoji> {
     public async fetch(emojiId: string): Promise<Emoji> {
         return this.upsert(
             await this.#rest.get<ConstructorParameters<typeof Emoji>[0]>(
-                Routes.guildEmoji(this.#guildId, emojiId)
-            )
+                Routes.guildEmoji(this.#guildId, emojiId),
+            ),
         );
     }
 
     /** Fetches all emojis for this guild. */
     public async fetchAll(): Promise<Emoji[]> {
-        const data = await this.#rest.get<ConstructorParameters<typeof Emoji>[0][]>(
-            Routes.guildEmoji(this.#guildId)
-        );
+        const data = await this.#rest.get<
+            ConstructorParameters<typeof Emoji>[0][]
+        >(Routes.guildEmoji(this.#guildId));
         return data.map((item) => this.upsert(item));
     }
 
@@ -53,18 +53,21 @@ export class EmojiManager extends Manager<string, Emoji> {
         return this.upsert(
             await this.#rest.post<ConstructorParameters<typeof Emoji>[0]>(
                 Routes.guildEmoji(this.#guildId),
-                options
-            )
+                options,
+            ),
         );
     }
 
     /** Edits an existing custom emoji. */
-    public async edit(emojiId: string, options: EmojiEditOptions): Promise<Emoji> {
+    public async edit(
+        emojiId: string,
+        options: EmojiEditOptions,
+    ): Promise<Emoji> {
         return this.upsert(
             await this.#rest.patch<ConstructorParameters<typeof Emoji>[0]>(
                 Routes.guildEmoji(this.#guildId, emojiId),
-                options
-            )
+                options,
+            ),
         );
     }
 
@@ -78,8 +81,7 @@ export class EmojiManager extends Manager<string, Emoji> {
      * snowflake ID; unicode emojis (no ID) are keyed by `unicode:${name}` so repeated
      * upserts reuse the same cached instance instead of allocating a new one each call. */
     public upsert(data: ConstructorParameters<typeof Emoji>[0]): Emoji {
-        const key =
-            data.id != null ? data.id : `unicode:${data.name ?? ""}`;
+        const key = data.id != null ? data.id : `unicode:${data.name ?? ""}`;
         const existing = this.get(key);
         const emoji = new Emoji(data);
         if (existing) {

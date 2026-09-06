@@ -46,17 +46,22 @@ describe("EmbedBuilder → APIEmbed payload", () => {
         expect(embed.toJSON().fields![0]!.name).toBe("a");
     });
     test("rejects out-of-range color like Discord", () => {
-        expect(() => new EmbedBuilder().setColor(0x1000000)).toThrow(RangeError);
+        expect(() => new EmbedBuilder().setColor(0x1000000)).toThrow(
+            RangeError,
+        );
     });
     // discord.js EmbedBuilder.addFields accepts BOTH spread and a single array
     // (RestOrArray). Lunibee only accepts spread, so addFields([...]) throws.
-    test.failing("addFields accepts an array argument (discord.js RestOrArray)", () => {
-        const embed = new EmbedBuilder().addFields([
-            { name: "f1", value: "v1" },
-            { name: "f2", value: "v2" },
-        ] as unknown as { name: string; value: string });
-        expect(embed.toJSON().fields).toHaveLength(2);
-    });
+    test.failing(
+        "addFields accepts an array argument (discord.js RestOrArray)",
+        () => {
+            const embed = new EmbedBuilder().addFields([
+                { name: "f1", value: "v1" },
+                { name: "f2", value: "v2" },
+            ] as unknown as { name: string; value: string });
+            expect(embed.toJSON().fields).toHaveLength(2);
+        },
+    );
 });
 
 describe("ButtonBuilder → APIButtonComponent payload", () => {
@@ -91,7 +96,9 @@ describe("ButtonBuilder → APIButtonComponent payload", () => {
 describe("ActionRowBuilder → APIActionRowComponent payload", () => {
     test("wraps children with type 1 and nested toJSON payloads", () => {
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("a").setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId("a")
+                .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId("b").setStyle(ButtonStyle.Danger),
         );
         const json = row.toJSON();
@@ -102,7 +109,9 @@ describe("ActionRowBuilder → APIActionRowComponent payload", () => {
     test("enforces the Discord 5-component row limit", () => {
         const row = new ActionRowBuilder();
         const buttons = Array.from({ length: 6 }, (_, i) =>
-            new ButtonBuilder().setCustomId(`b${i}`).setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`b${i}`)
+                .setStyle(ButtonStyle.Secondary),
         );
         expect(() => row.addComponents(...buttons)).toThrow(RangeError);
     });
@@ -162,9 +171,7 @@ describe("SlashCommandBuilder → application command payload", () => {
             .addUserOption((o) =>
                 o.setName("target").setDescription("Who").setRequired(true),
             )
-            .addStringOption((o) =>
-                o.setName("reason").setDescription("Why"),
-            )
+            .addStringOption((o) => o.setName("reason").setDescription("Why"))
             .toJSON();
         expect(json.name).toBe("ban");
         expect(json.description).toBe("Ban a user");

@@ -397,4 +397,8 @@ export {
     type BanOptions,
 } from "./member.js";
 export { ApplicationCommandManager } from "./application.js";
-export { EmojiManager, type EmojiCreateOptions, type EmojiEditOptions } from "./emoji.js";
+export {
+    EmojiManager,
+    type EmojiCreateOptions,
+    type EmojiEditOptions,
+} from "./emoji.js";

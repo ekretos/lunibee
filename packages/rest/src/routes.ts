@@ -146,7 +146,7 @@ export const Routes = {
     /** Returns members in a guild (paginated). @param guildId Guild identifier. @returns Members collection route. */
     guildMembers: (guildId: string) =>
         `/guilds/${snowflake(guildId, "Guild ID")}/members`,
-        
+
     // ─── Welcome Screen & Onboarding ──────────────────────────────────────────────
     /** Returns the welcome screen for a guild. @param guildId Guild identifier. */
     guildWelcomeScreen: (guildId: string) =>

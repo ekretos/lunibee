@@ -102,14 +102,19 @@ describe("Voice", () => {
 
     test("VoiceReceiver maps SSRCs and routes packets", () => {
         const conn = new VoiceConnection("123");
-        
+
         let onMessageCb: ((packet: Uint8Array) => void) | undefined;
         const mockGateway: VoiceGatewayTransport = {
-            connect: async () => {}, send: () => {}, close: () => {},
+            connect: async () => {},
+            send: () => {},
+            close: () => {},
         };
         const mockUdp: VoiceUdpTransport = {
-            send: () => {}, close: () => {},
-            onMessage: (cb) => { onMessageCb = cb; }
+            send: () => {},
+            close: () => {},
+            onMessage: (cb) => {
+                onMessageCb = cb;
+            },
         };
 
         conn.attachTransports(mockGateway, mockUdp);
@@ -117,10 +122,12 @@ describe("Voice", () => {
 
         conn.receiver.mapSsrc(12345, "user1");
         const stream = conn.receiver.subscribe("user1");
-        
+
         const reader = stream.stream.getReader();
         let readResult: any;
-        reader.read().then((res) => { readResult = res; });
+        reader.read().then((res) => {
+            readResult = res;
+        });
 
         // Simulate incoming UDP packet: 12-byte RTP header (SSRC 12345 at byte 8)
         // followed by a 4-byte audio payload.

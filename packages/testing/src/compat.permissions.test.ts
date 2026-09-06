@@ -22,10 +22,7 @@ describe("PermissionsBitField — core behavior", () => {
         expect(perms.has(PermissionFlagsBits.KickMembers)).toBe(false);
     });
     test("has() with multiple perms is an AND check", () => {
-        const perms = new PermissionsBitField([
-            "Administrator",
-            "ManageGuild",
-        ]);
+        const perms = new PermissionsBitField(["Administrator", "ManageGuild"]);
         expect(perms.has("Administrator", "ManageGuild")).toBe(true);
         expect(perms.has("Administrator", "KickMembers")).toBe(false);
     });
@@ -43,10 +40,7 @@ describe("PermissionsBitField — core behavior", () => {
         expect(more.remove("EmbedLinks").has("EmbedLinks")).toBe(false);
     });
     test("toArray returns held permission names", () => {
-        const perms = new PermissionsBitField([
-            "Administrator",
-            "BanMembers",
-        ]);
+        const perms = new PermissionsBitField(["Administrator", "BanMembers"]);
         const arr = perms.toArray().map((n) => n.toLowerCase());
         expect(arr).toContain("administrator");
         expect(arr).toContain("banmembers");

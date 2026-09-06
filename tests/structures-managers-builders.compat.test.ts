@@ -30,7 +30,12 @@ import type {
     APIThumbnailComponent,
     APIEntitySelectComponent,
 } from "../packages/builders/src/components.ts";
-import { User, Guild, Role, GuildMember } from "../packages/structures/src/index.ts";
+import {
+    User,
+    Guild,
+    Role,
+    GuildMember,
+} from "../packages/structures/src/index.ts";
 
 describe("Builders — payload contracts", () => {
     test("EmbedBuilder.toJSON returns a snake_case Discord payload and is cloned", () => {
@@ -63,7 +68,9 @@ describe("Builders — payload contracts", () => {
         });
 
         // setURL flips to a link button and drops custom_id.
-        const link = new ButtonBuilder().setCustomId("x").setURL("https://a.b/");
+        const link = new ButtonBuilder()
+            .setCustomId("x")
+            .setURL("https://a.b/");
         expect(link.toJSON()).toEqual({
             type: ComponentType.Button,
             style: ButtonStyle.Link,
@@ -118,7 +125,9 @@ describe("Builders — payload contracts", () => {
         ).setDefaultValues({ id: "1", type: "user" });
         const json: APIEntitySelectComponent = select.toJSON();
         expect(json.default_values).toEqual([{ id: "1", type: "user" }]);
-        expect(() => new EntitySelectBuilder(ComponentType.Button as never)).toThrow();
+        expect(
+            () => new EntitySelectBuilder(ComponentType.Button as never),
+        ).toThrow();
     });
 
     test("Modal + TextInput serialize to Discord's nested shape", () => {
@@ -172,7 +181,9 @@ describe("Builders — Components V2", () => {
     });
 
     test("Thumbnail supports description + spoiler and stays minimal by default", () => {
-        expect(new ThumbnailBuilder().setUrl("https://a.b/t.png").toJSON()).toEqual({
+        expect(
+            new ThumbnailBuilder().setUrl("https://a.b/t.png").toJSON(),
+        ).toEqual({
             type: ComponentType.Thumbnail,
             url: "https://a.b/t.png",
         });
@@ -201,7 +212,9 @@ describe("Builders — Components V2", () => {
     test("MediaGallery caps at 10 items", () => {
         expect(() =>
             new MediaGalleryBuilder().addItems(
-                ...Array.from({ length: 11 }, () => ({ url: "https://a.b/i.png" })),
+                ...Array.from({ length: 11 }, () => ({
+                    url: "https://a.b/i.png",
+                })),
             ),
         ).toThrow(RangeError);
     });
