@@ -1,4 +1,5 @@
 import { createInflate, constants as zlibConstants } from "node:zlib";
+import { GatewaySession } from "./session.js";
 import {
     resolveGatewayIntents,
     type GatewayPayload,
@@ -6,6 +7,13 @@ import {
     type GatewayPresence,
     type GatewayIntentResolvable,
 } from "@lunibee/types";
+
+export {
+    GatewaySession,
+    type ResumeInfo,
+    type HandshakeIntent,
+    type InvalidationReason,
+} from "./session.js";
 
 /** Discord Gateway opcodes. */
 export const GatewayOpcodes = {
@@ -115,9 +123,15 @@ export class Gateway {
         compress?: boolean;
     };
     #ws?: WebSocket;
-    #sequence: number | null = null;
-    #sessionId?: string;
-    #resumeURL?: string;
+    /**
+     * Session identity and the IDENTIFY-vs-RESUME decision.
+     *
+     * The Gateway holds no session fields of its own: every read and write goes
+     * through the session, which rejects mutations from a superseded socket.
+     */
+    readonly #session = new GatewaySession();
+    /** Token of the socket this Gateway currently owns. */
+    #token = 0;
     #heartbeatTimer?: ReturnType<typeof setInterval>;
     #initialHeartbeat?: ReturnType<typeof setTimeout>;
     #heartbeatAckTimer?: ReturnType<typeof setTimeout>;
@@ -345,6 +359,10 @@ export class Gateway {
                 this.#emitError(error);
             }
         }
+        // Each attempt takes a new generation token: the socket being replaced
+        // keeps the old one and can no longer mutate the session.
+        const token = this.#session.beginConnection();
+        this.#token = token;
         let ws: WebSocket;
         try {
             ws = new WebSocket(url);
@@ -391,14 +409,16 @@ export class Gateway {
                     .then(() => this.#toBytes(data))
                     .then((bytes) => this.#decompress(bytes))
                     .then((text) => {
-                        if (text !== undefined) this.#message(ws, text);
+                        if (text !== undefined) this.#message(ws, text, token);
                     })
                     .catch((err) => this.#emitError(err));
             } else {
-                this.#message(ws, String(data));
+                this.#message(ws, String(data), token);
             }
         });
-        ws.addEventListener("close", (event) => this.#close(ws, event.code));
+        ws.addEventListener("close", (event) =>
+            this.#close(ws, event.code, token),
+        );
         ws.addEventListener("error", () =>
             this.#emitError(new GatewayError("Gateway WebSocket error")),
         );
@@ -443,7 +463,13 @@ export class Gateway {
             }
         }, interval);
     }
-    #message(ws: WebSocket, raw: string): void {
+    #message(ws: WebSocket, raw: string, token: number): void {
+        // Decompression is asynchronous, so a frame can arrive here after its
+        // socket was replaced: the listener's synchronous socket check passed a
+        // moment ago and cannot help. The session decides who owns the
+        // connection, and a frame from a superseded generation is discarded
+        // rather than dispatched to listeners.
+        if (this.#ws !== ws || !this.#session.owns(token)) return;
         let payload: GatewayPayload;
         try {
             payload = JSON.parse(raw) as GatewayPayload;
@@ -463,11 +489,14 @@ export class Gateway {
             ws.close(1002, "Invalid payload");
             return;
         }
-        if (typeof payload.s === "number") this.#sequence = payload.s;
+        // The session ignores a sequence from a superseded connection, so a
+        // late dispatch on an old socket cannot advance the live one.
+        if (typeof payload.s === "number")
+            this.#session.recordSequence(payload.s, token);
         switch (payload.op) {
             case GatewayOpcodes.Dispatch:
                 this.#setState(GatewayState.Dispatch);
-                this.#handleDispatch(payload.t, payload.d);
+                this.#handleDispatch(payload.t, payload.d, token);
                 break;
             case GatewayOpcodes.Hello:
                 this.#handleHello(payload.d);
@@ -491,11 +520,8 @@ export class Gateway {
                 // session is dead and we must re-IDENTIFY from scratch. Matches
                 // Discord/Discord.js semantics rather than always re-identifying.
                 const resumable = payload.d === true;
-                if (!resumable) {
-                    this.#sessionId = undefined;
-                    this.#sequence = null;
-                    this.#resumeURL = undefined;
-                }
+                if (!resumable)
+                    this.#session.invalidate(token, "invalid-session");
                 this.#emit("invalidSession", resumable);
                 ws.close(
                     resumable ? GatewayCloseCodes.UnknownError : 1000,
@@ -507,25 +533,19 @@ export class Gateway {
             }
         }
     }
-    #handleDispatch(event: string | null, data: unknown): void {
+    #handleDispatch(event: string | null, data: unknown, token: number): void {
         if (event === "READY") {
-            const ready = data as {
-                session_id?: unknown;
-                resume_gateway_url?: unknown;
-            };
-            if (
-                typeof ready?.session_id !== "string" ||
-                typeof ready?.resume_gateway_url !== "string"
-            ) {
-                this.#emitError(
-                    new GatewayError(
-                        "Gateway READY payload is missing session information",
-                    ),
-                );
+            if (!this.#session.activate(data, token)) {
+                // Either the payload lacked session information or this socket
+                // no longer owns the session; only the former is an error.
+                if (this.#session.owns(token))
+                    this.#emitError(
+                        new GatewayError(
+                            "Gateway READY payload is missing session information",
+                        ),
+                    );
                 return;
             }
-            this.#sessionId = ready.session_id;
-            this.#resumeURL = ready.resume_gateway_url;
             this.#attempt = 0;
             this.#setState(GatewayState.Ready);
             this.#emit("ready", data);
@@ -560,15 +580,14 @@ export class Gateway {
         }
         this.#heartbeatInterval = interval;
         this.#setState(
-            this.#sessionId && this.#sequence !== null && this.#resumeURL
-                ? GatewayState.Resume
-                : GatewayState.Hello,
+            this.#session.canResume ? GatewayState.Resume : GatewayState.Hello,
         );
         this.#startHeartbeat(interval);
         this.#identifyOrResume();
     }
     #identifyOrResume(): void {
-        if (this.#sessionId && this.#sequence !== null && this.#resumeURL) {
+        const intent = this.#session.handshake();
+        if (intent.type === "resume") {
             this.#setState(GatewayState.Resume);
             // IDENTIFY/RESUME are privileged for the same reason heartbeats
             // are: dropping one leaves the shard connected but never READY,
@@ -579,8 +598,8 @@ export class Gateway {
                     op: GatewayOpcodes.Resume,
                     d: {
                         token: this.#options.token,
-                        session_id: this.#sessionId,
-                        seq: this.#sequence,
+                        session_id: intent.sessionId,
+                        seq: intent.sequence,
                     },
                     s: null,
                     t: null,
@@ -646,7 +665,7 @@ export class Gateway {
             !this.#dispatch(
                 {
                     op: GatewayOpcodes.Heartbeat,
-                    d: this.#sequence,
+                    d: this.#session.sequence,
                     s: null,
                     t: null,
                 },
@@ -677,7 +696,7 @@ export class Gateway {
             }
         }, this.#options.heartbeatAckTimeout);
     }
-    #close(ws: WebSocket, code: number): void {
+    #close(ws: WebSocket, code: number, token: number): void {
         if (this.#ws !== ws) return;
         this.#ws = undefined;
         this.#clearTimers();
@@ -696,13 +715,10 @@ export class Gateway {
                 );
             return;
         }
-        if (action === "identify") {
-            // Fresh IDENTIFY: drop the resumable session AND its resume URL so
-            // the reconnect targets the main Gateway, not a stale resume host.
-            this.#sequence = null;
-            this.#sessionId = undefined;
-            this.#resumeURL = undefined;
-        }
+        if (action === "identify")
+            // Fresh IDENTIFY: drop the session AND its resume host so the
+            // reconnect targets the main Gateway, not a stale resume URL.
+            this.#session.invalidate(token, "session-timeout");
         this.#setState(GatewayState.Reconnect);
         this.#scheduleReconnect();
     }
@@ -724,9 +740,7 @@ export class Gateway {
         )
             return "identify";
         // Otherwise resume when we still hold a live session + sequence.
-        return this.#sessionId && this.#sequence !== null
-            ? "resume"
-            : "identify";
+        return this.#session.canResume ? "resume" : "identify";
     }
     #scheduleReconnect(): void {
         if (this.#closed || !this.#options.reconnect || this.#reconnectTimer)
@@ -749,8 +763,9 @@ export class Gateway {
         this.#reconnectTimer = setTimeout(() => {
             this.#reconnectTimer = undefined;
             this.#open(
-                this.#resumeURL ??
+                this.#session.connectURL(
                     "wss://gateway.discord.gg/?v=10&encoding=json",
+                ),
             );
         }, delay + jitter);
     }

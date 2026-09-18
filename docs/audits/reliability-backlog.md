@@ -27,6 +27,7 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | REDIS-001 | P1 | `packages/rest` | Redis outage silently disables rate limiting fleet-wide | **Fixed** |
 | CACHE-001 | P2 | `packages/collection` | TTL sweeper keeps the process alive | **Fixed** |
 | COLLECT-001 | P2 | `packages/core` | `Collector.next()` leaks a listener per call | **Fixed** |
+| WS-006 | P1 | `packages/ws` | Late-decompressed frame from a replaced socket still dispatched | **Fixed** |
 | WS-003 | P2 | `packages/ws` | Fatal close leaves state `CONNECT`, not `CLOSED` | Open |
 | REST-003 | P2 | `packages/rest` | One in-flight request per bucket caps throughput | Open |
 | REST-004 | P1 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | **Fixed** |
@@ -212,6 +213,23 @@ now removes its counterpart.
 - **Bun compatibility** — remaining Node dependencies are `node:zlib` (verified
   under Bun), `node:events`, and `child_process.fork`, which is explicitly
   guarded and documented as Node-only.
+
+### WS-006 · P1 · `packages/ws/src/index.ts` (fixed)
+
+- **Problem** — With `compress: true`, decompression is asynchronous. A frame that
+  arrived on a socket the Gateway later replaced finished decoding afterwards and was
+  still processed: the message listener's `#ws === ws` check had passed before the
+  frame was queued, and nothing re-checked at completion.
+- **Impact** — Events from an abandoned connection reach listeners, and a stale
+  sequence enters the live session, corrupting a later RESUME. Same class as WS-005,
+  on the path WS-005's socket check cannot cover.
+- **Fix** — `GatewaySession` generation tokens: each connection takes a token,
+  `#message` discards any frame whose token no longer owns the session.
+- **Regression test** — `tests/gateway.session.test.ts`: a compressed frame delivered
+  immediately before the socket is replaced is neither emitted nor allowed into the
+  sequence; the following RESUME carries the pre-replacement sequence.
+- **Found by** — the Stage 1B session extraction; invisible while ownership was an
+  ad-hoc check at each call site.
 
 ## P2 — Reliability & performance (open)
 
