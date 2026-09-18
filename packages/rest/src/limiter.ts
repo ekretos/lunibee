@@ -32,18 +32,49 @@ export class RateLimiter {
         );
     }
 
-    /** Waits until both the route bucket and the global limit permit sending. */
+    /** Whether the backing store can reserve allowance atomically. */
+    public get reserves(): boolean {
+        return typeof this.#store.reserve === "function";
+    }
+
+    /**
+     * Waits until both the route bucket and the global limit permit sending.
+     *
+     * When the store supports it, allowance is *reserved* rather than merely
+     * observed. Reading `remaining` and deciding to send is a race across
+     * workers: three processes all read `remaining: 1` and all send. A
+     * reservation hands the unit to exactly one of them.
+     */
     public async acquire(
         bucketKey: string,
         signal: AbortSignal | undefined,
         path: string,
     ): Promise<void> {
-        const bucket = await this.#store.getBucket(bucketKey);
-        if (bucket) {
-            const delay = bucket.resetAt - Date.now();
-            if (bucket.remaining <= 0 && delay > 0)
-                await sleep(delay, signal, path);
+        await this.#waitGlobal(signal, path);
+        if (!this.#store.reserve) {
+            const bucket = await this.#store.getBucket(bucketKey);
+            if (bucket) {
+                const delay = bucket.resetAt - Date.now();
+                if (bucket.remaining <= 0 && delay > 0)
+                    await sleep(delay, signal, path);
+            }
+            return;
         }
+        // Each refusal carries the wait until the window resets, so the loop
+        // advances by a real interval every time; the bound only guards against
+        // a pathological store that keeps refusing with a zero wait.
+        for (let attempt = 0; attempt < 8; attempt++) {
+            const reservation = await this.#store.reserve(bucketKey);
+            if (reservation.granted) return;
+            await sleep(Math.max(1, reservation.retryAfterMs), signal, path);
+            await this.#waitGlobal(signal, path);
+        }
+    }
+
+    async #waitGlobal(
+        signal: AbortSignal | undefined,
+        path: string,
+    ): Promise<void> {
         const globalDelay = (await this.#store.getGlobalReset()) - Date.now();
         if (globalDelay > 0) await sleep(globalDelay, signal, path);
     }

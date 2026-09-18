@@ -267,17 +267,17 @@ export class REST {
         const requestPath = query ? `${path}${query}` : path;
 
         // Discord scopes a rate limit by (bucket hash, major parameter): two
-        // channels sharing an endpoint have independent limits. The key that
-        // gates sending must therefore carry the major parameter, or unrelated
-        // resources serialize against one another and share one counter.
-        const bucketKey = await this.#limiter.resolveBucketKey(
-            route.route,
-            route.major,
-        );
-        // The scheduler keys on the bucket as known at enqueue time; the key may
-        // be reassigned to the server bucket hash once a response arrives.
-        return this.#scheduler.run(bucketKey, options.signal, path, () =>
-            this.#attempts<T>(route, requestPath, body, options, bucketKey),
+        // channels sharing an endpoint have independent limits, while two
+        // different routes can share one hash. The key is therefore resolved
+        // again once the slot is acquired, so a request that queued under its
+        // route-derived key joins the shared bucket's queue if one was
+        // discovered while it waited.
+        return this.#scheduler.runResolved(
+            () => this.#limiter.resolveBucketKey(route.route, route.major),
+            options.signal,
+            path,
+            (bucketKey) =>
+                this.#attempts<T>(route, requestPath, body, options, bucketKey),
         );
     }
     /**
@@ -600,6 +600,7 @@ export { ResponseDecoder, type DecodedError } from "./decoder.js";
 export {
     type RateLimitStore,
     type BucketState,
+    type Reservation,
     MemoryRateLimitStore,
 } from "./store.js";
 export {

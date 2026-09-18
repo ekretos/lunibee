@@ -29,8 +29,8 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | COLLECT-001 | P2 | `packages/core` | `Collector.next()` leaks a listener per call | **Fixed** |
 | WS-003 | P2 | `packages/ws` | Fatal close leaves state `CONNECT`, not `CLOSED` | Open |
 | REST-003 | P2 | `packages/rest` | One in-flight request per bucket caps throughput | Open |
-| REST-004 | P2 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | Open |
-| REST-005 | P2 | `packages/rest` | Shared store has no reservation, so workers race the same `remaining` | Open |
+| REST-004 | P1 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | **Fixed** |
+| REST-005 | P1 | `packages/rest` | Shared store has no reservation, so workers race the same `remaining` | **Fixed** |
 | BUS-001 | P2 | `packages/sharding` | Async shard-message handler rejections are swallowed | Open |
 | REST-006 | P2 | `packages/rest` | 429 without a `Retry-After` header retried with zero delay | **Fixed** |
 | CI-001 | P2 | repo | Tests were not executed by CI | **Fixed** |
@@ -226,9 +226,8 @@ now removes its counterpart.
   server bucket do not serialise against each other and can 429.
 - **MEM-001** — `MemoryRateLimitStore` prunes only on write; a process that goes idle
   keeps every bucket until the next request.
-- **REST-005** — A shared store synchronises *observed* limits but cannot reserve
-  one: several workers reading `remaining: 5` all send, so the fleet still relies
-  on 429 feedback. A decrement-on-send reservation would close this.
+- ~~**REST-005**~~ — fixed in Stage 1A: `RateLimitStore.reserve` atomically consumes
+  one unit (Lua server-side for Redis), so allowance is handed to exactly one worker.
 - **BUS-001** — `ShardBus` swallows async handler rejections with no error
   channel, so a failing cross-shard handler is invisible.
 

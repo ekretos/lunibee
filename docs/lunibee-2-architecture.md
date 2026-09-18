@@ -40,10 +40,13 @@ optimization, **State** is authoritative runtime state, **Snapshot** is serializ
 
 | Stage | Content | Status |
 |---|---|---|
-| 1 | Internal seams behind today's public API: pipeline stages, session, store, supervision | **In progress** |
-| 2 | Implementations move behind the seams; old classes become thin facades | Next |
-| 3 | New public naming (`GuildResource`, `GuildService`, `Store`) alongside the old | Planned |
-| 4 | Old names deprecated with aliases and a migration guide | Planned |
+| 1 | REST pipeline seams behind today's public API | **Landed** |
+| 1A | REST distributed correctness: reservation, shared bucket mapping | **Landed** |
+| 1B | Gateway architecture: Session, Heartbeat, Reconnect, Protocol, Transport | **Next** |
+| 1C | `ShardSupervisor` lifted out of `ClusterManager` | Planned |
+| 2 | Store architecture (`Store`, `LocalState` / `SharedState` / `PersistentState`) | Planned |
+| 3 | Resource/Service architecture (`GuildResource`, `GuildService`) alongside the old | Planned |
+| 4 | New public naming; old names deprecated with aliases and a migration guide | Planned |
 | 5 | Lunibee 2.x — clean architecture as the default surface | Planned |
 
 Nothing is rewritten from scratch, and no stage may break the public API before Stage 4.
@@ -77,7 +80,48 @@ retried *immediately* instead of using the documented 1s default. Isolating the
 decoder made that a three-line unit test; inside the old class it needed a full
 `fetch` stub and had gone unnoticed.
 
-## Stage 1 — remaining work, in priority order
+## Stage 1A — landed: distributed REST correctness
+
+### REST-005 — reservation, not observation
+
+`GET remaining` then `UPDATE remaining` cannot arbitrate between workers: three
+processes read `remaining: 1` and all three send. The store contract now carries an
+optional atomic operation:
+
+```ts
+reserve?(key: string): Promise<Reservation> | Reservation;
+type Reservation = { granted: true } | { granted: false; retryAfterMs: number };
+```
+
+- `MemoryRateLimitStore.reserve` decrements in-process, which is trivially atomic.
+- `RedisRateLimitStore.reserve` runs a Lua script server-side, so the read, the
+  decrement and the write cannot interleave across workers. It is assigned only when
+  the client exposes `eval` — capability by presence, so `RateLimiter.reserves`
+  reports what the store can actually do rather than what it hopes to.
+- A store without `reserve` keeps the old wait-on-observed-state path, unchanged.
+- **Grant, never deadlock:** an unknown bucket or an elapsed window is always granted.
+  An unknown bucket is only discovered by sending; refusing would stall the route
+  across the entire fleet. A Redis failure likewise falls back to the local mirror.
+
+Proven by three separate worker stores racing one shared server for a single unit:
+exactly one grant, two refusals carrying a real wait.
+
+### REST-004 — bucket keys resolve late, not at enqueue
+
+A route learns its bucket hash only from a response, so a request that queued under
+its route-derived key could run beside the shared bucket's other traffic once the
+hash appeared. `RequestScheduler.runResolved` re-resolves the key at the moment the
+slot is acquired and re-queues under the shared hash if it changed (bounded by
+`MAX_REMAPS`).
+
+**Honest limit:** a cold-start burst is still not fully preventable. If two routes
+that share a hash both start with no hash known, their first requests overlap —
+nothing in the process knows they are related until Discord answers. The remap fixes
+every request after that first response, which is the steady state. The regression
+test asserts exactly this and no more: the discovering request may overlap, the one
+queued behind it may not.
+
+## Stage 1B — next, in priority order
 
 1. **`GatewaySession`** — extract session identity (session id, sequence, resume URL,
    IDENTIFY vs RESUME decision) out of `Gateway`. This is the highest-value gateway
@@ -95,12 +139,10 @@ decoder made that a three-line unit test; inside the old class it needed a full
 
 ## Open architectural debts this direction should absorb
 
-- **REST-003 / REST-005** — the scheduler allows one in-flight request per bucket and
-  the shared store cannot reserve capacity. Both belong to the limiter/scheduler seam
-  now that it exists: a token bucket keyed on `remaining`, plus a reservation in the
-  distributed store.
-- **REST-004** — routes that Discord maps onto one bucket hash still queue separately,
-  because the scheduler key is fixed at enqueue time. Addressable now that key
-  resolution is a single function.
+- **REST-003** — the scheduler still allows only one in-flight request per bucket, so
+  a bucket with `limit: 5` is used at a fifth of its allowance. The reservation
+  primitive from Stage 1A is the foundation for lifting this: once allowance is
+  reserved rather than inferred from ordering, parallel sends within a bucket become
+  safe. This is the next REST performance item.
 - **WS-003 / WS-004** — fatal-close state and the `Gateway` monolith are both resolved
   by the `GatewaySession` extraction above rather than by a rename.
