@@ -1,5 +1,6 @@
 import { createInflate, constants as zlibConstants } from "node:zlib";
 import { GatewaySession } from "./session.js";
+import { GatewayHeartbeat, type HeartbeatTimeout } from "./heartbeat.js";
 import {
     resolveGatewayIntents,
     type GatewayPayload,
@@ -7,6 +8,12 @@ import {
     type GatewayPresence,
     type GatewayIntentResolvable,
 } from "@lunibee/types";
+
+export {
+    GatewayHeartbeat,
+    type HeartbeatOptions,
+    type HeartbeatTimeout,
+} from "./heartbeat.js";
 
 export {
     GatewaySession,
@@ -132,15 +139,13 @@ export class Gateway {
     readonly #session = new GatewaySession();
     /** Token of the socket this Gateway currently owns. */
     #token = 0;
-    #heartbeatTimer?: ReturnType<typeof setInterval>;
-    #initialHeartbeat?: ReturnType<typeof setTimeout>;
-    #heartbeatAckTimer?: ReturnType<typeof setTimeout>;
-    #heartbeatACK = true;
-    #heartbeatInterval = 0;
-    #heartbeatSentAt = 0;
-    #lastMessageAt = 0;
-    #zombieTimer?: ReturnType<typeof setInterval>;
-    #zombieReported = false;
+    /**
+     * Heartbeat, acknowledgement deadline and staleness watch.
+     *
+     * The Gateway holds no heartbeat timers of its own; it supplies the socket
+     * and decides what to close when liveness fails.
+     */
+    readonly #heartbeat: GatewayHeartbeat;
     #closed = false;
     #attempt = 0;
     #reconnectTimer?: ReturnType<typeof setTimeout>;
@@ -198,6 +203,63 @@ export class Gateway {
             throw new RangeError(
                 "Gateway zombieTimeout must be greater than heartbeatAckTimeout",
             );
+        this.#heartbeat = new GatewayHeartbeat({
+            ackTimeout: this.#options.heartbeatAckTimeout,
+            zombieTimeout: this.#options.zombieTimeout,
+            // Heartbeats are privileged: application traffic must never starve
+            // the one payload that keeps the connection alive.
+            send: (sequence) =>
+                this.#dispatch(
+                    {
+                        op: GatewayOpcodes.Heartbeat,
+                        d: sequence,
+                        s: null,
+                        t: null,
+                    },
+                    true,
+                ),
+            sequence: () => this.#session.sequence,
+            isConnected: () =>
+                !this.#closed && this.#ws?.readyState === WebSocket.OPEN,
+            onTimeout: (timeout) => this.#onHeartbeatTimeout(timeout),
+            onError: (error) => this.#emitError(error),
+        });
+    }
+
+    /**
+     * Closes a connection that failed a liveness check.
+     *
+     * The heartbeat decides *that* the connection is dead; the Gateway decides
+     * what to do about it, because only the Gateway owns the socket.
+     */
+    #onHeartbeatTimeout(timeout: HeartbeatTimeout): void {
+        if (timeout.type === "zombie") {
+            this.#emit("zombie", {
+                silentFor: timeout.silentFor,
+                timeout: timeout.deadline,
+            });
+            this.#emitError(
+                new GatewayError(
+                    `Gateway connection appears stale after ${timeout.silentFor}ms without traffic.`,
+                ),
+            );
+        } else {
+            this.#emitError(
+                new GatewayError(
+                    `Gateway heartbeat acknowledgement timed out after ${timeout.elapsedMs}ms.`,
+                ),
+            );
+        }
+        try {
+            this.#ws?.close(
+                1001,
+                timeout.type === "zombie"
+                    ? "Zombie Gateway connection"
+                    : "Heartbeat timeout",
+            );
+        } catch (error) {
+            this.#emitError(error);
+        }
     }
 
     /** Opens the Gateway connection. @param url Gateway WebSocket URL. @returns Promise fulfilled when the socket opens. @throws {GatewayError} If permanently closed or unable to connect. */
@@ -387,9 +449,9 @@ export class Gateway {
         this.#ws = ws;
         ws.addEventListener("open", () => {
             if (this.#ws !== ws) return;
-            this.#lastMessageAt = Date.now();
-            this.#zombieReported = false;
-            this.#startZombieDetection();
+            // Watch for silence from the moment the socket opens: a connection
+            // that never reaches HELLO must still be detected as dead.
+            this.#heartbeat.watch();
             this.#emit("open", undefined);
             this.#settleConnect();
         });
@@ -398,8 +460,7 @@ export class Gateway {
             // replaced or abandoned: its payloads carry a sequence stream that
             // no longer belongs to the live session.
             if (this.#ws !== ws) return;
-            this.#lastMessageAt = Date.now();
-            this.#zombieReported = false;
+            this.#heartbeat.receivedMessage();
             const data = event.data;
             if (this.#options.compress && typeof data !== "string") {
                 // Frames must be decoded strictly in arrival order: the
@@ -422,46 +483,6 @@ export class Gateway {
         ws.addEventListener("error", () =>
             this.#emitError(new GatewayError("Gateway WebSocket error")),
         );
-    }
-    #startZombieDetection(): void {
-        if (this.#zombieTimer) clearInterval(this.#zombieTimer);
-        // Poll granularity only needs to be a fraction of the staleness
-        // deadline (heartbeatInterval + heartbeatAckTimeout, ~51s in
-        // practice). A 1s ceiling keeps detection latency negligible while
-        // costing one wakeup per second per shard instead of four.
-        const interval = Math.max(
-            1,
-            Math.min(
-                1000,
-                this.#options.heartbeatAckTimeout,
-                this.#options.zombieTimeout / 2,
-            ),
-        );
-        this.#zombieTimer = setInterval(() => {
-            if (
-                this.#closed ||
-                this.#ws?.readyState !== WebSocket.OPEN ||
-                this.#lastMessageAt === 0
-            )
-                return;
-            const silentFor = Date.now() - this.#lastMessageAt;
-            const deadline = Math.max(
-                this.#options.zombieTimeout,
-                this.#heartbeatInterval + this.#options.heartbeatAckTimeout,
-            );
-            if (silentFor < deadline || this.#zombieReported) return;
-            this.#zombieReported = true;
-            const error = new GatewayError(
-                `Gateway connection appears stale after ${silentFor}ms without traffic.`,
-            );
-            this.#emit("zombie", { silentFor, timeout: deadline });
-            this.#emitError(error);
-            try {
-                this.#ws.close(1001, "Zombie Gateway connection");
-            } catch (closeError) {
-                this.#emitError(closeError);
-            }
-        }, interval);
     }
     #message(ws: WebSocket, raw: string, token: number): void {
         // Decompression is asynchronous, so a frame can arrive here after its
@@ -503,12 +524,11 @@ export class Gateway {
                 break;
             case GatewayOpcodes.Heartbeat:
                 this.#setState(GatewayState.Heartbeat);
-                this.#sendHeartbeat();
+                this.#heartbeat.sendHeartbeat();
                 break;
             case GatewayOpcodes.HeartbeatAck:
-                this.#heartbeatACK = true;
-                this.ping = Date.now() - this.#heartbeatSentAt;
-                this.#clearHeartbeatAckTimer();
+                this.#heartbeat.acknowledge();
+                this.ping = this.#heartbeat.latency;
                 this.#emit("heartbeatAck", payload.d);
                 break;
             case GatewayOpcodes.Reconnect:
@@ -578,11 +598,10 @@ export class Gateway {
             this.#ws?.close(1002, "Invalid heartbeat interval");
             return;
         }
-        this.#heartbeatInterval = interval;
         this.#setState(
             this.#session.canResume ? GatewayState.Resume : GatewayState.Hello,
         );
-        this.#startHeartbeat(interval);
+        this.#heartbeat.start(interval);
         this.#identifyOrResume();
     }
     #identifyOrResume(): void {
@@ -645,56 +664,6 @@ export class Gateway {
             },
             true,
         );
-    }
-    #startHeartbeat(interval: number): void {
-        this.#clearHeartbeatTimers();
-        this.#heartbeatACK = true;
-        this.#initialHeartbeat = setTimeout(
-            () => this.#sendHeartbeat(),
-            Math.random() * interval,
-        );
-        this.#heartbeatTimer = setInterval(
-            () => this.#sendHeartbeat(),
-            interval,
-        );
-    }
-    #sendHeartbeat(): void {
-        this.#heartbeatACK = false;
-        this.#heartbeatSentAt = Date.now();
-        if (
-            !this.#dispatch(
-                {
-                    op: GatewayOpcodes.Heartbeat,
-                    d: this.#session.sequence,
-                    s: null,
-                    t: null,
-                },
-                true,
-            )
-        ) {
-            this.#emitError(
-                new GatewayError(
-                    "Unable to send Gateway heartbeat because the WebSocket is not open.",
-                ),
-            );
-            return;
-        }
-        this.#clearHeartbeatAckTimer();
-        this.#heartbeatAckTimer = setTimeout(() => {
-            if (!this.#heartbeatACK) {
-                const elapsed = Date.now() - this.#heartbeatSentAt;
-                this.#emitError(
-                    new GatewayError(
-                        `Gateway heartbeat acknowledgement timed out after ${elapsed}ms.`,
-                    ),
-                );
-                try {
-                    this.#ws?.close(1001, "Heartbeat timeout");
-                } catch (error) {
-                    this.#emitError(error);
-                }
-            }
-        }, this.#options.heartbeatAckTimeout);
     }
     #close(ws: WebSocket, code: number, token: number): void {
         if (this.#ws !== ws) return;
@@ -778,23 +747,10 @@ export class Gateway {
         if (error) reject?.(error);
         else resolve?.();
     }
-    #clearHeartbeatAckTimer(): void {
-        if (this.#heartbeatAckTimer) clearTimeout(this.#heartbeatAckTimer);
-        this.#heartbeatAckTimer = undefined;
-    }
-    #clearHeartbeatTimers(): void {
-        if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
-        if (this.#initialHeartbeat) clearTimeout(this.#initialHeartbeat);
-        this.#clearHeartbeatAckTimer();
-        this.#heartbeatTimer = undefined;
-        this.#initialHeartbeat = undefined;
-    }
     #clearTimers(): void {
         if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
-        if (this.#zombieTimer) clearInterval(this.#zombieTimer);
         this.#reconnectTimer = undefined;
-        this.#zombieTimer = undefined;
-        this.#clearHeartbeatTimers();
+        this.#heartbeat.stop();
     }
     #normalizeError(error: unknown): GatewayError {
         return error instanceof GatewayError

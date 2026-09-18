@@ -42,7 +42,7 @@ optimization, **State** is authoritative runtime state, **Snapshot** is serializ
 |---|---|---|
 | 1 | REST pipeline seams behind today's public API | **Landed** |
 | 1A | REST distributed correctness: reservation, shared bucket mapping | **Landed** |
-| 1B | Gateway architecture: Session **landed**; Heartbeat, Reconnect, Protocol, Transport next | **In progress** |
+| 1B | Gateway architecture: Session and Heartbeat **landed**; Reconnect, Transport, Protocol, Dispatcher next | **In progress** |
 | 1C | `ShardSupervisor` lifted out of `ClusterManager` | Planned |
 | 2 | Store architecture (`Store`, `LocalState` / `SharedState` / `PersistentState`) | Planned |
 | 3 | Resource/Service architecture (`GuildResource`, `GuildService`) alongside the old | Planned |
@@ -162,14 +162,62 @@ them out is what stops the first extraction becoming a second god object.
    generation no longer owns the connection. This is exactly the class of bug the seam
    was extracted to prevent, and it was invisible until the session could be asked.
 
+## Stage 1B.2 — landed: `GatewayHeartbeat`
+
+Every liveness timer now lives in one object. `Gateway` lost nine fields
+(`#heartbeatTimer`, `#initialHeartbeat`, `#heartbeatAckTimer`, `#heartbeatACK`,
+`#heartbeatInterval`, `#heartbeatSentAt`, `#lastMessageAt`, `#zombieTimer`,
+`#zombieReported`) and gained one collaborator.
+
+**Owns:** the heartbeat interval and its jittered first beat · the acknowledgement
+deadline · the staleness (zombie) watch · measured latency · whether the connection
+looks alive.
+
+**Does not own:** the socket, the session, reconnect policy, opcode interpretation,
+event emission. It reports through `onTimeout` and `onError`; the Gateway decides
+what to close, because only the Gateway owns the socket.
+
+```ts
+new GatewayHeartbeat({
+    ackTimeout, zombieTimeout,
+    send: (sequence) => transport.send(heartbeatPayload(sequence)),
+    sequence: () => session.sequence,
+    isConnected: () => socketIsOpen(),
+    onTimeout: (timeout) => gateway.closeFor(timeout),
+    onError: (error) => gateway.emitError(error),
+});
+```
+
+The staleness deadline stays derived — `max(zombieTimeout, interval + ackTimeout)` —
+so a Gateway with a 45s interval is never mistaken for a dead one.
+
+**What this buys:** 16 liveness tests that construct no socket, no Gateway and no
+session. The ACK deadline, the send-failure path, single-shot zombie reporting,
+silence reset, and the "disconnected socket is never a zombie" rule are now direct
+assertions rather than choreography through a fake WebSocket.
+
 ## Stage 1B — remaining, in priority order
 
-1. **`GatewayHeartbeat` / `GatewayReconnect`** — timer ownership, so the zombie and
-   ACK deadlines are testable without a socket.
-2. **`GatewayProtocol` / `GatewayTransport`** — opcode handling separated from socket
-   mechanics; `GatewayShard` then composes the four. `GatewayReconnect` should ask the
-   session via `resumeInfo()` rather than reaching into Gateway fields.
-3. **`ShardSupervisor`** (Stage 1C) — the restart/backoff policy currently inlined in
+1. **`GatewayReconnect`** — `#attempt`, `#reconnectTimer`, `#connectPromise` and the
+   backoff/close-code policy. It should ask `session.handshake()` rather than know
+   session internals, and own the close-code classification table (`4004` fatal,
+   `4007`/`4009` identify, `1006` reconnect) that is currently spread through
+   `Gateway#closeAction`. This also resolves WS-003: a fatal close should settle as
+   `CLOSED`, which is a reconnect-policy decision, not a session one.
+2. **`GatewayTransport`** — `#ws`, socket construction, listener wiring, send, and
+   socket replacement, behind an interface that admits `BunWebSocketTransport`,
+   `NodeWebSocketTransport` and `MockGatewayTransport` without touching protocol
+   logic. The compression decoder (`#inflate`, `#inflateChunks`, `#decompressQueue`)
+   belongs under it as a `GatewayDecoder`, so a split compressed frame can be tested
+   with two `push()` calls and no Gateway.
+3. **`GatewayProtocol`** — opcode interpretation as a pure translation from payload
+   to action (`hello` / `dispatch` / `heartbeat-ack` / `invalid-session` …), so op 9
+   is classified by the protocol and merely *applied* by the session.
+4. **`GatewayDispatcher`** — the listener map and emission, leaving `Gateway` as
+   orchestration rather than event infrastructure.
+5. **`GatewaySendLimiter`** (P2) — `#sendTimestamps` and the 115/60s budget as its
+   own primitive. Deliberately after the correctness-critical seams.
+6. **`ShardSupervisor`** (Stage 1C) — the restart/backoff policy currently inlined in
    `ClusterManager`, lifted out so `Fleet` can reuse it per `FleetNode`.
 
 ## Open architectural debts this direction should absorb
