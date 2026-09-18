@@ -193,6 +193,17 @@ export class Gateway {
         if (this.state === GatewayState.Closed)
             throw new GatewayError("Gateway has been permanently closed.");
         if (this.#connectPromise) return this.#connectPromise;
+        // Connecting an already-live Gateway must be a no-op. Opening a second
+        // socket leaves the first one unmanaged but still dispatching, which
+        // interleaves two sequence streams (corrupting a later RESUME) and
+        // sends a second IDENTIFY on the same session.
+        if (this.#isLive(this.#ws)) return Promise.resolve();
+        // A manual connect supersedes a scheduled reconnect; leaving the timer
+        // armed would open a second socket once it fires.
+        if (this.#reconnectTimer) {
+            clearTimeout(this.#reconnectTimer);
+            this.#reconnectTimer = undefined;
+        }
         this.#closed = false;
         this.#setState(GatewayState.Connect);
         // Append compression parameter if enabled
@@ -315,8 +326,25 @@ export class Gateway {
             t: null,
         });
     }
+    /** Whether a socket is connecting or open, and therefore still this Gateway's. */
+    #isLive(ws: WebSocket | undefined): boolean {
+        // 0 = CONNECTING, 1 = OPEN. Compared numerically so a stubbed
+        // WebSocket without the static constants still behaves correctly.
+        return ws !== undefined && ws.readyState <= 1;
+    }
     #open(url: string): void {
         if (this.#closed) return;
+        // Never leave a previous socket behind: an orphan keeps its listeners
+        // and would go on feeding dispatches into this Gateway.
+        const previous = this.#ws;
+        if (previous) {
+            this.#ws = undefined;
+            try {
+                previous.close(1000, "Superseded by a new connection");
+            } catch (error) {
+                this.#emitError(error);
+            }
+        }
         let ws: WebSocket;
         try {
             ws = new WebSocket(url);
@@ -340,6 +368,7 @@ export class Gateway {
         }
         this.#ws = ws;
         ws.addEventListener("open", () => {
+            if (this.#ws !== ws) return;
             this.#lastMessageAt = Date.now();
             this.#zombieReported = false;
             this.#startZombieDetection();
@@ -347,6 +376,10 @@ export class Gateway {
             this.#settleConnect();
         });
         ws.addEventListener("message", (event) => {
+            // Ignore anything arriving on a socket this Gateway has already
+            // replaced or abandoned: its payloads carry a sequence stream that
+            // no longer belongs to the live session.
+            if (this.#ws !== ws) return;
             this.#lastMessageAt = Date.now();
             this.#zombieReported = false;
             const data = event.data;

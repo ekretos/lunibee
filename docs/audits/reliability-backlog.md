@@ -23,9 +23,15 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | SHARD-001 | P1 | `packages/sharding` | No default IDENTIFY pacing between shard starts | **Fixed** |
 | CLUSTER-001 | P1 | `packages/sharding` | Crashed cluster child is never restarted or reported | **Fixed** |
 | REST-002 | P1 | `packages/rest` | Transport failures never retried despite documented policy | **Fixed** |
+| WS-005 | P1 | `packages/ws` | `connect()` on a live Gateway opens a duplicate socket | **Fixed** |
+| REDIS-001 | P1 | `packages/rest` | Redis outage silently disables rate limiting fleet-wide | **Fixed** |
+| CACHE-001 | P2 | `packages/collection` | TTL sweeper keeps the process alive | **Fixed** |
+| COLLECT-001 | P2 | `packages/core` | `Collector.next()` leaks a listener per call | **Fixed** |
 | WS-003 | P2 | `packages/ws` | Fatal close leaves state `CONNECT`, not `CLOSED` | Open |
 | REST-003 | P2 | `packages/rest` | One in-flight request per bucket caps throughput | Open |
 | REST-004 | P2 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | Open |
+| REST-005 | P2 | `packages/rest` | Shared store has no reservation, so workers race the same `remaining` | Open |
+| BUS-001 | P2 | `packages/sharding` | Async shard-message handler rejections are swallowed | Open |
 | CI-001 | P2 | repo | Tests were not executed by CI | **Fixed** |
 | WS-004 | P3 | `packages/ws` | `Gateway` is a single 800-line class | Open |
 
@@ -130,6 +136,82 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 - **Regression test** — Policy matrix over status `0`, `429`, `500` per method.
 - **Risk** — Low; bounded by `maxRetries` and restricted to idempotent methods.
 
+## Second pass — findings against the hardened `dev`
+
+Re-audited REST concurrency, gateway lifecycle, sharding, structures/cache, Bun
+compatibility and test adversariality against current `dev`.
+
+**P0: clean.** Nothing in the current state can take a bot down outright; the two
+P0s from the first pass (REST-001, WS-001) remain the only ones found, and both
+are fixed with regression tests.
+
+### WS-005 · P1 · `packages/ws/src/index.ts`
+
+- **Problem** — `connect()` on an already-connected Gateway opened a second
+  WebSocket and abandoned the first, which stayed open and kept dispatching.
+- **Evidence** — Probe: two sockets created, the first still `OPEN`, and a
+  dispatch emitted on the abandoned socket was still delivered to listeners.
+- **Impact** — Two sequence streams interleave into one `#sequence` field, so a
+  later RESUME asks Discord to replay from a sequence that never belonged to the
+  live session; events are delivered twice; a second IDENTIFY on the same session
+  invites close `4005`. Reachable from `login()` called twice, a supervisor
+  reconnecting a live shard, or `ShardManager.connect()` called twice — which
+  duplicates *every* shard's socket at once.
+- **Root cause** — `connect()` only guarded on an in-flight `#connectPromise`,
+  not on an existing live socket; `#open` never tore down its predecessor; and
+  the message handler did not check that the socket was still the current one.
+- **Fix** — `connect()` is idempotent for a connecting/open socket and cancels a
+  pending reconnect timer; `#open` closes any predecessor; `open`/`message`
+  listeners ignore events from a superseded socket.
+- **Regression test** — `tests/reliability.pass2.test.ts`: no second socket, a
+  dropped socket's dispatches are ignored, and a manual connect does not race the
+  scheduled reconnect into a third socket.
+- **Risk** — Low. Behaviour only changes on paths that previously produced a
+  duplicate socket.
+
+### REDIS-001 · P1 · `packages/rest/src/redis.ts`
+
+- **Problem** — Every read path answered a Redis failure with `undefined` / `0`,
+  which the REST limiter reads as "no limit known — send now". The warning even
+  claimed it was "falling back to local limiting"; there was no local state.
+- **Impact** — A Redis blip drops the whole fleet to unlimited sending
+  simultaneously — mass 429s and the Cloudflare ban that sustained 429 abuse
+  earns. Worse than running without a shared store at all.
+- **Root cause** — The store was a pure pass-through with no in-process mirror.
+- **Fix** — Mirror every write into a `MemoryRateLimitStore` and serve reads from
+  it whenever Redis throws, so the documented fallback is real.
+- **Regression test** — Outage simulation asserts mirrored bucket/hash/global
+  reads, plus an end-to-end check that REST still waits out a known bucket with
+  Redis down.
+- **Risk** — Low; bounded extra memory, pruned on write. The mirror only reflects
+  this process's traffic — correct for a fallback, not a replacement for Redis.
+
+### CACHE-001 · P2 · `packages/collection/src/cache.ts`
+
+A TTL `Cache` created a referenced `setInterval`, so a process could not exit
+until `dispose()` was called. The sweeper is now `unref`'d (verified by asserting
+`hasRef() === false` on the handle).
+
+### COLLECT-001 · P2 · `packages/core/src/collector.ts`
+
+`Collector.next()` registered `once("collect")` and `once("end")` and removed
+neither when the other settled, so polling a long-lived collector in a loop grew
+one dangling listener per call until the max-listener warning fired. Each handler
+now removes its counterpart.
+
+### Areas checked, no finding worth a ticket
+
+- **Gateway heartbeat/session** — ACK timer, zombie deadline, `op 9` resumable
+  handling, `op 7` reconnect and backoff jitter all behave correctly under the
+  existing tests; timers are cleared on every close path.
+- **Sharding cross-process state** — `ShardBus` self-filtering and targeting are
+  correct; `BroadcastChannel` failures surface synchronously to the caller.
+- **Structures/Collection** — LRU promotion, bounded eviction and sweep semantics
+  are consistent; no stale-reference or serialization defect found.
+- **Bun compatibility** — remaining Node dependencies are `node:zlib` (verified
+  under Bun), `node:events`, and `child_process.fork`, which is explicitly
+  guarded and documented as Node-only.
+
 ## P2 — Reliability & performance (open)
 
 - **WS-003** — A fatal close (`4004`, `4013`, `4014`, …) stops reconnects but leaves
@@ -143,6 +225,11 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
   server bucket do not serialise against each other and can 429.
 - **MEM-001** — `MemoryRateLimitStore` prunes only on write; a process that goes idle
   keeps every bucket until the next request.
+- **REST-005** — A shared store synchronises *observed* limits but cannot reserve
+  one: several workers reading `remaining: 5` all send, so the fleet still relies
+  on 429 feedback. A decrement-on-send reservation would close this.
+- **BUS-001** — `ShardBus` swallows async handler rejections with no error
+  channel, so a failing cross-shard handler is invisible.
 
 ## P3 — Engineering quality (open)
 

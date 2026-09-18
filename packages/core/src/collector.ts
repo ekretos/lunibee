@@ -94,17 +94,25 @@ export class Collector<K, V> extends EventEmitter {
                 );
             }
 
-            this.once("collect", (item: V) => {
+            // Each settled next() must drop its counterpart listener. Polling
+            // a long-lived collector in a loop otherwise leaves one dangling
+            // "end" listener per call, which grows without bound and trips the
+            // EventEmitter max-listener warning.
+            const onCollect = (item: V): void => {
+                this.off("end", onEnd);
                 resolve(item);
-            });
-
-            this.once("end", (_collected, reason) => {
+            };
+            const onEnd = (_collected: Map<K, V>, reason: string): void => {
+                this.off("collect", onCollect);
                 reject(
                     new Error(
                         `Collector ended before item was collected: ${reason}`,
                     ),
                 );
-            });
+            };
+
+            this.once("collect", onCollect);
+            this.once("end", onEnd);
         });
     }
 }

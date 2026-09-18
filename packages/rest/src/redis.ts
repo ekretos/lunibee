@@ -1,4 +1,8 @@
-import type { RateLimitStore, BucketState } from "./store.js";
+import {
+    MemoryRateLimitStore,
+    type RateLimitStore,
+    type BucketState,
+} from "./store.js";
 
 /**
  * A Redis client interface that matches the subset of ioredis
@@ -33,6 +37,13 @@ export class RedisRateLimitStore implements RateLimitStore {
     readonly #client: MinimalRedisClient;
     readonly #prefix: string;
     readonly #onErrorCallback?: RedisRateLimitStoreOptions["onError"];
+    /**
+     * In-process mirror of every write. Reads fall back to it when Redis is
+     * unreachable: answering "no limit known" would drop every worker to
+     * unlimited sending at the same moment, which is how a fleet earns a
+     * Cloudflare ban during a Redis blip.
+     */
+    readonly #local = new MemoryRateLimitStore();
     #lastError?: unknown;
 
     public constructor(options: RedisRateLimitStoreOptions) {
@@ -80,11 +91,12 @@ export class RedisRateLimitStore implements RateLimitStore {
             return hash ?? undefined;
         } catch (error) {
             this.#onError("getBucketHash", error);
-            return undefined;
+            return this.#local.getBucketHash(route);
         }
     }
 
     public async setBucketHash(route: string, hash: string): Promise<void> {
+        this.#local.setBucketHash(route, hash);
         try {
             await this.#client.set(
                 `${this.#prefix}route:${route}`,
@@ -106,11 +118,12 @@ export class RedisRateLimitStore implements RateLimitStore {
             return JSON.parse(data) as BucketState;
         } catch (error) {
             this.#onError("getBucket", error);
-            return undefined;
+            return this.#local.getBucket(key);
         }
     }
 
     public async updateBucket(key: string, state: BucketState): Promise<void> {
+        this.#local.updateBucket(key, state);
         const bucketKey = `${this.#prefix}bucket:${key}`;
         // Expired buckets hold no useful limit info; drop them instead of
         // persisting stale state under a clamped 1s TTL.
@@ -135,11 +148,12 @@ export class RedisRateLimitStore implements RateLimitStore {
             return resetAt ? Number(resetAt) : 0;
         } catch (error) {
             this.#onError("getGlobalReset", error);
-            return 0;
+            return this.#local.getGlobalReset();
         }
     }
 
     public async setGlobalReset(resetAt: number): Promise<void> {
+        this.#local.setGlobalReset(resetAt);
         const globalKey = `${this.#prefix}global`;
         const ttl = Math.ceil((resetAt - Date.now()) / 1000);
         try {

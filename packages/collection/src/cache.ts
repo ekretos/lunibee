@@ -38,6 +38,9 @@ export class Cache<K, V> {
             if (!Number.isFinite(interval) || interval < 1)
                 throw new RangeError("Cache sweepInterval must be positive.");
             this.#timer = setInterval(() => this.sweep(), interval);
+            // A sweeper is housekeeping, not work: keeping it referenced makes
+            // a TTL cache hold the process open until dispose() is called.
+            (this.#timer as { unref?: () => void }).unref?.();
         }
     }
 
