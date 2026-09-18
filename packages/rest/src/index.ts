@@ -230,11 +230,15 @@ export function createRetryPolicy(maxRetries = 2): RetryPolicy {
         maxRetries: Math.floor(maxRetries),
         shouldRetry(method, status) {
             const normalized = method.toUpperCase();
+            const idempotent = ["GET", "HEAD", "PUT", "DELETE"].includes(
+                normalized,
+            );
+            // Status 0 is a transport failure (DNS, reset connection, TLS):
+            // no response reached Discord's handlers, so replaying an
+            // idempotent request is as safe as replaying it after a 5xx.
+            if (status === 0) return idempotent;
             return (
-                status === 429 ||
-                (status >= 500 &&
-                    status <= 599 &&
-                    ["GET", "HEAD", "PUT", "DELETE"].includes(normalized))
+                status === 429 || (status >= 500 && status <= 599 && idempotent)
             );
         },
         getDelay(attempt, retryAfter) {
@@ -335,8 +339,12 @@ export class REST {
             release = resolve;
         });
         this.#localQueues.set(queueKey, gate);
-        await this.#abortable(previous, options.signal, path);
         try {
+            // Queue entry must be awaited inside the try: an abort raised while
+            // waiting for the predecessor would otherwise skip the `finally`
+            // that releases this request's gate, wedging every later request
+            // mapped to the same bucket key forever.
+            await this.#abortable(previous, options.signal, path);
             for (
                 let attempt = 0;
                 attempt <= this.#retryPolicy.maxRetries;

@@ -1,3 +1,4 @@
+import { createInflate, constants as zlibConstants } from "node:zlib";
 import {
     resolveGatewayIntents,
     type GatewayPayload,
@@ -94,7 +95,8 @@ export interface GatewayOptions {
     /** Presence data. */ presence?: GatewayPresence;
     /**
      * Whether to enable zlib-stream transport compression.
-     * Uses Bun's native `DecompressionStream` — no external dependencies.
+     * Decoded with a persistent `node:zlib` inflate stream, matching
+     * Discord's zlib-wrapped stream framing (`Z_SYNC_FLUSH` boundaries).
      * When enabled, appends `&compress=zlib-stream` to the Gateway URL.
      */
     compress?: boolean;
@@ -134,11 +136,12 @@ export class Gateway {
     readonly #listeners = new Map<string, Set<GatewayListener>>();
     readonly #sendTimestamps: number[] = [];
     public ping: number = -1;
-    /** Pending zlib-stream decompressor, initialised lazily when compress is enabled. */
-    #decompressor?: {
-        writer: WritableStreamDefaultWriter<BufferSource>;
-        reader: ReadableStreamDefaultReader<Uint8Array>;
-    };
+    /** Persistent zlib-stream inflater, initialised when compress is enabled. */
+    #inflate?: ReturnType<typeof createInflate>;
+    /** Output chunks emitted by the inflater since the last flush boundary. */
+    #inflateChunks: Uint8Array[] = [];
+    /** Serialises decompression so frames are decoded in arrival order. */
+    #decompressQueue: Promise<void> = Promise.resolve();
     /** Creates a Gateway connection manager. @param options Gateway configuration. @throws {TypeError|RangeError} If configuration is invalid. */
     public constructor(options: GatewayOptions) {
         if (!options.token?.trim())
@@ -326,6 +329,15 @@ export class Gateway {
             } else this.#settleConnect(failure);
             return;
         }
+        // Compressed frames must arrive as binary buffers, not Blobs, so the
+        // inflater can be fed synchronously in arrival order.
+        if (this.#options.compress) {
+            try {
+                (ws as { binaryType?: string }).binaryType = "arraybuffer";
+            } catch {
+                // Runtimes that pin binaryType are handled by #toBytes.
+            }
+        }
         this.#ws = ws;
         ws.addEventListener("open", () => {
             this.#lastMessageAt = Date.now();
@@ -337,12 +349,20 @@ export class Gateway {
         ws.addEventListener("message", (event) => {
             this.#lastMessageAt = Date.now();
             this.#zombieReported = false;
-            if (this.#options.compress && event.data instanceof ArrayBuffer) {
-                this.#decompress(new Uint8Array(event.data))
-                    .then((text) => this.#message(ws, text))
+            const data = event.data;
+            if (this.#options.compress && typeof data !== "string") {
+                // Frames must be decoded strictly in arrival order: the
+                // inflate stream carries state across frames, so interleaving
+                // two decodes corrupts the stream and reorders dispatches.
+                this.#decompressQueue = this.#decompressQueue
+                    .then(() => this.#toBytes(data))
+                    .then((bytes) => this.#decompress(bytes))
+                    .then((text) => {
+                        if (text !== undefined) this.#message(ws, text);
+                    })
                     .catch((err) => this.#emitError(err));
             } else {
-                this.#message(ws, String(event.data));
+                this.#message(ws, String(data));
             }
         });
         ws.addEventListener("close", (event) => this.#close(ws, event.code));
@@ -517,16 +537,23 @@ export class Gateway {
     #identifyOrResume(): void {
         if (this.#sessionId && this.#sequence !== null && this.#resumeURL) {
             this.#setState(GatewayState.Resume);
-            this.send({
-                op: GatewayOpcodes.Resume,
-                d: {
-                    token: this.#options.token,
-                    session_id: this.#sessionId,
-                    seq: this.#sequence,
+            // IDENTIFY/RESUME are privileged for the same reason heartbeats
+            // are: dropping one leaves the shard connected but never READY,
+            // recoverable only via the zombie timeout. Application traffic
+            // must never starve the handshake out of the send budget.
+            this.#dispatch(
+                {
+                    op: GatewayOpcodes.Resume,
+                    d: {
+                        token: this.#options.token,
+                        session_id: this.#sessionId,
+                        seq: this.#sequence,
+                    },
+                    s: null,
+                    t: null,
                 },
-                s: null,
-                t: null,
-            });
+                true,
+            );
             return;
         }
         this.#setState(GatewayState.Identify);
@@ -538,31 +565,34 @@ export class Gateway {
         const os = props.os ?? "Android";
         const browser = props.browser ?? "Discord Android";
         const device = props.device ?? "Discord Android";
-        this.send({
-            op: GatewayOpcodes.Identify,
-            d: {
-                token: this.#options.token,
-                intents: this.#options.intents,
-                properties: {
-                    os,
-                    browser,
-                    device,
-                    $os: os,
-                    $browser: browser,
-                    $device: device,
-                    ...props,
+        this.#dispatch(
+            {
+                op: GatewayOpcodes.Identify,
+                d: {
+                    token: this.#options.token,
+                    intents: this.#options.intents,
+                    properties: {
+                        os,
+                        browser,
+                        device,
+                        $os: os,
+                        $browser: browser,
+                        $device: device,
+                        ...props,
+                    },
+                    presence: {
+                        since: this.#options.presence?.since ?? null,
+                        activities: this.#options.presence?.activities ?? [],
+                        status: this.#options.presence?.status ?? "online",
+                        afk: Boolean(this.#options.presence?.afk),
+                    },
+                    shard: [this.#options.shardId, this.#options.shardCount],
                 },
-                presence: {
-                    since: this.#options.presence?.since ?? null,
-                    activities: this.#options.presence?.activities ?? [],
-                    status: this.#options.presence?.status ?? "online",
-                    afk: Boolean(this.#options.presence?.afk),
-                },
-                shard: [this.#options.shardId, this.#options.shardCount],
+                s: null,
+                t: null,
             },
-            s: null,
-            t: null,
-        });
+            true,
+        );
     }
     #startHeartbeat(interval: number): void {
         this.#clearHeartbeatTimers();
@@ -754,35 +784,58 @@ export class Gateway {
         this.state = next;
         this.#emit("stateChange", { previous, next });
     }
-    /** Initialises a fresh zlib-stream decompressor using Bun's native DecompressionStream. */
+    /** Initialises a fresh zlib-stream inflater for a new connection. */
     #initDecompressor(): void {
-        const ds = new DecompressionStream("deflate-raw");
-        this.#decompressor = {
-            writer: ds.writable.getWriter() as WritableStreamDefaultWriter<BufferSource>,
-            reader: ds.readable.getReader() as ReadableStreamDefaultReader<Uint8Array>,
-        };
+        this.#inflate?.removeAllListeners();
+        this.#inflate?.close();
+        this.#inflateChunks = [];
+        this.#decompressQueue = Promise.resolve();
+        const inflate = createInflate();
+        inflate.on("data", (chunk: Uint8Array) =>
+            this.#inflateChunks.push(chunk),
+        );
+        inflate.on("error", (error: unknown) => this.#emitError(error));
+        this.#inflate = inflate;
     }
-    /** Decompresses a zlib-stream chunk and returns the decoded JSON string. */
-    async #decompress(chunk: Uint8Array): Promise<string> {
-        if (!this.#decompressor) this.#initDecompressor();
-        const { writer, reader } = this.#decompressor!;
-        await writer.write(chunk as unknown as BufferSource);
-        const parts: Uint8Array[] = [];
-        // Drain all available output frames
-        while (true) {
-            const { done, value } = await Promise.race([
-                reader.read(),
-                // 50 ms fence so we don't hang on a partial payload
-                new Promise<{ done: true; value: undefined }>((resolve) =>
-                    setTimeout(
-                        () => resolve({ done: true, value: undefined }),
-                        50,
-                    ),
-                ),
-            ]);
-            if (done || !value) break;
-            parts.push(value);
-        }
+    /** Normalises a binary WebSocket payload into bytes. */
+    async #toBytes(data: unknown): Promise<Uint8Array> {
+        if (data instanceof Uint8Array) return data;
+        if (data instanceof ArrayBuffer) return new Uint8Array(data);
+        if (typeof Blob !== "undefined" && data instanceof Blob)
+            return new Uint8Array(await data.arrayBuffer());
+        throw new GatewayError(
+            "Gateway returned an unsupported compressed frame type.",
+        );
+    }
+    /**
+     * Feeds one zlib-stream chunk to the inflater.
+     *
+     * Discord terminates each logical payload with the `Z_SYNC_FLUSH` marker
+     * `00 00 FF FF`; a payload may span several WebSocket frames. Output is
+     * only decoded once that boundary arrives, so partial payloads are never
+     * parsed as JSON and nothing is dropped waiting on a timer.
+     */
+    async #decompress(chunk: Uint8Array): Promise<string | undefined> {
+        if (!this.#inflate) this.#initDecompressor();
+        const inflate = this.#inflate!;
+        const complete =
+            chunk.length >= 4 &&
+            chunk[chunk.length - 4] === 0x00 &&
+            chunk[chunk.length - 3] === 0x00 &&
+            chunk[chunk.length - 2] === 0xff &&
+            chunk[chunk.length - 1] === 0xff;
+        await new Promise<void>((resolve, reject) => {
+            inflate.write(chunk, (error) =>
+                error ? reject(error) : resolve(),
+            );
+        });
+        if (!complete) return undefined;
+        await new Promise<void>((resolve) =>
+            inflate.flush(zlibConstants.Z_SYNC_FLUSH, () => resolve()),
+        );
+        const parts = this.#inflateChunks;
+        this.#inflateChunks = [];
+        if (parts.length === 0) return undefined;
         const total = parts.reduce((n, p) => n + p.length, 0);
         const merged = new Uint8Array(total);
         let offset = 0;
