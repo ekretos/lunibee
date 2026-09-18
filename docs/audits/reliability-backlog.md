@@ -29,6 +29,7 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | COLLECT-001 | P2 | `packages/core` | `Collector.next()` leaks a listener per call | **Fixed** |
 | WS-006 | P1 | `packages/ws` | Late-decompressed frame from a replaced socket still dispatched | **Fixed** |
 | WS-007 | P1 | `packages/ws` | Corrupt compressed data hangs the decode forever | **Fixed** |
+| WS-008 | P0 | `packages/ws` | Array/string intents sent unresolved in IDENTIFY; bot never connects | **Fixed** |
 | WS-003 | P2 | `packages/ws` | Fatal close leaves state `CONNECT`, not `CLOSED` | **Fixed** |
 | REST-003 | P2 | `packages/rest` | One in-flight request per bucket caps throughput | Open |
 | REST-004 | P1 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | **Fixed** |
@@ -247,6 +248,26 @@ now removes its counterpart.
   reconnect starts clean.
 - **Found by** — unit-testing the decoder in isolation during the Stage 1B.4
   extraction. It hung the test run, which is how it surfaced.
+
+### WS-008 · P0 · `packages/ws/src/index.ts` (fixed)
+
+- **Problem** — `Gateway` resolved the intent resolvable only to *validate* it, then
+  stored and identified with the caller's original value.
+- **Evidence** — Against the code as shipped at `96d74de`, constructing a Gateway with
+  `intents: ["Guilds", "GuildMessages"]` produced an IDENTIFY carrying
+  `"intents": ["Guilds","GuildMessages"]` — an array, not a bitfield.
+- **Impact** — Discord answers a non-numeric intents field with close `4013`
+  (disallowed/invalid intents), which since WS-003 is fatal: the Gateway settles as
+  CLOSED and never retries. Any bot using the array or string intent form never
+  connected. `Client` forwards intents unchanged, and the documentation recommends the
+  array form, so this reached the documented path.
+- **Fix** — Store the resolved bitfield in the Gateway's options.
+- **Regression test** — `tests/gateway.protocol.test.ts` drives a Gateway constructed
+  with the array form to HELLO and asserts the IDENTIFY intents field is the number
+  `513`.
+- **Found by** — the Stage 1B.5 protocol extraction: `IdentifyOptions.intents` is
+  typed `number`, so the compiler rejected the resolvable at the seam that had been
+  forwarding it silently.
 
 ## P2 — Reliability & performance (open)
 

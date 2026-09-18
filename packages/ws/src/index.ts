@@ -3,6 +3,14 @@ import { GatewayHeartbeat, type HeartbeatTimeout } from "./heartbeat.js";
 import { GatewayCloseCodes } from "./close-codes.js";
 import { GatewayReconnect, type CloseAction } from "./reconnect.js";
 import { WebSocketTransport, type SocketFactory } from "./transport.js";
+import { GatewayOpcodes } from "./opcodes.js";
+import {
+    classifyFrame,
+    identifyPayload,
+    resumePayload,
+    heartbeatPayload,
+    type GatewayAction,
+} from "./protocol.js";
 import {
     resolveGatewayIntents,
     type GatewayPayload,
@@ -10,6 +18,19 @@ import {
     type GatewayPresence,
     type GatewayIntentResolvable,
 } from "@lunibee/types";
+
+export {
+    classifyFrame,
+    classifyPayload,
+    identifyPayload,
+    resumePayload,
+    heartbeatPayload,
+    type GatewayAction,
+    type ProtocolResult,
+    type ProtocolViolation,
+    type IdentifyOptions,
+    type IdentifyProperties,
+} from "./protocol.js";
 
 export {
     WebSocketTransport,
@@ -49,20 +70,8 @@ export {
     type InvalidationReason,
 } from "./session.js";
 
-/** Discord Gateway opcodes. */
-export const GatewayOpcodes = {
-    Dispatch: 0,
-    Heartbeat: 1,
-    Identify: 2,
-    PresenceUpdate: 3,
-    VoiceStateUpdate: 4,
-    Resume: 6,
-    Reconnect: 7,
-    RequestGuildMembers: 8,
-    InvalidSession: 9,
-    Hello: 10,
-    HeartbeatAck: 11,
-} as const;
+export { GatewayOpcodes } from "./opcodes.js";
+
 export { GatewayCloseCodes } from "./close-codes.js";
 
 /** Gateway connection lifecycle states. */
@@ -139,9 +148,11 @@ export class Gateway {
     #options: Required<
         Omit<
             GatewayOptions,
-            "properties" | "presence" | "compress" | "createSocket"
+            "properties" | "presence" | "compress" | "createSocket" | "intents"
         >
     > & {
+        /** Resolved intent bitfield, never the resolvable form. */
+        intents: number;
         properties?: GatewayProperties;
         presence?: GatewayPresence;
         compress?: boolean;
@@ -208,6 +219,12 @@ export class Gateway {
                 since: null,
             },
             ...options,
+            // Store the *resolved* bitfield, not the resolvable the caller
+            // passed. IDENTIFY must carry a number: sending the array or
+            // string form verbatim makes Discord answer 4013 (invalid
+            // intents), which is a fatal close — so the documented array form
+            // would never connect.
+            intents: resolvedIntents,
         };
         if (
             this.#options.shardId < 0 ||
@@ -251,15 +268,7 @@ export class Gateway {
             // Heartbeats are privileged: application traffic must never starve
             // the one payload that keeps the connection alive.
             send: (sequence) =>
-                this.#dispatch(
-                    {
-                        op: GatewayOpcodes.Heartbeat,
-                        d: sequence,
-                        s: null,
-                        t: null,
-                    },
-                    true,
-                ),
+                this.#dispatch(heartbeatPayload(sequence), true),
             sequence: () => this.#session.sequence,
             isConnected: () => !this.#closed && this.#transport.connected,
             onTimeout: (timeout) => this.#onHeartbeatTimeout(timeout),
@@ -456,66 +465,78 @@ export class Gateway {
         // The transport already drops frames from a replaced socket; this
         // second check keeps the session authoritative about who may mutate it.
         if (!this.#session.owns(token)) return;
-        let payload: GatewayPayload;
-        try {
-            payload = JSON.parse(raw) as GatewayPayload;
-        } catch (error) {
-            this.#emitError(
-                new GatewayError("Gateway returned invalid JSON", undefined, {
-                    cause: error,
-                }),
-            );
-            this.#transport.close(1002, "Invalid JSON");
-            return;
-        }
-        if (!payload || typeof payload.op !== "number") {
-            this.#emitError(
-                new GatewayError("Gateway returned an invalid payload"),
-            );
-            this.#transport.close(1002, "Invalid payload");
-            return;
-        }
-        // The session ignores a sequence from a superseded connection, so a
-        // late dispatch on an old socket cannot advance the live one.
-        if (typeof payload.s === "number")
-            this.#session.recordSequence(payload.s, token);
-        switch (payload.op) {
-            case GatewayOpcodes.Dispatch:
+        const { sequence, action } = classifyFrame(raw);
+        // Record before acting: a RESUME must never be built from a sequence
+        // the connection has not actually observed. The session ignores a
+        // sequence from a superseded connection.
+        if (sequence !== null) this.#session.recordSequence(sequence, token);
+        this.#apply(action, token);
+    }
+    /**
+     * Performs what the protocol says a frame meant.
+     *
+     * Every branch is an operation the protocol layer deliberately cannot do
+     * for itself: closing a socket, mutating the session, running timers,
+     * emitting events.
+     */
+    #apply(action: GatewayAction, token: number): void {
+        switch (action.type) {
+            case "dispatch":
                 this.#setState(GatewayState.Dispatch);
-                this.#handleDispatch(payload.t, payload.d, token);
-                break;
-            case GatewayOpcodes.Hello:
-                this.#handleHello(payload.d);
-                break;
-            case GatewayOpcodes.Heartbeat:
+                this.#handleDispatch(action.event, action.data, token);
+                return;
+            case "hello":
+                this.#handleHello(action.heartbeatInterval);
+                return;
+            case "heartbeat":
                 this.#setState(GatewayState.Heartbeat);
                 this.#heartbeat.sendHeartbeat();
-                break;
-            case GatewayOpcodes.HeartbeatAck:
+                return;
+            case "heartbeat-ack":
                 this.#heartbeat.acknowledge();
                 this.ping = this.#heartbeat.latency;
-                this.#emit("heartbeatAck", payload.d);
-                break;
-            case GatewayOpcodes.Reconnect:
+                this.#emit("heartbeatAck", action.data);
+                return;
+            case "reconnect":
                 this.#transport.close(1001, "Server requested reconnect");
-                break;
-            case GatewayOpcodes.InvalidSession: {
-                // Op 9 `d` is a boolean: true = the session is resumable, so we
-                // keep session state and RESUME on reconnect; false = the
-                // session is dead and we must re-IDENTIFY from scratch. Matches
-                // Discord/Discord.js semantics rather than always re-identifying.
-                const resumable = payload.d === true;
-                if (!resumable)
+                return;
+            case "invalid-session": {
+                // A resumable invalidation keeps the session; a non-resumable
+                // one destroys it, so the next connection must IDENTIFY.
+                if (!action.resumable)
                     this.#session.invalidate(token, "invalid-session");
-                this.#emit("invalidSession", resumable);
+                this.#emit("invalidSession", action.resumable);
                 this.#transport.close(
-                    resumable ? GatewayCloseCodes.UnknownError : 1000,
-                    resumable
+                    action.resumable ? GatewayCloseCodes.UnknownError : 1000,
+                    action.resumable
                         ? "Invalid session (resumable)"
                         : "Invalid session",
                 );
-                break;
+                return;
             }
+            case "invalid":
+                this.#emitError(
+                    new GatewayError(
+                        action.message,
+                        undefined,
+                        action.cause === undefined
+                            ? undefined
+                            : { cause: action.cause },
+                    ),
+                );
+                this.#transport.close(
+                    1002,
+                    action.violation === "invalid-json"
+                        ? "Invalid JSON"
+                        : action.violation === "invalid-hello"
+                          ? "Invalid heartbeat interval"
+                          : "Invalid payload",
+                );
+                return;
+            case "unknown":
+                // Forward compatibility: Discord may add opcodes, and an
+                // unfamiliar one is not a failure.
+                return;
         }
     }
     #handleDispatch(event: string | null, data: unknown, token: number): void {
@@ -547,22 +568,7 @@ export class Gateway {
         if (this.#closed) return;
         this.#emit(event ?? "dispatch", data);
     }
-    #handleHello(data: unknown): void {
-        const interval = (data as { heartbeat_interval?: unknown })
-            ?.heartbeat_interval;
-        if (
-            typeof interval !== "number" ||
-            !Number.isFinite(interval) ||
-            interval <= 0
-        ) {
-            this.#emitError(
-                new GatewayError(
-                    "Gateway HELLO payload contains an invalid heartbeat interval",
-                ),
-            );
-            this.#transport.close(1002, "Invalid heartbeat interval");
-            return;
-        }
+    #handleHello(interval: number): void {
         this.#setState(
             this.#session.canResume ? GatewayState.Resume : GatewayState.Hello,
         );
@@ -571,62 +577,25 @@ export class Gateway {
     }
     #identifyOrResume(): void {
         const intent = this.#session.handshake();
+        // IDENTIFY/RESUME are privileged for the same reason heartbeats are:
+        // dropping one leaves the shard connected but never READY, recoverable
+        // only via the zombie timeout. Application traffic must never starve
+        // the handshake out of the send budget.
         if (intent.type === "resume") {
             this.#setState(GatewayState.Resume);
-            // IDENTIFY/RESUME are privileged for the same reason heartbeats
-            // are: dropping one leaves the shard connected but never READY,
-            // recoverable only via the zombie timeout. Application traffic
-            // must never starve the handshake out of the send budget.
-            this.#dispatch(
-                {
-                    op: GatewayOpcodes.Resume,
-                    d: {
-                        token: this.#options.token,
-                        session_id: intent.sessionId,
-                        seq: intent.sequence,
-                    },
-                    s: null,
-                    t: null,
-                },
-                true,
-            );
+            this.#dispatch(resumePayload(this.#options.token, intent), true);
             return;
         }
         this.#setState(GatewayState.Identify);
-        const props = this.#options.properties ?? {
-            os: "Android",
-            browser: "Discord Android",
-            device: "Discord Android",
-        };
-        const os = props.os ?? "Android";
-        const browser = props.browser ?? "Discord Android";
-        const device = props.device ?? "Discord Android";
         this.#dispatch(
-            {
-                op: GatewayOpcodes.Identify,
-                d: {
-                    token: this.#options.token,
-                    intents: this.#options.intents,
-                    properties: {
-                        os,
-                        browser,
-                        device,
-                        $os: os,
-                        $browser: browser,
-                        $device: device,
-                        ...props,
-                    },
-                    presence: {
-                        since: this.#options.presence?.since ?? null,
-                        activities: this.#options.presence?.activities ?? [],
-                        status: this.#options.presence?.status ?? "online",
-                        afk: Boolean(this.#options.presence?.afk),
-                    },
-                    shard: [this.#options.shardId, this.#options.shardCount],
-                },
-                s: null,
-                t: null,
-            },
+            identifyPayload({
+                token: this.#options.token,
+                intents: this.#options.intents,
+                shardId: this.#options.shardId,
+                shardCount: this.#options.shardCount,
+                properties: this.#options.properties,
+                presence: this.#options.presence,
+            }),
             true,
         );
     }

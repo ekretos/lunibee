@@ -42,7 +42,7 @@ optimization, **State** is authoritative runtime state, **Snapshot** is serializ
 |---|---|---|
 | 1 | REST pipeline seams behind today's public API | **Landed** |
 | 1A | REST distributed correctness: reservation, shared bucket mapping | **Landed** |
-| 1B | Gateway architecture: Session, Heartbeat, Reconnect, Transport+Decoder **landed**; Protocol, Dispatcher next | **In progress** |
+| 1B | Gateway architecture: Session, Heartbeat, Reconnect, Transport+Decoder, Protocol **landed**; Dispatcher next | **In progress** |
 | 1C | `ShardSupervisor` lifted out of `ClusterManager` | Planned |
 | 2 | Store architecture (`Store`, `LocalState` / `SharedState` / `PersistentState`) | Planned |
 | 3 | Resource/Service architecture (`GuildResource`, `GuildService`) alongside the old | Planned |
@@ -274,15 +274,58 @@ a dead socket stale by construction rather than by a check at each call site.
    observable, so a decoder that can answer synchronously now must, and the Gateway
    re-wraps transport errors as `GatewayError`.
 
+## Stage 1B.5 — landed: `GatewayProtocol`
+
+Opcode interpretation is now a pure translation: frame in, action out. The protocol
+performs nothing — no socket, no timers, no session mutation, no emission — which is
+why every case is testable with a string and no connection.
+
+```text
+frame → classifyFrame() → { sequence, action } → Gateway applies it
+```
+
+| Action | Meaning |
+|---|---|
+| `hello` | `op 10`, with a validated `heartbeatInterval` |
+| `dispatch` | `op 0`, with event name and data |
+| `heartbeat` / `heartbeat-ack` | `op 1` / `op 11` |
+| `reconnect` | `op 7` |
+| `invalid-session` | `op 9`, with `resumable` |
+| `unknown` | an opcode this version does not act on |
+| `invalid` | a malformed frame, with its violation |
+
+**`op 9` is classified, never applied.** The protocol reports `{ resumable }` and the
+Gateway decides whether to invalidate the session. Anything other than `d: true` is
+read as non-resumable: a wrongly attempted RESUME costs a round trip, a wrongly
+skipped IDENTIFY strands the shard.
+
+**Unknown vs invalid is a deliberate split.** Discord adds opcodes, so an unfamiliar
+one is ignored — a client that errors on every addition breaks itself. A *malformed*
+frame is never swallowed: it produces an `invalid` action carrying its violation, and
+the Gateway reports and closes with `1002`.
+
+Outbound payload construction (IDENTIFY, RESUME, HEARTBEAT) moved here too, since
+payload shape is protocol. Sending stays with the Gateway.
+
+### The bug this exposed (WS-008, P0 for affected configurations)
+
+`Gateway` validated the *resolved* intent bitfield but stored and identified with the
+**resolvable the caller passed**. A bot using the array form — the form the
+documentation recommends — sent `"intents": ["Guilds","GuildMessages"]` in IDENTIFY.
+Discord answers a non-numeric intents field with close `4013`, which since WS-003 is
+fatal, so such a bot never connected at all. `Client` passes intents straight through,
+so this reached every consumer of the documented syntax. The Gateway now stores the
+resolved bitfield.
+
+Found because `IdentifyOptions.intents` is typed `number`: the compiler rejected the
+resolvable at the seam that had been silently forwarding it.
+
 ## Stage 1B — remaining, in priority order
-2. **`GatewayProtocol`** — opcode interpretation as a pure translation from payload
-   to action (`hello` / `dispatch` / `heartbeat-ack` / `invalid-session` …), so op 9
-   is classified by the protocol and merely *applied* by the session.
-3. **`GatewayDispatcher`** — the listener map and emission, leaving `Gateway` as
+2. **`GatewayDispatcher`** — the listener map and emission, leaving `Gateway` as
    orchestration rather than event infrastructure.
-4. **`GatewaySendLimiter`** (P2) — `#sendTimestamps` and the 115/60s budget as its
+3. **`GatewaySendLimiter`** (P2) — `#sendTimestamps` and the 115/60s budget as its
    own primitive. Deliberately after the correctness-critical seams.
-5. **`ShardSupervisor`** (Stage 1C) — the restart/backoff policy currently inlined in
+4. **`ShardSupervisor`** (Stage 1C) — the restart/backoff policy currently inlined in
    `ClusterManager`, lifted out so `Fleet` can reuse it per `FleetNode`.
 
 ## Open architectural debts this direction should absorb
