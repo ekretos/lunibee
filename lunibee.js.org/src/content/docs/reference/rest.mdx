@@ -41,11 +41,20 @@ new REST(options )
 </TabItem>
 </Tabs>
 
-| Option | Type | Description |
-|---|---|---|
-| `token` | `string` | Discord bot token. |
-| `apiVersion` | `number` | API version (default: `10`). |
-| `baseURL` | `string` | Override the Discord base URL. |
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `token` | `string` | — | Discord bot token. |
+| `baseURL` | `string` | `https://discord.com/api/v10` | Override the Discord base URL, including the API version. |
+| `timeout` | `number` | `15000` | Per-attempt timeout in milliseconds. |
+| `retries` | `number` | `2` | Maximum retries for the default policy. |
+| `retryPolicy` | `RetryPolicy` | — | Replaces the default retry policy entirely. |
+| `hooks` | `RESTHooks` | `{}` | Lifecycle callbacks: `onRequest`, `onResponse`, `onRateLimit`, `onRetry`. |
+| `store` | `RateLimitStore` | `MemoryRateLimitStore` | Where rate-limit state lives. Use `RedisRateLimitStore` to share limits across workers. |
+| `transport` | `HttpTransport` | — | Replaces the HTTP stage, e.g. a recording transport in tests. |
+
+> [!NOTE]
+> There is no `apiVersion` option. The API version is part of `baseURL`, which
+> defaults to `https://discord.com/api/v10`.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -59,6 +68,54 @@ const rest = new REST({ token: process.env.DISCORD_TOKEN });
 ```
 </TabItem>
 </Tabs>
+
+## Request pipeline
+
+A request passes through five stages, each separately constructible and exported
+from `@lunibee/rest`:
+
+```text
+Request → RouteKey → RequestScheduler → RateLimiter → HttpTransport → ResponseDecoder
+```
+
+| Stage | Responsibility |
+|---|---|
+| `createRouteKey()` | Normalises the route and extracts Discord's major parameter. |
+| `RequestScheduler` | Serialises requests per rate-limit bucket. |
+| `RateLimiter` | Waits for (or reserves) bucket and global allowance; records response headers. |
+| `HttpTransport` | Performs one HTTP attempt with timeout and cancellation. |
+| `ResponseDecoder` | Decodes the payload and Discord's error metadata. |
+
+You rarely need these directly, but they make REST behaviour testable without
+stubbing global `fetch`:
+
+```ts
+import { REST, HttpTransport } from "@lunibee/rest";
+
+const rest = new REST({
+  token: "test-token",
+  transport: new HttpTransport({
+    fetch: async () =>
+      new Response(JSON.stringify({ id: "1" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+  }),
+});
+```
+
+## Retries
+
+The default policy retries:
+
+- any `429`, honouring `Retry-After` (falling back to one second when Discord
+  sends no usable value);
+- `5xx` responses for idempotent methods (`GET`, `HEAD`, `PUT`, `DELETE`);
+- transport failures — DNS errors, connection resets, TLS failures — for those
+  same idempotent methods.
+
+Unsafe methods (`POST`, `PATCH`) are never replayed after a transport failure,
+because the request may already have been delivered. A timeout is never retried.
 
 ## Methods
 

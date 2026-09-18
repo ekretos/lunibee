@@ -3,6 +3,38 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
+## Unreleased
+
+### 🚨 Behaviour Changes
+
+* **`ShardManager.spawnDelay` now defaults to `5000` ms** (`ShardManager.IDENTIFY_INTERVAL`). Discord permits one IDENTIFY per 5 seconds; starting shards back to back earned close code `4008` and invalid-session churn. An *N*-shard bot now takes about `(N - 1) × 5s` to connect. Pass `spawnDelay: 0` to opt out.
+* **`ClusterManager` supervises its children.** A cluster that exits unexpectedly is re-forked with the same shard assignment after `restartDelay` (5000 ms). Disable with `restartOnExit: false`; observe with `onClusterExit`.
+
+### 🐛 Bug Fixes
+
+* **Gateway compression**: `compress: true` previously decoded nothing. Discord's `zlib-stream` is zlib-wrapped, but the decoder used raw deflate and drained output on a 50 ms timer, dropping and reordering frames. Frames are now decoded with a persistent inflate stream on the `Z_SYNC_FLUSH` boundary, strictly in arrival order.
+* **Gateway sessions**: `connect()` on an already-connected `Gateway` opened a second socket and left the first one dispatching, interleaving two sequence streams and corrupting later RESUMEs. `connect()` is now idempotent and cancels any pending reconnect.
+* **Gateway handshake**: IDENTIFY and RESUME no longer share the application send budget, so a busy shard can always complete its handshake.
+* **Stale frames**: a compressed frame that finished decoding after its socket was replaced is now discarded instead of dispatched.
+* **REST cancellation**: an aborted request waiting in its rate-limit queue permanently wedged that bucket. Fixed.
+* **REST retries**: a `429` carrying no `Retry-After` retried immediately instead of waiting the documented one second. Transport failures (DNS, resets, TLS) are now retried for idempotent methods.
+* **Redis rate limits**: a Redis outage answered every read with "no limit known", dropping all workers to unlimited sending. Writes are now mirrored in-process and reads fall back to that mirror.
+* **Leaks**: the `Cache` TTL sweeper no longer keeps the process alive, and `Collector.next()` no longer leaks a listener per call.
+
+### ✨ Additions
+
+* **Atomic rate-limit reservation**: `RateLimitStore.reserve()` hands one unit of a bucket's allowance to exactly one worker. `RedisRateLimitStore` uses a server-side Lua script when the client exposes `eval`.
+* **REST pipeline**: `createRouteKey`, `RequestScheduler`, `RateLimiter`, `HttpTransport` and `ResponseDecoder` are exported, and `new REST({ transport })` injects the HTTP stage for testing.
+* **`GatewaySession`**: session id, sequence, resume host and the IDENTIFY-vs-RESUME decision, exported from `@lunibee/ws`.
+
+### 📚 Documentation
+
+* Corrected the `ClusterManager` example: the method is `spawn()`, not `connect()`.
+* Corrected the `ShardManager` and `REST` option tables, which listed options that do not exist (`presence`, `autoScale`, `apiVersion`) and omitted the real ones.
+* Corrected the `Gateway` option table: `maxReconnectAttempts` defaults to `Infinity`, not `10`.
+
+---
+
 ## v0.1.7
 
 ### 🐛 Bug Fixes
