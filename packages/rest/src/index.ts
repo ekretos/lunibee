@@ -1,31 +1,3 @@
-/** Error thrown when Discord rejects a REST request. */
-export class RESTError extends Error {
-    /** HTTP status returned by Discord. */ public readonly status: number;
-    /** Discord API error code, when provided. */ public readonly code?: number;
-    /** Raw Discord validation/error payload. */ public readonly errors?: unknown;
-    /** HTTP method used for the failed request. */ public readonly method?: string;
-    /** API path used for the failed request. */ public readonly path?: string;
-    /** Creates a REST error with request context. @param message Error message. @param status HTTP status. @param code Discord error code. @param errors Raw error payload. @param options Request context and cause. */
-    public constructor(
-        message: string,
-        status: number,
-        code?: number,
-        errors?: unknown,
-        options: { method?: string; path?: string; cause?: unknown } = {},
-    ) {
-        super(
-            message,
-            options.cause === undefined ? undefined : { cause: options.cause },
-        );
-        this.name = "RESTError";
-        this.status = status;
-        this.code = code;
-        this.errors = errors;
-        this.method = options.method;
-        this.path = options.path;
-    }
-}
-
 /** Library version and source URL used for the Discord-compliant User-Agent. */
 import packageJson from "../package.json" with { type: "json" };
 const LIBRARY_VERSION = packageJson.version;
@@ -37,6 +9,17 @@ import {
     type RateLimitStore,
     type BucketState,
 } from "./store.js";
+import { RESTError, abortError, sleep } from "./errors.js";
+import {
+    createRouteKey,
+    serializeQuery,
+    type RESTQuery,
+    type RouteKey,
+} from "./route.js";
+import { RequestScheduler } from "./scheduler.js";
+import { RateLimiter } from "./limiter.js";
+import { HttpTransport, TransportError } from "./transport.js";
+import { ResponseDecoder } from "./decoder.js";
 
 /** Internal state shared by requests mapped to one Discord rate-limit bucket. */
 type Bucket = { remaining: number; resetAt: number };
@@ -46,12 +29,6 @@ export interface RESTFileAttachment {
     data: Blob | Uint8Array | ArrayBuffer;
     contentType?: string;
 }
-
-/** Query-string value accepted by {@link RESTRequestOptions.query}. */
-export type RESTQuery =
-    | URLSearchParams
-    | Record<string, string | number | boolean | null | undefined>
-    | string;
 
 /**
  * Options controlling an individual REST request.
@@ -113,49 +90,6 @@ function isRequestData(value: unknown): value is RequestData {
     const keys = Object.keys(value);
     if (keys.length === 0) return false;
     return keys.every((key) => REQUEST_DATA_KEYS.has(key));
-}
-
-/** Serialises a {@link RESTQuery} into a `?...` suffix (empty string when nothing to add). */
-function serializeQuery(query: RESTQuery | undefined): string {
-    if (query === undefined) return "";
-    if (typeof query === "string")
-        return query.length === 0 || query.startsWith("?")
-            ? query
-            : `?${query}`;
-    const params =
-        query instanceof URLSearchParams
-            ? query
-            : new URLSearchParams(
-                  Object.entries(query).flatMap(([key, value]) =>
-                      value === undefined || value === null
-                          ? []
-                          : [[key, String(value)] as [string, string]],
-                  ),
-              );
-    const serialized = params.toString();
-    return serialized.length === 0 ? "" : `?${serialized}`;
-}
-
-/**
- * Discord's *major parameters* — the resource ids that give an endpoint its own
- * independent rate limit. Per the API documentation these are `channel_id`,
- * `guild_id` and `webhook_id`; webhook routes are additionally scoped by
- * their token. Any other id in a path shares its limit with sibling resources.
- */
-function majorParameter(path: string): string {
-    const match = /^\/(channels|guilds|webhooks)\/(\d+)(?:\/([^/?]+))?/.exec(
-        path,
-    );
-    if (!match) return "@none";
-    // A webhook's limit is keyed by both its id and its token.
-    if (match[1] === "webhooks" && match[3] !== undefined)
-        return `${match[2]}:${match[3]}`;
-    return match[2]!;
-}
-
-/** Combines a bucket hash (or route) with a major parameter into a bucket key. */
-function scopeBucket(hashOrRoute: string, major: string): string {
-    return `${hashOrRoute}|${major}`;
 }
 
 // ─── REST Hooks ───────────────────────────────────────────────────────────────
@@ -250,12 +184,16 @@ export function createRetryPolicy(maxRetries = 2): RetryPolicy {
 
 /** Bun-native REST transport with Discord bucket-aware rate limiting, retries, and cancellation. */
 export class REST {
-    readonly #baseURL: string;
-    readonly #timeout: number;
     readonly #retryPolicy: RetryPolicy;
     #token?: string;
-    readonly #store: RateLimitStore;
-    readonly #localQueues = new Map<string, Promise<void>>();
+    /** Rate-limit state: when a request may go out, what a response says. */
+    readonly #limiter: RateLimiter;
+    /** Per-bucket ordering. */
+    readonly #scheduler = new RequestScheduler();
+    /** One HTTP attempt, with timeout and cancellation. */
+    readonly #transport: HttpTransport;
+    /** Response payload and error metadata. */
+    readonly #decoder = new ResponseDecoder();
     #hooks: RESTHooks = {};
     /** Creates a REST transport. @param options Transport configuration. @throws {TypeError} If retry configuration is invalid. */
     public constructor(
@@ -267,17 +205,27 @@ export class REST {
             baseURL?: string;
             hooks?: RESTHooks;
             store?: RateLimitStore;
+            /** Replaces the HTTP stage, e.g. with a recording transport in tests. */
+            transport?: HttpTransport;
         } = {},
     ) {
         this.#token = options.token;
-        this.#timeout = Math.max(1, options.timeout ?? 15_000);
         this.#retryPolicy =
             options.retryPolicy ?? createRetryPolicy(options.retries ?? 2);
-        this.#baseURL = (
-            options.baseURL ?? "https://discord.com/api/v10"
-        ).replace(/\/$/, "");
-        this.#store = options.store ?? new MemoryRateLimitStore();
+        this.#transport =
+            options.transport ??
+            new HttpTransport({
+                baseURL: options.baseURL,
+                timeout: options.timeout,
+            });
+        this.#limiter = new RateLimiter(
+            options.store ?? new MemoryRateLimitStore(),
+        );
         if (options.hooks) this.#hooks = options.hooks;
+    }
+    /** The rate-limit store backing this transport. */
+    public get store(): RateLimitStore {
+        return this.#limiter.store;
     }
     /** Replaces the current hook set. Pass an empty object to clear all hooks. */
     public setHooks(hooks: RESTHooks): this {
@@ -306,223 +254,180 @@ export class REST {
         body?: unknown,
         options: RequestData = {},
     ): Promise<T> {
-        const normalizedMethod = method.toUpperCase();
-        if (!normalizedMethod) throw new TypeError("REST method is required.");
+        if (!method.toUpperCase())
+            throw new TypeError("REST method is required.");
         if (!path.startsWith("/"))
             throw new TypeError("REST paths must start with '/'.");
+        const route = createRouteKey(method, path);
         // Upgrade to multipart when file attachments are supplied via options.
         const files = options.files;
         if (files && files.length > 0 && !(body instanceof FormData))
             body = this.#fileForm(body, files);
         const query = serializeQuery(options.query);
-        const finalPath = query ? `${path}${query}` : path;
-        const route = `${normalizedMethod}:${this.#normalizeRoute(path)}`;
-        // Discord scopes a rate limit by (bucket hash, major parameter): two
-        // channels sharing an endpoint have independent limits. The hash stays
-        // cached per normalized route (Discord returns the same hash for an
-        // endpoint regardless of major parameter), but every key that gates
-        // sending must carry the major parameter, or unrelated resources
-        // serialize against one another and share one `remaining` counter.
-        const major = majorParameter(path);
-        let bucketKey = scopeBucket(
-            (await this.#store.getBucketHash(route)) ?? route,
-            major,
-        );
+        const requestPath = query ? `${path}${query}` : path;
 
-        // The map is keyed by the bucket as known at enqueue time; `bucketKey`
-        // may be reassigned to the server bucket hash during the request, so we
-        // keep `queueKey` fixed for cleanup.
-        const queueKey = bucketKey;
-        const previous = this.#localQueues.get(queueKey) ?? Promise.resolve();
-        let release!: () => void;
-        const gate = new Promise<void>((resolve) => {
-            release = resolve;
-        });
-        this.#localQueues.set(queueKey, gate);
-        try {
-            // Queue entry must be awaited inside the try: an abort raised while
-            // waiting for the predecessor would otherwise skip the `finally`
-            // that releases this request's gate, wedging every later request
-            // mapped to the same bucket key forever.
-            await this.#abortable(previous, options.signal, path);
-            for (
-                let attempt = 0;
-                attempt <= this.#retryPolicy.maxRetries;
-                attempt++
-            ) {
-                await this.#wait(bucketKey, options.signal, path);
-                await this.#waitGlobal(options.signal, path);
-                const controller = new AbortController();
-                const onAbort = () => controller.abort(options.signal?.reason);
-                if (options.signal?.aborted)
-                    throw this.#abortError(path, options.signal.reason);
-                options.signal?.addEventListener("abort", onAbort, {
-                    once: true,
+        // Discord scopes a rate limit by (bucket hash, major parameter): two
+        // channels sharing an endpoint have independent limits. The key that
+        // gates sending must therefore carry the major parameter, or unrelated
+        // resources serialize against one another and share one counter.
+        const bucketKey = await this.#limiter.resolveBucketKey(
+            route.route,
+            route.major,
+        );
+        // The scheduler keys on the bucket as known at enqueue time; the key may
+        // be reassigned to the server bucket hash once a response arrives.
+        return this.#scheduler.run(bucketKey, options.signal, path, () =>
+            this.#attempts<T>(route, requestPath, body, options, bucketKey),
+        );
+    }
+    /**
+     * Runs the retry loop for one scheduled request: acquire limits, send,
+     * record what the response says, decode, and decide whether to try again.
+     */
+    async #attempts<T>(
+        route: RouteKey,
+        requestPath: string,
+        body: unknown,
+        options: RequestData,
+        initialBucketKey: string,
+    ): Promise<T> {
+        const { method, path } = route;
+        let bucketKey = initialBucketKey;
+        for (
+            let attempt = 0;
+            attempt <= this.#retryPolicy.maxRetries;
+            attempt++
+        ) {
+            await this.#limiter.acquire(bucketKey, options.signal, path);
+            this.#emit(this.#hooks.onRequest, { method, path, attempt });
+            const requestStart = Date.now();
+            let response: Response;
+            try {
+                response = await this.#transport.send({
+                    method,
+                    path: requestPath,
+                    headers: this.#headers(body, options),
+                    body: this.#encodeBody(body),
+                    signal: options.signal,
                 });
-                const timer = setTimeout(
-                    () =>
-                        controller.abort(
-                            new DOMException(
-                                "REST request timeout",
-                                "TimeoutError",
-                            ),
-                        ),
-                    this.#timeout,
-                );
-                // Build headers and body based on whether this is a multipart request
-                const isFormData =
-                    typeof FormData !== "undefined" && body instanceof FormData;
-                // Caller headers first; library-managed headers below take precedence.
-                const headers: Record<string, string> = { ...options.headers };
-                if (options.auth !== false && this.#token)
-                    headers["Authorization"] = `Bot ${this.#token}`;
-                headers["User-Agent"] = USER_AGENT;
-                if (options.reason !== undefined)
-                    headers["X-Audit-Log-Reason"] = encodeURIComponent(
-                        options.reason,
-                    );
-                if (!isFormData) headers["Content-Type"] = "application/json";
-                const fetchBody = isFormData
-                    ? (body as FormData)
-                    : body === undefined
-                      ? undefined
-                      : JSON.stringify(body);
-                try {
-                    this.#emit(this.#hooks.onRequest, {
-                        method: normalizedMethod,
+            } catch (error) {
+                if (error instanceof RESTError) throw error;
+                if (options.signal?.aborted)
+                    throw abortError(path, options.signal.reason);
+                const failure =
+                    error instanceof TransportError
+                        ? error
+                        : new TransportError(
+                              "Discord REST request failed",
+                              false,
+                              error,
+                          );
+                if (
+                    !failure.timedOut &&
+                    attempt < this.#retryPolicy.maxRetries &&
+                    this.#retryPolicy.shouldRetry(method, 0)
+                ) {
+                    await sleep(
+                        this.#retryPolicy.getDelay(attempt),
+                        options.signal,
                         path,
-                        attempt,
-                    });
-                    const requestStart = Date.now();
-                    const response = await fetch(
-                        `${this.#baseURL}${finalPath}`,
-                        {
-                            method: normalizedMethod,
-                            headers,
-                            body: fetchBody,
-                            signal: controller.signal,
-                        },
                     );
-                    this.#emit(this.#hooks.onResponse, {
-                        method: normalizedMethod,
-                        path,
-                        status: response.status,
-                        durationMs: Date.now() - requestStart,
-                    });
-                    bucketKey = await this.#update(
-                        response,
-                        bucketKey,
-                        route,
-                        major,
-                    );
-                    const payload = await this.#readPayload(response);
-                    if (response.ok)
-                        return (
-                            response.status === 204 ? undefined : payload
-                        ) as T;
-                    const data = this.#errorData(payload);
-                    const retryAfter =
-                        response.status === 429
-                            ? this.#retryAfter(response, data)
-                            : undefined;
-                    if (data.global && retryAfter !== undefined) {
-                        const currentGlobal =
-                            await this.#store.getGlobalReset();
-                        await this.#store.setGlobalReset(
-                            Math.max(
-                                currentGlobal,
-                                Date.now() + retryAfter * 1000,
-                            ),
-                        );
-                    }
-                    // Fire for ANY 429, including a global limit that arrives
-                    // without a Retry-After header; fall back to 1s in that case.
-                    if (response.status === 429)
-                        this.#emit(this.#hooks.onRateLimit, {
-                            method: normalizedMethod,
-                            path,
-                            retryAfterMs: (retryAfter ?? 1) * 1000,
-                            global: data.global ?? false,
-                            bucket: await this.#store.getBucketHash(route),
-                        });
-                    if (
-                        attempt < this.#retryPolicy.maxRetries &&
-                        this.#retryPolicy.shouldRetry(
-                            normalizedMethod,
-                            response.status,
-                        )
-                    ) {
-                        const delay = this.#retryPolicy.getDelay(
-                            attempt,
-                            retryAfter,
-                        );
-                        this.#emit(this.#hooks.onRetry, {
-                            method: normalizedMethod,
-                            path,
-                            attempt,
-                            status: response.status,
-                            delayMs: delay,
-                        });
-                        await this.#sleep(delay, options.signal, path);
-                        continue;
-                    }
-                    throw new RESTError(
-                        data.message ??
-                            response.statusText ??
-                            `Discord REST request failed with status ${response.status}`,
-                        response.status,
-                        data.code,
-                        payload,
-                        { method: normalizedMethod, path },
-                    );
-                } catch (error) {
-                    if (error instanceof RESTError) throw error;
-                    if (options.signal?.aborted)
-                        throw this.#abortError(path, options.signal.reason);
-                    const isTimeout =
-                        error instanceof DOMException &&
-                        (error.name === "TimeoutError" ||
-                            error.name === "AbortError");
-                    if (
-                        !isTimeout &&
-                        attempt < this.#retryPolicy.maxRetries &&
-                        this.#retryPolicy.shouldRetry(normalizedMethod, 0)
-                    ) {
-                        await this.#sleep(
-                            this.#retryPolicy.getDelay(attempt),
-                            options.signal,
-                            path,
-                        );
-                        continue;
-                    }
-                    throw new RESTError(
-                        isTimeout
-                            ? `Discord REST request timed out after ${this.#timeout}ms`
-                            : "Discord REST request failed",
-                        0,
-                        undefined,
-                        undefined,
-                        { method: normalizedMethod, path, cause: error },
-                    );
-                } finally {
-                    clearTimeout(timer);
-                    options.signal?.removeEventListener("abort", onAbort);
+                    continue;
                 }
+                throw new RESTError(failure.message, 0, undefined, undefined, {
+                    method,
+                    path,
+                    cause: failure.cause ?? failure,
+                });
+            }
+            this.#emit(this.#hooks.onResponse, {
+                method,
+                path,
+                status: response.status,
+                durationMs: Date.now() - requestStart,
+            });
+            bucketKey = await this.#limiter.applyResponse(
+                response,
+                bucketKey,
+                route.route,
+                route.major,
+            );
+            const payload = await this.#decoder.read(response);
+            if (response.ok)
+                return (response.status === 204 ? undefined : payload) as T;
+
+            const data = this.#decoder.errorData(payload);
+            const retryAfter =
+                response.status === 429
+                    ? this.#decoder.retryAfter(response, data)
+                    : undefined;
+            if (data.global && retryAfter !== undefined)
+                await this.#limiter.noteGlobalReset(
+                    Date.now() + retryAfter * 1000,
+                );
+            // Fire for ANY 429, including a global limit that arrives without a
+            // Retry-After header; fall back to 1s in that case.
+            if (response.status === 429)
+                this.#emit(this.#hooks.onRateLimit, {
+                    method,
+                    path,
+                    retryAfterMs: (retryAfter ?? 1) * 1000,
+                    global: data.global ?? false,
+                    bucket: await this.#limiter.store.getBucketHash(
+                        route.route,
+                    ),
+                });
+            if (
+                attempt < this.#retryPolicy.maxRetries &&
+                this.#retryPolicy.shouldRetry(method, response.status)
+            ) {
+                const delay = this.#retryPolicy.getDelay(attempt, retryAfter);
+                this.#emit(this.#hooks.onRetry, {
+                    method,
+                    path,
+                    attempt,
+                    status: response.status,
+                    delayMs: delay,
+                });
+                await sleep(delay, options.signal, path);
+                continue;
             }
             throw new RESTError(
-                "Discord REST request exhausted its retry attempts",
-                0,
-                undefined,
-                undefined,
-                { method: normalizedMethod, path },
+                data.message ??
+                    response.statusText ??
+                    `Discord REST request failed with status ${response.status}`,
+                response.status,
+                data.code,
+                payload,
+                { method, path },
             );
-        } finally {
-            release();
-            // Drop our entry so idle buckets don't accumulate. Only delete if it
-            // is still ours: a later request for the same key may have replaced it.
-            if (this.#localQueues.get(queueKey) === gate)
-                this.#localQueues.delete(queueKey);
         }
+        throw new RESTError(
+            "Discord REST request exhausted its retry attempts",
+            0,
+            undefined,
+            undefined,
+            { method, path },
+        );
+    }
+    /** Builds the header set for one attempt; library headers win over caller headers. */
+    #headers(body: unknown, options: RequestData): Record<string, string> {
+        const isFormData =
+            typeof FormData !== "undefined" && body instanceof FormData;
+        const headers: Record<string, string> = { ...options.headers };
+        if (options.auth !== false && this.#token)
+            headers["Authorization"] = `Bot ${this.#token}`;
+        headers["User-Agent"] = USER_AGENT;
+        if (options.reason !== undefined)
+            headers["X-Audit-Log-Reason"] = encodeURIComponent(options.reason);
+        if (!isFormData) headers["Content-Type"] = "application/json";
+        return headers;
+    }
+    /** Encodes a body as multipart (passed through) or JSON. */
+    #encodeBody(body: unknown): BodyInit | undefined {
+        if (typeof FormData !== "undefined" && body instanceof FormData)
+            return body;
+        return body === undefined ? undefined : JSON.stringify(body);
     }
     /**
      * Normalizes a verb helper's second argument into `(body, options)`.
@@ -670,171 +575,28 @@ export class REST {
             .then(() => hook(ctx))
             .catch(() => {});
     }
-    /** Waits for a route bucket while respecting cancellation. @param bucketKey Bucket identifier. @param signal Optional cancellation signal. @param path Request path for error context. @returns Promise fulfilled when sending is permitted. @throws {RESTError} If the request is aborted. */
-    async #wait(
-        bucketKey: string,
-        signal: AbortSignal | undefined,
-        path: string,
-    ): Promise<void> {
-        const bucket = await this.#store.getBucket(bucketKey);
-        if (!bucket) return;
-        const delay = bucket.resetAt - Date.now();
-        if (bucket.remaining <= 0 && delay > 0)
-            await this.#sleep(delay, signal, path);
-    }
-    /** Waits for the global Discord rate limit while respecting cancellation. @param signal Optional cancellation signal. @param path Request path for error context. @returns Promise fulfilled when the global limit expires. @throws {RESTError} If the request is aborted. */
-    async #waitGlobal(
-        signal: AbortSignal | undefined,
-        path: string,
-    ): Promise<void> {
-        const globalResetAt = await this.#store.getGlobalReset();
-        const delay = globalResetAt - Date.now();
-        if (delay > 0) await this.#sleep(delay, signal, path);
-    }
-    /** Waits for a delay or aborts immediately. @param delay Delay in milliseconds. @param signal Optional cancellation signal. @param path Request path. @returns Promise fulfilled after delay. @throws {RESTError} If aborted. */
-    async #sleep(
-        delay: number,
-        signal: AbortSignal | undefined,
-        path: string,
-    ): Promise<void> {
-        if (delay <= 0) return;
-        await new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(resolve, delay);
-            const abort = () => {
-                clearTimeout(timer);
-                reject(this.#abortError(path, signal?.reason));
-            };
-            if (signal?.aborted) return abort();
-            signal?.addEventListener("abort", abort, { once: true });
-        });
-    }
-    /** Waits for a queued request or aborts. @param promise Queue predecessor. @param signal Optional cancellation signal. @param path Request path. @returns Promise fulfilled when predecessor releases. @throws {RESTError} If aborted. */
-    async #abortable(
-        promise: Promise<void>,
-        signal: AbortSignal | undefined,
-        path: string,
-    ): Promise<void> {
-        if (!signal) return promise;
-        if (signal.aborted) throw this.#abortError(path, signal.reason);
-        return Promise.race([
-            promise,
-            new Promise<void>((_, reject) =>
-                signal.addEventListener(
-                    "abort",
-                    () => reject(this.#abortError(path, signal.reason)),
-                    { once: true },
-                ),
-            ),
-        ]);
-    }
-    /** Creates a consistent cancellation error. @param path Request path. @param reason Abort reason. @returns REST cancellation error. */
-    #abortError(path: string, reason: unknown): RESTError {
-        return new RESTError(
-            reason instanceof Error
-                ? reason.message
-                : "Discord REST request was aborted",
-            0,
-            undefined,
-            undefined,
-            { path, cause: reason },
-        );
-    }
-    /** Reads a Discord response payload. @param response HTTP response. @returns JSON or text payload. */
-    async #readPayload(response: Response): Promise<unknown> {
-        if (response.status === 204) return undefined;
-        const contentType = response.headers.get("content-type") ?? "";
-        if (contentType.includes("application/json"))
-            return response.json().catch(() => undefined);
-        return response.text().catch(() => undefined);
-    }
-    /** Extracts retry metadata from a Discord payload. @param payload Response payload. @returns Normalized error metadata. */
-    #errorData(payload: unknown): {
-        message?: string;
-        code?: number;
-        retry_after?: number;
-        global?: boolean;
-    } {
-        if (!payload || typeof payload !== "object") return {};
-        const data = payload as Record<string, unknown>;
-        return {
-            message:
-                typeof data.message === "string" ? data.message : undefined,
-            code: typeof data.code === "number" ? data.code : undefined,
-            retry_after:
-                typeof data.retry_after === "number"
-                    ? data.retry_after
-                    : undefined,
-            global: data.global === true,
-        };
-    }
-    /** Resolves Retry-After from headers or JSON. @param response HTTP response. @param data Parsed response metadata. @returns Retry delay in seconds. */
-    #retryAfter(response: Response, data: { retry_after?: number }): number {
-        const header = Number(response.headers.get("Retry-After"));
-        const retryAfter =
-            data.retry_after ?? (Number.isFinite(header) ? header : 1);
-        return Math.max(0, retryAfter);
-    }
-    /** Normalizes Discord routes for stable bucket discovery. @param path API path. @returns Normalized route. */
-    #normalizeRoute(path: string): string {
-        const queryIndex = path.indexOf("?");
-        const routePath = queryIndex === -1 ? path : path.slice(0, queryIndex);
-        return routePath.replace(/\/\d+(?=\/|$)/g, "/:id");
-    }
-    /** Updates bucket state from Discord's rate-limit headers and records the server bucket hash. @param response HTTP response. @param bucket Current bucket. @param route Normalized local route key. @param bucketKey Current bucket identifier. @param major Major parameter scoping the bucket. @returns Bucket state used for subsequent attempts. */
-    async #update(
-        response: Response,
-        bucketKey: string,
-        route: string,
-        major: string,
-    ): Promise<string> {
-        let currentKey = bucketKey;
-        const serverBucket = response.headers.get("X-RateLimit-Bucket");
-        if (serverBucket) {
-            await this.#store.setBucketHash(route, serverBucket);
-            currentKey = scopeBucket(serverBucket, major);
-        }
-
-        let bucket = (await this.#store.getBucket(currentKey)) ?? {
-            remaining: 1,
-            resetAt: 0,
-        };
-        const remaining = Number(response.headers.get("X-RateLimit-Remaining"));
-        const resetAfter = Number(
-            response.headers.get("X-RateLimit-Reset-After"),
-        );
-        const reset = Number(response.headers.get("X-RateLimit-Reset"));
-
-        if (Number.isFinite(remaining))
-            bucket.remaining = Math.max(0, remaining);
-        if (Number.isFinite(resetAfter))
-            bucket.resetAt = Date.now() + Math.max(0, resetAfter) * 1000;
-        else if (Number.isFinite(reset)) bucket.resetAt = reset * 1000;
-
-        if (response.status === 429) {
-            const retryAfter = Number(response.headers.get("Retry-After"));
-            if (Number.isFinite(retryAfter))
-                bucket.resetAt = Math.max(
-                    bucket.resetAt,
-                    Date.now() + retryAfter * 1000,
-                );
-        }
-        await this.#store.updateBucket(currentKey, bucket);
-
-        if (response.headers.get("X-RateLimit-Global") === "true") {
-            const retryAfter = Number(response.headers.get("Retry-After"));
-            if (Number.isFinite(retryAfter)) {
-                const currentGlobal = await this.#store.getGlobalReset();
-                await this.#store.setGlobalReset(
-                    Math.max(currentGlobal, Date.now() + retryAfter * 1000),
-                );
-            }
-        }
-
-        return currentKey;
-    }
 }
 
 export { Routes } from "./routes.js";
+export { RESTError, abortError } from "./errors.js";
+export {
+    createRouteKey,
+    normalizeRoutePath,
+    majorParameter,
+    scopeBucket,
+    serializeQuery,
+    type RouteKey,
+    type RESTQuery,
+} from "./route.js";
+export { RequestScheduler } from "./scheduler.js";
+export { RateLimiter } from "./limiter.js";
+export {
+    HttpTransport,
+    TransportError,
+    type TransportRequest,
+    type FetchLike,
+} from "./transport.js";
+export { ResponseDecoder, type DecodedError } from "./decoder.js";
 export {
     type RateLimitStore,
     type BucketState,

@@ -32,6 +32,7 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | REST-004 | P2 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | Open |
 | REST-005 | P2 | `packages/rest` | Shared store has no reservation, so workers race the same `remaining` | Open |
 | BUS-001 | P2 | `packages/sharding` | Async shard-message handler rejections are swallowed | Open |
+| REST-006 | P2 | `packages/rest` | 429 without a `Retry-After` header retried with zero delay | **Fixed** |
 | CI-001 | P2 | repo | Tests were not executed by CI | **Fixed** |
 | WS-004 | P3 | `packages/ws` | `Gateway` is a single 800-line class | Open |
 
@@ -230,6 +231,14 @@ now removes its counterpart.
   on 429 feedback. A decrement-on-send reservation would close this.
 - **BUS-001** — `ShardBus` swallows async handler rejections with no error
   channel, so a failing cross-shard handler is invisible.
+
+### REST-006 · P2 · `packages/rest/src/decoder.ts` (fixed)
+
+`retryAfter` read the header as `Number(headers.get("Retry-After"))`. An absent
+header is `null`, `Number(null)` is `0`, and `0` passes `Number.isFinite`, so a 429
+carrying no `Retry-After` and no body `retry_after` retried with **zero** delay
+instead of the documented 1s. Surfaced by unit-testing the decoder in isolation
+during the Stage 1 REST decomposition (see `docs/lunibee-2-architecture.md`).
 
 ## P3 — Engineering quality (open)
 
