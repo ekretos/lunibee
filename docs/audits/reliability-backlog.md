@@ -28,7 +28,7 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | CACHE-001 | P2 | `packages/collection` | TTL sweeper keeps the process alive | **Fixed** |
 | COLLECT-001 | P2 | `packages/core` | `Collector.next()` leaks a listener per call | **Fixed** |
 | WS-006 | P1 | `packages/ws` | Late-decompressed frame from a replaced socket still dispatched | **Fixed** |
-| WS-003 | P2 | `packages/ws` | Fatal close leaves state `CONNECT`, not `CLOSED` | Open |
+| WS-003 | P2 | `packages/ws` | Fatal close leaves state `CONNECT`, not `CLOSED` | **Fixed** |
 | REST-003 | P2 | `packages/rest` | One in-flight request per bucket caps throughput | Open |
 | REST-004 | P1 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | **Fixed** |
 | REST-005 | P1 | `packages/rest` | Shared store has no reservation, so workers race the same `remaining` | **Fixed** |
@@ -233,9 +233,8 @@ now removes its counterpart.
 
 ## P2 — Reliability & performance (open)
 
-- **WS-003** — A fatal close (`4004`, `4013`, `4014`, …) stops reconnects but leaves
-  `state = CONNECT`, which reads as "about to connect" to supervisors. It should settle
-  as `CLOSED`, and the reason should be observable.
+- ~~**WS-003**~~ — fixed in Stage 1B.3: a fatal close settles as `CLOSED` and a later
+  `connect()` throws. The close `action` (`stop`) is observable on the `close` event.
 - **REST-003** — `#localQueues` allows one in-flight request per bucket key, so a bucket
   with `limit: 5` still serialises. Correct, but it caps throughput well below what
   Discord allows; a token-bucket keyed on `remaining` would use the real allowance.

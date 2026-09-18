@@ -42,7 +42,7 @@ optimization, **State** is authoritative runtime state, **Snapshot** is serializ
 |---|---|---|
 | 1 | REST pipeline seams behind today's public API | **Landed** |
 | 1A | REST distributed correctness: reservation, shared bucket mapping | **Landed** |
-| 1B | Gateway architecture: Session and Heartbeat **landed**; Reconnect, Transport, Protocol, Dispatcher next | **In progress** |
+| 1B | Gateway architecture: Session, Heartbeat, Reconnect **landed**; Transport, Protocol, Dispatcher next | **In progress** |
 | 1C | `ShardSupervisor` lifted out of `ClusterManager` | Planned |
 | 2 | Store architecture (`Store`, `LocalState` / `SharedState` / `PersistentState`) | Planned |
 | 3 | Resource/Service architecture (`GuildResource`, `GuildService`) alongside the old | Planned |
@@ -196,14 +196,50 @@ session. The ACK deadline, the send-failure path, single-shot zombie reporting,
 silence reset, and the "disconnected socket is never a zombie" rule are now direct
 assertions rather than choreography through a fake WebSocket.
 
-## Stage 1B — remaining, in priority order
+## Stage 1B.3 — landed: `GatewayReconnect`
 
-1. **`GatewayReconnect`** — `#attempt`, `#reconnectTimer`, `#connectPromise` and the
-   backoff/close-code policy. It should ask `session.handshake()` rather than know
-   session internals, and own the close-code classification table (`4004` fatal,
-   `4007`/`4009` identify, `1006` reconnect) that is currently spread through
-   `Gateway#closeAction`. This also resolves WS-003: a fatal close should settle as
-   `CLOSED`, which is a reconnect-policy decision, not a session one.
+`Gateway` lost `#attempt`, `#reconnectTimer`, `#connectPromise`, `#resolveConnect`,
+`#rejectConnect` and `#closeAction`. Close classification also moved out of the class
+and into a pure function, so the policy can be asserted without constructing anything.
+
+**Owns:** close classification · whether another attempt is allowed · backoff and
+jitter · arming and cancelling the timer · the coordination that keeps at most one
+logical connection attempt in flight.
+
+**Does not own:** the socket, session internals (it is *told* `canResume`), the
+heartbeat, opcode handling, event emission. `GatewayCloseCodes` moved to its own
+module so the policy can import it without a cycle back through `index.ts`.
+
+### The classification table
+
+| Codes | Action | Why |
+|---|---|---|
+| `4004`, `4010`, `4011`, `4012`, `4013`, `4014` | `stop` | Bad token, shard config, API version or intents — retrying cannot succeed. |
+| `4007`, `4009` | `identify` | The session is destroyed; reconnect but start fresh. |
+| everything else | `resume` / `identify` | Reconnectable. Which one is decided by whether a session survives, not by the code. |
+
+**`1000` deliberately stays reconnectable.** A table mapping it to "close" would look
+tidy and would break `op 9`: after a non-resumable invalid-session the Gateway closes
+with `1000` precisely so the next connection re-IDENTIFYs. The regression test pins
+this.
+
+### WS-003, fixed
+
+A fatal close now settles the Gateway as `CLOSED` rather than leaving it in `CONNECT`
+looking like an attempt was imminent, and a later `connect()` throws. This is a
+deliberate behaviour change: an existing test asserted `CONNECT` after `4014`, which
+was the bug written down as an expectation. Since `CLOSED` is terminal, recovering
+from a fatal close means constructing a new `Gateway` — correct, because the
+condition behind `4004`/`4013`/`4014` cannot fix itself in-process.
+
+### The single-attempt invariant
+
+`attempt(start)` invokes `start` exactly once and hands every concurrent caller the
+same promise, so three `connect()` calls produce one socket and one shared result.
+`schedule()` refuses with `"pending"` while a timer is armed, so a burst of close
+events produces one reconnect rather than competing sockets.
+
+## Stage 1B — remaining, in priority order
 2. **`GatewayTransport`** — `#ws`, socket construction, listener wiring, send, and
    socket replacement, behind an interface that admits `BunWebSocketTransport`,
    `NodeWebSocketTransport` and `MockGatewayTransport` without touching protocol

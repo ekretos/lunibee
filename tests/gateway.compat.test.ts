@@ -220,7 +220,9 @@ describe("Gateway resume / reconnect behaviour", () => {
         socket.close(GatewayCloseCodes.DisallowedIntents);
         await Bun.sleep(10);
         expect(FakeWebSocket.instances.length).toBe(before);
-        expect(gateway.state).toBe(GatewayState.Connect);
+        // WS-003: a fatal close is terminal, so the Gateway settles as CLOSED
+        // rather than sitting in CONNECT as though an attempt were imminent.
+        expect(gateway.state).toBe(GatewayState.Closed);
         gateway.close();
     });
 });

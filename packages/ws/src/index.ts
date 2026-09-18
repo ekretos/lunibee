@@ -1,6 +1,8 @@
 import { createInflate, constants as zlibConstants } from "node:zlib";
 import { GatewaySession } from "./session.js";
 import { GatewayHeartbeat, type HeartbeatTimeout } from "./heartbeat.js";
+import { GatewayCloseCodes } from "./close-codes.js";
+import { GatewayReconnect, type CloseAction } from "./reconnect.js";
 import {
     resolveGatewayIntents,
     type GatewayPayload,
@@ -8,6 +10,17 @@ import {
     type GatewayPresence,
     type GatewayIntentResolvable,
 } from "@lunibee/types";
+
+export {
+    GatewayReconnect,
+    classifyCloseCode,
+    FATAL_CLOSE_CODES,
+    IDENTIFY_CLOSE_CODES,
+    type CloseAction,
+    type ReconnectOptions,
+    type ScheduleResult,
+    type ScheduleRefusal,
+} from "./reconnect.js";
 
 export {
     GatewayHeartbeat,
@@ -36,29 +49,8 @@ export const GatewayOpcodes = {
     Hello: 10,
     HeartbeatAck: 11,
 } as const;
-/**
- * Discord Gateway close codes.
- *
- * Discord.js-familiar names and numeric values, matching the Discord Gateway
- * protocol. Exposed so consumers can branch on named codes instead of magic
- * numbers; {@link Gateway} uses them internally to decide resume/identify/stop.
- */
-export const GatewayCloseCodes = {
-    UnknownError: 4000,
-    UnknownOpcode: 4001,
-    DecodeError: 4002,
-    NotAuthenticated: 4003,
-    AuthenticationFailed: 4004,
-    AlreadyAuthenticated: 4005,
-    InvalidSeq: 4007,
-    RateLimited: 4008,
-    SessionTimedOut: 4009,
-    InvalidShard: 4010,
-    ShardingRequired: 4011,
-    InvalidAPIVersion: 4012,
-    InvalidIntents: 4013,
-    DisallowedIntents: 4014,
-} as const;
+export { GatewayCloseCodes } from "./close-codes.js";
+
 /** Gateway connection lifecycle states. */
 export enum GatewayState {
     /** Initial connection state. */ Connect = "CONNECT",
@@ -116,6 +108,9 @@ export interface GatewayOptions {
      */
     compress?: boolean;
 }
+/** Discord's main Gateway endpoint, used when no resume host is known. */
+const DEFAULT_GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
+
 /** Gateway event listener. */
 type GatewayListener = (data: unknown) => unknown;
 /** Manages a Discord Gateway connection. */
@@ -147,11 +142,11 @@ export class Gateway {
      */
     readonly #heartbeat: GatewayHeartbeat;
     #closed = false;
-    #attempt = 0;
-    #reconnectTimer?: ReturnType<typeof setTimeout>;
-    #connectPromise?: Promise<void>;
-    #resolveConnect?: () => void;
-    #rejectConnect?: (error: GatewayError) => void;
+    /**
+     * Close classification, backoff, scheduling, and the coordination that
+     * keeps at most one logical connection attempt in flight.
+     */
+    readonly #reconnect: GatewayReconnect;
     readonly #listeners = new Map<string, Set<GatewayListener>>();
     readonly #sendTimestamps: number[] = [];
     public ping: number = -1;
@@ -203,6 +198,12 @@ export class Gateway {
             throw new RangeError(
                 "Gateway zombieTimeout must be greater than heartbeatAckTimeout",
             );
+        this.#reconnect = new GatewayReconnect({
+            enabled: this.#options.reconnect,
+            maxAttempts: this.#options.maxReconnectAttempts,
+            baseDelay: this.#options.reconnectBaseDelay,
+            maxDelay: this.#options.reconnectMaxDelay,
+        });
         this.#heartbeat = new GatewayHeartbeat({
             ackTimeout: this.#options.heartbeatAckTimeout,
             zombieTimeout: this.#options.zombieTimeout,
@@ -263,12 +264,13 @@ export class Gateway {
     }
 
     /** Opens the Gateway connection. @param url Gateway WebSocket URL. @returns Promise fulfilled when the socket opens. @throws {GatewayError} If permanently closed or unable to connect. */
-    public connect(
-        url = "wss://gateway.discord.gg/?v=10&encoding=json",
-    ): Promise<void> {
+    public connect(url = DEFAULT_GATEWAY_URL): Promise<void> {
         if (this.state === GatewayState.Closed)
             throw new GatewayError("Gateway has been permanently closed.");
-        if (this.#connectPromise) return this.#connectPromise;
+        // At most one logical connection attempt is active: concurrent callers
+        // join the in-flight attempt rather than opening competing sockets.
+        const inFlight = this.#reconnect.attemptPromise;
+        if (inFlight) return inFlight;
         // Connecting an already-live Gateway must be a no-op. Opening a second
         // socket leaves the first one unmanaged but still dispatching, which
         // interleaves two sequence streams (corrupting a later RESUME) and
@@ -276,10 +278,7 @@ export class Gateway {
         if (this.#isLive(this.#ws)) return Promise.resolve();
         // A manual connect supersedes a scheduled reconnect; leaving the timer
         // armed would open a second socket once it fires.
-        if (this.#reconnectTimer) {
-            clearTimeout(this.#reconnectTimer);
-            this.#reconnectTimer = undefined;
-        }
+        this.#reconnect.cancel();
         this.#closed = false;
         this.#setState(GatewayState.Connect);
         // Append compression parameter if enabled
@@ -289,12 +288,7 @@ export class Gateway {
                 : `${url}&compress=zlib-stream`
             : url;
         if (this.#options.compress) this.#initDecompressor();
-        this.#connectPromise = new Promise<void>((resolve, reject) => {
-            this.#resolveConnect = resolve;
-            this.#rejectConnect = reject;
-            this.#open(connectURL);
-        });
-        return this.#connectPromise;
+        return this.#reconnect.attempt(() => this.#open(connectURL));
     }
     /** Permanently closes the Gateway connection. */
     public close(): void {
@@ -566,7 +560,7 @@ export class Gateway {
                     );
                 return;
             }
-            this.#attempt = 0;
+            this.#reconnect.reset();
             this.#setState(GatewayState.Ready);
             this.#emit("ready", data);
         } else if (event === "RESUMED") {
@@ -574,7 +568,7 @@ export class Gateway {
             // reset the backoff counter so a later disconnect starts from the
             // base delay, mark the connection READY, and surface a Discord.js-
             // familiar `resumed` event.
-            this.#attempt = 0;
+            this.#reconnect.reset();
             this.#setState(GatewayState.Ready);
             this.#emit("resumed", data);
         }
@@ -669,14 +663,21 @@ export class Gateway {
         if (this.#ws !== ws) return;
         this.#ws = undefined;
         this.#clearTimers();
-        const action = this.#closeAction(code);
+        const action: CloseAction = this.#reconnect.classifyClose(
+            code,
+            this.#session.canResume,
+        );
         this.#emit("close", { code, action });
-        if (this.#closed || !this.#options.reconnect || action === "stop") {
+        if (this.#closed || !this.#reconnect.enabled || action === "stop") {
+            // A fatal close is terminal: the condition behind 4004/4013/4014
+            // cannot fix itself, so the Gateway settles as CLOSED rather than
+            // sitting in CONNECT looking like it is about to try again (WS-003).
+            if (action === "stop") this.#closed = true;
             this.#setState(
                 this.#closed ? GatewayState.Closed : GatewayState.Connect,
             );
-            if (this.#connectPromise)
-                this.#settleConnect(
+            if (this.#reconnect.connecting)
+                this.#reconnect.settle(
                     new GatewayError(
                         `Gateway closed before READY (code ${code}).`,
                         code,
@@ -691,65 +692,22 @@ export class Gateway {
         this.#setState(GatewayState.Reconnect);
         this.#scheduleReconnect();
     }
-    #closeAction(code: number): "resume" | "identify" | "stop" {
-        // Fatal codes: the connection cannot recover by reconnecting.
-        const fatal: number[] = [
-            GatewayCloseCodes.AuthenticationFailed,
-            GatewayCloseCodes.InvalidShard,
-            GatewayCloseCodes.ShardingRequired,
-            GatewayCloseCodes.InvalidAPIVersion,
-            GatewayCloseCodes.InvalidIntents,
-            GatewayCloseCodes.DisallowedIntents,
-        ];
-        if (fatal.includes(code)) return "stop";
-        // Sequence/session invalidated: reconnect but IDENTIFY afresh.
-        if (
-            code === GatewayCloseCodes.InvalidSeq ||
-            code === GatewayCloseCodes.SessionTimedOut
-        )
-            return "identify";
-        // Otherwise resume when we still hold a live session + sequence.
-        return this.#session.canResume ? "resume" : "identify";
-    }
     #scheduleReconnect(): void {
-        if (this.#closed || !this.#options.reconnect || this.#reconnectTimer)
-            return;
-        if (this.#attempt >= this.#options.maxReconnectAttempts) {
-            this.#settleConnect(
-                new GatewayError("Gateway reconnect attempts exhausted."),
-            );
-            this.#setState(GatewayState.Connect);
-            return;
-        }
-        const delay = Math.min(
-            this.#options.reconnectMaxDelay,
-            this.#options.reconnectBaseDelay * 2 ** this.#attempt++,
+        if (this.#closed) return;
+        const result = this.#reconnect.schedule(() =>
+            this.#open(this.#session.connectURL(DEFAULT_GATEWAY_URL)),
         );
-        // Jitter must scale with the delay: a fixed ceiling would reconnect
-        // every shard inside the same narrow window after a gateway-wide
-        // restart, which is exactly when decorrelation matters.
-        const jitter = Math.random() * Math.max(1, delay * 0.25);
-        this.#reconnectTimer = setTimeout(() => {
-            this.#reconnectTimer = undefined;
-            this.#open(
-                this.#session.connectURL(
-                    "wss://gateway.discord.gg/?v=10&encoding=json",
-                ),
-            );
-        }, delay + jitter);
+        if (result.scheduled || result.reason !== "exhausted") return;
+        this.#reconnect.settle(
+            new GatewayError("Gateway reconnect attempts exhausted."),
+        );
+        this.#setState(GatewayState.Connect);
     }
     #settleConnect(error?: GatewayError): void {
-        const resolve = this.#resolveConnect;
-        const reject = this.#rejectConnect;
-        this.#resolveConnect = undefined;
-        this.#rejectConnect = undefined;
-        this.#connectPromise = undefined;
-        if (error) reject?.(error);
-        else resolve?.();
+        this.#reconnect.settle(error);
     }
     #clearTimers(): void {
-        if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
-        this.#reconnectTimer = undefined;
+        this.#reconnect.cancel();
         this.#heartbeat.stop();
     }
     #normalizeError(error: unknown): GatewayError {
