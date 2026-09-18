@@ -42,7 +42,7 @@ optimization, **State** is authoritative runtime state, **Snapshot** is serializ
 |---|---|---|
 | 1 | REST pipeline seams behind today's public API | **Landed** |
 | 1A | REST distributed correctness: reservation, shared bucket mapping | **Landed** |
-| 1B | Gateway architecture: Session, Heartbeat, Reconnect **landed**; Transport, Protocol, Dispatcher next | **In progress** |
+| 1B | Gateway architecture: Session, Heartbeat, Reconnect, Transport+Decoder **landed**; Protocol, Dispatcher next | **In progress** |
 | 1C | `ShardSupervisor` lifted out of `ClusterManager` | Planned |
 | 2 | Store architecture (`Store`, `LocalState` / `SharedState` / `PersistentState`) | Planned |
 | 3 | Resource/Service architecture (`GuildResource`, `GuildService`) alongside the old | Planned |
@@ -239,21 +239,50 @@ same promise, so three `connect()` calls produce one socket and one shared resul
 `schedule()` refuses with `"pending"` while a timer is armed, so a burst of close
 events produces one reconnect rather than competing sockets.
 
+## Stage 1B.4 — landed: `WebSocketTransport` + `GatewayDecoder`
+
+`Gateway` no longer holds a `WebSocket`. Socket construction, listener wiring,
+sending, closing, replacement and decoding all moved out, and the zlib inflater
+(`#inflate`, `#inflateChunks`, `#decompressQueue`) went with them.
+
+**Transport owns:** the socket, its listeners, `send`/`close`/`destroy`, replacement,
+and connection-level errors. It never inspects an opcode: frames go out as text and
+come back as text.
+
+**Decoder owns:** bytes to complete frames, and nothing else. Malformed *JSON* is not
+a decoding failure — that belongs to the protocol seam — but malformed *compressed
+bytes* are.
+
+### Generations, again — this time for sockets
+
+Each `connect()` takes a generation and every event is checked against it, so a
+replaced socket cannot open, frame, error or close the transport. A socket's
+generation is also retired **when it closes**, which is what makes a late frame from
+a dead socket stale by construction rather than by a check at each call site.
+
+### Two bugs this seam exposed
+
+1. **A hang in the shipped `compress` path (WS-007, fixed).** zlib does not invoke a
+   `write` or `flush` callback once its stream has errored — it emits `error` and
+   abandons the callback. The decode promise therefore waited forever on corrupt
+   compressed input, wedging the connection with no error and no close. The decoder
+   now settles the waiting operation from the `error` handler. Present since the
+   WS-001 fix; found by unit-testing the decoder on garbage bytes.
+2. **Two timing regressions caught before release.** Moving decoding behind an
+   interface made every frame asynchronous, including uncompressed ones, and turned
+   transport errors into plain `Error`s. Dispatch timing and error types are both
+   observable, so a decoder that can answer synchronously now must, and the Gateway
+   re-wraps transport errors as `GatewayError`.
+
 ## Stage 1B — remaining, in priority order
-2. **`GatewayTransport`** — `#ws`, socket construction, listener wiring, send, and
-   socket replacement, behind an interface that admits `BunWebSocketTransport`,
-   `NodeWebSocketTransport` and `MockGatewayTransport` without touching protocol
-   logic. The compression decoder (`#inflate`, `#inflateChunks`, `#decompressQueue`)
-   belongs under it as a `GatewayDecoder`, so a split compressed frame can be tested
-   with two `push()` calls and no Gateway.
-3. **`GatewayProtocol`** — opcode interpretation as a pure translation from payload
+2. **`GatewayProtocol`** — opcode interpretation as a pure translation from payload
    to action (`hello` / `dispatch` / `heartbeat-ack` / `invalid-session` …), so op 9
    is classified by the protocol and merely *applied* by the session.
-4. **`GatewayDispatcher`** — the listener map and emission, leaving `Gateway` as
+3. **`GatewayDispatcher`** — the listener map and emission, leaving `Gateway` as
    orchestration rather than event infrastructure.
-5. **`GatewaySendLimiter`** (P2) — `#sendTimestamps` and the 115/60s budget as its
+4. **`GatewaySendLimiter`** (P2) — `#sendTimestamps` and the 115/60s budget as its
    own primitive. Deliberately after the correctness-critical seams.
-6. **`ShardSupervisor`** (Stage 1C) — the restart/backoff policy currently inlined in
+5. **`ShardSupervisor`** (Stage 1C) — the restart/backoff policy currently inlined in
    `ClusterManager`, lifted out so `Fleet` can reuse it per `FleetNode`.
 
 ## Open architectural debts this direction should absorb

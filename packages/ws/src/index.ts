@@ -1,8 +1,8 @@
-import { createInflate, constants as zlibConstants } from "node:zlib";
 import { GatewaySession } from "./session.js";
 import { GatewayHeartbeat, type HeartbeatTimeout } from "./heartbeat.js";
 import { GatewayCloseCodes } from "./close-codes.js";
 import { GatewayReconnect, type CloseAction } from "./reconnect.js";
+import { WebSocketTransport, type SocketFactory } from "./transport.js";
 import {
     resolveGatewayIntents,
     type GatewayPayload,
@@ -10,6 +10,20 @@ import {
     type GatewayPresence,
     type GatewayIntentResolvable,
 } from "@lunibee/types";
+
+export {
+    WebSocketTransport,
+    type TransportHandlers,
+    type TransportOptions,
+    type SocketFactory,
+} from "./transport.js";
+
+export {
+    createDecoder,
+    PlainTextDecoder,
+    ZlibStreamDecoder,
+    type GatewayDecoder,
+} from "./decoder.js";
 
 export {
     GatewayReconnect,
@@ -107,6 +121,11 @@ export interface GatewayOptions {
      * When enabled, appends `&compress=zlib-stream` to the Gateway URL.
      */
     compress?: boolean;
+    /**
+     * Constructs the underlying socket. Defaults to the ambient `WebSocket`.
+     * Injected to run the Gateway on an alternative transport, or on a stub.
+     */
+    createSocket?: SocketFactory;
 }
 /** Discord's main Gateway endpoint, used when no resume host is known. */
 const DEFAULT_GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
@@ -118,13 +137,22 @@ export class Gateway {
     /** Current Gateway lifecycle state. */
     public state: GatewayState = GatewayState.Connect;
     #options: Required<
-        Omit<GatewayOptions, "properties" | "presence" | "compress">
+        Omit<
+            GatewayOptions,
+            "properties" | "presence" | "compress" | "createSocket"
+        >
     > & {
         properties?: GatewayProperties;
         presence?: GatewayPresence;
         compress?: boolean;
     };
-    #ws?: WebSocket;
+    /**
+     * The socket this connection runs on.
+     *
+     * The Gateway never touches a `WebSocket` directly: construction, listener
+     * wiring, replacement and decoding all belong to the transport.
+     */
+    readonly #transport: WebSocketTransport;
     /**
      * Session identity and the IDENTIFY-vs-RESUME decision.
      *
@@ -150,12 +178,6 @@ export class Gateway {
     readonly #listeners = new Map<string, Set<GatewayListener>>();
     readonly #sendTimestamps: number[] = [];
     public ping: number = -1;
-    /** Persistent zlib-stream inflater, initialised when compress is enabled. */
-    #inflate?: ReturnType<typeof createInflate>;
-    /** Output chunks emitted by the inflater since the last flush boundary. */
-    #inflateChunks: Uint8Array[] = [];
-    /** Serialises decompression so frames are decoded in arrival order. */
-    #decompressQueue: Promise<void> = Promise.resolve();
     /** Creates a Gateway connection manager. @param options Gateway configuration. @throws {TypeError|RangeError} If configuration is invalid. */
     public constructor(options: GatewayOptions) {
         if (!options.token?.trim())
@@ -198,6 +220,25 @@ export class Gateway {
             throw new RangeError(
                 "Gateway zombieTimeout must be greater than heartbeatAckTimeout",
             );
+        this.#transport = new WebSocketTransport({
+            compress: this.#options.compress,
+            createSocket: options.createSocket,
+            handlers: {
+                onOpen: () => this.#onOpen(),
+                onFrame: (raw) => this.#message(raw, this.#token),
+                onClose: (code) => this.#close(code, this.#token),
+                // Transport failures reach consumers as GatewayError, the
+                // type every other Gateway error path already uses.
+                onError: (error) =>
+                    this.#emitError(
+                        error instanceof GatewayError
+                            ? error
+                            : new GatewayError(error.message, undefined, {
+                                  cause: error,
+                              }),
+                    ),
+            },
+        });
         this.#reconnect = new GatewayReconnect({
             enabled: this.#options.reconnect,
             maxAttempts: this.#options.maxReconnectAttempts,
@@ -220,8 +261,7 @@ export class Gateway {
                     true,
                 ),
             sequence: () => this.#session.sequence,
-            isConnected: () =>
-                !this.#closed && this.#ws?.readyState === WebSocket.OPEN,
+            isConnected: () => !this.#closed && this.#transport.connected,
             onTimeout: (timeout) => this.#onHeartbeatTimeout(timeout),
             onError: (error) => this.#emitError(error),
         });
@@ -251,16 +291,12 @@ export class Gateway {
                 ),
             );
         }
-        try {
-            this.#ws?.close(
-                1001,
-                timeout.type === "zombie"
-                    ? "Zombie Gateway connection"
-                    : "Heartbeat timeout",
-            );
-        } catch (error) {
-            this.#emitError(error);
-        }
+        this.#transport.close(
+            1001,
+            timeout.type === "zombie"
+                ? "Zombie Gateway connection"
+                : "Heartbeat timeout",
+        );
     }
 
     /** Opens the Gateway connection. @param url Gateway WebSocket URL. @returns Promise fulfilled when the socket opens. @throws {GatewayError} If permanently closed or unable to connect. */
@@ -275,7 +311,7 @@ export class Gateway {
         // socket leaves the first one unmanaged but still dispatching, which
         // interleaves two sequence streams (corrupting a later RESUME) and
         // sends a second IDENTIFY on the same session.
-        if (this.#isLive(this.#ws)) return Promise.resolve();
+        if (this.#transport.live) return Promise.resolve();
         // A manual connect supersedes a scheduled reconnect; leaving the timer
         // armed would open a second socket once it fires.
         this.#reconnect.cancel();
@@ -287,7 +323,6 @@ export class Gateway {
                 ? url
                 : `${url}&compress=zlib-stream`
             : url;
-        if (this.#options.compress) this.#initDecompressor();
         return this.#reconnect.attempt(() => this.#open(connectURL));
     }
     /** Permanently closes the Gateway connection. */
@@ -297,13 +332,9 @@ export class Gateway {
         this.#settleConnect(
             new GatewayError("Gateway connection closed before socket open."),
         );
-        const ws = this.#ws;
-        this.#ws = undefined;
-        try {
-            ws?.close(1000, "Client closed connection");
-        } catch (error) {
-            this.#emitError(error);
-        }
+        // Abandon rather than close-and-listen: the Gateway has already decided
+        // the connection is over and must not be woken by its close event.
+        this.#transport.destroy(1000, "Client closed connection");
         this.#setState(GatewayState.Closed);
     }
     /** Registers a Gateway event listener. @param event Event name. @param listener Event callback. @returns This Gateway. */
@@ -340,7 +371,7 @@ export class Gateway {
      * are still recorded, keeping the true total under Discord's limit.
      */
     #dispatch(payload: GatewayPayload, privileged: boolean): boolean {
-        if (this.#ws?.readyState !== WebSocket.OPEN) return false;
+        if (!this.#transport.connected) return false;
         const now = Date.now();
         while (
             this.#sendTimestamps.length &&
@@ -353,14 +384,9 @@ export class Gateway {
             );
             return false;
         }
-        try {
-            this.#ws.send(JSON.stringify(payload));
-            this.#sendTimestamps.push(now);
-            return true;
-        } catch (error) {
-            this.#emitError(error);
-            return false;
-        }
+        if (!this.#transport.send(JSON.stringify(payload))) return false;
+        this.#sendTimestamps.push(now);
+        return true;
     }
     /** Sends a presence update. @param data Presence payload. @returns Whether it was sent. */
     public setPresence(data: GatewayPresence): boolean {
@@ -396,95 +422,40 @@ export class Gateway {
             t: null,
         });
     }
-    /** Whether a socket is connecting or open, and therefore still this Gateway's. */
-    #isLive(ws: WebSocket | undefined): boolean {
-        // 0 = CONNECTING, 1 = OPEN. Compared numerically so a stubbed
-        // WebSocket without the static constants still behaves correctly.
-        return ws !== undefined && ws.readyState <= 1;
-    }
+    /**
+     * Starts one connection attempt.
+     *
+     * Ownership of the session moves to this attempt before the socket exists,
+     * so a frame from the socket being replaced can never be mistaken for one
+     * belonging to this connection.
+     */
     #open(url: string): void {
         if (this.#closed) return;
-        // Never leave a previous socket behind: an orphan keeps its listeners
-        // and would go on feeding dispatches into this Gateway.
-        const previous = this.#ws;
-        if (previous) {
-            this.#ws = undefined;
-            try {
-                previous.close(1000, "Superseded by a new connection");
-            } catch (error) {
-                this.#emitError(error);
-            }
+        this.#token = this.#session.beginConnection();
+        const result = this.#transport.connect(url);
+        if (result.ok) return;
+        // The socket could not be constructed. The caller's attempt fails with
+        // the underlying reason, so a thrown GatewayError keeps its message.
+        const failure = this.#normalizeError(result.error);
+        this.#emitError(failure);
+        if (this.#options.reconnect) {
+            this.#setState(GatewayState.Reconnect);
+            this.#scheduleReconnect();
+        } else {
+            this.#settleConnect(failure);
         }
-        // Each attempt takes a new generation token: the socket being replaced
-        // keeps the old one and can no longer mutate the session.
-        const token = this.#session.beginConnection();
-        this.#token = token;
-        let ws: WebSocket;
-        try {
-            ws = new WebSocket(url);
-        } catch (error) {
-            const failure = this.#normalizeError(error);
-            this.#emitError(failure);
-            if (this.#options.reconnect) {
-                this.#setState(GatewayState.Reconnect);
-                this.#scheduleReconnect();
-            } else this.#settleConnect(failure);
-            return;
-        }
-        // Compressed frames must arrive as binary buffers, not Blobs, so the
-        // inflater can be fed synchronously in arrival order.
-        if (this.#options.compress) {
-            try {
-                (ws as { binaryType?: string }).binaryType = "arraybuffer";
-            } catch {
-                // Runtimes that pin binaryType are handled by #toBytes.
-            }
-        }
-        this.#ws = ws;
-        ws.addEventListener("open", () => {
-            if (this.#ws !== ws) return;
-            // Watch for silence from the moment the socket opens: a connection
-            // that never reaches HELLO must still be detected as dead.
-            this.#heartbeat.watch();
-            this.#emit("open", undefined);
-            this.#settleConnect();
-        });
-        ws.addEventListener("message", (event) => {
-            // Ignore anything arriving on a socket this Gateway has already
-            // replaced or abandoned: its payloads carry a sequence stream that
-            // no longer belongs to the live session.
-            if (this.#ws !== ws) return;
-            this.#heartbeat.receivedMessage();
-            const data = event.data;
-            if (this.#options.compress && typeof data !== "string") {
-                // Frames must be decoded strictly in arrival order: the
-                // inflate stream carries state across frames, so interleaving
-                // two decodes corrupts the stream and reorders dispatches.
-                this.#decompressQueue = this.#decompressQueue
-                    .then(() => this.#toBytes(data))
-                    .then((bytes) => this.#decompress(bytes))
-                    .then((text) => {
-                        if (text !== undefined) this.#message(ws, text, token);
-                    })
-                    .catch((err) => this.#emitError(err));
-            } else {
-                this.#message(ws, String(data), token);
-            }
-        });
-        ws.addEventListener("close", (event) =>
-            this.#close(ws, event.code, token),
-        );
-        ws.addEventListener("error", () =>
-            this.#emitError(new GatewayError("Gateway WebSocket error")),
-        );
     }
-    #message(ws: WebSocket, raw: string, token: number): void {
-        // Decompression is asynchronous, so a frame can arrive here after its
-        // socket was replaced: the listener's synchronous socket check passed a
-        // moment ago and cannot help. The session decides who owns the
-        // connection, and a frame from a superseded generation is discarded
-        // rather than dispatched to listeners.
-        if (this.#ws !== ws || !this.#session.owns(token)) return;
+    #onOpen(): void {
+        // Watch for silence from the moment the socket opens: a connection
+        // that never reaches HELLO must still be detected as dead.
+        this.#heartbeat.watch();
+        this.#emit("open", undefined);
+        this.#settleConnect();
+    }
+    #message(raw: string, token: number): void {
+        // The transport already drops frames from a replaced socket; this
+        // second check keeps the session authoritative about who may mutate it.
+        if (!this.#session.owns(token)) return;
         let payload: GatewayPayload;
         try {
             payload = JSON.parse(raw) as GatewayPayload;
@@ -494,14 +465,14 @@ export class Gateway {
                     cause: error,
                 }),
             );
-            ws.close(1002, "Invalid JSON");
+            this.#transport.close(1002, "Invalid JSON");
             return;
         }
         if (!payload || typeof payload.op !== "number") {
             this.#emitError(
                 new GatewayError("Gateway returned an invalid payload"),
             );
-            ws.close(1002, "Invalid payload");
+            this.#transport.close(1002, "Invalid payload");
             return;
         }
         // The session ignores a sequence from a superseded connection, so a
@@ -526,7 +497,7 @@ export class Gateway {
                 this.#emit("heartbeatAck", payload.d);
                 break;
             case GatewayOpcodes.Reconnect:
-                ws.close(1001, "Server requested reconnect");
+                this.#transport.close(1001, "Server requested reconnect");
                 break;
             case GatewayOpcodes.InvalidSession: {
                 // Op 9 `d` is a boolean: true = the session is resumable, so we
@@ -537,7 +508,7 @@ export class Gateway {
                 if (!resumable)
                     this.#session.invalidate(token, "invalid-session");
                 this.#emit("invalidSession", resumable);
-                ws.close(
+                this.#transport.close(
                     resumable ? GatewayCloseCodes.UnknownError : 1000,
                     resumable
                         ? "Invalid session (resumable)"
@@ -589,7 +560,7 @@ export class Gateway {
                     "Gateway HELLO payload contains an invalid heartbeat interval",
                 ),
             );
-            this.#ws?.close(1002, "Invalid heartbeat interval");
+            this.#transport.close(1002, "Invalid heartbeat interval");
             return;
         }
         this.#setState(
@@ -659,9 +630,7 @@ export class Gateway {
             true,
         );
     }
-    #close(ws: WebSocket, code: number, token: number): void {
-        if (this.#ws !== ws) return;
-        this.#ws = undefined;
+    #close(code: number, token: number): void {
         this.#clearTimers();
         const action: CloseAction = this.#reconnect.classifyClose(
             code,
@@ -745,66 +714,5 @@ export class Gateway {
         const previous = this.state;
         this.state = next;
         this.#emit("stateChange", { previous, next });
-    }
-    /** Initialises a fresh zlib-stream inflater for a new connection. */
-    #initDecompressor(): void {
-        this.#inflate?.removeAllListeners();
-        this.#inflate?.close();
-        this.#inflateChunks = [];
-        this.#decompressQueue = Promise.resolve();
-        const inflate = createInflate();
-        inflate.on("data", (chunk: Uint8Array) =>
-            this.#inflateChunks.push(chunk),
-        );
-        inflate.on("error", (error: unknown) => this.#emitError(error));
-        this.#inflate = inflate;
-    }
-    /** Normalises a binary WebSocket payload into bytes. */
-    async #toBytes(data: unknown): Promise<Uint8Array> {
-        if (data instanceof Uint8Array) return data;
-        if (data instanceof ArrayBuffer) return new Uint8Array(data);
-        if (typeof Blob !== "undefined" && data instanceof Blob)
-            return new Uint8Array(await data.arrayBuffer());
-        throw new GatewayError(
-            "Gateway returned an unsupported compressed frame type.",
-        );
-    }
-    /**
-     * Feeds one zlib-stream chunk to the inflater.
-     *
-     * Discord terminates each logical payload with the `Z_SYNC_FLUSH` marker
-     * `00 00 FF FF`; a payload may span several WebSocket frames. Output is
-     * only decoded once that boundary arrives, so partial payloads are never
-     * parsed as JSON and nothing is dropped waiting on a timer.
-     */
-    async #decompress(chunk: Uint8Array): Promise<string | undefined> {
-        if (!this.#inflate) this.#initDecompressor();
-        const inflate = this.#inflate!;
-        const complete =
-            chunk.length >= 4 &&
-            chunk[chunk.length - 4] === 0x00 &&
-            chunk[chunk.length - 3] === 0x00 &&
-            chunk[chunk.length - 2] === 0xff &&
-            chunk[chunk.length - 1] === 0xff;
-        await new Promise<void>((resolve, reject) => {
-            inflate.write(chunk, (error) =>
-                error ? reject(error) : resolve(),
-            );
-        });
-        if (!complete) return undefined;
-        await new Promise<void>((resolve) =>
-            inflate.flush(zlibConstants.Z_SYNC_FLUSH, () => resolve()),
-        );
-        const parts = this.#inflateChunks;
-        this.#inflateChunks = [];
-        if (parts.length === 0) return undefined;
-        const total = parts.reduce((n, p) => n + p.length, 0);
-        const merged = new Uint8Array(total);
-        let offset = 0;
-        for (const p of parts) {
-            merged.set(p, offset);
-            offset += p.length;
-        }
-        return new TextDecoder().decode(merged);
     }
 }

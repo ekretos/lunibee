@@ -28,6 +28,7 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | CACHE-001 | P2 | `packages/collection` | TTL sweeper keeps the process alive | **Fixed** |
 | COLLECT-001 | P2 | `packages/core` | `Collector.next()` leaks a listener per call | **Fixed** |
 | WS-006 | P1 | `packages/ws` | Late-decompressed frame from a replaced socket still dispatched | **Fixed** |
+| WS-007 | P1 | `packages/ws` | Corrupt compressed data hangs the decode forever | **Fixed** |
 | WS-003 | P2 | `packages/ws` | Fatal close leaves state `CONNECT`, not `CLOSED` | **Fixed** |
 | REST-003 | P2 | `packages/rest` | One in-flight request per bucket caps throughput | Open |
 | REST-004 | P1 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | **Fixed** |
@@ -230,6 +231,22 @@ now removes its counterpart.
   sequence; the following RESUME carries the pre-replacement sequence.
 - **Found by** — the Stage 1B session extraction; invisible while ownership was an
   ad-hoc check at each call site.
+
+### WS-007 · P1 · `packages/ws/src/decoder.ts` (fixed)
+
+- **Problem** — On a corrupt zlib stream, `inflate.write`'s callback is never
+  invoked: zlib emits `error` and abandons it. The decode awaited that callback, so
+  the promise never settled.
+- **Impact** — A compressed connection receiving corrupt bytes stopped processing
+  frames permanently, with no error raised and no close: the heartbeat's staleness
+  watch was the only thing that would eventually notice. Present since the WS-001
+  fix.
+- **Fix** — The decoder's `error` handler settles whatever operation is waiting.
+- **Regression test** — `tests/gateway.transport.test.ts` pushes garbage bytes and
+  asserts the promise rejects; a second test proves `reset()` clears the failure so a
+  reconnect starts clean.
+- **Found by** — unit-testing the decoder in isolation during the Stage 1B.4
+  extraction. It hung the test run, which is how it surfaced.
 
 ## P2 — Reliability & performance (open)
 

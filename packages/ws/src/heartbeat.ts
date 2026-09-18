@@ -91,7 +91,9 @@ export class GatewayHeartbeat {
 
     /** Milliseconds since the last inbound message, or 0 when none has arrived. */
     public get silentFor(): number {
-        return this.#lastMessageAt === 0 ? 0 : this.#now() - this.#lastMessageAt;
+        return this.#lastMessageAt === 0
+            ? 0
+            : this.#now() - this.#lastMessageAt;
     }
 
     /**
@@ -197,7 +199,10 @@ export class GatewayHeartbeat {
                 this.#options.zombieTimeout / 2,
             ),
         );
-        this.#monitorTimer = setInterval(() => this.#checkStaleness(), interval);
+        this.#monitorTimer = setInterval(
+            () => this.#checkStaleness(),
+            interval,
+        );
     }
 
     #checkStaleness(): void {
