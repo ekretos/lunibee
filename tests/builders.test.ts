@@ -85,8 +85,8 @@ describe("Builders Full Coverage", () => {
         const blobBuf = await blobAtt.toBuffer();
         expect(new TextDecoder().decode(blobBuf)).toBe("hello");
 
-        const emptyAtt = new AttachmentBuilder(123 as any);
-        expect((await emptyAtt.toBuffer()).length).toBe(0);
+        const invalidAtt = new AttachmentBuilder(123 as any);
+        await expect(invalidAtt.toBuffer()).rejects.toThrow(TypeError);
     });
 
     test("SlashCommandBuilder covers all option types, subcommands and groups", () => {
