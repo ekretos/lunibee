@@ -44,12 +44,12 @@ new PermissionSet(bits: bigint | string | number = 0n)
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-const perms = new PermissionSet(member.permissions.bits);
+const perms = new PermissionSet(member.permissions.bitfield);
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const perms = new PermissionSet(member.permissions.bits);
+const perms = new PermissionSet(member.permissions.bitfield);
 ```
 </TabItem>
 </Tabs>
@@ -58,13 +58,13 @@ const perms = new PermissionSet(member.permissions.bits);
 
 | Property | Type | Description |
 |---|---|---|
-| `bits` | `bigint` | The raw bitfield as a BigInt. |
+| `bitfield` | `bigint` | The raw bitfield as a BigInt. |
 
 ## Methods
 
-### `has(permission)`
+### `has(...permissions)`
 
-Returns `true` if the bitfield contains the given permission. Accepts a `Permission` constant, a `bigint`, or a camelCase/PascalCase permission name string.
+Returns `true` only if **all** of the given permissions are present. Accepts a `Permission` constant, a `bigint`, or a camelCase/PascalCase permission name string.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -93,51 +93,30 @@ if (member.permissions.has("manageMessages")) {
 </TabItem>
 </Tabs>
 
-### `hasAll(...permissions)`
-
-Returns `true` only if **all** of the given permissions are present.
-
-<Tabs>
-<TabItem label="TypeScript">
-```ts
-if (member.permissions.hasAll(Permission.banMembers, Permission.kickMembers)) {
-  console.log("Has both ban and kick.");
-}
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-if (member.permissions.hasAll(Permission.banMembers, Permission.kickMembers)) {
-  console.log("Has both ban and kick.");
-}
-```
-</TabItem>
-</Tabs>
-
-### `hasAny(...permissions)`
+### `any(...permissions)`
 
 Returns `true` if **at least one** of the given permissions is present.
 
-### `isAdministrator()`
-
-Returns `true` if the `administrator` permission is set.
-
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-if (member.permissions.isAdministrator()) {
-  // full access
+if (member.permissions.any(Permission.banMembers, Permission.kickMembers)) {
+  console.log("Can ban or kick.");
 }
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-if (member.permissions.isAdministrator()) {
-  // full access
+if (member.permissions.any(Permission.banMembers, Permission.kickMembers)) {
+  console.log("Can ban or kick.");
 }
 ```
 </TabItem>
 </Tabs>
+
+For Administrator, use the `administrator` getter (`member.permissions.administrator`)
+or `has(Permission.administrator)`. `has()` does not treat Administrator as implying
+other permissions.
 
 ### `add(...permissions)`
 

@@ -76,6 +76,12 @@ bus.on("RELOAD_CONFIG", (message) => {
 bus.broadcast("RELOAD_CONFIG", { reason: "admin_request" });
 ```
 
+### Queries and errors
+
+`bus.onError(fn)` receives handler failures. `bus.respond(type, fn)` answers requests,
+and `bus.request(shard, type, data)` / `bus.broadcastRequest(type, data, { expected })`
+collect replies. See [Sharding](/core-concepts/sharding/#cross-shard-messaging-with-shardbus).
+
 ## When do I need sharding?
 
 A small bot normally starts with a single `Client`. Sharding becomes useful when the bot grows enough that Discord requires multiple Gateway sessions or when you want to distribute Gateway work across processes.

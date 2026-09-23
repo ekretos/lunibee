@@ -1,75 +1,137 @@
 ---
 title: Voice
-description: Discord Voice server connections, UDP audio streaming, and voice encryption.
+description: Voice session state, audio playback and receiving with lunibee (voice).
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
+`lunibee` (voice) tracks voice sessions and moves audio through a player and receiver.
+It is transport-agnostic: it does not open the voice WebSocket or UDP socket, encrypt
+packets or run a voice heartbeat. You attach transports that do that, and Lunibee handles
+lifecycle, speaking state and audio routing.
 
-`lunibee` (voice) implements the Discord Voice Gateway protocol, encryption, and audio streaming.
+## Joining a channel
 
-## Connecting to Voice
-
-You do not need to pass your bot token to voice connections. The client manages the voice handshake and receives a temporary session token from Discord's `VOICE_SERVER_UPDATE` event automatically.
-
-<Tabs>
-<TabItem label="TypeScript">
-```ts
-import { VoiceConnection } from "lunibee";
-const voice = new VoiceConnection({
-  guildId: "123456789012345678",
-  channelId: "987654321098765432",
-  selfMute: false,
-  selfDeaf: false,
-});
-voice.connect();
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { VoiceConnection } from "lunibee";
-const voice = new VoiceConnection({
-  guildId: "123456789012345678",
-  channelId: "987654321098765432",
-  selfMute ,
-  selfDeaf ,
-});
-voice.connect();
-```
-</TabItem>
-</Tabs>
-
-## Voice Connection Lifecycle
-
-`VoiceConnection` manages the connection state machine (`disconnected`, `connecting`, `connected`, `destroyed`) and provides lifecycle hooks:
+`joinVoiceChannel` keeps one connection per guild: calling it again moves the existing
+connection instead of creating a second one.
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-voice.on("stateChange", (newState, oldState) => {
-  console.log(`Voice state changed from ${oldState} to ${newState}`);
-});
+import {
+  joinVoiceChannel,
+  getVoiceConnection,
+  entersState,
+  VoiceConnectionState,
+} from "lunibee";
 
-voice.on("speaking", (flags, ssrc) => {
-  console.log(`Speaking state changed: ${flags}`);
+const connection = joinVoiceChannel({
+  guildId: "123456789012345678",
+  channelId: "987654321098765432",
+  selfDeaf: true,
 });
+connection.attachTransports(myVoiceGatewayTransport, myUdpTransport);
+await entersState(connection, VoiceConnectionState.Connected, 5_000);
+
+getVoiceConnection("123456789012345678") === connection; // true
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-voice.on("stateChange", (newState, oldState) => {
-  console.log(`Voice state changed from ${oldState} to ${newState}`);
-});
+import {
+  joinVoiceChannel,
+  getVoiceConnection,
+  entersState,
+  VoiceConnectionState,
+} from "lunibee";
 
-voice.on("speaking", (flags, ssrc) => {
-  console.log(`Speaking state changed: ${flags}`);
+const connection = joinVoiceChannel({
+  guildId: "123456789012345678",
+  channelId: "987654321098765432",
+  selfDeaf: true,
 });
+connection.attachTransports(myVoiceGatewayTransport, myUdpTransport);
+await entersState(connection, VoiceConnectionState.Connected, 5_000);
+
+getVoiceConnection("123456789012345678") === connection; // true
 ```
 </TabItem>
 </Tabs>
 
-## Features
+You can also construct `new VoiceConnection({ guildId, channelId, selfMute, selfDeaf })`
+directly and call `connect()`.
 
-- **Voice Gateway Lifecycle**: Fast handshakes, state tracking, and heartbeat scheduling.
-- **Audio Packet Encryption**: Modern AEAD & XSalsa20 voice transport encryption.
-- **Transport Abstraction**: Plug-and-play Gateway & UDP transports.
+## Lifecycle
+
+States are `disconnected`, `connecting`, `connected` and `destroyed`
+(`VoiceConnectionState`, alias `VoiceConnectionStatus`).
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+// VoiceConnection passes the NEW state first.
+connection.on("stateChange", (newState, oldState) => {
+  console.log(`Voice: ${oldState} → ${newState}`);
+});
+connection.on("error", (error) => console.error(error));
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// VoiceConnection passes the NEW state first.
+connection.on("stateChange", (newState, oldState) => {
+  console.log(`Voice: ${oldState} → ${newState}`);
+});
+connection.on("error", (error) => console.error(error));
+```
+</TabItem>
+</Tabs>
+
+## Playing audio
+
+`AudioPlayer` reads an `AudioStream` and passes each chunk to `onChunk()`. Override it to
+send audio to your UDP transport. `AudioPlayer`'s `stateChange` passes the **old** state
+first: `(from, to)`.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { AudioPlayer, createAudioResource, SpeakingFlags } from "lunibee";
+
+class UdpPlayer extends AudioPlayer {
+  protected override onChunk(chunk: Uint8Array): void {
+    myUdpTransport.send(chunk, host, port);
+  }
+}
+
+const player = new UdpPlayer();
+connection.setSpeaking(SpeakingFlags.Microphone);
+await player.play(createAudioResource(opusStream, { title: "Track" }));
+player.on("finish", () => connection.setSpeaking(0));
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { AudioPlayer, createAudioResource, SpeakingFlags } from "lunibee";
+
+class UdpPlayer extends AudioPlayer {
+  onChunk(chunk) {
+    myUdpTransport.send(chunk, host, port);
+  }
+}
+
+const player = new UdpPlayer();
+connection.setSpeaking(SpeakingFlags.Microphone);
+await player.play(createAudioResource(opusStream, { title: "Track" }));
+player.on("finish", () => connection.setSpeaking(0));
+```
+</TabItem>
+</Tabs>
+
+## Receiving audio
+
+Feed incoming UDP packets to `connection.receiver.onPacket(packet)`, map SSRCs to users
+with `mapSsrc(ssrc, userId)`, then `subscribe(userId)` for that user's `AudioStream`.
+
+See the [VoiceConnection & AudioPlayer reference](/reference/voice-connection/) for
+every method.

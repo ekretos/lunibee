@@ -118,7 +118,7 @@ Triggered when a user clicks a button or selects options in a dropdown.
 <TabItem label="TypeScript">
 ```ts
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isComponent()) return;
+  if (!interaction.isMessageComponent()) return;
 
   const { customId } = interaction;
 
@@ -148,7 +148,7 @@ client.on("interactionCreate", async (interaction) => {
 <TabItem label="JavaScript">
 ```js
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isComponent()) return;
+  if (!interaction.isMessageComponent()) return;
 
   const { customId } = interaction;
 
@@ -179,6 +179,13 @@ client.on("interactionCreate", async (interaction) => {
 
 ---
 
+### Type guards
+
+Besides `isChatInputCommand()`, `isMessageComponent()`, `isModalSubmit()` and
+`isAutocomplete()`, component interactions can be narrowed by component type:
+`isButton()`, `isStringSelectMenu()`, `isUserSelectMenu()`, `isRoleSelectMenu()`,
+`isMentionableSelectMenu()`, `isChannelSelectMenu()` and `isAnySelectMenu()`.
+
 ## `ModalSubmitInteraction`
 
 Triggered when a user submits a modal popup.
@@ -190,8 +197,8 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
 
   if (interaction.customId === "modal_ticket") {
-    const subject = interaction.fields.getTextInputValue("ticket_subject");
-    const description = interaction.fields.getTextInputValue("ticket_description");
+    const subject = interaction.getRequiredInputValue("ticket_subject");
+    const description = interaction.getRequiredInputValue("ticket_description");
 
     await interaction.reply({
       content: `Ticket created! **Subject:** ${subject}`,
@@ -207,8 +214,8 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
 
   if (interaction.customId === "modal_ticket") {
-    const subject = interaction.fields.getTextInputValue("ticket_subject");
-    const description = interaction.fields.getTextInputValue("ticket_description");
+    const subject = interaction.getRequiredInputValue("ticket_subject");
+    const description = interaction.getRequiredInputValue("ticket_description");
 
     await interaction.reply({
       content: `Ticket created **Subject:** ${subject}`,

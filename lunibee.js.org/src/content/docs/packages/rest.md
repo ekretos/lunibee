@@ -24,7 +24,7 @@ const rest = new REST({
 ## GET
 
 ```ts
-const user = await rest.get(Routes.currentUser());
+const user = await rest.get(Routes.user());
 ```
 
 ## POST
@@ -106,6 +106,12 @@ const rest = new REST({
 Hooks run in isolation from the request path — a throwing hook cannot fail a request —
 but they still share the event loop, so keep them cheap.
 
+### Concurrent buckets
+
+`new REST({ token, concurrentBuckets: true })` runs requests on a known bucket in
+parallel, up to its remaining allowance. It's off by default so per-bucket order is
+kept. See [REST & Rate Limits](/core-concepts/rest/#concurrent-buckets-opt-in).
+
 ## Routes
 
 Use `Routes` rather than hand-writing Discord URLs whenever a route helper exists.
@@ -163,7 +169,7 @@ REST requests reject when Discord returns an unsuccessful response. Catch errors
 
 ```ts
 try {
-  await rest.get(Routes.currentUser());
+  await rest.get(Routes.user());
 } catch (error) {
   console.error("Discord request failed:", error);
 }

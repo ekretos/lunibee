@@ -40,8 +40,8 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
 
   if (interaction.customId === "feedback_modal") {
-    const title = interaction.fields.getTextInputValue("feedback_title");
-    const body = interaction.fields.getTextInputValue("feedback_body");
+    const title = interaction.getRequiredInputValue("feedback_title");
+    const body = interaction.getRequiredInputValue("feedback_body");
 
     await interaction.reply({
       content: `Thanks for your feedback: **${title}**\n>${body}`,

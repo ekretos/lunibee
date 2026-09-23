@@ -46,6 +46,9 @@ const client = new Client({
 
 Some intents are privileged and must also be enabled for your bot in the Discord Developer Portal.
 
+`IntentsBitField` wraps intents as a mutable bitfield:
+`new IntentsBitField(["Guilds", "GuildMessages"]).add("MessageContent")`.
+
 ## Channel Types
 
 Use `ChannelType` when an API expects a Discord channel type rather than a string.

@@ -93,3 +93,18 @@ try {
 ```
 </TabItem>
 </Tabs>
+
+## Concurrent Buckets (opt-in)
+
+By default requests that share a rate-limit bucket run one at a time, which preserves
+their order (e.g. messages to one channel arrive in the order you sent them). Set
+`concurrentBuckets: true` to run requests on a bucket whose limit is already known in
+parallel, up to its remaining allowance:
+
+```ts
+const rest = new REST({ token, concurrentBuckets: true });
+```
+
+- A bucket whose limit is not known yet still sends one request until a response reveals it.
+- Requests on one bucket may finish out of order.
+- Needs a rate-limit store with atomic `reserve()`. The default memory store and the Redis store have one.

@@ -86,3 +86,40 @@ client.on("messageCreate", async (message) => {
 ```
 </TabItem>
 </Tabs>
+
+## Channel Classes
+
+Channels built by the client and managers use `createChannel(data)`, which returns the
+most specific class. All of them extend `Channel`.
+
+| Type | Class |
+|---|---|
+| Text (0) | `TextChannel` |
+| DM (1), Group DM (3) | `DMChannel` (`recipients`, `ownerId`) |
+| Voice (2) | `VoiceChannel` (`bitrate`, `userLimit`, `rtcRegion`) |
+| Category (4) | `CategoryChannel` |
+| Announcement (5) | `NewsChannel` |
+| Threads (10, 11, 12) | `ThreadChannel` (`archived`, `locked`, `messageCount`, `ownerId`) |
+| Stage (13) | `StageChannel` |
+| Forum (15) | `ForumChannel` (`availableTags`, …) |
+| Media (16) | `MediaChannel` |
+
+Every channel has `isThread()`, `isTextBased()`, `isVoiceBased()` and `isDMBased()`.
+
+## Guild Resource Managers
+
+| Access | Manager | Covers |
+|---|---|---|
+| `client.guilds.bans(guildId)` | `GuildBanManager` | `fetch`, `fetchAll`, `create`, `remove` |
+| `client.guilds.scheduledEvents(guildId)` | `GuildScheduledEventManager` | `fetch`, `fetchAll`, `create`, `edit`, `remove`, `fetchSubscribers` |
+| `client.channels.permissionOverwrites(channelId)` | `PermissionOverwriteManager` | `edit`, `remove` |
+| `client.stageInstances` | `StageInstanceManager` | `create`, `fetch`, `edit`, `remove` |
+
+```ts
+await client.guilds.bans(guildId).create(userId, {
+  deleteMessageSeconds: 3600,
+  reason: "Spam",
+});
+```
+
+These managers cache raw Discord payloads. `CachedManager` is an alias of `ResourceManager`.

@@ -103,7 +103,7 @@ Serializes to a raw Discord API-compatible modal object.
 
 | Method | Description |
 |---|---|
-| `setCustomId(id)` | Unique ID for this field (used in `fields.getTextInputValue()`). |
+| `setCustomId(id)` | Unique ID for this field (used in `getRequiredInputValue()`). |
 | `setLabel(label)` | The visible field label (max 45 chars). |
 | `setStyle(style)` | `TextInputStyle.Short` (single line) or `TextInputStyle.Paragraph` (multi-line). |
 | `setRequired(required)` | Whether the field is required. |
@@ -155,8 +155,8 @@ client.on("interactionCreate", async (interaction) => {
 // Handle the modal submission
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit() || interaction.customId !== "report_form") return;
-  const userId = interaction.fields.getTextInputValue("reported_user");
-  const reason = interaction.fields.getTextInputValue("reason");
+  const userId = interaction.getRequiredInputValue("reported_user");
+  const reason = interaction.getRequiredInputValue("reason");
   await interaction.reply({
     content: `📨 Report filed for **${userId}**: ${reason}`,
     ephemeral: true,
@@ -204,8 +204,8 @@ client.on("interactionCreate", async (interaction) => {
 // Handle the modal submission
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit() || interaction.customId !== "report_form") return;
-  const userId = interaction.fields.getTextInputValue("reported_user");
-  const reason = interaction.fields.getTextInputValue("reason");
+  const userId = interaction.getRequiredInputValue("reported_user");
+  const reason = interaction.getRequiredInputValue("reason");
   await interaction.reply({
     content: `📨 Report filed for **${userId}**: ${reason}`,
     ephemeral ,

@@ -123,6 +123,15 @@ await emojis.edit(emojiId, {
 await emojis.delete(emojiId);
 ```
 
+## Guild resource managers
+
+- `guilds.bans(guildId)`: `GuildBanManager` (`fetch`, `fetchAll`, `create`, `remove`)
+- `guilds.scheduledEvents(guildId)`: `GuildScheduledEventManager`
+- `channels.permissionOverwrites(channelId)`: `PermissionOverwriteManager`
+- `client.stageInstances`: `StageInstanceManager`
+
+See [Caching & Structures](/core-concepts/caching/#guild-resource-managers).
+
 ## When should I use a manager?
 
 Use a manager when you already have IDs and want a direct operation:
