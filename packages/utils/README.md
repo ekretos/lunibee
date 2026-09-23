@@ -1,11 +1,22 @@
 # @lunibee/utils
 
-> Part of the lunibee ecosystem.
+> Tiny shared utilities.
 
-## Basic use
+```bash
+bun add @lunibee/utils
+```
 
 ```ts
-import { ... } from '@lunibee/utils';
+import { sleep, randomInt, isSnowflake } from "@lunibee/utils";
 
-// Example basic usage
+await sleep(250);
+const roll = randomInt(1, 6);
+isSnowflake("123456789012345678"); // true
+console.log(roll);
 ```
+
+| Function | Description |
+|---|---|
+| `sleep(ms)` | Resolves after `ms` milliseconds. |
+| `randomInt(min, max)` | Random integer between `min` and `max`. |
+| `isSnowflake(value)` | Whether a string is a Discord snowflake. |

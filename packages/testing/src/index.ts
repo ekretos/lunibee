@@ -26,3 +26,5 @@ export async function waitFor(
         await Bun.sleep(interval);
     }
 }
+
+export { MockREST, type RecordedRequest } from "./rest.js";
