@@ -17,4 +17,35 @@ describe("ShardBus", () => {
         shard0.close();
         shard1.close();
     });
+
+    test("reports sync and async handler errors to error listeners", async () => {
+        const channel = `lunibee-test-${crypto.randomUUID()}`;
+        const shard0 = new ShardBus(0, channel);
+        const shard1 = new ShardBus(1, channel);
+        const errors: [unknown, string][] = [];
+        const received: unknown[] = [];
+        shard1.onError(() => {
+            throw new Error("listener failure is isolated");
+        });
+        shard1.onError((error, message) => errors.push([error, message.type]));
+        shard1.on("sync", () => {
+            throw new Error("sync");
+        });
+        shard1.on("async", async () => {
+            throw new Error("async");
+        });
+        shard1.on("sync", (message) => received.push(message.data));
+        shard0.broadcast("sync", 1);
+        shard0.broadcast("async", 2);
+        await Bun.sleep(10);
+        expect(
+            errors.map(([error, type]) => [(error as Error).message, type]),
+        ).toEqual([
+            ["sync", "sync"],
+            ["async", "async"],
+        ]);
+        expect(received).toEqual([1]);
+        shard0.close();
+        shard1.close();
+    });
 });

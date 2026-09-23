@@ -31,10 +31,10 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | WS-007 | P1 | `packages/ws` | Corrupt compressed data hangs the decode forever | **Fixed** |
 | WS-008 | P0 | `packages/ws` | Array/string intents sent unresolved in IDENTIFY; bot never connects | **Fixed** |
 | WS-003 | P2 | `packages/ws` | Fatal close leaves state `CONNECT`, not `CLOSED` | **Fixed** |
-| REST-003 | P2 | `packages/rest` | One in-flight request per bucket caps throughput | Open |
+| REST-003 | P2 | `packages/rest` | One in-flight request per bucket caps throughput | **Fixed** (opt-in `concurrentBuckets`) |
 | REST-004 | P1 | `packages/rest` | Routes remapped onto a shared bucket hash do not share a queue | **Fixed** |
 | REST-005 | P1 | `packages/rest` | Shared store has no reservation, so workers race the same `remaining` | **Fixed** |
-| BUS-001 | P2 | `packages/sharding` | Async shard-message handler rejections are swallowed | Open |
+| BUS-001 | P2 | `packages/sharding` | Async shard-message handler rejections are swallowed | **Fixed** (`ShardBus.onError`) |
 | REST-006 | P2 | `packages/rest` | 429 without a `Retry-After` header retried with zero delay | **Fixed** |
 | CI-001 | P2 | repo | Tests were not executed by CI | **Fixed** |
 | WS-004 | P3 | `packages/ws` | `Gateway` is a single 800-line class | Open |

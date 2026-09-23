@@ -305,3 +305,114 @@ describe("REST composition", () => {
         expect(attempts).toBe(2);
     });
 });
+
+describe("REST concurrent buckets (REST-003)", () => {
+    const limited = (remaining: number) =>
+        new Response("{}", {
+            status: 200,
+            headers: {
+                "content-type": "application/json",
+                "X-RateLimit-Remaining": String(remaining),
+                "X-RateLimit-Reset-After": "10",
+            },
+        });
+
+    const measure = async (concurrentBuckets: boolean) => {
+        let inFlight = 0;
+        let peak = 0;
+        let remaining = 5;
+        const rest = new REST({
+            token: "token",
+            concurrentBuckets,
+            transport: new HttpTransport({
+                fetch: async () => {
+                    peak = Math.max(peak, ++inFlight);
+                    await Bun.sleep(20);
+                    inFlight--;
+                    return limited(--remaining);
+                },
+            }),
+        });
+        // First request discovers the bucket's limit.
+        await rest.get("/channels/1/messages");
+        await Promise.all([
+            rest.get("/channels/1/messages"),
+            rest.get("/channels/1/messages"),
+            rest.get("/channels/1/messages"),
+        ]);
+        return peak;
+    };
+
+    test("runs requests on a known bucket concurrently when enabled", async () => {
+        expect(await measure(true)).toBe(3);
+    });
+
+    test("stays serial by default", async () => {
+        expect(await measure(false)).toBe(1);
+    });
+
+    test("an unknown bucket stays serial until a response reveals its limit", async () => {
+        let inFlight = 0;
+        let peak = 0;
+        const rest = new REST({
+            token: "token",
+            concurrentBuckets: true,
+            transport: new HttpTransport({
+                fetch: async () => {
+                    peak = Math.max(peak, ++inFlight);
+                    await Bun.sleep(20);
+                    inFlight--;
+                    return new Response("{}", {
+                        status: 200,
+                        headers: { "content-type": "application/json" },
+                    });
+                },
+            }),
+        });
+        await Promise.all([
+            rest.get("/channels/1/messages"),
+            rest.get("/channels/1/messages"),
+        ]);
+        expect(peak).toBe(1);
+    });
+
+    test("a late response cannot raise remaining within its window", async () => {
+        const store = new MemoryRateLimitStore();
+        store.updateBucket("k", { remaining: 0, resetAt: Date.now() + 10_000 });
+        const limiter = new RateLimiter(store, { concurrent: true });
+        await limiter.applyResponse(limited(3), "k", "route", "@none");
+        expect(store.getBucket("k")!.remaining).toBe(0);
+        const serial = new RateLimiter(store);
+        await serial.applyResponse(limited(3), "k", "route", "@none");
+        expect(store.getBucket("k")!.remaining).toBe(3);
+    });
+
+    test("never exceeds the bucket's remaining allowance", async () => {
+        let inFlight = 0;
+        let peak = 0;
+        const rest = new REST({
+            token: "token",
+            concurrentBuckets: true,
+            transport: new HttpTransport({
+                fetch: async () => {
+                    peak = Math.max(peak, ++inFlight);
+                    await Bun.sleep(20);
+                    inFlight--;
+                    return new Response("{}", {
+                        status: 200,
+                        headers: {
+                            "content-type": "application/json",
+                            "X-RateLimit-Remaining": "2",
+                            "X-RateLimit-Reset-After": "0.1",
+                        },
+                    });
+                },
+            }),
+        });
+        await rest.get("/channels/1/messages");
+        await Promise.all(
+            Array.from({ length: 4 }, () => rest.get("/channels/1/messages")),
+        );
+        expect(peak).toBe(2);
+    });
+});

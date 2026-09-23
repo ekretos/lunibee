@@ -13,7 +13,7 @@ _Baseline (dev, 2026-09-23): deps graph valid, typecheck clean, 312/312 tests pa
 | 1.4 | Enforce coverage threshold — **deferred to Phase 3**: Bun applies `coverageThreshold` per file, and several files are below 90% | prevent regression |
 | 1.5 | Add a lint/format check (`prettier --check`) job | `format` script exists, nothing enforces it |
 
-## Phase 2 — Open reliability backlog (`docs/audits/reliability-backlog.md`)
+## Phase 2 — Open reliability backlog (`docs/audits/reliability-backlog.md`) — BUS-001, REST-003 done
 
 | ID | Pri | Item |
 |---|---|---|

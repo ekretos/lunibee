@@ -10,6 +10,11 @@ export interface ShardMessage<T = unknown> {
 export type ShardMessageHandler<T = unknown> = (
     message: ShardMessage<T>,
 ) => unknown;
+/** Listener for errors thrown or rejected by shard message handlers. */
+export type ShardBusErrorHandler = (
+    error: unknown,
+    message: ShardMessage,
+) => void;
 /** Bun/Node-compatible cross-shard transport using BroadcastChannel. */
 export class ShardBus {
     /** Underlying broadcast channel. */ readonly #channel: BroadcastChannel;
@@ -17,6 +22,8 @@ export class ShardBus {
         string,
         Set<ShardMessageHandler>
     >();
+    /** Handler error listeners. */ readonly #errorHandlers =
+        new Set<ShardBusErrorHandler>();
     /** Current shard ID. */ readonly #shardId: number;
     /** Application-specific channel namespace. */ readonly #namespace: string;
     /** BroadcastChannel name used by this bus. */ public readonly channelName: string;
@@ -53,6 +60,20 @@ export class ShardBus {
         this.#handlers.get(type)?.delete(handler as ShardMessageHandler);
         return this;
     }
+    /** Registers a listener for errors thrown or rejected by message handlers. Without one, handler errors are isolated and dropped. @param handler Error listener. @returns This bus. @throws {TypeError} If handler is invalid. */ public onError(
+        handler: ShardBusErrorHandler,
+    ): this {
+        if (typeof handler !== "function")
+            throw new TypeError("Shard bus error handler is required.");
+        this.#errorHandlers.add(handler);
+        return this;
+    }
+    /** Removes a handler error listener. @param handler Error listener. @returns This bus. */ public offError(
+        handler: ShardBusErrorHandler,
+    ): this {
+        this.#errorHandlers.delete(handler);
+        return this;
+    }
     /** Sends a targeted shard message. @param target Target shard ID. @param type Message type. @param data Payload. @returns Unique message ID. */ public send<
         T,
     >(target: number, type: string, data: T): string {
@@ -70,6 +91,7 @@ export class ShardBus {
     /** Closes the transport. @returns Nothing. */ public close(): void {
         this.#channel.close();
         this.#handlers.clear();
+        this.#errorHandlers.clear();
     }
     /** Publishes a message. @param target Target shard ID or null. @param type Message type. @param data Payload. @returns Unique message ID. */ #publish<
         T,
@@ -107,9 +129,23 @@ export class ShardBus {
                     result &&
                     typeof (result as PromiseLike<unknown>).then === "function"
                 )
-                    void Promise.resolve(result).catch(() => undefined);
+                    void Promise.resolve(result).catch((error) =>
+                        this.#reportError(error, message),
+                    );
+            } catch (error) {
+                this.#reportError(error, message);
+            }
+        }
+    }
+    /** Forwards a handler error to error listeners, isolating listener failures. @param error Handler error. @param message Message being handled. @returns Nothing. */ #reportError(
+        error: unknown,
+        message: ShardMessage,
+    ): void {
+        for (const handler of this.#errorHandlers) {
+            try {
+                handler(error, message);
             } catch {
-                /* Consumer errors are isolated. */
+                /* Error listener failures are isolated. */
             }
         }
     }

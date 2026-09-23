@@ -195,6 +195,8 @@ export class REST {
     /** Response payload and error metadata. */
     readonly #decoder = new ResponseDecoder();
     #hooks: RESTHooks = {};
+    /** Whether requests on a known bucket may run concurrently. */
+    readonly #concurrentBuckets: boolean;
     /** Creates a REST transport. @param options Transport configuration. @throws {TypeError} If retry configuration is invalid. */
     public constructor(
         options: {
@@ -207,6 +209,13 @@ export class REST {
             store?: RateLimitStore;
             /** Replaces the HTTP stage, e.g. with a recording transport in tests. */
             transport?: HttpTransport;
+            /**
+             * Lets requests on a bucket whose limit is known run concurrently, up
+             * to its `remaining` allowance, instead of one at a time. Requires a
+             * store with `reserve`. Requests on one bucket may then complete out
+             * of order (e.g. messages to one channel). Defaults to `false`.
+             */
+            concurrentBuckets?: boolean;
         } = {},
     ) {
         this.#token = options.token;
@@ -218,9 +227,13 @@ export class REST {
                 baseURL: options.baseURL,
                 timeout: options.timeout,
             });
-        this.#limiter = new RateLimiter(
-            options.store ?? new MemoryRateLimitStore(),
-        );
+        const store = options.store ?? new MemoryRateLimitStore();
+        this.#concurrentBuckets =
+            (options.concurrentBuckets ?? false) &&
+            typeof store.reserve === "function";
+        this.#limiter = new RateLimiter(store, {
+            concurrent: this.#concurrentBuckets,
+        });
         if (options.hooks) this.#hooks = options.hooks;
     }
     /** The rate-limit store backing this transport. */
@@ -276,8 +289,15 @@ export class REST {
             () => this.#limiter.resolveBucketKey(route.route, route.major),
             options.signal,
             path,
-            (bucketKey) =>
-                this.#attempts<T>(route, requestPath, body, options, bucketKey),
+            (bucketKey, release) =>
+                this.#attempts<T>(
+                    route,
+                    requestPath,
+                    body,
+                    options,
+                    bucketKey,
+                    release,
+                ),
         );
     }
     /**
@@ -290,6 +310,7 @@ export class REST {
         body: unknown,
         options: RequestData,
         initialBucketKey: string,
+        release: () => void,
     ): Promise<T> {
         const { method, path } = route;
         let bucketKey = initialBucketKey;
@@ -299,6 +320,14 @@ export class REST {
             attempt++
         ) {
             await this.#limiter.acquire(bucketKey, options.signal, path);
+            // The reservation already claimed this request's unit, so once the
+            // bucket's window is known the next request need not wait for our
+            // response. An unknown bucket stays serial until a response
+            // reveals its limit.
+            if (this.#concurrentBuckets) {
+                const bucket = await this.#limiter.store.getBucket(bucketKey);
+                if (bucket && bucket.resetAt > Date.now()) release();
+            }
             this.#emit(this.#hooks.onRequest, { method, path, attempt });
             const requestStart = Date.now();
             let response: Response;

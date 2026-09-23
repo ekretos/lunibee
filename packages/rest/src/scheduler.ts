@@ -31,13 +31,14 @@ export class RequestScheduler {
      * @param resolveKey Returns the current bucket key for this request.
      * @param signal Cancellation signal honoured while queued.
      * @param path Request path, used for cancellation error context.
-     * @param task Work to run while holding the slot, given the final key.
+     * @param task Work to run while holding the slot, given the final key and
+     *   a callback that frees the slot early.
      */
     public async runResolved<T>(
         resolveKey: () => Promise<string>,
         signal: AbortSignal | undefined,
         path: string,
-        task: (key: string) => Promise<T>,
+        task: (key: string, release: () => void) => Promise<T>,
     ): Promise<T> {
         let key = await resolveKey();
         // A remap can only chain as far as route key -> shared hash, so a small
@@ -45,44 +46,52 @@ export class RequestScheduler {
         for (let hop = 0; hop < RequestScheduler.MAX_REMAPS; hop++) {
             const outcome = await this.run<
                 { done: true; value: T } | { done: false; key: string }
-            >(key, signal, path, async () => {
+            >(key, signal, path, async (release) => {
                 const current = await resolveKey();
                 if (current !== key) return { done: false, key: current };
-                return { done: true, value: await task(key) };
+                return { done: true, value: await task(key, release) };
             });
             if (outcome.done) return outcome.value;
             key = outcome.key;
         }
-        return this.run(key, signal, path, () => task(key));
+        return this.run(key, signal, path, (release) => task(key, release));
     }
 
     /**
-     * Runs `task` once every earlier task for `key` has settled.
+     * Runs `task` once every earlier task for `key` has settled, or has freed
+     * its slot early through the `release` callback it was given.
      * @param key Bucket key to serialise on.
      * @param signal Cancellation signal honoured while queued.
      * @param path Request path, used for cancellation error context.
-     * @param task Work to run while holding the slot.
+     * @param task Work to run while holding the slot, given an idempotent
+     *   callback that frees the slot before the task settles.
      */
     public async run<T>(
         key: string,
         signal: AbortSignal | undefined,
         path: string,
-        task: () => Promise<T>,
+        task: (release: () => void) => Promise<T>,
     ): Promise<T> {
         const previous = this.#queues.get(key) ?? Promise.resolve();
-        let release!: () => void;
+        let open!: () => void;
         const gate = new Promise<void>((resolve) => {
-            release = resolve;
+            open = resolve;
         });
         this.#queues.set(key, gate);
-        try {
-            await abortable(previous, signal, path);
-            return await task();
-        } finally {
-            release();
+        let released = false;
+        const release = (): void => {
+            if (released) return;
+            released = true;
+            open();
             // Drop our entry so idle buckets do not accumulate, but only if it
             // is still ours: a later request may already have replaced it.
             if (this.#queues.get(key) === gate) this.#queues.delete(key);
+        };
+        try {
+            await abortable(previous, signal, path);
+            return await task(release);
+        } finally {
+            release();
         }
     }
 }

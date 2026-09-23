@@ -5,6 +5,7 @@ const sleep = (ms: number): Promise<void> =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export { ShardBus } from "./bus.js";
+export type { ShardBusErrorHandler } from "./bus.js";
 export type { ShardMessage, ShardMessageHandler } from "./bus.js";
 
 export { ClusterManager } from "./cluster.js";

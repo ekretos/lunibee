@@ -11,9 +11,20 @@ import type { RateLimitStore } from "./store.js";
  */
 export class RateLimiter {
     readonly #store: RateLimitStore;
+    /** Whether responses may arrive out of order for one bucket. */
+    readonly #concurrent: boolean;
 
-    public constructor(store: RateLimitStore) {
+    /**
+     * @param store Rate-limit state store.
+     * @param options `concurrent`: set when several requests per bucket can be
+     *   in flight, so a late response cannot raise `remaining` within its window.
+     */
+    public constructor(
+        store: RateLimitStore,
+        options: { concurrent?: boolean } = {},
+    ) {
         this.#store = store;
+        this.#concurrent = options.concurrent ?? false;
     }
 
     /** The backing store, shared across processes when a distributed store is used. */
@@ -103,10 +114,10 @@ export class RateLimiter {
             currentKey = scopeBucket(serverBucket, major);
         }
 
-        const bucket = (await this.#store.getBucket(currentKey)) ?? {
-            remaining: 1,
-            resetAt: 0,
-        };
+        const stored = await this.#store.getBucket(currentKey);
+        const bucket = stored ? { ...stored } : { remaining: 1, resetAt: 0 };
+        const windowActive =
+            this.#concurrent && !!stored && stored.resetAt > Date.now();
         const remaining = Number(response.headers.get("X-RateLimit-Remaining"));
         const resetAfter = Number(
             response.headers.get("X-RateLimit-Reset-After"),
@@ -118,6 +129,12 @@ export class RateLimiter {
         if (Number.isFinite(resetAfter))
             bucket.resetAt = Date.now() + Math.max(0, resetAfter) * 1000;
         else if (Number.isFinite(reset)) bucket.resetAt = reset * 1000;
+        // With concurrent requests, responses from one window can arrive out of
+        // order: never let a late one hand back allowance already reserved.
+        if (windowActive && stored) {
+            bucket.remaining = Math.min(bucket.remaining, stored.remaining);
+            bucket.resetAt = Math.max(bucket.resetAt, stored.resetAt);
+        }
 
         if (response.status === 429) {
             const retryAfter = Number(response.headers.get("Retry-After"));
