@@ -12,6 +12,7 @@ export {
     /** Discord.js-familiar alias for {@link ClientEvent}. */
     ClientEvent as Events,
     type ClientEventName,
+    type ClientEvents,
     type ClientListener,
 } from "./events.js";
 export { Collector, type CollectorOptions } from "./collector.js";
@@ -36,7 +37,6 @@ import {
     Guild,
     Channel,
     Message,
-    Interaction,
     createInteraction,
     type InteractionClient,
     type InteractionData,
@@ -76,11 +76,10 @@ import type {
     APIChannelPinsUpdate,
     APIGuildMembersChunk,
     APIMessagePollVoteEvent,
-    APIThreadMember,
     ClientOptions,
     ClientUser,
 } from "@lunibee/types";
-import { ClientEvent } from "./events.js";
+import { ClientEvent, type ClientEvents } from "./events.js";
 
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
@@ -838,94 +837,3 @@ export class Client
         return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
     }
 }
-
-// ─── ClientEvents type map ────────────────────────────────────────────────────
-// Uses string literal keys so client.on("ready", ...) works without using
-// the ClientEvent enum explicitly.
-
-export type ClientEvents = {
-    // ── Lifecycle ──────────────────────────────────────────────────────────────
-    ready: [user: ClientUser];
-    resumed: [];
-    invalidSession: [isRecoverable: boolean];
-    raw: [data: { event: string; data: unknown }];
-    error: [error: Error];
-    open: [];
-    close: [data: { code: number; action: string }];
-    // ── Messages ───────────────────────────────────────────────────────────────
-    messageCreate: [message: Message];
-    messageUpdate: [message: Message];
-    messageDelete: [data: APIMessageDeleteEvent];
-    messageDeleteBulk: [data: APIMessageDeleteBulkEvent];
-    // ── Reactions ─────────────────────────────────────────────────────────────
-    messageReactionAdd: [data: APIMessageReactionEvent];
-    messageReactionRemove: [data: APIMessageReactionEvent];
-    messageReactionRemoveAll: [data: APIMessageDeleteEvent];
-    messageReactionRemoveEmoji: [data: APIMessageReactionRemoveEmojiEvent];
-    // ── Polls ─────────────────────────────────────────────────────────────────
-    messagePollVoteAdd: [data: APIMessagePollVoteEvent];
-    messagePollVoteRemove: [data: APIMessagePollVoteEvent];
-    // ── Guilds ────────────────────────────────────────────────────────────────
-    guildCreate: [data: APIGuild];
-    guildUpdate: [data: APIGuild];
-    guildDelete: [data: { id: string; unavailable?: boolean }];
-    guildAvailable: [data: APIGuild & { unavailable?: boolean }];
-    guildUnavailable: [data: { id: string; unavailable?: boolean }];
-    // ── Guild Members ──────────────────────────────────────────────────────────
-    guildMemberAdd: [member: APIGuildMember];
-    guildMemberUpdate: [member: APIGuildMember];
-    guildMemberRemove: [member: APIGuildMember];
-    guildMembersChunk: [data: APIGuildMembersChunk];
-    // ── Guild Bans ────────────────────────────────────────────────────────────
-    guildBanAdd: [data: APIGuildBanEvent];
-    guildBanRemove: [data: APIGuildBanEvent];
-    // ── Guild Roles ───────────────────────────────────────────────────────────
-    guildRoleCreate: [data: APIGuildRoleEvent];
-    guildRoleUpdate: [data: APIGuildRoleEvent];
-    guildRoleDelete: [data: APIGuildRoleDeleteEvent];
-    // ── Guild Emojis & Stickers ───────────────────────────────────────────────
-    guildEmojisUpdate: [data: APIGuildEmojisUpdateEvent];
-    guildStickersUpdate: [data: APIGuildStickersUpdateEvent];
-    // ── Guild Integrations ────────────────────────────────────────────────────
-    guildIntegrationsUpdate: [data: { guild_id: string }];
-    // ── Guild Scheduled Events ────────────────────────────────────────────────
-    guildScheduledEventCreate: [data: APIGuildScheduledEvent];
-    guildScheduledEventUpdate: [data: APIGuildScheduledEvent];
-    guildScheduledEventDelete: [data: APIGuildScheduledEvent];
-    guildScheduledEventUserAdd: [data: APIGuildScheduledEventUserEvent];
-    guildScheduledEventUserRemove: [data: APIGuildScheduledEventUserEvent];
-    // ── AutoMod ───────────────────────────────────────────────────────────────
-    autoModerationRuleCreate: [data: APIAutoModerationRule];
-    autoModerationRuleUpdate: [data: APIAutoModerationRule];
-    autoModerationRuleDelete: [data: APIAutoModerationRule];
-    autoModerationActionExecution: [data: APIAutoModerationActionExecution];
-    // ── Channels ──────────────────────────────────────────────────────────────
-    channelCreate: [channel: Channel];
-    channelUpdate: [channel: Channel];
-    channelDelete: [data: APIChannel];
-    channelPinsUpdate: [data: APIChannelPinsUpdate];
-    // ── Threads ───────────────────────────────────────────────────────────────
-    threadCreate: [channel: Channel];
-    threadUpdate: [channel: Channel];
-    threadDelete: [data: APIThreadEvent];
-    threadListSync: [data: APIThreadListSync];
-    threadMembersUpdate: [data: APIThreadMembersUpdate];
-    threadMemberUpdate: [data: APIThreadMember];
-    // ── Stage Instances ───────────────────────────────────────────────────────
-    stageInstanceCreate: [data: APIStageInstance];
-    stageInstanceUpdate: [data: APIStageInstance];
-    stageInstanceDelete: [data: APIStageInstance];
-    // ── Invites ───────────────────────────────────────────────────────────────
-    inviteCreate: [data: APIInviteCreate];
-    inviteDelete: [data: APIInviteDelete];
-    // ── Webhooks ──────────────────────────────────────────────────────────────
-    webhooksUpdate: [data: APIWebhooksUpdate];
-    // ── Voice ─────────────────────────────────────────────────────────────────
-    voiceStateUpdate: [data: APIVoiceState];
-    voiceServerUpdate: [data: APIVoiceServerUpdate];
-    // ── Presence & Typing ─────────────────────────────────────────────────────
-    presenceUpdate: [data: APIPresenceUpdate];
-    typingStart: [data: APITypingStart];
-    // ── Interactions ──────────────────────────────────────────────────────────
-    interactionCreate: [interaction: Interaction];
-};

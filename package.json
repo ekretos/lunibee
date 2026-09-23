@@ -97,9 +97,7 @@
     "ci:typecheck": "bun run typecheck",
     "ci:test": "bun test --coverage && bun test ./packages/testing/src",
     "ci": "bun run ci:deps && bun run format:check && bun run ci:typecheck && bun run ci:test",
-    "bench": "bun benchmarks/full.ts",
-    "bench:compare": "bun benchmarks/compare.ts",
-    "bench:stress": "bun benchmarks/stress.ts",
+    "bench": "bun benchmarks/parity.ts",
     "build:all": "bun run build && bun run build:dts",
     "publish:all": "bun run scripts/publish.ts"
   },
