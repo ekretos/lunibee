@@ -118,9 +118,8 @@ listed as incompatibilities — only genuine behavioural/wire/type mismatches ar
 
 ## Also observed (not encoded as failing tests)
 
-- **`tests/managers.test.ts` "GuildManager executes REST operations" fails** — a **test‑fixture
-  defect** (the mock returns `[]` for the single‑rule GET), not a library incompatibility. The impl
-  and its snowflake validation are correct. → Dev (managers). See `test-results.md`.
+- ~~`tests/managers.test.ts` "GuildManager executes REST operations" fails~~ — fixture fixed;
+  the test passes.
 - **`packages/lunibee` has no `package.json`** — latent packaging gap; `export * from
   "@lunibee/formatters"` is undeclared, so a clean source‑only test run can fail to resolve it until
   `dist/` is built. → Rohan / Arjun (packaging). See `test-results.md`.

@@ -68,10 +68,9 @@ event payloads, channel subclasses) need a design proposal first.
 1 → 2 (BUS-001, REST-003) → 3 → 4 → 2 (WS-004) → 5. Each step: small PR-sized change
 on `dev`, `bun run ci` green before push.
 
-Outcome: all additive aliases/helpers above landed (see the Status block in
+Phase 4 outcome: all additive aliases/helpers above landed (see the Status block in
 `remaining-gaps.md`), tested from the top-level `lunibee` barrel in
-`tests/compat.phase4.test.ts`. Still open: `IntentsBitField` class, `broadcastEval`,
-and the design-level items.
+`tests/compat.phase4.test.ts`; the rest was finished in the completion pass below.
 
 Phase 5 outcome: split `types/src/index.ts` (→ `gateway.ts`, `gateway-events.ts`),
 `structures/src/interactions.ts` (→ `options.ts`), and moved the `ClientEvents` map
@@ -79,9 +78,7 @@ next to `ClientEvent` in `core/src/events.ts` (one place per event). Merged nine
 one-line CI/review notes into `docs/ci.md` (removing claims of a non-existent
 OpenAI review workflow). `bench` now runs `benchmarks/parity.ts` (the old scripts
 pointed at missing files) and a non-blocking CI job publishes results to the job
-summary. **Open:** generating the API reference from TSDoc changes how
-`lunibee.js.org` is built (e.g. a Starlight TypeDoc plugin replacing the
-hand-written `reference/` pages) — needs a decision.
+summary. API reference generation was done in the completion pass below.
 
 ## Completion pass
 
