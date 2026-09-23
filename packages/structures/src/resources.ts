@@ -342,7 +342,10 @@ export class Emoji extends BaseStructure {
         animated?: boolean;
         available?: boolean;
     }) {
-        super(data.id ?? "unicode");
+        // Unicode emoji have no snowflake: pass the base check with a
+        // placeholder, then expose the documented "unicode" sentinel id.
+        super(data.id ?? "0");
+        if (data.id === null) (this as { id: string }).id = "unicode";
         this.name = data.name;
         this.roleIds = data.roles ?? [];
         this.user = data.user ? new User(data.user) : null;

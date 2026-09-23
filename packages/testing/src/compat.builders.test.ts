@@ -51,17 +51,14 @@ describe("EmbedBuilder → APIEmbed payload", () => {
         );
     });
     // discord.js EmbedBuilder.addFields accepts BOTH spread and a single array
-    // (RestOrArray). Lunibee only accepts spread, so addFields([...]) throws.
-    test.failing(
-        "addFields accepts an array argument (discord.js RestOrArray)",
-        () => {
-            const embed = new EmbedBuilder().addFields([
-                { name: "f1", value: "v1" },
-                { name: "f2", value: "v2" },
-            ] as unknown as { name: string; value: string });
-            expect(embed.toJSON().fields).toHaveLength(2);
-        },
-    );
+    // (RestOrArray); Lunibee matches.
+    test("addFields accepts an array argument (discord.js RestOrArray)", () => {
+        const embed = new EmbedBuilder().addFields([
+            { name: "f1", value: "v1" },
+            { name: "f2", value: "v2" },
+        ] as unknown as { name: string; value: string });
+        expect(embed.toJSON().fields).toHaveLength(2);
+    });
 });
 
 describe("ButtonBuilder → APIButtonComponent payload", () => {

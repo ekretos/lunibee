@@ -52,19 +52,14 @@ describe("Enum wire values — ButtonStyle", () => {
         expect(TypesButtonStyle.Link).toBe(5);
         expect(TypesButtonStyle.Premium).toBe(6);
     });
-    // @lunibee/builders ships its OWN ButtonStyle constant (a duplicate of the one in
-    // @lunibee/types) that is missing `Premium: 6`. A dev importing ButtonStyle from the
-    // builders package and calling .setStyle(ButtonStyle.Premium) gets undefined → an
-    // invalid Discord payload. The two definitions must not drift.
-    test.failing(
-        "builders ButtonStyle does not drift from the canonical types ButtonStyle",
-        () => {
-            for (const key of Object.keys(TypesButtonStyle) as Array<
-                keyof typeof TypesButtonStyle
-            >)
-                expect(BuildersButtonStyle[key]).toBe(TypesButtonStyle[key]);
-        },
-    );
+    // @lunibee/builders' ButtonStyle must not drift from @lunibee/types (e.g. `Premium: 6`),
+    // or .setStyle(ButtonStyle.Premium) would build an invalid Discord payload.
+    test("builders ButtonStyle does not drift from the canonical types ButtonStyle", () => {
+        for (const key of Object.keys(TypesButtonStyle) as Array<
+            keyof typeof TypesButtonStyle
+        >)
+            expect(BuildersButtonStyle[key]).toBe(TypesButtonStyle[key]);
+    });
 });
 
 describe("Enum wire values — ChannelType", () => {

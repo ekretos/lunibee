@@ -3,14 +3,14 @@
 _Baseline (dev, 2026-09-23): deps graph valid, typecheck clean, 312/312 tests pass,
 90.2% line coverage. All work lands on `dev`._
 
-## Phase 1 — CI & release hygiene (quick wins) — done except 1.2, 1.4
+## Phase 1 — CI & release hygiene (quick wins) — done except 1.2
 
 | # | Item | Why |
 |---|---|---|
 | 1.1 | Run CI on `dev` pushes/PRs (`ci.yml` only triggers on `master`/`main`) | dev changes are currently unvalidated |
 | 1.2 | Frozen-lockfile installs — **blocked**: with the isolated linker Bun 1.3.11 adds nested `@lunibee/*` entries to `bun.lock` on every install, so `--frozen-lockfile` always fails | reproducible installs |
 | 1.3 | Pin `bun-version` instead of `latest` | avoid surprise breakage |
-| 1.4 | Enforce coverage threshold — **deferred to Phase 3**: Bun applies `coverageThreshold` per file, and several files are below 90% | prevent regression |
+| 1.4 | Enforce coverage threshold — **done in Phase 3**: per-file `{ lines = 0.9, functions = 0.5 }` in `bunfig.toml` (Bun counts transpiler-generated functions, so a function threshold above 0.5 fails files with 100% line coverage) | prevent regression |
 | 1.5 | Add a lint/format check (`prettier --check`) job | `format` script exists, nothing enforces it |
 
 ## Phase 2 — Open reliability backlog (`docs/audits/reliability-backlog.md`) — BUS-001, REST-003 done
@@ -23,7 +23,7 @@ _Baseline (dev, 2026-09-23): deps graph valid, typecheck clean, 312/312 tests pa
 
 Each fix ships with a regression test in `tests/reliability.*.test.ts`.
 
-## Phase 3 — Test coverage gaps
+## Phase 3 — Test coverage gaps — done (lines 94.4% → 99.5%, functions 90.2% → 96.3%)
 
 Lowest-covered files (lines %):
 
@@ -39,6 +39,12 @@ Lowest-covered files (lines %):
 
 Also resolve the 5 `test.failing`/`skip`/`todo` markers (e.g. `createdTimestamp`
 compat test in `packages/testing` — getter now exists, so flip to `test`).
+
+Outcome: new `tests/coverage.phase3.test.ts` and `tests/sharding.cluster.test.ts`
+(mocked `fork`); the 5 `test.failing` compat tests now pass and were flipped, and
+`packages/testing` compat tests run in `ci:test`. Bugs found and fixed:
+`Emoji` with `id: null` (unicode) threw; `generateInvite` sent `scopes=` instead of
+Discord's `scope=`; `fetchInvite`/`fetchGuildTemplate` did not encode the code.
 
 ## Phase 4 — Compatibility gaps (`docs/compatibility/remaining-gaps.md`)
 

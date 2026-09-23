@@ -83,8 +83,7 @@ describe("Message hydration", () => {
         expect(typeof m.pin).toBe("function");
     });
     // discord.js exposes message.createdTimestamp (number) and message.createdAt (Date).
-    // Lunibee exposes only `timestamp` (Date); the createdTimestamp accessor is missing.
-    test.failing("exposes discord.js createdTimestamp accessor", () => {
+    test("exposes discord.js createdTimestamp accessor", () => {
         const m = new Message({
             ...base,
             timestamp: "2024-01-01T00:00:00.000Z",

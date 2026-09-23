@@ -794,7 +794,7 @@ export class Client
             );
         const qs = query.toString();
         return this.rest.get(
-            `/invites/${code}${qs ? `?${qs}` : ""}`,
+            `/invites/${encodeURIComponent(code)}${qs ? `?${qs}` : ""}`,
         ) as Promise<Record<string, unknown>>;
     }
 
@@ -814,9 +814,9 @@ export class Client
 
     /** Fetches a guild template from Discord. */
     public fetchGuildTemplate(code: string): Promise<Record<string, unknown>> {
-        return this.rest.get(`/guilds/templates/${code}`) as Promise<
-            Record<string, unknown>
-        >;
+        return this.rest.get(
+            `/guilds/templates/${encodeURIComponent(code)}`,
+        ) as Promise<Record<string, unknown>>;
     }
 
     /** Generates an invite link for this client. */
@@ -828,7 +828,7 @@ export class Client
             throw new Error("Client must be ready to generate invite.");
         const params = new URLSearchParams({
             client_id: this.user.id,
-            scopes: (options?.scopes ?? ["bot"]).join(" "),
+            scope: (options?.scopes ?? ["bot"]).join(" "),
         });
         if (options?.permissions) {
             params.set("permissions", String(options.permissions));
