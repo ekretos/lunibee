@@ -163,8 +163,12 @@ describe("Gateway zlib-stream (P0: compressed payloads)", () => {
             seen.push((data as { content: string }).content),
         );
 
+        // Take the socket this connect() creates (synchronously), not index 0:
+        // a gateway left over from another test file may reconnect into the
+        // shared stub while this test runs.
+        const created = FakeWebSocket.instances.length;
         const connecting = gateway.connect("wss://example.test");
-        const socket = FakeWebSocket.instances[0]!;
+        const socket = FakeWebSocket.instances[created]!;
         socket.open();
         await connecting;
         expect(socket.binaryType).toBe("arraybuffer");
@@ -201,8 +205,12 @@ describe("Gateway zlib-stream (P0: compressed payloads)", () => {
         );
         gateway.on("error", (error) => errors.push(error));
 
+        // Take the socket this connect() creates (synchronously), not index 0:
+        // a gateway left over from another test file may reconnect into the
+        // shared stub while this test runs.
+        const created = FakeWebSocket.instances.length;
         const connecting = gateway.connect("wss://example.test");
-        const socket = FakeWebSocket.instances[0]!;
+        const socket = FakeWebSocket.instances[created]!;
         socket.open();
         await connecting;
 
@@ -243,8 +251,12 @@ describe("Gateway handshake budget (P1: starved IDENTIFY)", () => {
             intents: 1,
             reconnect: false,
         });
+        // Take the socket this connect() creates (synchronously), not index 0:
+        // a gateway left over from another test file may reconnect into the
+        // shared stub while this test runs.
+        const created = FakeWebSocket.instances.length;
         const connecting = gateway.connect("wss://example.test");
-        const socket = FakeWebSocket.instances[0]!;
+        const socket = FakeWebSocket.instances[created]!;
         socket.open();
         await connecting;
 
