@@ -20,6 +20,7 @@ export {
     GatewayIntentBits,
     IntentBits,
     Intents,
+    IntentsBitField,
     resolveGatewayIntents,
     type GatewayIntentResolvable,
 } from "@lunibee/types";
@@ -29,6 +30,7 @@ import {
     ApplicationCommandManager,
     ChannelManager,
     GuildManager,
+    StageInstanceManager,
     UserManager,
 } from "@lunibee/managers";
 import { REST, Routes } from "@lunibee/rest";
@@ -175,6 +177,8 @@ export class Client
     public readonly users: UserManager;
     public readonly guilds: GuildManager;
     public readonly channels: ChannelManager;
+    /** Stage instances, cached by stage channel ID. */
+    public readonly stageInstances: StageInstanceManager;
     public readonly application: { commands: ApplicationCommandManager };
     public get ws(): Gateway {
         return this.#gateway;
@@ -227,6 +231,7 @@ export class Client
         this.users = new UserManager(this.rest);
         this.guilds = new GuildManager(this.rest);
         this.channels = new ChannelManager(this.rest);
+        this.stageInstances = new StageInstanceManager(this.rest);
         const placeholderAppCommands = new ApplicationCommandManager(
             this.rest,
             "0",

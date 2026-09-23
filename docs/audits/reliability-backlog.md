@@ -37,7 +37,7 @@ a monolithic class is debt (P2/P3); a handshake that silently never sends is P0/
 | BUS-001 | P2 | `packages/sharding` | Async shard-message handler rejections are swallowed | **Fixed** (`ShardBus.onError`) |
 | REST-006 | P2 | `packages/rest` | 429 without a `Retry-After` header retried with zero delay | **Fixed** |
 | CI-001 | P2 | repo | Tests were not executed by CI | **Fixed** |
-| WS-004 | P3 | `packages/ws` | `Gateway` is a single 800-line class | Open |
+| WS-004 | P3 | `packages/ws` | `Gateway` is a single 800-line class | **Fixed** (transport, heartbeat, session, reconnect, protocol, decoder, send budget and state modules) |
 
 ---
 

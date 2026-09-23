@@ -51,6 +51,8 @@ export interface ChannelCreateOptions extends Record<string, unknown> {
 }
 export type ChannelEditOptions = Record<string, unknown>;
 
+import { PermissionOverwriteManager } from "./guild-resources.js";
+
 export class ChannelManager extends Manager<string, Channel> {
     readonly #rest: REST;
     readonly #context: ResourceContext;
@@ -89,6 +91,10 @@ export class ChannelManager extends Manager<string, Channel> {
             this.#messageManagers.set(channelId, manager);
         }
         return manager;
+    }
+    /** Permission overwrite manager for a channel. */
+    public permissionOverwrites(channelId: string): PermissionOverwriteManager {
+        return new PermissionOverwriteManager(this.#rest, channelId);
     }
     public threads(channelId: string): ThreadManager {
         return new ThreadManager(this.#rest, this.#context, channelId);
@@ -399,6 +405,18 @@ export {
     type BanOptions,
 } from "./member.js";
 export { ApplicationCommandManager } from "./application.js";
+export {
+    GuildBanManager,
+    GuildScheduledEventManager,
+    StageInstanceManager,
+    PermissionOverwriteManager,
+    type APIBan,
+    type GuildBanCreateOptions,
+    type GuildScheduledEventOptions,
+    type StageInstanceCreateOptions,
+    type PermissionOverwriteOptions,
+    type PermissionOverwriteTargetType,
+} from "./guild-resources.js";
 export {
     EmojiManager,
     type EmojiCreateOptions,

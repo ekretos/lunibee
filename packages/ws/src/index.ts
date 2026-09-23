@@ -74,41 +74,9 @@ export { GatewayOpcodes } from "./opcodes.js";
 
 export { GatewayCloseCodes } from "./close-codes.js";
 
-/** Gateway connection lifecycle states. */
-export enum GatewayState {
-    /** Initial connection state. */ Connect = "CONNECT",
-    /** Gateway HELLO received state. */ Hello = "HELLO",
-    /** IDENTIFY operation in progress. */ Identify = "IDENTIFY",
-    /** RESUME operation in progress. */ Resume = "RESUME",
-    /** Gateway READY state. */ Ready = "READY",
-    /** Gateway dispatch processing state. */ Dispatch = "DISPATCH",
-    /** Heartbeat processing state. */ Heartbeat = "HEARTBEAT",
-    /** Reconnect in progress. */ Reconnect = "RECONNECT",
-    /** Gateway is permanently closed. */ Closed = "CLOSED",
-}
-/**
- * Discord.js-familiar alias for {@link GatewayState}.
- *
- * Discord.js exposes connection status via a `Status` enum. Lunibee's canonical
- * name is {@link GatewayState}; this is an additive alias so `discord.js` users
- * find the expected name. Note the *values* remain Lunibee's string states
- * (e.g. `"READY"`), not Discord.js's numeric `Status` members — an intentional
- * divergence documented in the compatibility matrix.
- */
-export { GatewayState as Status };
-/** Gateway protocol error. */
-export class GatewayError extends Error {
-    /** Gateway close/error code. */ public readonly code?: number;
-    /** Creates a Gateway error. @param message Error message. @param code Optional Gateway code. @param options Optional error metadata. */ public constructor(
-        message: string,
-        code?: number,
-        options?: ErrorOptions,
-    ) {
-        super(message, options);
-        this.name = "GatewayError";
-        this.code = code;
-    }
-}
+export { GatewayState, Status, GatewayError } from "./state.js";
+import { GatewayState, GatewayError } from "./state.js";
+import { SendBudget } from "./send-budget.js";
 /** Gateway connection configuration. */
 export interface GatewayOptions {
     /** Authentication token. */ token: string;
@@ -187,7 +155,8 @@ export class Gateway {
      */
     readonly #reconnect: GatewayReconnect;
     readonly #listeners = new Map<string, Set<GatewayListener>>();
-    readonly #sendTimestamps: number[] = [];
+    /** Application send budget under Discord's 120-per-60s limit. */
+    readonly #sendBudget = new SendBudget();
     public ping: number = -1;
     /** Creates a Gateway connection manager. @param options Gateway configuration. @throws {TypeError|RangeError} If configuration is invalid. */
     public constructor(options: GatewayOptions) {
@@ -382,19 +351,14 @@ export class Gateway {
     #dispatch(payload: GatewayPayload, privileged: boolean): boolean {
         if (!this.#transport.connected) return false;
         const now = Date.now();
-        while (
-            this.#sendTimestamps.length &&
-            now - this.#sendTimestamps[0]! >= 60000
-        )
-            this.#sendTimestamps.shift();
-        if (!privileged && this.#sendTimestamps.length >= 115) {
+        if (!this.#sendBudget.allows(privileged, now)) {
             this.#emitError(
                 new GatewayError("Gateway send rate budget exhausted."),
             );
             return false;
         }
         if (!this.#transport.send(JSON.stringify(payload))) return false;
-        this.#sendTimestamps.push(now);
+        this.#sendBudget.record(now);
         return true;
     }
     /** Sends a presence update. @param data Presence payload. @returns Whether it was sent. */

@@ -5,7 +5,18 @@ export interface ShardMessage<T = unknown> {
     /** Application message type. */ type: string;
     /** Message payload. */ data: T;
     /** Unique message ID. */ id: string;
+    /** Set on requests that expect a reply (see {@link ShardBus.request}). */ expectsReply?: boolean;
 }
+/** A reply collected by {@link ShardBus.broadcastRequest}. */
+export interface ShardReply<R = unknown> {
+    /** Replying shard ID. */ shardId: number;
+    /** Handler result, when it succeeded. */ result?: R;
+    /** Handler error message, when it failed. */ error?: string;
+}
+/** Internal reply envelope type. */
+const REPLY_TYPE = "__lunibee:reply";
+/** Payload carried by a reply envelope. */
+type ReplyPayload = { requestId: string; result?: unknown; error?: string };
 /** Handler invoked for shard messages. @typeParam T Message payload type. */
 export type ShardMessageHandler<T = unknown> = (
     message: ShardMessage<T>,
@@ -28,6 +39,8 @@ export class ShardBus {
     /** Application-specific channel namespace. */ readonly #namespace: string;
     /** BroadcastChannel name used by this bus. */ public readonly channelName: string;
     /** Monotonic message counter. */ #counter = 0;
+    /** Reply collectors for in-flight requests, by request message ID. */ readonly #pending =
+        new Map<string, (reply: ShardReply) => void>();
     /** Creates a shard bus. @param shardId Shard ID. @param channelName Application-specific channel name. @throws {RangeError} If shard ID is invalid. @throws {TypeError} If channel name is empty. */
     public constructor(shardId: number, channelName: string) {
         if (!Number.isInteger(shardId) || shardId < 0)
@@ -88,6 +101,97 @@ export class ShardBus {
     >(type: string, data: T): string {
         return this.#publish(null, type, data);
     }
+    /**
+     * Registers a handler that answers requests of `type`. Its return value (or
+     * thrown error) is sent back to the requesting shard. Discord.js-familiar
+     * replacement for `broadcastEval` that never evaluates received code.
+     * @returns This bus.
+     */
+    public respond<T, R>(
+        type: string,
+        handler: (data: T, message: ShardMessage<T>) => R | Promise<R>,
+    ): this {
+        return this.on<T>(type, async (message) => {
+            if (!message.expectsReply) return;
+            const reply: ReplyPayload = { requestId: message.id };
+            try {
+                reply.result = await handler(message.data, message);
+            } catch (error) {
+                reply.error =
+                    error instanceof Error ? error.message : String(error);
+            }
+            this.#publish(message.source, REPLY_TYPE, reply);
+        });
+    }
+    /**
+     * Sends a request to one shard and resolves with its handler's result.
+     * @throws {Error} If the handler failed or no reply arrives in time.
+     */
+    public async request<R = unknown, T = unknown>(
+        target: number,
+        type: string,
+        data: T,
+        timeoutMs = 5000,
+    ): Promise<R> {
+        if (!Number.isInteger(target) || target < 0)
+            throw new RangeError(
+                "Shard target must be a non-negative integer.",
+            );
+        const [reply] = await this.#collect<R>(
+            target,
+            type,
+            data,
+            timeoutMs,
+            1,
+        );
+        if (!reply)
+            throw new Error(
+                `Shard ${target} did not reply to "${type}" within ${timeoutMs}ms.`,
+            );
+        if (reply.error !== undefined) throw new Error(reply.error);
+        return reply.result as R;
+    }
+    /**
+     * Sends a request to every other shard and collects replies until
+     * `expected` have arrived or `timeoutMs` elapses (never rejects).
+     */
+    public broadcastRequest<R = unknown, T = unknown>(
+        type: string,
+        data: T,
+        options: { timeoutMs?: number; expected?: number } = {},
+    ): Promise<ShardReply<R>[]> {
+        return this.#collect<R>(
+            null,
+            type,
+            data,
+            options.timeoutMs ?? 5000,
+            options.expected ?? Number.POSITIVE_INFINITY,
+        );
+    }
+    /** Publishes a request and gathers replies. */
+    #collect<R>(
+        target: number | null,
+        type: string,
+        data: unknown,
+        timeoutMs: number,
+        expected: number,
+    ): Promise<ShardReply<R>[]> {
+        const replies: ShardReply<R>[] = [];
+        return new Promise((resolve) => {
+            let requestId = "";
+            const finish = (): void => {
+                clearTimeout(timer);
+                this.#pending.delete(requestId);
+                resolve(replies);
+            };
+            const timer = setTimeout(finish, timeoutMs);
+            requestId = this.#publish(target, type, data, true);
+            this.#pending.set(requestId, (reply) => {
+                replies.push(reply as ShardReply<R>);
+                if (replies.length >= expected) finish();
+            });
+        });
+    }
     /** Closes the transport. @returns Nothing. */ public close(): void {
         this.#channel.close();
         this.#handlers.clear();
@@ -95,7 +199,12 @@ export class ShardBus {
     }
     /** Publishes a message. @param target Target shard ID or null. @param type Message type. @param data Payload. @returns Unique message ID. */ #publish<
         T,
-    >(target: number | null, type: string, data: T): string {
+    >(
+        target: number | null,
+        type: string,
+        data: T,
+        expectsReply = false,
+    ): string {
         if (!type.trim())
             throw new TypeError("Shard message type is required.");
         const id = `${this.#namespace}:${this.#shardId}:${++this.#counter}`;
@@ -105,6 +214,7 @@ export class ShardBus {
             type,
             data,
             id,
+            ...(expectsReply ? { expectsReply } : {}),
         } satisfies ShardMessage<T>);
         return id;
     }
@@ -122,6 +232,16 @@ export class ShardBus {
             (message.target !== null && message.target !== this.#shardId)
         )
             return;
+        if (message.type === REPLY_TYPE) {
+            const reply = message.data as ReplyPayload;
+            this.#pending.get(reply?.requestId)?.({
+                shardId: message.source,
+                ...(reply.error !== undefined
+                    ? { error: reply.error }
+                    : { result: reply.result }),
+            });
+            return;
+        }
         for (const handler of this.#handlers.get(message.type) ?? []) {
             try {
                 const result = handler(message);

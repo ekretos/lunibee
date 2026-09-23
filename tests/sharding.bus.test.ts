@@ -48,4 +48,34 @@ describe("ShardBus", () => {
         shard0.close();
         shard1.close();
     });
+
+    test("request/respond and broadcastRequest collect replies", async () => {
+        const channel = `lunibee-test-${crypto.randomUUID()}`;
+        const [a, b, c] = [0, 1, 2].map((id) => new ShardBus(id, channel));
+        b!.respond<number, number>("double", (n) => n * 2);
+        c!.respond<number, number>("double", async (n) => n * 3);
+        b!.respond("fail", () => {
+            throw new Error("nope");
+        });
+        expect(await a!.request<number>(1, "double", 4)).toBe(8);
+        await expect(a!.request(1, "fail", null)).rejects.toThrow("nope");
+        await expect(a!.request(2, "missing", null, 30)).rejects.toThrow(
+            /did not reply/,
+        );
+        const replies = await a!.broadcastRequest<number>("double", 5, {
+            expected: 2,
+        });
+        expect(replies.map((r) => [r.shardId, r.result]).sort()).toEqual([
+            [1, 10],
+            [2, 15],
+        ]);
+        const partial = await a!.broadcastRequest("fail", null, {
+            timeoutMs: 30,
+        });
+        expect(partial).toEqual([{ shardId: 1, error: "nope" }]);
+        // Plain sends to a responder type are ignored (no reply expected).
+        a!.send(1, "double", 1);
+        await Bun.sleep(10);
+        for (const bus of [a, b, c]) bus!.close();
+    });
 });

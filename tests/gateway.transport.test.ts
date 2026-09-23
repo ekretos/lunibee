@@ -391,3 +391,21 @@ describe("ZlibStreamDecoder", () => {
         expect(decoder.push('{"op":11}')).toEqual(['{"op":11}']);
     });
 });
+
+import { SendBudget } from "../packages/ws/src/send-budget.ts";
+
+describe("SendBudget", () => {
+    test("caps application sends per window but never privileged ones", () => {
+        const budget = new SendBudget(2, 1000);
+        expect(budget.allows(false, 0)).toBe(true);
+        budget.record(0);
+        budget.record(10);
+        expect(budget.allows(false, 20)).toBe(false);
+        expect(budget.allows(true, 20)).toBe(true);
+        budget.record(20);
+        expect(budget.used).toBe(3);
+        expect(budget.allows(false, 1005)).toBe(false);
+        expect(budget.allows(false, 1021)).toBe(true);
+        expect(budget.used).toBe(0);
+    });
+});

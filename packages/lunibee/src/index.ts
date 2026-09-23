@@ -101,6 +101,7 @@ export {
     GatewayIntentBits,
     IntentBits,
     Intents,
+    IntentsBitField,
     resolveGatewayIntents,
     MessageFlags,
     ChannelType,
