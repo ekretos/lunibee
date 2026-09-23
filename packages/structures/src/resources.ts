@@ -159,7 +159,7 @@ export class Role extends BaseStructure {
         return cdnURL(`/role-icons/${this.id}`, this.iconHash, options);
     }
 
-    /** Whether this is the @everyone base role (its ID equals the guild ID). */
+    /** Whether this is the `@everyone` base role (its ID equals the guild ID). */
     public isEveryone(guildId: string): boolean {
         return this.id === guildId;
     }
@@ -179,10 +179,10 @@ export class TextChannel extends Channel {
         data: {
             id: string;
             type: number;
-            name?: string;
+            name?: string | null;
             parent_id?: string | null;
             guild_id?: string;
-        },
+        } & Partial<import("@lunibee/types").APIChannel>,
         context?: import("./base.js").ResourceContext,
     ) {
         super(data, context);

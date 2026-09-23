@@ -221,6 +221,26 @@ export class Channel extends BaseStructure {
         return this.edit(options);
     }
 
+    /** Whether this is a thread (announcement, public or private). */
+    public isThread(): boolean {
+        return this.type === 10 || this.type === 11 || this.type === 12;
+    }
+
+    /** Whether messages can be sent in this channel (text, DM, announcement, voice, stage, threads). */
+    public isTextBased(): boolean {
+        return [0, 1, 2, 3, 5, 10, 11, 12, 13].includes(this.type);
+    }
+
+    /** Whether this is a voice or stage channel. */
+    public isVoiceBased(): boolean {
+        return this.type === 2 || this.type === 13;
+    }
+
+    /** Whether this is a direct-message channel (DM or group DM). */
+    public isDMBased(): boolean {
+        return this.type === 1 || this.type === 3;
+    }
+
     /** Returns the Discord channel mention string. Used automatically in template literals. */
     public override toString(): string {
         return `<#${this.id}>`;

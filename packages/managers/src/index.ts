@@ -6,6 +6,7 @@ import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
 import {
     Channel,
+    createChannel,
     Message,
     User,
     Guild,
@@ -111,7 +112,7 @@ export class ChannelManager extends Manager<string, Channel> {
     }
     public upsert(data: ConstructorParameters<typeof Channel>[0]): Channel {
         const existing = this.get(data.id);
-        const channel = new Channel(data, this.#context);
+        const channel = createChannel(data, this.#context);
         if (existing) {
             Object.assign(existing, channel);
             return existing;

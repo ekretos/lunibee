@@ -75,8 +75,10 @@ try {
     await Bun.write(auditConfig, JSON.stringify({
         compilerOptions: {
             target: "ES2022",
-            module: "NodeNext",
-            moduleResolution: "NodeNext",
+            module: "ESNext",
+            moduleResolution: "Bundler",
+            types: ["bun"],
+            typeRoots: [join(root.pathname, "node_modules/@types")],
             declaration: true,
             emitDeclarationOnly: true,
             noEmitOnError: false,
@@ -86,7 +88,7 @@ try {
             skipLibCheck: true,
             allowImportingTsExtensions: false
         },
-        include: packages.map(name => `packages/${name}/src/index.ts`)
+        include: packages.map(name => join(root.pathname, `packages/${name}/src/index.ts`))
     }, null, 2));
 
     const tsc = Bun.spawnSync(["bunx", "--bun", "tsc", "--project", auditConfig], {

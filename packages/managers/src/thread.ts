@@ -1,5 +1,9 @@
 import { REST, Routes } from "@lunibee/rest";
-import { Channel, type ResourceContext } from "@lunibee/structures";
+import {
+    Channel,
+    createChannel,
+    type ResourceContext,
+} from "@lunibee/structures";
 
 /** Manages thread resources created from a parent channel. */
 export class ThreadManager {
@@ -33,6 +37,6 @@ export class ThreadManager {
             auto_archive_duration: options.autoArchiveDuration,
             rate_limit_per_user: options.rateLimitPerUser,
         });
-        return new Channel(data, this.#context);
+        return createChannel(data, this.#context);
     }
 }

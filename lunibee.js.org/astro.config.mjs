@@ -1,5 +1,6 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import starlightTypeDoc, { typeDocSidebarGroup } from "starlight-typedoc";
 
 const site = process.env.ASTRO_SITE || "https://lunibee.js.org";
 const base = process.env.ASTRO_BASE || undefined;
@@ -24,6 +25,17 @@ export default defineConfig({
         },
       ],
       customCss: ["./src/styles/custom.css"],
+      // Generated API reference (TSDoc) for the public `lunibee` barrel,
+      // served under /api/ next to the hand-written guides and reference.
+      plugins: [
+        starlightTypeDoc({
+          entryPoints: ["../packages/lunibee/src/index.ts"],
+          tsconfig: "../tsconfig.json",
+          output: "api",
+          sidebar: { label: "Generated API", collapsed: true },
+          typeDoc: { excludePrivate: true, excludeInternal: true },
+        }),
+      ],
       sidebar: [
         {
           label: "Getting Started",
@@ -147,6 +159,7 @@ export default defineConfig({
             },
           ],
         },
+        typeDocSidebarGroup,
         {
           label: "Guides & Recipes",
           items: [

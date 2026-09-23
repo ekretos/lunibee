@@ -8,6 +8,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@lunibee/types": "file:../types"
+    "@lunibee/types": "workspace:*"
   }
 }

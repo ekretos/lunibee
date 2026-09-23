@@ -163,3 +163,110 @@ describe("guild resource managers", () => {
         ]);
     });
 });
+
+import {
+    Channel,
+    TextChannel,
+    NewsChannel,
+    DMChannel,
+    VoiceChannel,
+    StageChannel,
+    CategoryChannel,
+    ThreadChannel,
+    ForumChannel,
+    MediaChannel,
+    createChannel,
+} from "../packages/lunibee/src/index.ts";
+
+describe("channel subclasses", () => {
+    const make = (type: number, extra: Record<string, unknown> = {}) =>
+        createChannel({ id: "1", type, ...extra } as never);
+
+    test("createChannel picks the most specific class", () => {
+        const cases: [number, unknown][] = [
+            [0, TextChannel],
+            [1, DMChannel],
+            [2, VoiceChannel],
+            [3, DMChannel],
+            [4, CategoryChannel],
+            [5, NewsChannel],
+            [10, ThreadChannel],
+            [11, ThreadChannel],
+            [12, ThreadChannel],
+            [13, StageChannel],
+            [15, ForumChannel],
+            [16, MediaChannel],
+            [14, Channel],
+        ];
+        for (const [type, cls] of cases) {
+            const channel = make(type);
+            expect(channel.constructor).toBe(cls as never);
+            expect(channel).toBeInstanceOf(Channel);
+        }
+    });
+
+    test("type guards", () => {
+        expect(make(11).isThread()).toBe(true);
+        expect(make(0).isThread()).toBe(false);
+        expect(make(13).isVoiceBased()).toBe(true);
+        expect(make(4).isTextBased()).toBe(false);
+        expect(make(2).isTextBased()).toBe(true);
+        expect(make(3).isDMBased()).toBe(true);
+        expect(make(0).isDMBased()).toBe(false);
+    });
+
+    test("subclass fields", () => {
+        const voice = make(2, {
+            bitrate: 96000,
+            user_limit: 5,
+            rtc_region: "us",
+        }) as VoiceChannel;
+        expect([voice.bitrate, voice.userLimit, voice.rtcRegion]).toEqual([
+            96000,
+            5,
+            "us",
+        ]);
+        const defaults = make(13) as StageChannel;
+        expect([
+            defaults.bitrate,
+            defaults.userLimit,
+            defaults.rtcRegion,
+        ]).toEqual([64000, 0, null]);
+        const thread = make(11, {
+            owner_id: "9",
+            message_count: 3,
+            thread_metadata: {
+                archived: true,
+                locked: false,
+                auto_archive_duration: 60,
+                archive_timestamp: "",
+            },
+        }) as ThreadChannel;
+        expect([thread.ownerId, thread.messageCount, thread.archived]).toEqual([
+            "9",
+            3,
+            true,
+        ]);
+        expect([thread.locked, thread.autoArchiveDuration]).toEqual([
+            false,
+            60,
+        ]);
+        const bare = make(12) as ThreadChannel;
+        expect([bare.archived, bare.locked, bare.autoArchiveDuration]).toEqual([
+            false,
+            false,
+            null,
+        ]);
+        const dm = make(1, {
+            recipients: [{ id: "2", username: "u" }],
+        }) as DMChannel;
+        expect(dm.recipients[0]!.id).toBe("2");
+        expect(dm.ownerId).toBeNull();
+        const forum = make(15, {
+            available_tags: [{ id: "1", name: "t" }],
+        }) as ForumChannel;
+        expect(forum.availableTags).toHaveLength(1);
+        expect(forum.defaultReactionEmoji).toBeNull();
+        expect(forum.defaultThreadRateLimitPerUser).toBe(0);
+    });
+});

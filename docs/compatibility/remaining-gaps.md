@@ -15,9 +15,15 @@ SelectMenuBuilder` · exported `ContextMenuCommandBuilder` with `setType()` · `
 alias · voice `joinVoiceChannel`, `getVoiceConnection`, `createAudioPlayer`,
 `createAudioResource`, `entersState`, `VoiceConnectionStatus` alias · `ShardingManager` alias.
 
-**Open:** `IntentsBitField` (discord.js's is a `BitField` class, not a plain alias of
-`Intents`; needs a small class) · `broadcastEval`/`Shard` mapping · design-level items:
-wrapped event payloads (Rohan #4), extra managers (Dev #5), channel subclasses (Dev #7).
+Also done: `IntentsBitField` class · `ShardBus.respond`/`request`/`broadcastRequest`
+(replaces `broadcastEval`) · managers `GuildBanManager`, `GuildScheduledEventManager`,
+`StageInstanceManager`, `PermissionOverwriteManager` (Dev #5) · channel subclasses
+`TextChannel`, `NewsChannel`, `DMChannel`, `VoiceChannel`, `StageChannel`,
+`CategoryChannel`, `ThreadChannel`, `ForumChannel`, `MediaChannel` via `createChannel()`,
+plus `isThread()`/`isTextBased()`/`isVoiceBased()`/`isDMBased()` (Dev #7).
+
+**Decided, not planned:** wrapped event payloads (Rohan #4) and `broadcastEval` — see
+"Decided divergences" in `known-incompatibilities.md`. Nothing else is open.
 
 ## A. Cross-cutting coordination flags
 

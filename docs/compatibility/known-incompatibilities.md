@@ -16,6 +16,23 @@ Naming caveat: Lunibee intentionally keeps its own naming in places (route helpe
 interaction‑response enum key names). Those are **allowed** per the mission board and are **not**
 listed as incompatibilities — only genuine behavioural/wire/type mismatches are.
 
+> **Status 2026-09-23:** KI‑1 to KI‑5 are all resolved; their `test.failing` markers were
+> flipped to `test` and the compat suite runs in `ci:test`.
+
+## Decided divergences (by design, not planned)
+
+- **Events emit raw payloads for non-core entities.** e.g. `guildMemberAdd` emits
+  `APIGuildMember`, not a `GuildMember` structure. Changing payload types would break every
+  existing handler, and raw payloads keep dispatch allocation-free. Wrap on demand with the
+  exported constructors (`new GuildMember(data)`, `createChannel(data)`). Messages,
+  channels, users and interactions are already emitted as structures.
+- **`broadcastEval` is not provided.** It ships code as a string and `eval`s it on every
+  shard. Use `ShardBus.respond(type, handler)` with `request()` / `broadcastRequest()`
+  instead: same fan-out-and-collect shape, without executing received code.
+- **Voice `stateChange` argument order differs per class**: `VoiceConnection` emits
+  `(next, previous)`, `AudioPlayer` emits `(from, to)`. Kept for backwards compatibility;
+  `entersState()` handles both.
+
 ---
 
 ## KI‑1 — `@lunibee/builders` exports a duplicate `ButtonStyle` missing `Premium` — **High**

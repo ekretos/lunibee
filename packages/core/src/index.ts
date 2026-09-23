@@ -37,7 +37,7 @@ import { REST, Routes } from "@lunibee/rest";
 import {
     User,
     Guild,
-    Channel,
+    createChannel,
     Message,
     createInteraction,
     type InteractionClient,
@@ -398,7 +398,7 @@ export class Client
             ])
                 this.channels.set(
                     channelData.id,
-                    new Channel(channelData, this.#resourceContext),
+                    createChannel(channelData, this.#resourceContext),
                 );
             this.emit(
                 wasCached
@@ -547,7 +547,7 @@ export class Client
 
         // ── Channels ─────────────────────────────────────────────────────────────
         this.#gateway.on("CHANNEL_CREATE", (data) => {
-            const channel = new Channel(
+            const channel = createChannel(
                 data as APIChannel,
                 this.#resourceContext,
             );
@@ -555,7 +555,7 @@ export class Client
             this.emit(ClientEvent.ChannelCreate, channel);
         });
         this.#gateway.on("CHANNEL_UPDATE", (data) => {
-            const channel = new Channel(
+            const channel = createChannel(
                 data as APIChannel,
                 this.#resourceContext,
             );
@@ -576,7 +576,7 @@ export class Client
 
         // ── Threads ──────────────────────────────────────────────────────────────
         this.#gateway.on("THREAD_CREATE", (data) => {
-            const channel = new Channel(
+            const channel = createChannel(
                 data as APIThreadEvent,
                 this.#resourceContext,
             );
@@ -584,7 +584,7 @@ export class Client
             this.emit(ClientEvent.ThreadCreate, channel);
         });
         this.#gateway.on("THREAD_UPDATE", (data) => {
-            const channel = new Channel(
+            const channel = createChannel(
                 data as APIThreadEvent,
                 this.#resourceContext,
             );

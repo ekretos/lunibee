@@ -10,7 +10,20 @@ description: Lunibee version history and release notes.
 * **`ShardManager.spawnDelay` now defaults to `5000` ms** (`ShardManager.IDENTIFY_INTERVAL`). Discord permits one IDENTIFY per 5 seconds; starting shards back to back earned close code `4008` and invalid-session churn. An *N*-shard bot now takes about `(N - 1) × 5s` to connect. Pass `spawnDelay: 0` to opt out.
 * **`ClusterManager` supervises its children.** A cluster that exits unexpectedly is re-forked with the same shard assignment after `restartDelay` (5000 ms). Disable with `restartOnExit: false`; observe with `onClusterExit`.
 
+### ✨ Features
+
+* **Discord.js-familiar API**: `Events`, `IntentsBitField`, `CachedManager`, `ShardingManager`, `StringSelectMenuBuilder` / `User`/`Role`/`Mentionable`/`ChannelSelectMenuBuilder`, exported `ContextMenuCommandBuilder` with `setType()`, interaction guards (`isButton()`, `isStringSelectMenu()`, `isAnySelectMenu()`, …) and `interaction.options.getFocused()` for autocomplete.
+* **Channel subclasses**: `createChannel()` returns `TextChannel`, `NewsChannel`, `DMChannel`, `VoiceChannel`, `StageChannel`, `CategoryChannel`, `ThreadChannel`, `ForumChannel` or `MediaChannel` (all extend `Channel`); channels emitted by the client use it. New `isThread()`, `isTextBased()`, `isVoiceBased()`, `isDMBased()`.
+* **Managers**: `guilds.bans(id)`, `guilds.scheduledEvents(id)`, `channels.permissionOverwrites(id)` and `client.stageInstances`.
+* **Voice helpers**: `joinVoiceChannel`, `getVoiceConnection`, `createAudioPlayer`, `createAudioResource`, `entersState`, `VoiceConnectionStatus`.
+* **Sharding**: `ShardBus.onError()` receives handler failures; `ShardBus.respond()` with `request()` / `broadcastRequest()` for cross-shard queries.
+* **REST**: opt-in `concurrentBuckets` runs requests on a known bucket in parallel up to its remaining allowance.
+
 ### 🐛 Bug Fixes
+
+* **Emoji**: constructing a unicode emoji (`id: null`) threw.
+* **Invites**: `client.generateInvite()` sent `scopes=` instead of Discord's `scope=`, so invite links lacked the bot scope. `fetchInvite` / `fetchGuildTemplate` now URL-encode the code.
+* **Bans**: `GuildMemberManager.ban()` ignored `reason`.
 
 * **Gateway compression**: `compress: true` previously decoded nothing. Discord's `zlib-stream` is zlib-wrapped, but the decoder used raw deflate and drained output on a 50 ms timer, dropping and reordering frames. Frames are now decoded with a persistent inflate stream on the `Z_SYNC_FLUSH` boundary, strictly in arrival order.
 * **Gateway sessions**: `connect()` on an already-connected `Gateway` opened a second socket and left the first one dispatching, interleaving two sequence streams and corrupting later RESUMEs. `connect()` is now idempotent and cancels any pending reconnect.

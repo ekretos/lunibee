@@ -8,6 +8,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@lunibee/ws": "file:../ws"
+    "@lunibee/ws": "workspace:*"
   }
 }

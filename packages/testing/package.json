@@ -11,13 +11,13 @@
     "test:compat": "bun test ./src/compat.*.test.ts"
   },
   "dependencies": {
-    "@lunibee/rest": "file:../rest",
-    "@lunibee/managers": "file:../managers",
-    "@lunibee/builders": "file:../builders",
-    "@lunibee/structures": "file:../structures",
-    "@lunibee/collection": "file:../collection",
-    "@lunibee/core": "file:../core",
-    "@lunibee/types": "file:../types"
+    "@lunibee/rest": "workspace:*",
+    "@lunibee/managers": "workspace:*",
+    "@lunibee/builders": "workspace:*",
+    "@lunibee/structures": "workspace:*",
+    "@lunibee/collection": "workspace:*",
+    "@lunibee/core": "workspace:*",
+    "@lunibee/types": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest"

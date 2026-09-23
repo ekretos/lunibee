@@ -3,17 +3,17 @@
 _Baseline (dev, 2026-09-23): deps graph valid, typecheck clean, 312/312 tests pass,
 90.2% line coverage. All work lands on `dev`._
 
-## Phase 1 — CI & release hygiene (quick wins) — done except 1.2
+## Phase 1 — CI & release hygiene (quick wins) — done
 
 | # | Item | Why |
 |---|---|---|
 | 1.1 | Run CI on `dev` pushes/PRs (`ci.yml` only triggers on `master`/`main`) | dev changes are currently unvalidated |
-| 1.2 | Frozen-lockfile installs — **blocked**: with the isolated linker Bun 1.3.11 adds nested `@lunibee/*` entries to `bun.lock` on every install, so `--frozen-lockfile` always fails | reproducible installs |
+| 1.2 | Frozen-lockfile installs — **done**: the churn came from internal `file:../x` dependencies; switching them to `workspace:*` makes `bun.lock` stable, so it is committed and CI uses `--frozen-lockfile` | reproducible installs |
 | 1.3 | Pin `bun-version` instead of `latest` | avoid surprise breakage |
 | 1.4 | Enforce coverage threshold — **done in Phase 3**: per-file `{ lines = 0.9, functions = 0.5 }` in `bunfig.toml` (Bun counts transpiler-generated functions, so a function threshold above 0.5 fails files with 100% line coverage) | prevent regression |
 | 1.5 | Add a lint/format check (`prettier --check`) job | `format` script exists, nothing enforces it |
 
-## Phase 2 — Open reliability backlog (`docs/audits/reliability-backlog.md`) — BUS-001, REST-003 done
+## Phase 2 — Open reliability backlog (`docs/audits/reliability-backlog.md`) — done
 
 | ID | Pri | Item |
 |---|---|---|
@@ -46,7 +46,7 @@ Outcome: new `tests/coverage.phase3.test.ts` and `tests/sharding.cluster.test.ts
 `Emoji` with `id: null` (unicode) threw; `generateInvite` sent `scopes=` instead of
 Discord's `scope=`; `fetchInvite`/`fetchGuildTemplate` did not encode the code.
 
-## Phase 4 — Compatibility gaps (`docs/compatibility/remaining-gaps.md`) — low-risk items done
+## Phase 4 — Compatibility gaps (`docs/compatibility/remaining-gaps.md`) — done
 
 Re-verify the list (several items appear done: `DiscordAPIError`, `guildAvailable`,
 `createdTimestamp`), mark completed items, then implement remaining low-risk additive
@@ -54,7 +54,7 @@ aliases first: interaction guards (`isButton`, `isStringSelectMenu`), select-men
 aliases, `ContextMenuCommandBuilder`, voice factory wrappers. Breaking items (wrapped
 event payloads, channel subclasses) need a design proposal first.
 
-## Phase 5 — Maintainability & docs — done except API reference generation
+## Phase 5 — Maintainability & docs — done
 
 - Break up largest modules: `types/src/index.ts` (1176), `core/src/index.ts` (929),
   `structures/src/interactions.ts` (719).
@@ -82,4 +82,17 @@ pointed at missing files) and a non-blocking CI job publishes results to the job
 summary. **Open:** generating the API reference from TSDoc changes how
 `lunibee.js.org` is built (e.g. a Starlight TypeDoc plugin replacing the
 hand-written `reference/` pages) — needs a decision.
+
+## Completion pass
+
+- WS-004: `Gateway` send budget and state/error types extracted (`send-budget.ts`,
+  `state.ts`), completing the transport/heartbeat/session/reconnect/protocol split.
+- `IntentsBitField`; `ShardBus.respond`/`request`/`broadcastRequest`; the four missing
+  guild resource managers; channel subclasses with `createChannel()`; fixed
+  `GuildMemberManager.ban` dropping its audit-log reason.
+- Generated API reference: `starlight-typedoc` (already a docs dependency) now builds
+  `/api/` from TSDoc alongside the hand-written pages.
+- `audit:api` wired into `bun run ci` and CI (its temp tsconfig resolved no inputs before).
+- Wrapped event payloads and `broadcastEval` are recorded as deliberate divergences in
+  `known-incompatibilities.md`. No plan items remain open.
 
