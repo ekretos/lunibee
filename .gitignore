@@ -24,6 +24,7 @@ roster.json
 *.temp
 *.swp
 *.lock
+!bun.lock
 
 benchmarks/
 

@@ -11,8 +11,7 @@ export interface BucketState {
  * several workers share a store.
  */
 export type Reservation =
-    | { granted: true }
-    | { granted: false; retryAfterMs: number };
+    { granted: true } | { granted: false; retryAfterMs: number };
 
 /** Interface for distributed or local rate limit synchronization. */
 export interface RateLimitStore {

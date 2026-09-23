@@ -23,8 +23,7 @@ export interface ResumeInfo {
  * an undefined session" is not a state this codebase can express.
  */
 export type HandshakeIntent =
-    | ({ type: "resume" } & ResumeInfo)
-    | { type: "identify" };
+    ({ type: "resume" } & ResumeInfo) | { type: "identify" };
 
 /** Internal session state. `none` and `established` are the only possibilities. */
 type SessionState =

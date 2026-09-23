@@ -15,8 +15,7 @@ export interface ShardManagerOptions {
     /** Bot token. */ token: string;
     /** Gateway intents. */ intents: number;
     /** Number of shards. Use `"auto"` to request Discord's recommended count. */ shardCount?:
-        | number
-        | "auto";
+        number | "auto";
     /** Gateway reconnect behavior. */ reconnect?: boolean;
     /**
      * Delay between shard starts in milliseconds. Defaults to 5000 to respect
