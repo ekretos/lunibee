@@ -217,3 +217,6 @@ export class ShardManager {
         });
     }
 }
+
+/** Discord.js-familiar alias for {@link ShardManager}. */
+export { ShardManager as ShardingManager };

@@ -1,5 +1,7 @@
 import { Manager, ResourceManager } from "./base.js";
 export { Manager, ResourceManager } from "./base.js";
+/** Discord.js-familiar alias for {@link ResourceManager}. */
+export { ResourceManager as CachedManager } from "./base.js";
 import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
 import {

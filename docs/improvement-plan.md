@@ -46,7 +46,7 @@ Outcome: new `tests/coverage.phase3.test.ts` and `tests/sharding.cluster.test.ts
 `Emoji` with `id: null` (unicode) threw; `generateInvite` sent `scopes=` instead of
 Discord's `scope=`; `fetchInvite`/`fetchGuildTemplate` did not encode the code.
 
-## Phase 4 — Compatibility gaps (`docs/compatibility/remaining-gaps.md`)
+## Phase 4 — Compatibility gaps (`docs/compatibility/remaining-gaps.md`) — low-risk items done
 
 Re-verify the list (several items appear done: `DiscordAPIError`, `guildAvailable`,
 `createdTimestamp`), mark completed items, then implement remaining low-risk additive
@@ -67,3 +67,9 @@ event payloads, channel subclasses) need a design proposal first.
 
 1 → 2 (BUS-001, REST-003) → 3 → 4 → 2 (WS-004) → 5. Each step: small PR-sized change
 on `dev`, `bun run ci` green before push.
+
+Outcome: all additive aliases/helpers above landed (see the Status block in
+`remaining-gaps.md`), tested from the top-level `lunibee` barrel in
+`tests/compat.phase4.test.ts`. Still open: `IntentsBitField` class, `broadcastEval`,
+and the design-level items.
+

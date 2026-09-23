@@ -552,11 +552,19 @@ function validateNumberRange(
 
 // ─── Context Menu Builders ────────────────────────────────────────────────────
 
-/** Base builder for application commands that appear in right-click context menus. */
-class ContextMenuCommandBuilder {
+/** Builder for application commands that appear in right-click context menus.
+ * Discord.js-familiar: `new ContextMenuCommandBuilder().setName("x").setType(2)`. */
+export class ContextMenuCommandBuilder {
     protected readonly data: Record<string, unknown>;
-    public constructor(type: 2 | 3) {
+    public constructor(type: 2 | 3 = 2) {
         this.data = { type };
+    }
+    /** Sets the command type: 2 = USER, 3 = MESSAGE. @throws {RangeError} For any other type. */
+    public setType(type: 2 | 3): this {
+        if (type !== 2 && type !== 3)
+            throw new RangeError("Context menu command type must be 2 or 3.");
+        this.data.type = type;
+        return this;
     }
     /** Sets the command name (shown in the right-click menu).
      * Unlike CHAT_INPUT commands, USER (type 2) and MESSAGE (type 3) context-menu

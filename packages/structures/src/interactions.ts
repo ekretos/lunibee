@@ -148,6 +148,19 @@ export class CommandOptions {
         return this.#subcommandGroup;
     }
 
+    // ── Autocomplete ───────────────────────────────────────────────────────────
+
+    /** Returns the focused option's value (autocomplete), or the full option when `full` is true. @throws {TypeError} If no option is focused. */
+    public getFocused(full: true): APIInteractionDataOption;
+    public getFocused(full?: false): string | number | boolean;
+    public getFocused(
+        full = false,
+    ): APIInteractionDataOption | string | number | boolean {
+        const focused = this.#options.find((o) => o.focused);
+        if (!focused) throw new TypeError("No focused option was provided.");
+        return full ? focused : (focused.value ?? "");
+    }
+
     // ── Primitive value options ────────────────────────────────────────────────
 
     /** Gets a string option. @param name Option name. @param required If true, throws when missing. */
@@ -448,6 +461,33 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     /** Whether this interaction is autocomplete. @returns True for autocomplete interactions. */ public isAutocomplete(): this is AutocompleteInteraction {
         return this.type === InteractionType.ApplicationCommandAutocomplete;
     }
+    /** Message component type of this interaction, or 0 when it is not a component. */
+    #componentType(): number {
+        return this.isMessageComponent()
+            ? ((this.data.data?.component_type as number | undefined) ?? 0)
+            : 0;
+    }
+    /** Whether this is a button interaction. */ public isButton(): this is ComponentInteraction {
+        return this.#componentType() === 2;
+    }
+    /** Whether this is a string select menu interaction. */ public isStringSelectMenu(): this is ComponentInteraction {
+        return this.#componentType() === 3;
+    }
+    /** Whether this is a user select menu interaction. */ public isUserSelectMenu(): this is ComponentInteraction {
+        return this.#componentType() === 5;
+    }
+    /** Whether this is a role select menu interaction. */ public isRoleSelectMenu(): this is ComponentInteraction {
+        return this.#componentType() === 6;
+    }
+    /** Whether this is a mentionable select menu interaction. */ public isMentionableSelectMenu(): this is ComponentInteraction {
+        return this.#componentType() === 7;
+    }
+    /** Whether this is a channel select menu interaction. */ public isChannelSelectMenu(): this is ComponentInteraction {
+        return this.#componentType() === 8;
+    }
+    /** Whether this is any select menu interaction. */ public isAnySelectMenu(): this is ComponentInteraction {
+        return [3, 5, 6, 7, 8].includes(this.#componentType());
+    }
     /** Ensures the interaction has not already been acknowledged. @returns Nothing. @throws {Error} When already acknowledged. */ protected assertUnacknowledged(): void {
         if (this.replied || this.deferred)
             throw new Error("Interaction has already been acknowledged.");
@@ -649,6 +689,16 @@ export class ModalSubmitInteraction extends Interaction {
 
 /** Represents a Discord slash command autocomplete interaction. */
 export class AutocompleteInteraction extends Interaction {
+    /** Option resolver; use `options.getFocused()` for the focused value. */
+    public readonly options: CommandOptions;
+
+    public constructor(client: InteractionClient, data: InteractionData) {
+        super(client, data);
+        this.options = new CommandOptions(
+            (data.data?.options as APIInteractionDataOption[]) ?? [],
+        );
+    }
+
     /** Gets the target command name. */
     public get commandName(): string {
         return (this.data as any)?.data?.name ?? "";

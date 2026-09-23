@@ -9,6 +9,8 @@ export {
 } from "./permissions.js";
 export {
     ClientEvent,
+    /** Discord.js-familiar alias for {@link ClientEvent}. */
+    ClientEvent as Events,
     type ClientEventName,
     type ClientListener,
 } from "./events.js";
