@@ -162,10 +162,19 @@ describe("Gateway zlib-stream (P0: compressed payloads)", () => {
         gateway.on("MESSAGE_CREATE", (data) =>
             seen.push((data as { content: string }).content),
         );
+        // Diagnostics for a rare, unexplained CI failure where nothing was
+        // dispatched (seen: []). Printed only when the assertion would fail.
+        const errors: string[] = [];
+        const events: string[] = [];
+        const frameSizes: number[] = [];
+        gateway.on("error", (error) => errors.push(String(error)));
+        for (const event of ["RAW", "close", "stateChange", "invalidSession"])
+            gateway.on(event, (data) =>
+                events.push(`${event}:${JSON.stringify(data)?.slice(0, 120)}`),
+            );
 
-        // Take the socket this connect() creates (synchronously), not index 0:
-        // a gateway left over from another test file may reconnect into the
-        // shared stub while this test runs.
+        // Take the socket this connect() creates (synchronously) rather than
+        // index 0, so an unrelated socket in the shared stub can't be picked.
         const created = FakeWebSocket.instances.length;
         const connecting = gateway.connect("wss://example.test");
         const socket = FakeWebSocket.instances[created]!;
@@ -181,12 +190,27 @@ describe("Gateway zlib-stream (P0: compressed payloads)", () => {
                 s: 1,
                 d: { content },
             });
+            frameSizes.push(bytes.length);
             socket.emit("message", { data: bytes.buffer });
         }
         // Drain the serialised decompression chain.
         for (let i = 0; i < 20 && seen.length < 3; i++)
             await new Promise((resolve) => setTimeout(resolve, 10));
 
+        if (seen.length !== 3)
+            console.error(
+                "zlib dispatch diagnostics:",
+                JSON.stringify({
+                    seen,
+                    frameSizes,
+                    errors,
+                    events,
+                    gatewayState: gateway.state,
+                    socketIndex: created,
+                    socketCount: FakeWebSocket.instances.length,
+                    socketReadyState: socket.readyState,
+                }),
+            );
         expect(seen).toEqual(["one", "two", "three"]);
         gateway.close();
     });
