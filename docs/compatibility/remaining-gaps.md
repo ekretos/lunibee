@@ -4,6 +4,27 @@
 > Phase-1 agent, the bucket (`api-conventions.md §1`), and whether it touches a coordination
 > zone. **Rule reminder: alias/adapt additively; never rename a Lunibee canonical export.**
 
+
+## Status (2026-09-23)
+
+**Done:** `Events` alias · `guildAvailable` emitted · interaction guards (`isButton`,
+`isStringSelectMenu`, `isUser/Role/Mentionable/ChannelSelectMenu`, `isAnySelectMenu`) ·
+`AutocompleteInteraction.options.getFocused()` · `DiscordAPIError` · `GatewayState` → `Status`
+· `createdTimestamp` · `StringSelectMenuBuilder` alias and `User/Role/Mentionable/Channel
+SelectMenuBuilder` · exported `ContextMenuCommandBuilder` with `setType()` · `CachedManager`
+alias · voice `joinVoiceChannel`, `getVoiceConnection`, `createAudioPlayer`,
+`createAudioResource`, `entersState`, `VoiceConnectionStatus` alias · `ShardingManager` alias.
+
+Also done: `IntentsBitField` class · `ShardBus.respond`/`request`/`broadcastRequest`
+(replaces `broadcastEval`) · managers `GuildBanManager`, `GuildScheduledEventManager`,
+`StageInstanceManager`, `PermissionOverwriteManager` (Dev #5) · channel subclasses
+`TextChannel`, `NewsChannel`, `DMChannel`, `VoiceChannel`, `StageChannel`,
+`CategoryChannel`, `ThreadChannel`, `ForumChannel`, `MediaChannel` via `createChannel()`,
+plus `isThread()`/`isTextBased()`/`isVoiceBased()`/`isDMBased()` (Dev #7).
+
+**Decided, not planned:** wrapped event payloads (Rohan #4) and `broadcastEval` — see
+"Decided divergences" in `known-incompatibilities.md`. Nothing else is open.
+
 ## A. Cross-cutting coordination flags
 
 - **`packages/types` is Arjun-owned.** Any new `API*` type, enum member, or enum

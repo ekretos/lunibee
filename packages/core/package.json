@@ -8,12 +8,12 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@lunibee/types": "file:../types",
-    "@lunibee/rest": "file:../rest",
-    "@lunibee/ws": "file:../ws",
-    "@lunibee/collection": "file:../collection",
-    "@lunibee/structures": "file:../structures",
-    "@lunibee/managers": "file:../managers",
-    "@lunibee/builders": "file:../builders"
+    "@lunibee/types": "workspace:*",
+    "@lunibee/rest": "workspace:*",
+    "@lunibee/ws": "workspace:*",
+    "@lunibee/collection": "workspace:*",
+    "@lunibee/structures": "workspace:*",
+    "@lunibee/managers": "workspace:*",
+    "@lunibee/builders": "workspace:*"
   }
 }

@@ -45,3 +45,39 @@ await manager.connect();
 ```
 </TabItem>
 </Tabs>
+
+## Cross-Shard Messaging with `ShardBus`
+
+`ShardBus` passes messages between shards over a named `BroadcastChannel`.
+
+```ts
+import { ShardBus } from "lunibee";
+
+const bus = new ShardBus(shardId, "my-bot");
+
+// Fire-and-forget
+bus.on("reload", (message) => reloadConfig(message.data));
+bus.broadcast("reload", { section: "commands" });
+
+// Errors thrown or rejected by handlers
+bus.onError((error, message) => console.error(message.type, error));
+```
+
+### Queries across shards
+
+`respond()` answers requests. `request()` asks one shard; `broadcastRequest()` asks every
+other shard and collects replies until `expected` arrive or the timeout passes. This
+covers discord.js's `broadcastEval` use cases without sending code to be evaluated.
+
+```ts
+bus.respond("guildCount", () => client.guilds.cache.size);
+
+const one = await bus.request<number>(1, "guildCount", null);      // throws on timeout
+const all = await bus.broadcastRequest<number>("guildCount", null, {
+  expected: totalShards - 1,
+  timeoutMs: 5_000,
+});
+const total = all.reduce((sum, r) => sum + (r.result ?? 0), 0);
+```
+
+`ShardingManager` is an alias of `ShardManager`.

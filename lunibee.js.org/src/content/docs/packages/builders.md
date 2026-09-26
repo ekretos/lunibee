@@ -88,6 +88,11 @@ const row = new ActionRowBuilder<StringSelectBuilder>().addComponents(
 );
 ```
 
+Entity pickers: `UserSelectMenuBuilder`, `RoleSelectMenuBuilder`,
+`ChannelSelectMenuBuilder`, `MentionableSelectMenuBuilder`. `StringSelectMenuBuilder` is an
+alias of `StringSelectBuilder`. Context menu commands: `ContextMenuCommandBuilder`
+(`setType(2 | 3)`), `UserCommandBuilder`, `MessageCommandBuilder`.
+
 ## Modals
 
 ```ts

@@ -641,3 +641,30 @@ function validateLength(value: number, field: string, max = 4000): void {
             `${field} must be an integer between 0 and ${max}.`,
         );
 }
+
+/** Discord.js-familiar alias for {@link StringSelectBuilder}. */
+export { StringSelectBuilder as StringSelectMenuBuilder };
+/** User select menu builder (Discord.js-familiar). */
+export class UserSelectMenuBuilder extends EntitySelectBuilder {
+    public constructor() {
+        super(ComponentType.UserSelect);
+    }
+}
+/** Role select menu builder (Discord.js-familiar). */
+export class RoleSelectMenuBuilder extends EntitySelectBuilder {
+    public constructor() {
+        super(ComponentType.RoleSelect);
+    }
+}
+/** Mentionable select menu builder (Discord.js-familiar). */
+export class MentionableSelectMenuBuilder extends EntitySelectBuilder {
+    public constructor() {
+        super(ComponentType.MentionableSelect);
+    }
+}
+/** Channel select menu builder (Discord.js-familiar). */
+export class ChannelSelectMenuBuilder extends EntitySelectBuilder {
+    public constructor() {
+        super(ComponentType.ChannelSelect);
+    }
+}

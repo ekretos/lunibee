@@ -3,6 +3,7 @@ linker = "isolated"
 
 [test]
 root = "tests"
+coverageThreshold = { lines = 0.9, functions = 0.5 }
 
 [format]
 indentWidth = 4

@@ -114,6 +114,7 @@ describe("Sharding integration", () => {
             token: "test_token",
             intents: 0,
             shardCount: 2,
+            spawnDelay: 0,
         });
         for (const shard of fresh.shards.values()) {
             (shard as unknown as { connect: () => Promise<void> }).connect =

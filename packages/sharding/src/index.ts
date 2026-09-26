@@ -5,7 +5,12 @@ const sleep = (ms: number): Promise<void> =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export { ShardBus } from "./bus.js";
-export type { ShardMessage, ShardMessageHandler } from "./bus.js";
+export type {
+    ShardBusErrorHandler,
+    ShardMessage,
+    ShardMessageHandler,
+    ShardReply,
+} from "./bus.js";
 
 export { ClusterManager } from "./cluster.js";
 export type { ClusterManagerOptions, ClusterInfo } from "./cluster.js";
@@ -17,7 +22,11 @@ export interface ShardManagerOptions {
     /** Number of shards. Use `"auto"` to request Discord's recommended count. */ shardCount?:
         number | "auto";
     /** Gateway reconnect behavior. */ reconnect?: boolean;
-    /** Delay between shard starts in milliseconds. */ spawnDelay?: number;
+    /**
+     * Delay between shard starts in milliseconds. Defaults to 5000 to respect
+     * Discord's IDENTIFY rate limit (one per 5s per rate-limit key); set 0 to
+     * opt out when an external scheduler already paces the handshakes.
+     */ spawnDelay?: number;
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */ autoScaleInterval?: number;
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */ onAutoScaleError?: (
         error: unknown,
@@ -31,6 +40,8 @@ export interface ShardInfo {
 
 /** Manages independent Discord Gateway shards with explicit destruction and reinitialization semantics. */
 export class ShardManager {
+    /** Discord's minimum interval between IDENTIFY payloads, in milliseconds. */
+    public static readonly IDENTIFY_INTERVAL = 5000;
     /** Active Gateway shards indexed by shard identifier. */ public readonly shards =
         new Map<number, Gateway>();
     /** Number of shards managed by this instance after initialization. */ public get shardCount(): number {
@@ -64,8 +75,22 @@ export class ShardManager {
             throw new RangeError(
                 "autoScaleInterval must be an integer of at least 1000 milliseconds.",
             );
+        if (
+            options.spawnDelay !== undefined &&
+            (!Number.isFinite(options.spawnDelay) || options.spawnDelay < 0)
+        )
+            throw new RangeError(
+                "spawnDelay must be a non-negative finite number of milliseconds.",
+            );
         this.#auto = options.shardCount === "auto";
-        this.#options = { ...options };
+        // Discord allows one IDENTIFY per 5s per rate-limit key. Spawning
+        // shards back-to-back trips that limit and the gateway answers with
+        // close 4008 / invalid session, so 5s is the default rather than an
+        // opt-in.
+        this.#options = {
+            spawnDelay: ShardManager.IDENTIFY_INTERVAL,
+            ...options,
+        };
         if (options.shardCount !== "auto") this.#initialize(count);
     }
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
@@ -196,3 +221,6 @@ export class ShardManager {
         });
     }
 }
+
+/** Discord.js-familiar alias for {@link ShardManager}. */
+export { ShardManager as ShardingManager };

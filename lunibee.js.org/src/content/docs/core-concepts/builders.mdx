@@ -118,3 +118,30 @@ const row = new ActionRowBuilder().addComponents(select);
 ```
 </TabItem>
 </Tabs>
+
+## Entity Select Menus
+
+For user, role, mentionable and channel pickers, use the fixed-type builders (or
+`EntitySelectBuilder` with a component type). `StringSelectMenuBuilder` is an alias of
+`StringSelectBuilder`.
+
+```ts
+import {
+  UserSelectMenuBuilder,
+  RoleSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
+  MentionableSelectMenuBuilder,
+} from "lunibee";
+
+const pickUser = new UserSelectMenuBuilder().setCustomId("pick_user");
+```
+
+## Context Menu Commands
+
+```ts
+import { ContextMenuCommandBuilder, UserCommandBuilder, MessageCommandBuilder } from "lunibee";
+
+new ContextMenuCommandBuilder().setName("Report").setType(3); // 2 = USER, 3 = MESSAGE
+new UserCommandBuilder().setName("View Profile");             // type 2
+new MessageCommandBuilder().setName("Quote");                  // type 3
+```

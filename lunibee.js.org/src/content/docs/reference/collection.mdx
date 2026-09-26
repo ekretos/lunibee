@@ -169,7 +169,7 @@ const hasBot = client.users.cache.some(u => u.bot);
 
 Returns `true` if **all** entries match the predicate.
 
-### `first(amount?)`
+### `first()`
 
 Returns the first value, or the first `n` values as an array.
 
@@ -177,22 +177,20 @@ Returns the first value, or the first `n` values as an array.
 <TabItem label="TypeScript">
 ```ts
 const firstUser = client.users.cache.first();
-const firstThree = client.users.cache.first(3);
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
 const firstUser = client.users.cache.first();
-const firstThree = client.users.cache.first(3);
 ```
 </TabItem>
 </Tabs>
 
-### `last(amount?)`
+### `last()`
 
 Returns the last value, or the last `n` values as an array.
 
-### `firstKey(amount?)` / `lastKey(amount?)`
+### `firstKey()` / `lastKey()`
 
 Returns the first or last key(s).
 
@@ -217,11 +215,11 @@ const lastUser = client.users.cache.at(-1);
 
 Returns the key at a numeric index.
 
-### `random(amount?)`
+### `random()`
 
 Returns a random value, or `n` random values as an array.
 
-### `randomKey(amount?)`
+### `randomKey()`
 
 Returns a random key.
 
@@ -276,33 +274,33 @@ const byName = client.guilds.cache.sorted((a, b) => a.name.localeCompare(b.name)
 </TabItem>
 </Tabs>
 
-### `sort(compareFn?)`
+### `union(other)`
 
-Sorts the collection **in place**.
+Returns a new Collection with the entries of both collections (`other` wins on key clashes).
 
-### `concat(...collections)`
+### `intersection(other)`
 
-Returns a new Collection merging this with others.
+Returns entries whose keys are in both collections.
 
 ### `difference(other)`
 
 Returns entries that are in this collection but not in `other`.
 
-### `intersect(other)`
+### `hasAll(...keys)` / `hasAny(...keys)`
 
-Returns entries that are in both collections.
+Whether every / at least one of the keys is present.
 
-### `mapValues(fn)`
+### `clone()`
 
-Returns a new Collection with transformed values.
+Returns a shallow copy.
 
-### `groupBy(fn, collection?)`
+### `tap(fn)`
 
-Groups values by the return value of `fn`.
+Calls `fn(collection)` and returns the collection unchanged, for side effects in a chain.
 
 ### `toJSON()`
 
-Returns an array of values.
+Returns the entries as `[key, value]` pairs.
 
 ## Example
 
@@ -336,14 +334,16 @@ console.log("Community guilds:", onlineMembers.join(", "));
 ```ts
 const newest = client.users.cache
   .sorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-  .first(5);
+  .array()
+  .slice(0, 5);
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
 const newest = client.users.cache
   .sorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-  .first(5);
+  .array()
+  .slice(0, 5);
 ```
 </TabItem>
 </Tabs>

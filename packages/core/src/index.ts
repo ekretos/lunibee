@@ -9,7 +9,10 @@ export {
 } from "./permissions.js";
 export {
     ClientEvent,
+    /** Discord.js-familiar alias for {@link ClientEvent}. */
+    ClientEvent as Events,
     type ClientEventName,
+    type ClientEvents,
     type ClientListener,
 } from "./events.js";
 export { Collector, type CollectorOptions } from "./collector.js";
@@ -17,6 +20,7 @@ export {
     GatewayIntentBits,
     IntentBits,
     Intents,
+    IntentsBitField,
     resolveGatewayIntents,
     type GatewayIntentResolvable,
 } from "@lunibee/types";
@@ -26,15 +30,15 @@ import {
     ApplicationCommandManager,
     ChannelManager,
     GuildManager,
+    StageInstanceManager,
     UserManager,
 } from "@lunibee/managers";
 import { REST, Routes } from "@lunibee/rest";
 import {
     User,
     Guild,
-    Channel,
+    createChannel,
     Message,
-    Interaction,
     createInteraction,
     type InteractionClient,
     type InteractionData,
@@ -74,11 +78,10 @@ import type {
     APIChannelPinsUpdate,
     APIGuildMembersChunk,
     APIMessagePollVoteEvent,
-    APIThreadMember,
     ClientOptions,
     ClientUser,
 } from "@lunibee/types";
-import { ClientEvent } from "./events.js";
+import { ClientEvent, type ClientEvents } from "./events.js";
 
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
@@ -174,6 +177,8 @@ export class Client
     public readonly users: UserManager;
     public readonly guilds: GuildManager;
     public readonly channels: ChannelManager;
+    /** Stage instances, cached by stage channel ID. */
+    public readonly stageInstances: StageInstanceManager;
     public readonly application: { commands: ApplicationCommandManager };
     public get ws(): Gateway {
         return this.#gateway;
@@ -226,6 +231,7 @@ export class Client
         this.users = new UserManager(this.rest);
         this.guilds = new GuildManager(this.rest);
         this.channels = new ChannelManager(this.rest);
+        this.stageInstances = new StageInstanceManager(this.rest);
         const placeholderAppCommands = new ApplicationCommandManager(
             this.rest,
             "0",
@@ -392,7 +398,7 @@ export class Client
             ])
                 this.channels.set(
                     channelData.id,
-                    new Channel(channelData, this.#resourceContext),
+                    createChannel(channelData, this.#resourceContext),
                 );
             this.emit(
                 wasCached
@@ -541,7 +547,7 @@ export class Client
 
         // ── Channels ─────────────────────────────────────────────────────────────
         this.#gateway.on("CHANNEL_CREATE", (data) => {
-            const channel = new Channel(
+            const channel = createChannel(
                 data as APIChannel,
                 this.#resourceContext,
             );
@@ -549,7 +555,7 @@ export class Client
             this.emit(ClientEvent.ChannelCreate, channel);
         });
         this.#gateway.on("CHANNEL_UPDATE", (data) => {
-            const channel = new Channel(
+            const channel = createChannel(
                 data as APIChannel,
                 this.#resourceContext,
             );
@@ -570,7 +576,7 @@ export class Client
 
         // ── Threads ──────────────────────────────────────────────────────────────
         this.#gateway.on("THREAD_CREATE", (data) => {
-            const channel = new Channel(
+            const channel = createChannel(
                 data as APIThreadEvent,
                 this.#resourceContext,
             );
@@ -578,7 +584,7 @@ export class Client
             this.emit(ClientEvent.ThreadCreate, channel);
         });
         this.#gateway.on("THREAD_UPDATE", (data) => {
-            const channel = new Channel(
+            const channel = createChannel(
                 data as APIThreadEvent,
                 this.#resourceContext,
             );
@@ -794,7 +800,7 @@ export class Client
             );
         const qs = query.toString();
         return this.rest.get(
-            `/invites/${code}${qs ? `?${qs}` : ""}`,
+            `/invites/${encodeURIComponent(code)}${qs ? `?${qs}` : ""}`,
         ) as Promise<Record<string, unknown>>;
     }
 
@@ -814,9 +820,9 @@ export class Client
 
     /** Fetches a guild template from Discord. */
     public fetchGuildTemplate(code: string): Promise<Record<string, unknown>> {
-        return this.rest.get(`/guilds/templates/${code}`) as Promise<
-            Record<string, unknown>
-        >;
+        return this.rest.get(
+            `/guilds/templates/${encodeURIComponent(code)}`,
+        ) as Promise<Record<string, unknown>>;
     }
 
     /** Generates an invite link for this client. */
@@ -828,7 +834,7 @@ export class Client
             throw new Error("Client must be ready to generate invite.");
         const params = new URLSearchParams({
             client_id: this.user.id,
-            scopes: (options?.scopes ?? ["bot"]).join(" "),
+            scope: (options?.scopes ?? ["bot"]).join(" "),
         });
         if (options?.permissions) {
             params.set("permissions", String(options.permissions));
@@ -836,94 +842,3 @@ export class Client
         return `https://discord.com/api/oauth2/authorize?${params.toString()}`;
     }
 }
-
-// ─── ClientEvents type map ────────────────────────────────────────────────────
-// Uses string literal keys so client.on("ready", ...) works without using
-// the ClientEvent enum explicitly.
-
-export type ClientEvents = {
-    // ── Lifecycle ──────────────────────────────────────────────────────────────
-    ready: [user: ClientUser];
-    resumed: [];
-    invalidSession: [isRecoverable: boolean];
-    raw: [data: { event: string; data: unknown }];
-    error: [error: Error];
-    open: [];
-    close: [data: { code: number; action: string }];
-    // ── Messages ───────────────────────────────────────────────────────────────
-    messageCreate: [message: Message];
-    messageUpdate: [message: Message];
-    messageDelete: [data: APIMessageDeleteEvent];
-    messageDeleteBulk: [data: APIMessageDeleteBulkEvent];
-    // ── Reactions ─────────────────────────────────────────────────────────────
-    messageReactionAdd: [data: APIMessageReactionEvent];
-    messageReactionRemove: [data: APIMessageReactionEvent];
-    messageReactionRemoveAll: [data: APIMessageDeleteEvent];
-    messageReactionRemoveEmoji: [data: APIMessageReactionRemoveEmojiEvent];
-    // ── Polls ─────────────────────────────────────────────────────────────────
-    messagePollVoteAdd: [data: APIMessagePollVoteEvent];
-    messagePollVoteRemove: [data: APIMessagePollVoteEvent];
-    // ── Guilds ────────────────────────────────────────────────────────────────
-    guildCreate: [data: APIGuild];
-    guildUpdate: [data: APIGuild];
-    guildDelete: [data: { id: string; unavailable?: boolean }];
-    guildAvailable: [data: APIGuild & { unavailable?: boolean }];
-    guildUnavailable: [data: { id: string; unavailable?: boolean }];
-    // ── Guild Members ──────────────────────────────────────────────────────────
-    guildMemberAdd: [member: APIGuildMember];
-    guildMemberUpdate: [member: APIGuildMember];
-    guildMemberRemove: [member: APIGuildMember];
-    guildMembersChunk: [data: APIGuildMembersChunk];
-    // ── Guild Bans ────────────────────────────────────────────────────────────
-    guildBanAdd: [data: APIGuildBanEvent];
-    guildBanRemove: [data: APIGuildBanEvent];
-    // ── Guild Roles ───────────────────────────────────────────────────────────
-    guildRoleCreate: [data: APIGuildRoleEvent];
-    guildRoleUpdate: [data: APIGuildRoleEvent];
-    guildRoleDelete: [data: APIGuildRoleDeleteEvent];
-    // ── Guild Emojis & Stickers ───────────────────────────────────────────────
-    guildEmojisUpdate: [data: APIGuildEmojisUpdateEvent];
-    guildStickersUpdate: [data: APIGuildStickersUpdateEvent];
-    // ── Guild Integrations ────────────────────────────────────────────────────
-    guildIntegrationsUpdate: [data: { guild_id: string }];
-    // ── Guild Scheduled Events ────────────────────────────────────────────────
-    guildScheduledEventCreate: [data: APIGuildScheduledEvent];
-    guildScheduledEventUpdate: [data: APIGuildScheduledEvent];
-    guildScheduledEventDelete: [data: APIGuildScheduledEvent];
-    guildScheduledEventUserAdd: [data: APIGuildScheduledEventUserEvent];
-    guildScheduledEventUserRemove: [data: APIGuildScheduledEventUserEvent];
-    // ── AutoMod ───────────────────────────────────────────────────────────────
-    autoModerationRuleCreate: [data: APIAutoModerationRule];
-    autoModerationRuleUpdate: [data: APIAutoModerationRule];
-    autoModerationRuleDelete: [data: APIAutoModerationRule];
-    autoModerationActionExecution: [data: APIAutoModerationActionExecution];
-    // ── Channels ──────────────────────────────────────────────────────────────
-    channelCreate: [channel: Channel];
-    channelUpdate: [channel: Channel];
-    channelDelete: [data: APIChannel];
-    channelPinsUpdate: [data: APIChannelPinsUpdate];
-    // ── Threads ───────────────────────────────────────────────────────────────
-    threadCreate: [channel: Channel];
-    threadUpdate: [channel: Channel];
-    threadDelete: [data: APIThreadEvent];
-    threadListSync: [data: APIThreadListSync];
-    threadMembersUpdate: [data: APIThreadMembersUpdate];
-    threadMemberUpdate: [data: APIThreadMember];
-    // ── Stage Instances ───────────────────────────────────────────────────────
-    stageInstanceCreate: [data: APIStageInstance];
-    stageInstanceUpdate: [data: APIStageInstance];
-    stageInstanceDelete: [data: APIStageInstance];
-    // ── Invites ───────────────────────────────────────────────────────────────
-    inviteCreate: [data: APIInviteCreate];
-    inviteDelete: [data: APIInviteDelete];
-    // ── Webhooks ──────────────────────────────────────────────────────────────
-    webhooksUpdate: [data: APIWebhooksUpdate];
-    // ── Voice ─────────────────────────────────────────────────────────────────
-    voiceStateUpdate: [data: APIVoiceState];
-    voiceServerUpdate: [data: APIVoiceServerUpdate];
-    // ── Presence & Typing ─────────────────────────────────────────────────────
-    presenceUpdate: [data: APIPresenceUpdate];
-    typingStart: [data: APITypingStart];
-    // ── Interactions ──────────────────────────────────────────────────────────
-    interactionCreate: [interaction: Interaction];
-};

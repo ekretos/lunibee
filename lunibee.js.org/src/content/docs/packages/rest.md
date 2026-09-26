@@ -24,7 +24,7 @@ const rest = new REST({
 ## GET
 
 ```ts
-const user = await rest.get(Routes.currentUser());
+const user = await rest.get(Routes.user());
 ```
 
 ## POST
@@ -46,6 +46,71 @@ await rest.delete(route);
 ```
 
 The REST client handles Discord response errors, route-aware rate limits, retries, and request cancellation. Let the resulting error propagate or catch it when your application needs to recover.
+
+## Rate limits
+
+Limits are keyed by Discord's `(bucket hash, major parameter)` pair, so two channels
+using the same endpoint never share a counter, while two routes Discord maps onto one
+bucket hash do. Requests are serialised per bucket, and a request that queued before
+its route's bucket hash was known joins the shared queue once it is.
+
+State lives in a `RateLimitStore`. The default keeps it in memory, which is correct
+for a single process.
+
+### Sharing limits across workers
+
+Several processes hitting Discord with the same token share one allowance. Give them
+a shared store:
+
+```ts
+import { REST, RedisRateLimitStore } from "@lunibee/rest";
+import Redis from "ioredis";
+
+const rest = new REST({
+  token: process.env.DISCORD_TOKEN!,
+  store: new RedisRateLimitStore({
+    client: new Redis(process.env.REDIS_URL!),
+    onError: (operation, error) => console.warn("redis", operation, error),
+  }),
+});
+```
+
+**Use a client that exposes `eval`.** With it, the store reserves allowance with an
+atomic Lua script: one unit is handed to exactly one worker. Without it, workers only
+*observe* `remaining`, so several can read the same value and all send — the store
+still works, but the fleet relies on 429 feedback instead of avoiding the collision.
+
+```ts
+const store = new RedisRateLimitStore({ client });
+store.supportsReservation; // true when the client can reserve atomically
+```
+
+If Redis becomes unreachable, every write is mirrored in-process and reads fall back
+to that mirror, so a Redis outage does not silently drop the fleet to unlimited
+sending. `store.isHealthy()` reports whether the last operation succeeded.
+
+### Observing limits
+
+```ts
+const rest = new REST({
+  token: process.env.DISCORD_TOKEN!,
+  hooks: {
+    onRateLimit: ({ path, retryAfterMs, global }) =>
+      console.warn(`rate limited on ${path} for ${retryAfterMs}ms`, { global }),
+    onRetry: ({ path, attempt, status }) =>
+      console.warn(`retrying ${path} (attempt ${attempt}, status ${status})`),
+  },
+});
+```
+
+Hooks run in isolation from the request path — a throwing hook cannot fail a request —
+but they still share the event loop, so keep them cheap.
+
+### Concurrent buckets
+
+`new REST({ token, concurrentBuckets: true })` runs requests on a known bucket in
+parallel, up to its remaining allowance. It's off by default so per-bucket order is
+kept. See [REST & Rate Limits](/core-concepts/rest/#concurrent-buckets-opt-in).
 
 ## Routes
 
@@ -104,7 +169,7 @@ REST requests reject when Discord returns an unsuccessful response. Catch errors
 
 ```ts
 try {
-  await rest.get(Routes.currentUser());
+  await rest.get(Routes.user());
 } catch (error) {
   console.error("Discord request failed:", error);
 }

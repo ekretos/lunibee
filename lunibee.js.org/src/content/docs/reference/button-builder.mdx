@@ -168,7 +168,7 @@ await channel.send({ content: "Are you sure?", components: [row] });
 
 // Handle the button click:
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isComponent()) return;
+  if (!interaction.isMessageComponent()) return;
   if (interaction.customId === "confirm") {
     await interaction.update({ content: "✅ Confirmed!", components: [] });
   } else if (interaction.customId === "cancel") {
@@ -198,7 +198,7 @@ await channel.send({ content: "Are you sure?", components: [row] });
 
 // Handle the button click:
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isComponent()) return;
+  if (!interaction.isMessageComponent()) return;
   if (interaction.customId === "confirm") {
     await interaction.update({ content: "✅ Confirmed!", components: [] });
   } else if (interaction.customId === "cancel") {

@@ -1,3 +1,16 @@
+import { GatewaySession } from "./session.js";
+import { GatewayHeartbeat, type HeartbeatTimeout } from "./heartbeat.js";
+import { GatewayCloseCodes } from "./close-codes.js";
+import { GatewayReconnect, type CloseAction } from "./reconnect.js";
+import { WebSocketTransport, type SocketFactory } from "./transport.js";
+import { GatewayOpcodes } from "./opcodes.js";
+import {
+    classifyFrame,
+    identifyPayload,
+    resumePayload,
+    heartbeatPayload,
+    type GatewayAction,
+} from "./protocol.js";
 import {
     resolveGatewayIntents,
     type GatewayPayload,
@@ -6,78 +19,64 @@ import {
     type GatewayIntentResolvable,
 } from "@lunibee/types";
 
-/** Discord Gateway opcodes. */
-export const GatewayOpcodes = {
-    Dispatch: 0,
-    Heartbeat: 1,
-    Identify: 2,
-    PresenceUpdate: 3,
-    VoiceStateUpdate: 4,
-    Resume: 6,
-    Reconnect: 7,
-    RequestGuildMembers: 8,
-    InvalidSession: 9,
-    Hello: 10,
-    HeartbeatAck: 11,
-} as const;
-/**
- * Discord Gateway close codes.
- *
- * Discord.js-familiar names and numeric values, matching the Discord Gateway
- * protocol. Exposed so consumers can branch on named codes instead of magic
- * numbers; {@link Gateway} uses them internally to decide resume/identify/stop.
- */
-export const GatewayCloseCodes = {
-    UnknownError: 4000,
-    UnknownOpcode: 4001,
-    DecodeError: 4002,
-    NotAuthenticated: 4003,
-    AuthenticationFailed: 4004,
-    AlreadyAuthenticated: 4005,
-    InvalidSeq: 4007,
-    RateLimited: 4008,
-    SessionTimedOut: 4009,
-    InvalidShard: 4010,
-    ShardingRequired: 4011,
-    InvalidAPIVersion: 4012,
-    InvalidIntents: 4013,
-    DisallowedIntents: 4014,
-} as const;
-/** Gateway connection lifecycle states. */
-export enum GatewayState {
-    /** Initial connection state. */ Connect = "CONNECT",
-    /** Gateway HELLO received state. */ Hello = "HELLO",
-    /** IDENTIFY operation in progress. */ Identify = "IDENTIFY",
-    /** RESUME operation in progress. */ Resume = "RESUME",
-    /** Gateway READY state. */ Ready = "READY",
-    /** Gateway dispatch processing state. */ Dispatch = "DISPATCH",
-    /** Heartbeat processing state. */ Heartbeat = "HEARTBEAT",
-    /** Reconnect in progress. */ Reconnect = "RECONNECT",
-    /** Gateway is permanently closed. */ Closed = "CLOSED",
-}
-/**
- * Discord.js-familiar alias for {@link GatewayState}.
- *
- * Discord.js exposes connection status via a `Status` enum. Lunibee's canonical
- * name is {@link GatewayState}; this is an additive alias so `discord.js` users
- * find the expected name. Note the *values* remain Lunibee's string states
- * (e.g. `"READY"`), not Discord.js's numeric `Status` members — an intentional
- * divergence documented in the compatibility matrix.
- */
-export { GatewayState as Status };
-/** Gateway protocol error. */
-export class GatewayError extends Error {
-    /** Gateway close/error code. */ public readonly code?: number;
-    /** Creates a Gateway error. @param message Error message. @param code Optional Gateway code. @param options Optional error metadata. */ public constructor(
-        message: string,
-        code?: number,
-        options?: ErrorOptions,
-    ) {
-        super(message, options);
-        this.name = "GatewayError";
-        this.code = code;
-    }
-}
+export {
+    classifyFrame,
+    classifyPayload,
+    identifyPayload,
+    resumePayload,
+    heartbeatPayload,
+    type GatewayAction,
+    type ProtocolResult,
+    type ProtocolViolation,
+    type IdentifyOptions,
+    type IdentifyProperties,
+} from "./protocol.js";
+
+export {
+    WebSocketTransport,
+    type TransportHandlers,
+    type TransportOptions,
+    type SocketFactory,
+} from "./transport.js";
+
+export {
+    createDecoder,
+    PlainTextDecoder,
+    ZlibStreamDecoder,
+    type GatewayDecoder,
+} from "./decoder.js";
+
+export {
+    GatewayReconnect,
+    classifyCloseCode,
+    FATAL_CLOSE_CODES,
+    IDENTIFY_CLOSE_CODES,
+    type CloseAction,
+    type ReconnectOptions,
+    type ScheduleResult,
+    type ScheduleRefusal,
+} from "./reconnect.js";
+
+export {
+    GatewayHeartbeat,
+    type HeartbeatOptions,
+    type HeartbeatTimeout,
+} from "./heartbeat.js";
+
+export {
+    GatewaySession,
+    type ResumeInfo,
+    type HandshakeIntent,
+    type InvalidationReason,
+} from "./session.js";
+
+export { GatewayOpcodes } from "./opcodes.js";
+
+export { GatewayCloseCodes } from "./close-codes.js";
+
+export { GatewayState, Status, GatewayError } from "./state.js";
+import { GatewayState, GatewayError } from "./state.js";
+import { SendBudget } from "./send-budget.js";
 /** Gateway connection configuration. */
 export interface GatewayOptions {
     /** Authentication token. */ token: string;
@@ -94,11 +93,20 @@ export interface GatewayOptions {
     /** Presence data. */ presence?: GatewayPresence;
     /**
      * Whether to enable zlib-stream transport compression.
-     * Uses Bun's native `DecompressionStream` — no external dependencies.
+     * Decoded with a persistent `node:zlib` inflate stream, matching
+     * Discord's zlib-wrapped stream framing (`Z_SYNC_FLUSH` boundaries).
      * When enabled, appends `&compress=zlib-stream` to the Gateway URL.
      */
     compress?: boolean;
+    /**
+     * Constructs the underlying socket. Defaults to the ambient `WebSocket`.
+     * Injected to run the Gateway on an alternative transport, or on a stub.
+     */
+    createSocket?: SocketFactory;
 }
+/** Discord's main Gateway endpoint, used when no resume host is known. */
+const DEFAULT_GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
+
 /** Gateway event listener. */
 type GatewayListener = (data: unknown) => unknown;
 /** Manages a Discord Gateway connection. */
@@ -106,39 +114,50 @@ export class Gateway {
     /** Current Gateway lifecycle state. */
     public state: GatewayState = GatewayState.Connect;
     #options: Required<
-        Omit<GatewayOptions, "properties" | "presence" | "compress">
+        Omit<
+            GatewayOptions,
+            "properties" | "presence" | "compress" | "createSocket" | "intents"
+        >
     > & {
+        /** Resolved intent bitfield, never the resolvable form. */
+        intents: number;
         properties?: GatewayProperties;
         presence?: GatewayPresence;
         compress?: boolean;
     };
-    #ws?: WebSocket;
-    #sequence: number | null = null;
-    #sessionId?: string;
-    #resumeURL?: string;
-    #heartbeatTimer?: ReturnType<typeof setInterval>;
-    #initialHeartbeat?: ReturnType<typeof setTimeout>;
-    #heartbeatAckTimer?: ReturnType<typeof setTimeout>;
-    #heartbeatACK = true;
-    #heartbeatInterval = 0;
-    #heartbeatSentAt = 0;
-    #lastMessageAt = 0;
-    #zombieTimer?: ReturnType<typeof setInterval>;
-    #zombieReported = false;
+    /**
+     * The socket this connection runs on.
+     *
+     * The Gateway never touches a `WebSocket` directly: construction, listener
+     * wiring, replacement and decoding all belong to the transport.
+     */
+    readonly #transport: WebSocketTransport;
+    /**
+     * Session identity and the IDENTIFY-vs-RESUME decision.
+     *
+     * The Gateway holds no session fields of its own: every read and write goes
+     * through the session, which rejects mutations from a superseded socket.
+     */
+    readonly #session = new GatewaySession();
+    /** Token of the socket this Gateway currently owns. */
+    #token = 0;
+    /**
+     * Heartbeat, acknowledgement deadline and staleness watch.
+     *
+     * The Gateway holds no heartbeat timers of its own; it supplies the socket
+     * and decides what to close when liveness fails.
+     */
+    readonly #heartbeat: GatewayHeartbeat;
     #closed = false;
-    #attempt = 0;
-    #reconnectTimer?: ReturnType<typeof setTimeout>;
-    #connectPromise?: Promise<void>;
-    #resolveConnect?: () => void;
-    #rejectConnect?: (error: GatewayError) => void;
+    /**
+     * Close classification, backoff, scheduling, and the coordination that
+     * keeps at most one logical connection attempt in flight.
+     */
+    readonly #reconnect: GatewayReconnect;
     readonly #listeners = new Map<string, Set<GatewayListener>>();
-    readonly #sendTimestamps: number[] = [];
+    /** Application send budget under Discord's 120-per-60s limit. */
+    readonly #sendBudget = new SendBudget();
     public ping: number = -1;
-    /** Pending zlib-stream decompressor, initialised lazily when compress is enabled. */
-    #decompressor?: {
-        writer: WritableStreamDefaultWriter<BufferSource>;
-        reader: ReadableStreamDefaultReader<Uint8Array>;
-    };
     /** Creates a Gateway connection manager. @param options Gateway configuration. @throws {TypeError|RangeError} If configuration is invalid. */
     public constructor(options: GatewayOptions) {
         if (!options.token?.trim())
@@ -169,6 +188,12 @@ export class Gateway {
                 since: null,
             },
             ...options,
+            // Store the *resolved* bitfield, not the resolvable the caller
+            // passed. IDENTIFY must carry a number: sending the array or
+            // string form verbatim makes Discord answer 4013 (invalid
+            // intents), which is a fatal close — so the documented array form
+            // would never connect.
+            intents: resolvedIntents,
         };
         if (
             this.#options.shardId < 0 ||
@@ -181,15 +206,93 @@ export class Gateway {
             throw new RangeError(
                 "Gateway zombieTimeout must be greater than heartbeatAckTimeout",
             );
+        this.#transport = new WebSocketTransport({
+            compress: this.#options.compress,
+            createSocket: options.createSocket,
+            handlers: {
+                onOpen: () => this.#onOpen(),
+                onFrame: (raw) => this.#message(raw, this.#token),
+                onClose: (code) => this.#close(code, this.#token),
+                // Transport failures reach consumers as GatewayError, the
+                // type every other Gateway error path already uses.
+                onError: (error) =>
+                    this.#emitError(
+                        error instanceof GatewayError
+                            ? error
+                            : new GatewayError(error.message, undefined, {
+                                  cause: error,
+                              }),
+                    ),
+            },
+        });
+        this.#reconnect = new GatewayReconnect({
+            enabled: this.#options.reconnect,
+            maxAttempts: this.#options.maxReconnectAttempts,
+            baseDelay: this.#options.reconnectBaseDelay,
+            maxDelay: this.#options.reconnectMaxDelay,
+        });
+        this.#heartbeat = new GatewayHeartbeat({
+            ackTimeout: this.#options.heartbeatAckTimeout,
+            zombieTimeout: this.#options.zombieTimeout,
+            // Heartbeats are privileged: application traffic must never starve
+            // the one payload that keeps the connection alive.
+            send: (sequence) =>
+                this.#dispatch(heartbeatPayload(sequence), true),
+            sequence: () => this.#session.sequence,
+            isConnected: () => !this.#closed && this.#transport.connected,
+            onTimeout: (timeout) => this.#onHeartbeatTimeout(timeout),
+            onError: (error) => this.#emitError(error),
+        });
+    }
+
+    /**
+     * Closes a connection that failed a liveness check.
+     *
+     * The heartbeat decides *that* the connection is dead; the Gateway decides
+     * what to do about it, because only the Gateway owns the socket.
+     */
+    #onHeartbeatTimeout(timeout: HeartbeatTimeout): void {
+        if (timeout.type === "zombie") {
+            this.#emit("zombie", {
+                silentFor: timeout.silentFor,
+                timeout: timeout.deadline,
+            });
+            this.#emitError(
+                new GatewayError(
+                    `Gateway connection appears stale after ${timeout.silentFor}ms without traffic.`,
+                ),
+            );
+        } else {
+            this.#emitError(
+                new GatewayError(
+                    `Gateway heartbeat acknowledgement timed out after ${timeout.elapsedMs}ms.`,
+                ),
+            );
+        }
+        this.#transport.close(
+            1001,
+            timeout.type === "zombie"
+                ? "Zombie Gateway connection"
+                : "Heartbeat timeout",
+        );
     }
 
     /** Opens the Gateway connection. @param url Gateway WebSocket URL. @returns Promise fulfilled when the socket opens. @throws {GatewayError} If permanently closed or unable to connect. */
-    public connect(
-        url = "wss://gateway.discord.gg/?v=10&encoding=json",
-    ): Promise<void> {
+    public connect(url = DEFAULT_GATEWAY_URL): Promise<void> {
         if (this.state === GatewayState.Closed)
             throw new GatewayError("Gateway has been permanently closed.");
-        if (this.#connectPromise) return this.#connectPromise;
+        // At most one logical connection attempt is active: concurrent callers
+        // join the in-flight attempt rather than opening competing sockets.
+        const inFlight = this.#reconnect.attemptPromise;
+        if (inFlight) return inFlight;
+        // Connecting an already-live Gateway must be a no-op. Opening a second
+        // socket leaves the first one unmanaged but still dispatching, which
+        // interleaves two sequence streams (corrupting a later RESUME) and
+        // sends a second IDENTIFY on the same session.
+        if (this.#transport.live) return Promise.resolve();
+        // A manual connect supersedes a scheduled reconnect; leaving the timer
+        // armed would open a second socket once it fires.
+        this.#reconnect.cancel();
         this.#closed = false;
         this.#setState(GatewayState.Connect);
         // Append compression parameter if enabled
@@ -198,13 +301,7 @@ export class Gateway {
                 ? url
                 : `${url}&compress=zlib-stream`
             : url;
-        if (this.#options.compress) this.#initDecompressor();
-        this.#connectPromise = new Promise<void>((resolve, reject) => {
-            this.#resolveConnect = resolve;
-            this.#rejectConnect = reject;
-            this.#open(connectURL);
-        });
-        return this.#connectPromise;
+        return this.#reconnect.attempt(() => this.#open(connectURL));
     }
     /** Permanently closes the Gateway connection. */
     public close(): void {
@@ -213,13 +310,9 @@ export class Gateway {
         this.#settleConnect(
             new GatewayError("Gateway connection closed before socket open."),
         );
-        const ws = this.#ws;
-        this.#ws = undefined;
-        try {
-            ws?.close(1000, "Client closed connection");
-        } catch (error) {
-            this.#emitError(error);
-        }
+        // Abandon rather than close-and-listen: the Gateway has already decided
+        // the connection is over and must not be woken by its close event.
+        this.#transport.destroy(1000, "Client closed connection");
         this.#setState(GatewayState.Closed);
     }
     /** Registers a Gateway event listener. @param event Event name. @param listener Event callback. @returns This Gateway. */
@@ -256,27 +349,17 @@ export class Gateway {
      * are still recorded, keeping the true total under Discord's limit.
      */
     #dispatch(payload: GatewayPayload, privileged: boolean): boolean {
-        if (this.#ws?.readyState !== WebSocket.OPEN) return false;
+        if (!this.#transport.connected) return false;
         const now = Date.now();
-        while (
-            this.#sendTimestamps.length &&
-            now - this.#sendTimestamps[0]! >= 60000
-        )
-            this.#sendTimestamps.shift();
-        if (!privileged && this.#sendTimestamps.length >= 115) {
+        if (!this.#sendBudget.allows(privileged, now)) {
             this.#emitError(
                 new GatewayError("Gateway send rate budget exhausted."),
             );
             return false;
         }
-        try {
-            this.#ws.send(JSON.stringify(payload));
-            this.#sendTimestamps.push(now);
-            return true;
-        } catch (error) {
-            this.#emitError(error);
-            return false;
-        }
+        if (!this.#transport.send(JSON.stringify(payload))) return false;
+        this.#sendBudget.record(now);
+        return true;
     }
     /** Sends a presence update. @param data Presence payload. @returns Whether it was sent. */
     public setPresence(data: GatewayPresence): boolean {
@@ -312,168 +395,128 @@ export class Gateway {
             t: null,
         });
     }
+    /**
+     * Starts one connection attempt.
+     *
+     * Ownership of the session moves to this attempt before the socket exists,
+     * so a frame from the socket being replaced can never be mistaken for one
+     * belonging to this connection.
+     */
     #open(url: string): void {
         if (this.#closed) return;
-        let ws: WebSocket;
-        try {
-            ws = new WebSocket(url);
-        } catch (error) {
-            const failure = this.#normalizeError(error);
-            this.#emitError(failure);
-            if (this.#options.reconnect) {
-                this.#setState(GatewayState.Reconnect);
-                this.#scheduleReconnect();
-            } else this.#settleConnect(failure);
-            return;
+        this.#token = this.#session.beginConnection();
+        const result = this.#transport.connect(url);
+        if (result.ok) return;
+        // The socket could not be constructed. The caller's attempt fails with
+        // the underlying reason, so a thrown GatewayError keeps its message.
+        const failure = this.#normalizeError(result.error);
+        this.#emitError(failure);
+        if (this.#options.reconnect) {
+            this.#setState(GatewayState.Reconnect);
+            this.#scheduleReconnect();
+        } else {
+            this.#settleConnect(failure);
         }
-        this.#ws = ws;
-        ws.addEventListener("open", () => {
-            this.#lastMessageAt = Date.now();
-            this.#zombieReported = false;
-            this.#startZombieDetection();
-            this.#emit("open", undefined);
-            this.#settleConnect();
-        });
-        ws.addEventListener("message", (event) => {
-            this.#lastMessageAt = Date.now();
-            this.#zombieReported = false;
-            if (this.#options.compress && event.data instanceof ArrayBuffer) {
-                this.#decompress(new Uint8Array(event.data))
-                    .then((text) => this.#message(ws, text))
-                    .catch((err) => this.#emitError(err));
-            } else {
-                this.#message(ws, String(event.data));
-            }
-        });
-        ws.addEventListener("close", (event) => this.#close(ws, event.code));
-        ws.addEventListener("error", () =>
-            this.#emitError(new GatewayError("Gateway WebSocket error")),
-        );
     }
-    #startZombieDetection(): void {
-        if (this.#zombieTimer) clearInterval(this.#zombieTimer);
-        // Poll granularity only needs to be a fraction of the staleness
-        // deadline (heartbeatInterval + heartbeatAckTimeout, ~51s in
-        // practice). A 1s ceiling keeps detection latency negligible while
-        // costing one wakeup per second per shard instead of four.
-        const interval = Math.max(
-            1,
-            Math.min(
-                1000,
-                this.#options.heartbeatAckTimeout,
-                this.#options.zombieTimeout / 2,
-            ),
-        );
-        this.#zombieTimer = setInterval(() => {
-            if (
-                this.#closed ||
-                this.#ws?.readyState !== WebSocket.OPEN ||
-                this.#lastMessageAt === 0
-            )
-                return;
-            const silentFor = Date.now() - this.#lastMessageAt;
-            const deadline = Math.max(
-                this.#options.zombieTimeout,
-                this.#heartbeatInterval + this.#options.heartbeatAckTimeout,
-            );
-            if (silentFor < deadline || this.#zombieReported) return;
-            this.#zombieReported = true;
-            const error = new GatewayError(
-                `Gateway connection appears stale after ${silentFor}ms without traffic.`,
-            );
-            this.#emit("zombie", { silentFor, timeout: deadline });
-            this.#emitError(error);
-            try {
-                this.#ws.close(1001, "Zombie Gateway connection");
-            } catch (closeError) {
-                this.#emitError(closeError);
-            }
-        }, interval);
+    #onOpen(): void {
+        // Watch for silence from the moment the socket opens: a connection
+        // that never reaches HELLO must still be detected as dead.
+        this.#heartbeat.watch();
+        this.#emit("open", undefined);
+        this.#settleConnect();
     }
-    #message(ws: WebSocket, raw: string): void {
-        let payload: GatewayPayload;
-        try {
-            payload = JSON.parse(raw) as GatewayPayload;
-        } catch (error) {
-            this.#emitError(
-                new GatewayError("Gateway returned invalid JSON", undefined, {
-                    cause: error,
-                }),
-            );
-            ws.close(1002, "Invalid JSON");
-            return;
-        }
-        if (!payload || typeof payload.op !== "number") {
-            this.#emitError(
-                new GatewayError("Gateway returned an invalid payload"),
-            );
-            ws.close(1002, "Invalid payload");
-            return;
-        }
-        if (typeof payload.s === "number") this.#sequence = payload.s;
-        switch (payload.op) {
-            case GatewayOpcodes.Dispatch:
+    #message(raw: string, token: number): void {
+        // The transport already drops frames from a replaced socket; this
+        // second check keeps the session authoritative about who may mutate it.
+        if (!this.#session.owns(token)) return;
+        const { sequence, action } = classifyFrame(raw);
+        // Record before acting: a RESUME must never be built from a sequence
+        // the connection has not actually observed. The session ignores a
+        // sequence from a superseded connection.
+        if (sequence !== null) this.#session.recordSequence(sequence, token);
+        this.#apply(action, token);
+    }
+    /**
+     * Performs what the protocol says a frame meant.
+     *
+     * Every branch is an operation the protocol layer deliberately cannot do
+     * for itself: closing a socket, mutating the session, running timers,
+     * emitting events.
+     */
+    #apply(action: GatewayAction, token: number): void {
+        switch (action.type) {
+            case "dispatch":
                 this.#setState(GatewayState.Dispatch);
-                this.#handleDispatch(payload.t, payload.d);
-                break;
-            case GatewayOpcodes.Hello:
-                this.#handleHello(payload.d);
-                break;
-            case GatewayOpcodes.Heartbeat:
+                this.#handleDispatch(action.event, action.data, token);
+                return;
+            case "hello":
+                this.#handleHello(action.heartbeatInterval);
+                return;
+            case "heartbeat":
                 this.#setState(GatewayState.Heartbeat);
-                this.#sendHeartbeat();
-                break;
-            case GatewayOpcodes.HeartbeatAck:
-                this.#heartbeatACK = true;
-                this.ping = Date.now() - this.#heartbeatSentAt;
-                this.#clearHeartbeatAckTimer();
-                this.#emit("heartbeatAck", payload.d);
-                break;
-            case GatewayOpcodes.Reconnect:
-                ws.close(1001, "Server requested reconnect");
-                break;
-            case GatewayOpcodes.InvalidSession: {
-                // Op 9 `d` is a boolean: true = the session is resumable, so we
-                // keep session state and RESUME on reconnect; false = the
-                // session is dead and we must re-IDENTIFY from scratch. Matches
-                // Discord/Discord.js semantics rather than always re-identifying.
-                const resumable = payload.d === true;
-                if (!resumable) {
-                    this.#sessionId = undefined;
-                    this.#sequence = null;
-                    this.#resumeURL = undefined;
-                }
-                this.#emit("invalidSession", resumable);
-                ws.close(
-                    resumable ? GatewayCloseCodes.UnknownError : 1000,
-                    resumable
+                this.#heartbeat.sendHeartbeat();
+                return;
+            case "heartbeat-ack":
+                this.#heartbeat.acknowledge();
+                this.ping = this.#heartbeat.latency;
+                this.#emit("heartbeatAck", action.data);
+                return;
+            case "reconnect":
+                this.#transport.close(1001, "Server requested reconnect");
+                return;
+            case "invalid-session": {
+                // A resumable invalidation keeps the session; a non-resumable
+                // one destroys it, so the next connection must IDENTIFY.
+                if (!action.resumable)
+                    this.#session.invalidate(token, "invalid-session");
+                this.#emit("invalidSession", action.resumable);
+                this.#transport.close(
+                    action.resumable ? GatewayCloseCodes.UnknownError : 1000,
+                    action.resumable
                         ? "Invalid session (resumable)"
                         : "Invalid session",
                 );
-                break;
-            }
-        }
-    }
-    #handleDispatch(event: string | null, data: unknown): void {
-        if (event === "READY") {
-            const ready = data as {
-                session_id?: unknown;
-                resume_gateway_url?: unknown;
-            };
-            if (
-                typeof ready?.session_id !== "string" ||
-                typeof ready?.resume_gateway_url !== "string"
-            ) {
-                this.#emitError(
-                    new GatewayError(
-                        "Gateway READY payload is missing session information",
-                    ),
-                );
                 return;
             }
-            this.#sessionId = ready.session_id;
-            this.#resumeURL = ready.resume_gateway_url;
-            this.#attempt = 0;
+            case "invalid":
+                this.#emitError(
+                    new GatewayError(
+                        action.message,
+                        undefined,
+                        action.cause === undefined
+                            ? undefined
+                            : { cause: action.cause },
+                    ),
+                );
+                this.#transport.close(
+                    1002,
+                    action.violation === "invalid-json"
+                        ? "Invalid JSON"
+                        : action.violation === "invalid-hello"
+                          ? "Invalid heartbeat interval"
+                          : "Invalid payload",
+                );
+                return;
+            case "unknown":
+                // Forward compatibility: Discord may add opcodes, and an
+                // unfamiliar one is not a failure.
+                return;
+        }
+    }
+    #handleDispatch(event: string | null, data: unknown, token: number): void {
+        if (event === "READY") {
+            if (!this.#session.activate(data, token)) {
+                // Either the payload lacked session information or this socket
+                // no longer owns the session; only the former is an error.
+                if (this.#session.owns(token))
+                    this.#emitError(
+                        new GatewayError(
+                            "Gateway READY payload is missing session information",
+                        ),
+                    );
+                return;
+            }
+            this.#reconnect.reset();
             this.#setState(GatewayState.Ready);
             this.#emit("ready", data);
         } else if (event === "RESUMED") {
@@ -481,7 +524,7 @@ export class Gateway {
             // reset the backoff counter so a later disconnect starts from the
             // base delay, mark the connection READY, and surface a Discord.js-
             // familiar `resumed` event.
-            this.#attempt = 0;
+            this.#reconnect.reset();
             this.#setState(GatewayState.Ready);
             this.#emit("resumed", data);
         }
@@ -489,143 +532,54 @@ export class Gateway {
         if (this.#closed) return;
         this.#emit(event ?? "dispatch", data);
     }
-    #handleHello(data: unknown): void {
-        const interval = (data as { heartbeat_interval?: unknown })
-            ?.heartbeat_interval;
-        if (
-            typeof interval !== "number" ||
-            !Number.isFinite(interval) ||
-            interval <= 0
-        ) {
-            this.#emitError(
-                new GatewayError(
-                    "Gateway HELLO payload contains an invalid heartbeat interval",
-                ),
-            );
-            this.#ws?.close(1002, "Invalid heartbeat interval");
-            return;
-        }
-        this.#heartbeatInterval = interval;
+    #handleHello(interval: number): void {
         this.#setState(
-            this.#sessionId && this.#sequence !== null && this.#resumeURL
-                ? GatewayState.Resume
-                : GatewayState.Hello,
+            this.#session.canResume ? GatewayState.Resume : GatewayState.Hello,
         );
-        this.#startHeartbeat(interval);
+        this.#heartbeat.start(interval);
         this.#identifyOrResume();
     }
     #identifyOrResume(): void {
-        if (this.#sessionId && this.#sequence !== null && this.#resumeURL) {
+        const intent = this.#session.handshake();
+        // IDENTIFY/RESUME are privileged for the same reason heartbeats are:
+        // dropping one leaves the shard connected but never READY, recoverable
+        // only via the zombie timeout. Application traffic must never starve
+        // the handshake out of the send budget.
+        if (intent.type === "resume") {
             this.#setState(GatewayState.Resume);
-            this.send({
-                op: GatewayOpcodes.Resume,
-                d: {
-                    token: this.#options.token,
-                    session_id: this.#sessionId,
-                    seq: this.#sequence,
-                },
-                s: null,
-                t: null,
-            });
+            this.#dispatch(resumePayload(this.#options.token, intent), true);
             return;
         }
         this.#setState(GatewayState.Identify);
-        const props = this.#options.properties ?? {
-            os: "Android",
-            browser: "Discord Android",
-            device: "Discord Android",
-        };
-        const os = props.os ?? "Android";
-        const browser = props.browser ?? "Discord Android";
-        const device = props.device ?? "Discord Android";
-        this.send({
-            op: GatewayOpcodes.Identify,
-            d: {
+        this.#dispatch(
+            identifyPayload({
                 token: this.#options.token,
                 intents: this.#options.intents,
-                properties: {
-                    os,
-                    browser,
-                    device,
-                    $os: os,
-                    $browser: browser,
-                    $device: device,
-                    ...props,
-                },
-                presence: {
-                    since: this.#options.presence?.since ?? null,
-                    activities: this.#options.presence?.activities ?? [],
-                    status: this.#options.presence?.status ?? "online",
-                    afk: Boolean(this.#options.presence?.afk),
-                },
-                shard: [this.#options.shardId, this.#options.shardCount],
-            },
-            s: null,
-            t: null,
-        });
-    }
-    #startHeartbeat(interval: number): void {
-        this.#clearHeartbeatTimers();
-        this.#heartbeatACK = true;
-        this.#initialHeartbeat = setTimeout(
-            () => this.#sendHeartbeat(),
-            Math.random() * interval,
-        );
-        this.#heartbeatTimer = setInterval(
-            () => this.#sendHeartbeat(),
-            interval,
+                shardId: this.#options.shardId,
+                shardCount: this.#options.shardCount,
+                properties: this.#options.properties,
+                presence: this.#options.presence,
+            }),
+            true,
         );
     }
-    #sendHeartbeat(): void {
-        this.#heartbeatACK = false;
-        this.#heartbeatSentAt = Date.now();
-        if (
-            !this.#dispatch(
-                {
-                    op: GatewayOpcodes.Heartbeat,
-                    d: this.#sequence,
-                    s: null,
-                    t: null,
-                },
-                true,
-            )
-        ) {
-            this.#emitError(
-                new GatewayError(
-                    "Unable to send Gateway heartbeat because the WebSocket is not open.",
-                ),
-            );
-            return;
-        }
-        this.#clearHeartbeatAckTimer();
-        this.#heartbeatAckTimer = setTimeout(() => {
-            if (!this.#heartbeatACK) {
-                const elapsed = Date.now() - this.#heartbeatSentAt;
-                this.#emitError(
-                    new GatewayError(
-                        `Gateway heartbeat acknowledgement timed out after ${elapsed}ms.`,
-                    ),
-                );
-                try {
-                    this.#ws?.close(1001, "Heartbeat timeout");
-                } catch (error) {
-                    this.#emitError(error);
-                }
-            }
-        }, this.#options.heartbeatAckTimeout);
-    }
-    #close(ws: WebSocket, code: number): void {
-        if (this.#ws !== ws) return;
-        this.#ws = undefined;
+    #close(code: number, token: number): void {
         this.#clearTimers();
-        const action = this.#closeAction(code);
+        const action: CloseAction = this.#reconnect.classifyClose(
+            code,
+            this.#session.canResume,
+        );
         this.#emit("close", { code, action });
-        if (this.#closed || !this.#options.reconnect || action === "stop") {
+        if (this.#closed || !this.#reconnect.enabled || action === "stop") {
+            // A fatal close is terminal: the condition behind 4004/4013/4014
+            // cannot fix itself, so the Gateway settles as CLOSED rather than
+            // sitting in CONNECT looking like it is about to try again (WS-003).
+            if (action === "stop") this.#closed = true;
             this.#setState(
                 this.#closed ? GatewayState.Closed : GatewayState.Connect,
             );
-            if (this.#connectPromise)
-                this.#settleConnect(
+            if (this.#reconnect.connecting)
+                this.#reconnect.settle(
                     new GatewayError(
                         `Gateway closed before READY (code ${code}).`,
                         code,
@@ -633,90 +587,30 @@ export class Gateway {
                 );
             return;
         }
-        if (action === "identify") {
-            // Fresh IDENTIFY: drop the resumable session AND its resume URL so
-            // the reconnect targets the main Gateway, not a stale resume host.
-            this.#sequence = null;
-            this.#sessionId = undefined;
-            this.#resumeURL = undefined;
-        }
+        if (action === "identify")
+            // Fresh IDENTIFY: drop the session AND its resume host so the
+            // reconnect targets the main Gateway, not a stale resume URL.
+            this.#session.invalidate(token, "session-timeout");
         this.#setState(GatewayState.Reconnect);
         this.#scheduleReconnect();
     }
-    #closeAction(code: number): "resume" | "identify" | "stop" {
-        // Fatal codes: the connection cannot recover by reconnecting.
-        const fatal: number[] = [
-            GatewayCloseCodes.AuthenticationFailed,
-            GatewayCloseCodes.InvalidShard,
-            GatewayCloseCodes.ShardingRequired,
-            GatewayCloseCodes.InvalidAPIVersion,
-            GatewayCloseCodes.InvalidIntents,
-            GatewayCloseCodes.DisallowedIntents,
-        ];
-        if (fatal.includes(code)) return "stop";
-        // Sequence/session invalidated: reconnect but IDENTIFY afresh.
-        if (
-            code === GatewayCloseCodes.InvalidSeq ||
-            code === GatewayCloseCodes.SessionTimedOut
-        )
-            return "identify";
-        // Otherwise resume when we still hold a live session + sequence.
-        return this.#sessionId && this.#sequence !== null
-            ? "resume"
-            : "identify";
-    }
     #scheduleReconnect(): void {
-        if (this.#closed || !this.#options.reconnect || this.#reconnectTimer)
-            return;
-        if (this.#attempt >= this.#options.maxReconnectAttempts) {
-            this.#settleConnect(
-                new GatewayError("Gateway reconnect attempts exhausted."),
-            );
-            this.#setState(GatewayState.Connect);
-            return;
-        }
-        const delay = Math.min(
-            this.#options.reconnectMaxDelay,
-            this.#options.reconnectBaseDelay * 2 ** this.#attempt++,
+        if (this.#closed) return;
+        const result = this.#reconnect.schedule(() =>
+            this.#open(this.#session.connectURL(DEFAULT_GATEWAY_URL)),
         );
-        // Jitter must scale with the delay: a fixed ceiling would reconnect
-        // every shard inside the same narrow window after a gateway-wide
-        // restart, which is exactly when decorrelation matters.
-        const jitter = Math.random() * Math.max(1, delay * 0.25);
-        this.#reconnectTimer = setTimeout(() => {
-            this.#reconnectTimer = undefined;
-            this.#open(
-                this.#resumeURL ??
-                    "wss://gateway.discord.gg/?v=10&encoding=json",
-            );
-        }, delay + jitter);
+        if (result.scheduled || result.reason !== "exhausted") return;
+        this.#reconnect.settle(
+            new GatewayError("Gateway reconnect attempts exhausted."),
+        );
+        this.#setState(GatewayState.Connect);
     }
     #settleConnect(error?: GatewayError): void {
-        const resolve = this.#resolveConnect;
-        const reject = this.#rejectConnect;
-        this.#resolveConnect = undefined;
-        this.#rejectConnect = undefined;
-        this.#connectPromise = undefined;
-        if (error) reject?.(error);
-        else resolve?.();
-    }
-    #clearHeartbeatAckTimer(): void {
-        if (this.#heartbeatAckTimer) clearTimeout(this.#heartbeatAckTimer);
-        this.#heartbeatAckTimer = undefined;
-    }
-    #clearHeartbeatTimers(): void {
-        if (this.#heartbeatTimer) clearInterval(this.#heartbeatTimer);
-        if (this.#initialHeartbeat) clearTimeout(this.#initialHeartbeat);
-        this.#clearHeartbeatAckTimer();
-        this.#heartbeatTimer = undefined;
-        this.#initialHeartbeat = undefined;
+        this.#reconnect.settle(error);
     }
     #clearTimers(): void {
-        if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
-        if (this.#zombieTimer) clearInterval(this.#zombieTimer);
-        this.#reconnectTimer = undefined;
-        this.#zombieTimer = undefined;
-        this.#clearHeartbeatTimers();
+        this.#reconnect.cancel();
+        this.#heartbeat.stop();
     }
     #normalizeError(error: unknown): GatewayError {
         return error instanceof GatewayError
@@ -753,43 +647,5 @@ export class Gateway {
         const previous = this.state;
         this.state = next;
         this.#emit("stateChange", { previous, next });
-    }
-    /** Initialises a fresh zlib-stream decompressor using Bun's native DecompressionStream. */
-    #initDecompressor(): void {
-        const ds = new DecompressionStream("deflate-raw");
-        this.#decompressor = {
-            writer: ds.writable.getWriter() as WritableStreamDefaultWriter<BufferSource>,
-            reader: ds.readable.getReader() as ReadableStreamDefaultReader<Uint8Array>,
-        };
-    }
-    /** Decompresses a zlib-stream chunk and returns the decoded JSON string. */
-    async #decompress(chunk: Uint8Array): Promise<string> {
-        if (!this.#decompressor) this.#initDecompressor();
-        const { writer, reader } = this.#decompressor!;
-        await writer.write(chunk as unknown as BufferSource);
-        const parts: Uint8Array[] = [];
-        // Drain all available output frames
-        while (true) {
-            const { done, value } = await Promise.race([
-                reader.read(),
-                // 50 ms fence so we don't hang on a partial payload
-                new Promise<{ done: true; value: undefined }>((resolve) =>
-                    setTimeout(
-                        () => resolve({ done: true, value: undefined }),
-                        50,
-                    ),
-                ),
-            ]);
-            if (done || !value) break;
-            parts.push(value);
-        }
-        const total = parts.reduce((n, p) => n + p.length, 0);
-        const merged = new Uint8Array(total);
-        let offset = 0;
-        for (const p of parts) {
-            merged.set(p, offset);
-            offset += p.length;
-        }
-        return new TextDecoder().decode(merged);
     }
 }

@@ -124,6 +124,12 @@ export const Routes = {
     /** Returns one guild scheduled event. @param guildId Guild identifier. @param eventId Event identifier. @returns Scheduled-event route. */ guildScheduledEvent:
         (guildId: string, eventId: string) =>
             `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events/${snowflake(eventId, "Event ID")}`,
+    /** Returns users subscribed to a scheduled event. @param guildId Guild identifier. @param eventId Event identifier. @returns Scheduled-event users route. */ guildScheduledEventUsers:
+        (guildId: string, eventId: string) =>
+            `/guilds/${snowflake(guildId, "Guild ID")}/scheduled-events/${snowflake(eventId, "Event ID")}/users`,
+    /** Returns a channel permission overwrite. @param channelId Channel identifier. @param overwriteId Role or user identifier. @returns Permission overwrite route. */ channelPermission:
+        (channelId: string, overwriteId: string) =>
+            `/channels/${snowflake(channelId, "Channel ID")}/permissions/${snowflake(overwriteId, "Overwrite ID")}`,
     /** Returns guild automod rules. @param guildId Guild identifier. @returns Automod-rule collection route. */ guildAutoModerationRules:
         (guildId: string) =>
             `/guilds/${snowflake(guildId, "Guild ID")}/auto-moderation/rules`,

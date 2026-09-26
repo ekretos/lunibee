@@ -3,6 +3,16 @@ export interface BucketState {
     resetAt: number;
 }
 
+/**
+ * Outcome of an atomic reservation.
+ *
+ * `granted` means one unit of the bucket's allowance now belongs to the caller
+ * and to nobody else — the distinction that a read-then-write cannot make when
+ * several workers share a store.
+ */
+export type Reservation =
+    { granted: true } | { granted: false; retryAfterMs: number };
+
 /** Interface for distributed or local rate limit synchronization. */
 export interface RateLimitStore {
     /** Gets the server bucket hash for a normalized route. */
@@ -23,6 +33,16 @@ export interface RateLimitStore {
     getGlobalReset(): Promise<number> | number;
     /** Sets the global reset timestamp. */
     setGlobalReset(resetAt: number): Promise<void> | void;
+
+    /**
+     * Atomically consumes one unit of a bucket's allowance.
+     *
+     * Optional: a store that cannot do this atomically must omit it, and the
+     * limiter falls back to waiting on observed state. Implementations must
+     * grant when the bucket is unknown or its window has elapsed — an unknown
+     * bucket is discovered by sending, and refusing would deadlock the route.
+     */
+    reserve?(key: string): Promise<Reservation> | Reservation;
 
     /**
      * Evicts expired bucket entries. Optional: stores with native key
@@ -50,6 +70,24 @@ export class MemoryRateLimitStore implements RateLimitStore {
     }
     public getBucket(key: string): BucketState | undefined {
         return this.#buckets.get(key);
+    }
+    /**
+     * Consumes one unit of the bucket's allowance.
+     *
+     * Single-process reservation is trivially atomic: JavaScript will not
+     * interleave this method with another caller's copy of it.
+     */
+    public reserve(key: string): Reservation {
+        const state = this.#buckets.get(key);
+        const now = Date.now();
+        // Unknown bucket, or a window that has already elapsed: the next
+        // response re-establishes the real allowance.
+        if (!state || state.resetAt <= now) return { granted: true };
+        if (state.remaining > 0) {
+            state.remaining -= 1;
+            return { granted: true };
+        }
+        return { granted: false, retryAfterMs: state.resetAt - now };
     }
     public updateBucket(key: string, state: BucketState): void {
         this.#buckets.set(key, state);

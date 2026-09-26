@@ -41,13 +41,51 @@ new ShardManager(options )
 </TabItem>
 </Tabs>
 
-| Option | Type | Description |
-|---|---|---|
-| `token` | `string` | Discord bot token. |
-| `intents` | `GatewayIntentResolvable` | Gateway intents for all shards. |
-| `shardCount` | `number \| "auto"` | Number of shards. `"auto"` fetches Discord's recommendation. |
-| `presence` | `GatewayPresence` | Initial presence for all shards. |
-| `autoScale` | `boolean` | Automatically rescale shards over time. |
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `token` | `string` | Required | Discord bot token. |
+| `intents` | `GatewayIntentResolvable` | Required | Gateway intents for all shards. |
+| `shardCount` | `number \| "auto"` | `1` | Number of shards. `"auto"` fetches Discord's recommendation. |
+| `reconnect` | `boolean` | `true` | Automatic reconnect for every shard. |
+| `spawnDelay` | `number` | `5000` | Milliseconds between shard starts. See below. |
+| `autoScaleInterval` | `number` | — | Milliseconds between automatic shard-count checks (minimum `1000`). Only applies with `shardCount: "auto"`. |
+| `onAutoScaleError` | `(error: unknown) => void` | — | Called when a background auto-scale check fails. |
+
+### Shard start pacing
+
+Discord allows **one IDENTIFY every 5 seconds** per rate-limit key. `spawnDelay`
+therefore defaults to `ShardManager.IDENTIFY_INTERVAL` (5000 ms): starting shards
+back to back trips that limit and Discord answers with close code `4008` and
+invalid-session churn.
+
+This means an *N*-shard bot takes roughly `(N - 1) × 5s` to finish connecting. That
+is the protocol-correct behaviour. Pass `spawnDelay: 0` only when something else
+already paces your handshakes, such as an external scheduler or a bucketed
+`max_concurrency` allowance.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const manager = new ShardManager({
+  token: process.env.DISCORD_TOKEN!,
+  intents: IntentBits.guilds,
+  shardCount: 4,
+  // Default: ShardManager.IDENTIFY_INTERVAL (5000).
+  spawnDelay: ShardManager.IDENTIFY_INTERVAL,
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const manager = new ShardManager({
+  token: process.env.DISCORD_TOKEN,
+  intents: IntentBits.guilds,
+  shardCount: 4,
+  spawnDelay: ShardManager.IDENTIFY_INTERVAL,
+});
+```
+</TabItem>
+</Tabs>
 
 ## Properties
 
@@ -245,10 +283,10 @@ const cluster = new ClusterManager({
   token: process.env.DISCORD_TOKEN!,
   script: "./dist/bot.js",  // worker script path
   shardCount: "auto",
-  clusterCount: 4,          // number of CPU worker processes
+  clusterCount: 4,          // number of child processes
 });
 
-await cluster.connect();
+await cluster.spawn();
 ```
 </TabItem>
 <TabItem label="JavaScript">
@@ -259,10 +297,75 @@ const cluster = new ClusterManager({
   token: process.env.DISCORD_TOKEN,
   script: "./dist/bot.js",  // worker script path
   shardCount: "auto",
-  clusterCount ,          // number of CPU worker processes
+  clusterCount: 4,          // number of child processes
 });
 
-await cluster.connect();
+await cluster.spawn();
 ```
 </TabItem>
 </Tabs>
+
+> [!IMPORTANT]
+> `ClusterManager` uses Node's `child_process.fork()`, which Bun does not fully
+> support. Run the cluster manager under Node.js; `spawn()` throws on a runtime
+> whose `fork()` is unavailable. Individual clusters can still run under Bun.
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `token` | `string` | Required | Discord bot token. |
+| `script` | `string` | Required | Worker script each cluster runs. |
+| `shardCount` | `number \| "auto"` | `"auto"` | Total shards across all clusters. |
+| `clusterCount` | `number` | CPU count | Number of child processes. |
+| `autoScaleInterval` | `number` | — | Milliseconds between shard-count checks. |
+| `onAutoScaleError` | `(error: Error) => void` | — | Called when an auto-scale check fails. |
+| `shutdownTimeout` | `number` | `5000` | Grace period after `SIGTERM` before `SIGKILL`. |
+| `restartOnExit` | `boolean` | `true` | Re-fork a cluster that exits unexpectedly. |
+| `restartDelay` | `number` | `5000` | Delay before re-forking a crashed cluster. |
+| `onClusterExit` | `(cluster, code, signal) => void` | — | Called whenever a cluster exits, before any restart. |
+
+### Crash supervision
+
+A cluster that dies — an uncaught rejection, an OOM kill — takes its shards offline
+permanently unless something re-forks it. `ClusterManager` supervises every child:
+an unexpected exit calls `onClusterExit` and then re-forks the **same shard
+assignment** after `restartDelay`. Exits caused by `shutdownAll()` or `killAll()`
+are never restarted.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const cluster = new ClusterManager({
+  token: process.env.DISCORD_TOKEN!,
+  script: "./dist/bot.js",
+  onClusterExit: (info, code, signal) => {
+    console.warn(`Cluster ${info.id} exited`, { code, signal, shards: info.shards });
+  },
+});
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const cluster = new ClusterManager({
+  token: process.env.DISCORD_TOKEN,
+  script: "./dist/bot.js",
+  onClusterExit: (info, code, signal) => {
+    console.warn(`Cluster ${info.id} exited`, { code, signal, shards: info.shards });
+  },
+});
+```
+</TabItem>
+</Tabs>
+
+> [!NOTE]
+> Restarts are not yet backed off: a cluster that crashes on startup is re-forked
+> every `restartDelay`. Set `restartOnExit: false` and supervise externally if your
+> process manager already handles restarts.
+
+### Shutting down
+
+```ts
+await cluster.shutdownAll();  // SIGTERM, then SIGKILL after shutdownTimeout
+cluster.killAll();            // immediate, no grace period
+```

@@ -157,7 +157,7 @@ async function confirmAction(channel, userId: string): Promise<boolean> {
 
   // Feed interactions into the collector
   const handler = async (interaction: Interaction) => {
-    if (interaction.isComponent() && interaction.message?.id === msg.id) {
+    if (interaction.isMessageComponent() && interaction.message?.id === msg.id) {
       await collector.handle(interaction.id, interaction as ComponentInteraction);
     }
   };
@@ -200,7 +200,7 @@ async function confirmAction(channel, userId) {
 
   // Feed interactions into the collector
   const handler = async (interaction ) => {
-    if (interaction.isComponent() && interaction.message?.id === msg.id) {
+    if (interaction.isMessageComponent() && interaction.message?.id === msg.id) {
       await collector.handle(interaction.id, interaction as ComponentInteraction);
     }
   };

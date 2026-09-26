@@ -144,10 +144,6 @@ select.addOptions(
 </TabItem>
 </Tabs>
 
-### `setOptions(...options)`
-
-Replaces all options with a new set.
-
 ### `toJSON()`
 
 Serializes to a raw Discord API-compatible component object.
@@ -179,7 +175,7 @@ await channel.send({ content: "Subscribe to channels:", components: [row] });
 
 // Handle selection:
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isComponent() || interaction.customId !== "role_select") return;
+  if (!interaction.isMessageComponent() || interaction.customId !== "role_select") return;
   const selected = interaction.values; // e.g. ["announcements", "gaming"]
   await interaction.reply({
     content: `✅ Subscribed to: ${selected.join(", ")}`,
@@ -210,7 +206,7 @@ await channel.send({ content: "Subscribe to channels:", components: [row] });
 
 // Handle selection:
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isComponent() || interaction.customId !== "role_select") return;
+  if (!interaction.isMessageComponent() || interaction.customId !== "role_select") return;
   const selected = interaction.values; // e.g. ["announcements", "gaming"]
   await interaction.reply({
     content: `✅ Subscribed to: ${selected.join(", ")}`,

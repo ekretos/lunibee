@@ -6,7 +6,12 @@ export {
     ComponentType,
     ActionRowBuilder,
     StringSelectBuilder,
+    StringSelectMenuBuilder,
     EntitySelectBuilder,
+    UserSelectMenuBuilder,
+    RoleSelectMenuBuilder,
+    MentionableSelectMenuBuilder,
+    ChannelSelectMenuBuilder,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
@@ -35,5 +40,6 @@ export {
     ApplicationCommandOptionType,
     UserCommandBuilder,
     MessageCommandBuilder,
+    ContextMenuCommandBuilder,
 } from "./commands.js";
 export { AttachmentBuilder, type AttachmentData } from "./attachment.js";

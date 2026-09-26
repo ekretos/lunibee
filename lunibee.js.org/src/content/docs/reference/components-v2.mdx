@@ -53,8 +53,8 @@ The top-level V2 component that wraps other components. Set `IS_COMPONENTS_V2` f
 const container = new ContainerBuilder()
   .addComponents(
     new SectionBuilder()
-      .addText(new TextDisplayBuilder().setContent("**Welcome!** 🐝"))
-      .setThumbnail(new ThumbnailBuilder().setURL("https://example.com/bee.png")),
+      .addComponents(new TextDisplayBuilder().setContent("**Welcome!** 🐝"))
+      .setAccessory(new ThumbnailBuilder().setUrl("https://example.com/bee.png")),
     new SeparatorBuilder(),
     new TextDisplayBuilder().setContent("Explore the channels below."),
   );
@@ -70,8 +70,8 @@ await channel.send({
 const container = new ContainerBuilder()
   .addComponents(
     new SectionBuilder()
-      .addText(new TextDisplayBuilder().setContent("**Welcome!** 🐝"))
-      .setThumbnail(new ThumbnailBuilder().setURL("https://example.com/bee.png")),
+      .addComponents(new TextDisplayBuilder().setContent("**Welcome!** 🐝"))
+      .setAccessory(new ThumbnailBuilder().setUrl("https://example.com/bee.png")),
     new SeparatorBuilder(),
     new TextDisplayBuilder().setContent("Explore the channels below."),
   );
@@ -94,18 +94,17 @@ A two-column layout with text on the left and an optional accessory (thumbnail o
 
 | Method | Description |
 |---|---|
-| `addText(textDisplay)` | Adds a `TextDisplayBuilder` to the left column. |
-| `setThumbnail(thumbnail)` | Sets a `ThumbnailBuilder` accessory on the right. |
-| `setButton(button)` | Sets a `ButtonBuilder` accessory on the right. |
+| `addComponents(...textDisplays)` | Adds `TextDisplayBuilder`s to the left column. |
+| `setAccessory(accessory)` | Sets a `ThumbnailBuilder` or `ButtonBuilder` accessory on the right. |
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
 const section = new SectionBuilder()
-  .addText(new TextDisplayBuilder().setContent("**Lunibee v0.1.7** is here!"))
-  .setThumbnail(
+  .addComponents(new TextDisplayBuilder().setContent("**Lunibee v0.1.7** is here!"))
+  .setAccessory(
     new ThumbnailBuilder()
-      .setURL("https://example.com/release.png")
+      .setUrl("https://example.com/release.png")
       .setDescription("Release banner"),
   );
 ```
@@ -113,10 +112,10 @@ const section = new SectionBuilder()
 <TabItem label="JavaScript">
 ```js
 const section = new SectionBuilder()
-  .addText(new TextDisplayBuilder().setContent("**Lunibee v0.1.7** is here!"))
-  .setThumbnail(
+  .addComponents(new TextDisplayBuilder().setContent("**Lunibee v0.1.7** is here!"))
+  .setAccessory(
     new ThumbnailBuilder()
-      .setURL("https://example.com/release.png")
+      .setUrl("https://example.com/release.png")
       .setDescription("Release banner"),
   );
 ```
@@ -162,7 +161,7 @@ Displays a grid of images.
 
 | Method | Description |
 |---|---|
-| `addItems(...items)` | Adds media items. Each item: `{ url, description?, spoiler? }`. |
+| `addItems(...items)` | Adds media items. Each item: `{ url, description? }`. |
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -193,7 +192,7 @@ A small image accessory used in `SectionBuilder`.
 
 | Method | Description |
 |---|---|
-| `setURL(url)` | Sets the image URL. |
+| `setUrl(url)` | Sets the image URL. |
 | `setDescription(text)` | Sets alt text for accessibility. |
 | `setSpoiler(spoiler)` | Marks as a spoiler image. |
 
@@ -201,14 +200,14 @@ A small image accessory used in `SectionBuilder`.
 <TabItem label="TypeScript">
 ```ts
 const thumb = new ThumbnailBuilder()
-  .setURL("https://example.com/avatar.png")
+  .setUrl("https://example.com/avatar.png")
   .setDescription("User avatar");
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
 const thumb = new ThumbnailBuilder()
-  .setURL("https://example.com/avatar.png")
+  .setUrl("https://example.com/avatar.png")
   .setDescription("User avatar");
 ```
 </TabItem>
@@ -224,18 +223,18 @@ Renders a visual divider between components.
 
 | Method | Description |
 |---|---|
-| `setSpacing(spacing)` | Sets the spacing size (`"small"` or `"large"`). |
+| `setSpacing(spacing)` | Sets the spacing size (`1` = small, `2` = large). |
 | `setDivider(show)` | Whether to show a visible line (default: `true`). |
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-const sep = new SeparatorBuilder().setSpacing("large");
+const sep = new SeparatorBuilder().setSpacing(2);
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const sep = new SeparatorBuilder().setSpacing("large");
+const sep = new SeparatorBuilder().setSpacing(2);
 ```
 </TabItem>
 </Tabs>
@@ -250,18 +249,18 @@ Attaches an uploaded file component to the layout.
 
 | Method | Description |
 |---|---|
-| `setURL(url)` | Sets the attachment URL (`attachment://filename`). |
+| `setUrl(url)` | Sets the attachment URL (`attachment://filename`). |
 | `setSpoiler(spoiler)` | Marks as spoiler. |
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-const file = new FileComponentBuilder().setURL("attachment://report.pdf");
+const file = new FileComponentBuilder().setUrl("attachment://report.pdf");
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const file = new FileComponentBuilder().setURL("attachment://report.pdf");
+const file = new FileComponentBuilder().setUrl("attachment://report.pdf");
 ```
 </TabItem>
 </Tabs>
@@ -288,10 +287,10 @@ import {
 const layout = new ContainerBuilder().addComponents(
   // Header section
   new SectionBuilder()
-    .addText(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.1.7"))
-    .setThumbnail(new ThumbnailBuilder().setURL("https://example.com/bee.png")),
+    .addComponents(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.1.7"))
+    .setAccessory(new ThumbnailBuilder().setUrl("https://example.com/bee.png")),
 
-  new SeparatorBuilder().setSpacing("small"),
+  new SeparatorBuilder().setSpacing(1),
 
   // Body text
   new TextDisplayBuilder().setContent(
@@ -333,10 +332,10 @@ import {
 const layout = new ContainerBuilder().addComponents(
   // Header section
   new SectionBuilder()
-    .addText(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.1.7"))
-    .setThumbnail(new ThumbnailBuilder().setURL("https://example.com/bee.png")),
+    .addComponents(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.1.7"))
+    .setAccessory(new ThumbnailBuilder().setUrl("https://example.com/bee.png")),
 
-  new SeparatorBuilder().setSpacing("small"),
+  new SeparatorBuilder().setSpacing(1),
 
   // Body text
   new TextDisplayBuilder().setContent(

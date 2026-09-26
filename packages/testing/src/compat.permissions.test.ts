@@ -56,9 +56,8 @@ describe("PermissionsBitField — core behavior", () => {
 
 describe("PermissionsBitField — discord.js divergences", () => {
     // discord.js PermissionsBitField.Flags.* are BIGINT values (8n), enabling
-    // `Flags.A | Flags.B`. Lunibee's PermissionFlagsBits is a string enum ("8"),
-    // so bitwise composition string-concatenates instead of OR-ing.
-    test.failing("Flags values are bigints supporting bitwise OR", () => {
+    // `Flags.A | Flags.B`; Lunibee matches.
+    test("Flags values are bigints supporting bitwise OR", () => {
         expect(typeof PermissionFlagsBits.Administrator).toBe("bigint");
         const combined =
             (PermissionFlagsBits.Administrator as unknown as bigint) |
@@ -67,11 +66,9 @@ describe("PermissionsBitField — discord.js divergences", () => {
         expect(combined).toBe(40n);
     });
 
-    // discord.js re-exports PermissionsBitField from its top-level entry. Lunibee's
-    // @lunibee/structures package ships a permissions module but does NOT export it
-    // from the package index — only @lunibee/core does. Importers of the structures
-    // package cannot reach PermissionsBitField.
-    test.failing("@lunibee/structures re-exports PermissionsBitField", () => {
+    // discord.js re-exports PermissionsBitField from its top-level entry; importers of
+    // @lunibee/structures must be able to reach it too.
+    test("@lunibee/structures re-exports PermissionsBitField", () => {
         expect(
             (structures as Record<string, unknown>).PermissionsBitField,
         ).toBeDefined();

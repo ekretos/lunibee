@@ -590,3 +590,105 @@ export class VoiceReceiver {
         }
     }
 }
+
+// ─── Discord.js-familiar helpers (@discordjs/voice) ───────────────────────────
+
+/** Discord.js-familiar alias for {@link VoiceConnectionState}. Member values are Lunibee's. */
+export { VoiceConnectionState as VoiceConnectionStatus };
+
+/** Active connections by guild, as tracked by {@link joinVoiceChannel}. */
+const voiceConnections = new Map<string, VoiceConnection>();
+
+/**
+ * Joins (or moves to) a voice channel, reusing the guild's tracked connection.
+ * Mirrors `@discordjs/voice`'s `joinVoiceChannel`; transports are still attached
+ * with {@link VoiceConnection.attachTransports}.
+ * @param options Guild, channel and self mute/deaf flags.
+ * @returns The guild's voice connection.
+ * @throws {TypeError} If the guild or channel ID is empty.
+ */
+export function joinVoiceChannel(
+    options: VoiceConnectionOptions & { channelId: string },
+): VoiceConnection {
+    let connection = voiceConnections.get(options.guildId);
+    if (!connection) {
+        connection = new VoiceConnection(options);
+        const created = connection;
+        // VoiceConnection emits stateChange as (next, previous).
+        created.on("stateChange", (next) => {
+            if (
+                next === VoiceConnectionState.Destroyed &&
+                voiceConnections.get(created.guildId) === created
+            )
+                voiceConnections.delete(created.guildId);
+        });
+        voiceConnections.set(options.guildId, connection);
+    }
+    connection.setChannel(options.channelId);
+    connection.setSuppression(options);
+    connection.connect();
+    return connection;
+}
+
+/** Returns the connection tracked by {@link joinVoiceChannel} for a guild, if any. */
+export function getVoiceConnection(
+    guildId: string,
+): VoiceConnection | undefined {
+    return voiceConnections.get(guildId);
+}
+
+/** Creates an {@link AudioPlayer}. Mirrors `@discordjs/voice`'s `createAudioPlayer`. */
+export function createAudioPlayer(): AudioPlayer {
+    return new AudioPlayer();
+}
+
+/** Creates an {@link AudioStream}. Mirrors `@discordjs/voice`'s `createAudioResource`. */
+export function createAudioResource(
+    stream: ReadableStream<Uint8Array>,
+    metadata?: { title?: string; duration?: number },
+): AudioStream {
+    return new AudioStream(stream, metadata);
+}
+
+/**
+ * Resolves once a connection or player reaches `status`, or rejects after `timeoutMs`.
+ * Mirrors `@discordjs/voice`'s `entersState`.
+ * @returns The same target, for chaining.
+ * @throws {VoiceError} If the state is not reached in time.
+ */
+export function entersState<T extends VoiceConnection | AudioPlayer>(
+    target: T,
+    status: T extends VoiceConnection ? VoiceConnectionState : AudioPlayerState,
+    timeoutMs: number,
+): Promise<T> {
+    if (target.state === status) return Promise.resolve(target);
+    const emitter = target as unknown as {
+        on(
+            event: "stateChange",
+            fn: (from: unknown, to: unknown) => void,
+        ): unknown;
+        off(
+            event: "stateChange",
+            fn: (from: unknown, to: unknown) => void,
+        ): unknown;
+    };
+    // VoiceConnection emits (next, previous); AudioPlayer emits (from, to).
+    const isConnection = target instanceof VoiceConnection;
+    return new Promise<T>((resolve, reject) => {
+        const onChange = (first: unknown, second: unknown): void => {
+            if ((isConnection ? first : second) !== status) return;
+            clearTimeout(timer);
+            emitter.off("stateChange", onChange);
+            resolve(target);
+        };
+        const timer = setTimeout(() => {
+            emitter.off("stateChange", onChange);
+            reject(
+                new VoiceError(
+                    `Did not enter state "${String(status)}" within ${timeoutMs}ms.`,
+                ),
+            );
+        }, timeoutMs);
+        emitter.on("stateChange", onChange);
+    });
+}

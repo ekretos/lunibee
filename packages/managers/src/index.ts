@@ -1,9 +1,12 @@
 import { Manager, ResourceManager } from "./base.js";
 export { Manager, ResourceManager } from "./base.js";
+/** Discord.js-familiar alias for {@link ResourceManager}. */
+export { ResourceManager as CachedManager } from "./base.js";
 import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
 import {
     Channel,
+    createChannel,
     Message,
     User,
     Guild,
@@ -49,6 +52,8 @@ export interface ChannelCreateOptions extends Record<string, unknown> {
 }
 export type ChannelEditOptions = Record<string, unknown>;
 
+import { PermissionOverwriteManager } from "./guild-resources.js";
+
 export class ChannelManager extends Manager<string, Channel> {
     readonly #rest: REST;
     readonly #context: ResourceContext;
@@ -88,6 +93,10 @@ export class ChannelManager extends Manager<string, Channel> {
         }
         return manager;
     }
+    /** Permission overwrite manager for a channel. */
+    public permissionOverwrites(channelId: string): PermissionOverwriteManager {
+        return new PermissionOverwriteManager(this.#rest, channelId);
+    }
     public threads(channelId: string): ThreadManager {
         return new ThreadManager(this.#rest, this.#context, channelId);
     }
@@ -103,7 +112,7 @@ export class ChannelManager extends Manager<string, Channel> {
     }
     public upsert(data: ConstructorParameters<typeof Channel>[0]): Channel {
         const existing = this.get(data.id);
-        const channel = new Channel(data, this.#context);
+        const channel = createChannel(data, this.#context);
         if (existing) {
             Object.assign(existing, channel);
             return existing;
@@ -397,6 +406,18 @@ export {
     type BanOptions,
 } from "./member.js";
 export { ApplicationCommandManager } from "./application.js";
+export {
+    GuildBanManager,
+    GuildScheduledEventManager,
+    StageInstanceManager,
+    PermissionOverwriteManager,
+    type APIBan,
+    type GuildBanCreateOptions,
+    type GuildScheduledEventOptions,
+    type StageInstanceCreateOptions,
+    type PermissionOverwriteOptions,
+    type PermissionOverwriteTargetType,
+} from "./guild-resources.js";
 export {
     EmojiManager,
     type EmojiCreateOptions,

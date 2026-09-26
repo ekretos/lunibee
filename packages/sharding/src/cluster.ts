@@ -21,6 +21,20 @@ export interface ClusterManagerOptions {
     onAutoScaleError?: (error: Error) => void;
     /** Grace period in milliseconds to await a cluster's clean exit after SIGTERM before force-killing. Defaults to 5000. */
     shutdownTimeout?: number;
+    /**
+     * Whether a cluster that exits unexpectedly is re-forked with the same
+     * shard assignment. Defaults to true: without it a crashed child leaves
+     * its shards permanently offline and nothing reports it.
+     */
+    restartOnExit?: boolean;
+    /** Delay in milliseconds before re-forking a crashed cluster. Defaults to 5000. */
+    restartDelay?: number;
+    /** Called whenever a cluster process exits, before any restart. */
+    onClusterExit?(
+        cluster: ClusterInfo,
+        code: number | null,
+        signal: NodeJS.Signals | null,
+    ): void;
 }
 
 /** Information about a running cluster. */
@@ -52,6 +66,10 @@ export class ClusterManager {
     readonly #auto: boolean;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
     #spawned = false;
+    /** Set while a deliberate shutdown is in progress so exits are not restarted. */
+    #stopping = false;
+    /** Pending restart timers, kept so shutdown can cancel them. */
+    readonly #restartTimers = new Set<ReturnType<typeof setTimeout>>();
 
     /** Creates a cluster manager. @param options Clustering configuration. @throws {TypeError} If token or script is missing. */
     public constructor(options: ClusterManagerOptions) {
@@ -132,22 +150,7 @@ export class ClusterManager {
 
         for (let i = 0; i < clusterCount; i++) {
             if (chunks[i].length === 0) continue;
-
-            const child = fork(this.#options.script, [], {
-                env: {
-                    ...process.env,
-                    SHARD_LIST: chunks[i].join(","),
-                    SHARD_COUNT: count.toString(),
-                    CLUSTER_ID: i.toString(),
-                },
-            });
-
-            this.clusters.set(i, {
-                id: i,
-                process: child,
-                shards: chunks[i],
-            });
-
+            this.#launch(i, chunks[i], count);
             // Stagger cluster creation
             await sleep(500);
         }
@@ -160,6 +163,47 @@ export class ClusterManager {
                 void this.checkAutoScale();
             }, this.#options.autoScaleInterval);
         }
+    }
+
+    /**
+     * Forks one cluster child and supervises its exit.
+     *
+     * A child that dies (crash, OOM kill, uncaught rejection) takes its shards
+     * offline for good, so unless the exit came from a deliberate shutdown the
+     * same shard assignment is re-forked after `restartDelay`.
+     */
+    #launch(id: number, shards: number[], shardCount: number): ClusterInfo {
+        const child = fork(this.#options.script, [], {
+            env: {
+                ...process.env,
+                SHARD_LIST: shards.join(","),
+                SHARD_COUNT: shardCount.toString(),
+                CLUSTER_ID: id.toString(),
+            },
+        });
+        const info: ClusterInfo = { id, process: child, shards };
+        this.clusters.set(id, info);
+        child.once("exit", (code, signal) => {
+            // Only act on the process still registered as this cluster: a
+            // restart or respawn may already have replaced it.
+            if (this.clusters.get(id)?.process !== child) return;
+            try {
+                this.#options.onClusterExit?.(info, code, signal);
+            } catch {
+                // A faulty consumer callback must not break supervision.
+            }
+            if (this.#stopping || this.#options.restartOnExit === false) return;
+            this.clusters.delete(id);
+            const timer = setTimeout(() => {
+                this.#restartTimers.delete(timer);
+                if (this.#stopping || !this.#spawned) return;
+                this.#launch(id, shards, shardCount);
+            }, this.#options.restartDelay ?? 5000);
+            // Do not hold the event loop open purely for a pending restart.
+            (timer as { unref?: () => void }).unref?.();
+            this.#restartTimers.add(timer);
+        });
+        return info;
     }
 
     /** Checks if the recommended shard count has changed and respawns if so. */
@@ -196,6 +240,8 @@ export class ClusterManager {
     public async shutdownAll(
         timeoutMs = this.#options.shutdownTimeout ?? 5000,
     ): Promise<void> {
+        this.#stopping = true;
+        this.#clearRestartTimers();
         if (this.#autoScaleTimer) {
             clearInterval(this.#autoScaleTimer);
             this.#autoScaleTimer = undefined;
@@ -207,6 +253,13 @@ export class ClusterManager {
         );
         this.clusters.clear();
         this.#spawned = false;
+        this.#stopping = false;
+    }
+
+    /** Cancels any pending crash-restart timers. */
+    #clearRestartTimers(): void {
+        for (const timer of this.#restartTimers) clearTimeout(timer);
+        this.#restartTimers.clear();
     }
 
     /** Gracefully terminates a single cluster child, escalating to SIGKILL after the timeout. */
@@ -242,6 +295,8 @@ export class ClusterManager {
 
     /** Immediately force-kills all active cluster processes and clears the cluster map. Prefer {@link shutdownAll} for a graceful stop. */
     public killAll(): void {
+        this.#stopping = true;
+        this.#clearRestartTimers();
         if (this.#autoScaleTimer) {
             clearInterval(this.#autoScaleTimer);
             this.#autoScaleTimer = undefined;
@@ -255,5 +310,6 @@ export class ClusterManager {
         }
         this.clusters.clear();
         this.#spawned = false;
+        this.#stopping = false;
     }
 }

@@ -44,9 +44,11 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
 
     /** Bans a user from the guild. */
     public async ban(userId: string, options: BanOptions = {}): Promise<void> {
-        await this.#rest.put(Routes.guildBan(this.guildId, userId), {
-            delete_message_seconds: options.deleteMessageSeconds,
-        });
+        await this.#rest.put(
+            Routes.guildBan(this.guildId, userId),
+            { delete_message_seconds: options.deleteMessageSeconds },
+            { reason: options.reason },
+        );
         this.delete(userId);
     }
 

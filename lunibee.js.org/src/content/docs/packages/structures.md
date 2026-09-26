@@ -39,6 +39,13 @@ await channel.delete();
 
 ---
 
+### Channel classes
+
+`createChannel(data)` returns `TextChannel`, `NewsChannel`, `DMChannel`, `VoiceChannel`,
+`StageChannel`, `CategoryChannel`, `ThreadChannel`, `ForumChannel` or `MediaChannel`, all
+subclasses of `Channel`. Use `isThread()`, `isTextBased()`, `isVoiceBased()` and
+`isDMBased()` to narrow. See [Caching & Structures](/core-concepts/caching/#channel-classes).
+
 ## `Message`
 
 Messages provide their own resource operations and expose the originating channel through `message.channel`.

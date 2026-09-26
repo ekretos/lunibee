@@ -24,5 +24,9 @@ roster.json
 *.temp
 *.swp
 *.lock
+!bun.lock
 
 benchmarks/
+
+*.tmp.ts
+lunibee.js.org/src/content/docs/api/

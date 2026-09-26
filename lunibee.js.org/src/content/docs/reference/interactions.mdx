@@ -66,7 +66,7 @@ Use type guard methods on the base `Interaction` to narrow to the correct subtyp
 client.on("interactionCreate", async (interaction) => {
   if (interaction.isChatInputCommand()) {
     // CommandInteraction
-  } else if (interaction.isComponent()) {
+  } else if (interaction.isMessageComponent()) {
     // ComponentInteraction
   } else if (interaction.isModalSubmit()) {
     // ModalSubmitInteraction
@@ -81,7 +81,7 @@ client.on("interactionCreate", async (interaction) => {
 client.on("interactionCreate", async (interaction) => {
   if (interaction.isChatInputCommand()) {
     // CommandInteraction
-  } else if (interaction.isComponent()) {
+  } else if (interaction.isMessageComponent()) {
     // ComponentInteraction
   } else if (interaction.isModalSubmit()) {
     // ModalSubmitInteraction
@@ -221,7 +221,7 @@ Triggered when a user clicks a button or chooses a select menu option.
 <TabItem label="TypeScript">
 ```ts
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isComponent()) return;
+  if (!interaction.isMessageComponent()) return;
 
   if (interaction.customId === "btn_confirm") {
     await interaction.update({ content: "✅ Confirmed!", components: [] });
@@ -237,7 +237,7 @@ client.on("interactionCreate", async (interaction) => {
 <TabItem label="JavaScript">
 ```js
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isComponent()) return;
+  if (!interaction.isMessageComponent()) return;
 
   if (interaction.customId === "btn_confirm") {
     await interaction.update({ content: "✅ Confirmed!", components: [] });
@@ -270,12 +270,12 @@ Triggered when a user submits a modal form.
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-const value = interaction.fields.getTextInputValue("field_custom_id");
+const value = interaction.getRequiredInputValue("field_custom_id");
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const value = interaction.fields.getTextInputValue("field_custom_id");
+const value = interaction.getRequiredInputValue("field_custom_id");
 ```
 </TabItem>
 </Tabs>
@@ -289,8 +289,8 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
 
   if (interaction.customId === "feedback_modal") {
-    const subject = interaction.fields.getTextInputValue("subject");
-    const body = interaction.fields.getTextInputValue("body");
+    const subject = interaction.getRequiredInputValue("subject");
+    const body = interaction.getRequiredInputValue("body");
     await interaction.reply({
       content: `📨 Feedback received!\n**${subject}**\n${body}`,
       ephemeral: true,
@@ -305,8 +305,8 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
 
   if (interaction.customId === "feedback_modal") {
-    const subject = interaction.fields.getTextInputValue("subject");
-    const body = interaction.fields.getTextInputValue("body");
+    const subject = interaction.getRequiredInputValue("subject");
+    const body = interaction.getRequiredInputValue("body");
     await interaction.reply({
       content: `📨 Feedback received!\n**${subject}**\n${body}`,
       ephemeral ,

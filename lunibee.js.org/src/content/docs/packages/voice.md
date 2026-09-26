@@ -1,9 +1,11 @@
 ---
 title: "@lunibee/voice"
-description: Discord Voice Gateway connection and audio streaming abstractions.
+description: Transport-agnostic voice session, audio playback and receive abstractions.
 ---
 
-The `@lunibee/voice` package provides the low-level pieces needed to connect to Discord voice channels and manage the voice WebSocket/UDP lifecycle.
+`@lunibee/voice` tracks voice sessions and moves audio through a player and receiver.
+It does not open the voice WebSocket or UDP socket, encrypt packets or run the voice
+heartbeat. You attach transports that do that with `attachTransports(gateway, udp)`.
 
 ## Installation
 
@@ -11,25 +13,32 @@ The `@lunibee/voice` package provides the low-level pieces needed to connect to 
 bun add @lunibee/voice
 ```
 
-## Connect to Voice
+## Connect to voice
 
 ```ts
-import { VoiceConnection } from "@lunibee/voice";
+import { joinVoiceChannel, entersState, VoiceConnectionState } from "@lunibee/voice";
 
-const voice = new VoiceConnection({
+const voice = joinVoiceChannel({
   guildId: "123456789012345678",
   channelId: "987654321098765432",
   selfDeaf: true,
-  selfMute: false,
 });
+voice.attachTransports(myVoiceGatewayTransport, myUdpTransport);
 
 voice.on("stateChange", (newState, oldState) => {
   console.log(`Voice state: ${oldState} → ${newState}`);
 });
+await entersState(voice, VoiceConnectionState.Connected, 5_000);
 ```
 
-The connection handles the Discord voice handshake and UDP encryption setup, but does not transmit or decode audio itself. Listen for state changes so your application can react to connection, reconnect, and disconnect transitions.
+## What's included
+
+- `VoiceConnection`: lifecycle state, channel and self mute/deaf, speaking updates, transport ownership.
+- `AudioPlayer` / `AudioStream`: play, pause, resume and stop; override `onChunk()` to send audio.
+- `VoiceReceiver`: routes incoming packets to per-user streams by SSRC.
+- `@discordjs/voice`-style helpers: `joinVoiceChannel`, `getVoiceConnection`, `createAudioPlayer`, `createAudioResource`, `entersState`, `VoiceConnectionStatus`.
 
 ## When to use this package
 
-Use `@lunibee/voice` when you need direct control over the voice connection or audio pipeline. If your application only needs text channels, messages, commands, or interactions, you do not need this package.
+Use `@lunibee/voice` when you need direct control over the voice connection or audio
+pipeline. Text-only bots don't need it.

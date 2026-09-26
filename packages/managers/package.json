@@ -8,8 +8,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@lunibee/collection": "file:../collection",
-    "@lunibee/rest": "file:../rest",
-    "@lunibee/structures": "file:../structures"
+    "@lunibee/collection": "workspace:*",
+    "@lunibee/rest": "workspace:*",
+    "@lunibee/structures": "workspace:*"
   }
 }

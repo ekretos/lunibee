@@ -1,5 +1,9 @@
 import { ResourceManager } from "./base.js";
 import {
+    GuildBanManager,
+    GuildScheduledEventManager,
+} from "./guild-resources.js";
+import {
     Guild,
     AutoModerationRule,
     GuildWelcomeScreen,
@@ -33,6 +37,8 @@ export interface GuildEditOptions extends Record<string, unknown> {}
 
 export class GuildManager extends ResourceManager<string, Guild> {
     readonly #rest: REST;
+    readonly #bans = new Map<string, GuildBanManager>();
+    readonly #scheduledEvents = new Map<string, GuildScheduledEventManager>();
     public constructor(rest: REST) {
         super(
             async (id) =>
@@ -40,6 +46,28 @@ export class GuildManager extends ResourceManager<string, Guild> {
             (guild) => guild.id,
         );
         this.#rest = rest;
+    }
+
+    /** Ban manager for a guild (one instance per guild). */
+    public bans(guildId: string): GuildBanManager {
+        let manager = this.#bans.get(guildId);
+        if (!manager)
+            this.#bans.set(
+                guildId,
+                (manager = new GuildBanManager(this.#rest, guildId)),
+            );
+        return manager;
+    }
+
+    /** Scheduled-event manager for a guild (one instance per guild). */
+    public scheduledEvents(guildId: string): GuildScheduledEventManager {
+        let manager = this.#scheduledEvents.get(guildId);
+        if (!manager)
+            this.#scheduledEvents.set(
+                guildId,
+                (manager = new GuildScheduledEventManager(this.#rest, guildId)),
+            );
+        return manager;
     }
 
     /** Creates a new guild. (Bot must be in fewer than 10 guilds). */

@@ -269,6 +269,17 @@ export {
     OnboardingPrompt,
     GuildOnboarding,
 } from "./resources.js";
+export {
+    NewsChannel,
+    DMChannel,
+    VoiceChannel,
+    StageChannel,
+    CategoryChannel,
+    ThreadChannel,
+    ForumChannel,
+    MediaChannel,
+    createChannel,
+} from "./channels.js";
 export * from "./interactions.js";
 export { Embed } from "./embed.js";
 export { AuditLog, AuditLogEntry } from "./audit-log.js";
