@@ -32,6 +32,17 @@ function kindFromStatus(status: number): RESTErrorKind {
     return "client";
 }
 
+/**
+ * Replaces the token segment of webhook and interaction paths with `:token`,
+ * so request paths can appear in errors, hooks and logs without leaking a
+ * credential.
+ */
+export function redactPath(path: string): string {
+    return path
+        .replace(/^(\/webhooks\/\d+\/)[^/?]+/, "$1:token")
+        .replace(/^(\/interactions\/\d+\/)[^/?]+/, "$1:token");
+}
+
 /** Error thrown when Discord rejects a REST request. */
 export class RESTError extends Error {
     /** Failure category. */ public readonly kind: RESTErrorKind;
@@ -63,7 +74,8 @@ export class RESTError extends Error {
         this.code = code;
         this.errors = errors;
         this.method = options.method;
-        this.path = options.path;
+        this.path =
+            options.path === undefined ? undefined : redactPath(options.path);
     }
 
     /** Whether sending the same request again later could succeed. Validation,

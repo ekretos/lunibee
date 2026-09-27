@@ -9,7 +9,7 @@ import {
     type RateLimitStore,
     type BucketState,
 } from "./store.js";
-import { RESTError, abortError, sleep } from "./errors.js";
+import { RESTError, abortError, redactPath, sleep } from "./errors.js";
 import {
     createRouteKey,
     serializeQuery,
@@ -601,6 +601,9 @@ export class REST {
      * hook cannot reject the request. @param hook Optional callback. @param ctx Event context. */
     #emit<C>(hook: ((ctx: C) => void) | undefined, ctx: C): void {
         if (!hook) return;
+        const withPath = ctx as { path?: unknown };
+        if (typeof withPath.path === "string")
+            ctx = { ...ctx, path: redactPath(withPath.path) };
         Promise.resolve()
             .then(() => hook(ctx))
             .catch(() => {});
@@ -608,7 +611,12 @@ export class REST {
 }
 
 export { Routes } from "./routes.js";
-export { RESTError, abortError, type RESTErrorKind } from "./errors.js";
+export {
+    RESTError,
+    abortError,
+    redactPath,
+    type RESTErrorKind,
+} from "./errors.js";
 export {
     createRouteKey,
     normalizeRoutePath,

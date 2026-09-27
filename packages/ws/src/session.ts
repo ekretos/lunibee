@@ -124,6 +124,9 @@ export class GatewaySession {
     public recordSequence(sequence: number, token: number): boolean {
         if (!this.owns(token)) return false;
         if (!Number.isInteger(sequence)) return false;
+        // Sequences only move forward within a session; a lower one is a
+        // stale frame and must not roll back the point a RESUME replays from.
+        if (this.#sequence !== null && sequence < this.#sequence) return false;
         this.#sequence = sequence;
         return true;
     }
