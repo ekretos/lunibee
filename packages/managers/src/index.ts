@@ -118,20 +118,29 @@ export class ChannelManager extends Manager<string, Channel> {
     public threads(channelId: string): ThreadManager {
         return new ThreadManager(this.#rest, this.#context, channelId);
     }
-    public async fetch(channelId: string): Promise<Channel> {
-        return this.upsert(
-            await this.#rest.get<ConstructorParameters<typeof Channel>[0]>(
-                Routes.channel(channelId),
-            ),
+    /** Fetches a channel; concurrent fetches share a request and a stale result never overwrites newer state. */
+    public fetch(channelId: string): Promise<Channel> {
+        return this.fetchOnce(
+            channelId,
+            async () =>
+                createChannel(
+                    await this.#rest.get<
+                        ConstructorParameters<typeof Channel>[0]
+                    >(Routes.channel(channelId)),
+                    this.#context,
+                ),
+            (channel) => this.#merge(channel),
         );
     }
     public async resolve(channelId: string): Promise<Channel> {
         return this.get(channelId) ?? this.fetch(channelId);
     }
     public upsert(data: ConstructorParameters<typeof Channel>[0]): Channel {
-        const existing = this.get(data.id);
-        const channel = createChannel(data, this.#context);
-        // A type change (e.g. text -> announcement) needs the new subclass.
+        return this.#merge(createChannel(data, this.#context));
+    }
+    /** Merges into the cached instance; a type change (e.g. text -> announcement) needs the new subclass. */
+    #merge(channel: Channel): Channel {
+        const existing = this.get(channel.id);
         if (existing && existing.type === channel.type) {
             Object.assign(existing, channel);
             return existing;

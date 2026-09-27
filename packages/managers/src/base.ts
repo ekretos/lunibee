@@ -14,16 +14,62 @@ export class Manager<K, V> {
     ): boolean {
         return this.cache.has(id);
     }
+    /** In-flight fetches; `dirty` is set when the key is written or deleted meanwhile. */
+    readonly #inflight = new Map<K, { promise: Promise<V>; dirty: boolean }>();
+
+    /**
+     * Runs a REST load for one key. Concurrent loads of that key share a
+     * single request. If the key is written (e.g. by a Gateway update) or
+     * deleted while the request is in flight, the result is returned but not
+     * stored, so it cannot overwrite fresher state or resurrect a deleted
+     * resource.
+     * @param store Stores a fresh result and returns the canonical instance.
+     */
+    protected fetchOnce(
+        id: K,
+        load: () => Promise<V>,
+        store: (value: V) => V = (value) => {
+            this.set(id, value);
+            return value;
+        },
+    ): Promise<V> {
+        const pending = this.#inflight.get(id);
+        if (pending) return pending.promise;
+        const entry = {
+            promise: new Promise<V>((resolve) => resolve(load())),
+            dirty: false,
+        };
+        this.#inflight.set(id, entry);
+        entry.promise = entry.promise.then(
+            (value) => {
+                this.#inflight.delete(id);
+                return entry.dirty ? (this.get(id) ?? value) : store(value);
+            },
+            (error: unknown) => {
+                this.#inflight.delete(id);
+                throw error;
+            },
+        );
+        return entry.promise;
+    }
+
+    #markDirty(id: K): void {
+        const pending = this.#inflight.get(id);
+        if (pending) pending.dirty = true;
+    }
+
     /** Stores a resource with `setWithoutTTL()`, so it leaves only on an explicit delete (e.g. a Gateway `*_DELETE`), never through TTL. @param id Cache key. @param value Value. @returns This manager. */ public set(
         id: K,
         value: V,
     ): this {
+        this.#markDirty(id);
         this.cache.setWithoutTTL(id, value);
         return this;
     }
     /** Deletes a cached value. @param id Cache key. @returns True when deleted. */ public delete(
         id: K,
     ): boolean {
+        this.#markDirty(id);
         return this.cache.delete(id);
     }
     /** Clears the cache. @returns Nothing. */ public clear(): void {
@@ -70,56 +116,28 @@ export class ResourceManager<K, V> extends Manager<K, V> {
         return this.get(id) ?? this.fetch(id);
     }
 
-    /** In-flight fetches; `dirty` is set when the key is written or deleted meanwhile. */
-    readonly #inflight = new Map<K, { promise: Promise<V>; dirty: boolean }>();
-
-    /**
-     * Fetches a resource over REST. Concurrent fetches of one key share a
-     * single request. If the key is written (e.g. by a Gateway update) or
-     * deleted while the request is in flight, the response is returned but
-     * not cached, so it cannot overwrite fresher state or resurrect a
-     * deleted resource.
-     */
     public fetch(id: K): Promise<V> {
-        const pending = this.#inflight.get(id);
-        if (pending) return pending.promise;
-        const entry = {
-            promise: new Promise<V>((resolve) => resolve(this.#fetcher(id))),
-            dirty: false,
-        };
-        this.#inflight.set(id, entry);
-        entry.promise = entry.promise.then(
-            (resource) => {
-                this.#inflight.delete(id);
-                if (!entry.dirty) super.set(id, resource);
-                return entry.dirty ? (this.get(id) ?? resource) : resource;
-            },
-            (error: unknown) => {
-                this.#inflight.delete(id);
-                throw error;
-            },
-        );
-        return entry.promise;
-    }
-
-    public override set(id: K, value: V): this {
-        const pending = this.#inflight.get(id);
-        if (pending) pending.dirty = true;
-        return super.set(id, value);
-    }
-
-    public override delete(id: K): boolean {
-        const pending = this.#inflight.get(id);
-        if (pending) pending.dirty = true;
-        return super.delete(id);
+        return this.fetchOnce(id, () => this.#fetcher(id));
     }
 
     public async fetchMany(ids: Iterable<K>): Promise<V[]> {
         return Promise.all([...ids].map((id) => this.resolve(id)));
     }
 
+    /** Stores a resource, merging into the cached instance when there is one so existing references stay current. @returns The canonical instance. */
     public upsert(resource: V): V {
         const key = this.#key(resource);
+        const existing = this.get(key);
+        if (
+            existing !== undefined &&
+            existing !== resource &&
+            typeof existing === "object" &&
+            existing !== null
+        ) {
+            Object.assign(existing, resource);
+            this.set(key, existing);
+            return existing;
+        }
         this.set(key, resource);
         return resource;
     }
