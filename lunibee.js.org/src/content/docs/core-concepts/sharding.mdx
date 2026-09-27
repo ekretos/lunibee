@@ -81,3 +81,16 @@ const total = all.reduce((sum, r) => sum + (r.result ?? 0), 0);
 ```
 
 `ShardingManager` is an alias of `ShardManager`.
+
+## Startup Pacing and Health
+
+With `shardCount: "auto"`, the manager reads `/gateway/bot` and starts shards
+in rounds of Discord's `max_concurrency` (override with `maxConcurrency`),
+waiting `spawnDelay` between rounds. It refuses to start more shards than the
+remaining session-start budget and tells you when it resets.
+
+```ts
+const manager = new ShardManager({ token, intents, shardCount: "auto" });
+await manager.connect();
+manager.health(); // [{ id, state, ping }, ...]
+```

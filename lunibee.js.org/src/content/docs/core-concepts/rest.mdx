@@ -108,3 +108,19 @@ const rest = new REST({ token, concurrentBuckets: true });
 - A bucket whose limit is not known yet still sends one request until a response reveals it.
 - Requests on one bucket may finish out of order.
 - Needs a rate-limit store with atomic `reserve()`. The default memory store and the Redis store have one.
+
+## Classifying Failures
+
+Every `RESTError` has a `kind` and a `retryable` flag, so handlers do not need
+to match status codes:
+
+```ts
+try {
+  await client.channels.send(channelId, { content: "hi" });
+} catch (error) {
+  if (error instanceof RESTError) {
+    error.kind;      // "permission" | "notFound" | "validation" | "rateLimited" | "server" | "timeout" | ...
+    error.retryable; // false for validation, permission, auth and not-found
+  }
+}
+```

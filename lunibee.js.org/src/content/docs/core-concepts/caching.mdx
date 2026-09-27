@@ -33,30 +33,69 @@ console.log(userA === userB); // true Exact same instance
 </TabItem>
 </Tabs>
 
-## Bounded Memory & TTL Eviction
+## Resource State Never Expires
 
-`lunibee` (collection) provides a high-performance `Cache` with optional bounds and Time-To-Live (TTL):
+Every manager cache is a `Collection`. Managers store Discord resources with
+`setWithoutTTL()`, so a guild, channel, role, member or user leaves the cache
+only through an explicit delete — a Gateway `*_DELETE` event or your own
+`manager.delete(id)` — never because nobody read it.
 
-<Tabs>
-<TabItem label="TypeScript">
+Gateway events keep the caches current: `GUILD_CREATE` fills roles, emojis,
+members and channels; updates merge into the cached object; `GUILD_DELETE`
+removes the guild with its channels and per-guild managers.
+
 ```ts
-import { Cache } from "lunibee";
-const messageCache = new Cache<string, Message>({
-  maxSize: 1000,     // Keeps memory predictable
-  ttl: 60 * 1000,    // Evicts unreferenced entries after 60s
+client.guilds.members(guildId).get(userId); // GuildMember
+client.guilds.roles(guildId).get(roleId);   // Role
+client.guilds.emojis(guildId).cache.size;
+```
+
+A REST fetch that finishes after a Gateway update (or delete) for the same
+resource is returned to you but not cached, so it cannot overwrite newer state.
+Concurrent fetches of one resource share a single request.
+
+## TTL & LRU Collections for Your Own Data
+
+`Collection` doubles as a bounded cache for application data:
+
+```ts
+import { Collection } from "lunibee";
+
+const cooldowns = new Collection<string, number>(null, {
+  ttl: 60_000,     // sliding: each get() restarts the window
+  maxSize: 10_000, // least-recently-used set() entries are evicted
+  onEvict: (key, value, reason) => console.debug(key, reason), // "expired" | "evicted"
+});
+
+cooldowns.set(userId, Date.now());          // TTL/LRU entry
+cooldowns.set(userId, Date.now(), 5_000);   // per-entry TTL
+cooldowns.setWithoutTTL("pinned", 0);       // never expires, never evicted
+cooldowns.peek(userId);                     // read without sliding the TTL
+cooldowns.stats;                            // { hits, misses, expired, evicted }
+```
+
+## Messages Are Not Cached by Default
+
+Messages are temporary data. Enable a bounded per-channel cache only if you
+need the previous content on edits and deletes:
+
+```ts
+const client = new Client({
+  token, intents,
+  messageCache: { maxSize: 200, ttl: 30 * 60_000 },
 });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { Cache } from "lunibee";
-const messageCache = new Cache<string, Message>({
-  maxSize ,     // Keeps memory predictable
-  ttl: 60 * 1000,    // Evicts unreferenced entries after 60s
+
+## Turning Caches Off on Large Bots
+
+Events still carry full objects when a resource is not cached:
+
+```ts
+const client = new Client({
+  token, intents,
+  cache: { members: false, users: false }, // roles and emojis stay cached
 });
 ```
-</TabItem>
-</Tabs>
 
 ## Structure Resource Methods
 

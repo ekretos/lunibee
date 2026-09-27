@@ -145,3 +145,11 @@ new ContextMenuCommandBuilder().setName("Report").setType(3); // 2 = USER, 3 = M
 new UserCommandBuilder().setName("View Profile");             // type 2
 new MessageCommandBuilder().setName("Quote");                  // type 3
 ```
+
+## Validation on Serialization
+
+`toJSON()` checks a component as a whole, so mistakes fail locally instead of
+as a Discord 400: buttons need a custom ID (a URL for links, a SKU for premium
+buttons via `setSKUId()`) and a label or emoji; selects need a custom ID and
+`min_values <= max_values`; a select or text input must be alone in its action
+row; modals need a custom ID, title and at least one component.

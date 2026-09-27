@@ -284,3 +284,26 @@ client.on("interactionCreate", async (interaction) => {
 | `interaction.deleteReply()` | Deletes the initial interaction response. |
 | `interaction.followUp(options)` | Sends secondary follow-up messages linked to the interaction. |
 | `interaction.showModal(modal)` | Pops up an interactive modal dialog for user input. |
+
+## Acknowledgement, Follow-ups and Expiry
+
+An interaction can be acknowledged once. `reply`, `deferReply`, `update`,
+`deferUpdate`, `showModal` and autocomplete `respond` share one guard, so two
+concurrent calls cannot both send; a failed acknowledgement can be retried.
+
+```ts
+await interaction.deferReply(true);              // ephemeral
+await interaction.editReply({ content: "Done" });
+const reply = await interaction.fetchReply();
+
+const note = await interaction.followUp({ content: "FYI", ephemeral: true });
+await interaction.editFollowUp(note.id, "Updated");
+await interaction.deleteFollowUp(note.id);
+
+interaction.user;        // invoking User (guild or DM)
+interaction.member;      // GuildMember, or null outside a guild
+interaction.isExpired;   // tokens stop working 15 minutes after creation
+```
+
+`{ ephemeral: true }` is turned into Discord's flag on replies, edits and
+follow-ups.

@@ -198,3 +198,26 @@ This keeps permission logic readable and avoids duplicating bit-shift calculatio
 | `.administrator` | Full administrator permission |
 
 Lunibee exposes the complete Discord permission set through the same camelCase style. Use autocomplete on `Permission` or `member.permissions` when you need a less common flag.
+
+## Resolving Effective Permissions
+
+`computePermissions()` applies Discord's rules: `@everyone` and role
+permissions, owner and administrator shortcuts, then channel overwrites for
+`@everyone`, the member's roles and the member.
+
+```ts
+import { computePermissions } from "lunibee";
+
+const perms = computePermissions({
+  guildId, ownerId, memberId,
+  memberRoleIds: member.roleIds,
+  roles: [...guildRoles],
+  overwrites: channel.permissionOverwrites,
+});
+perms.has("sendMessages");
+perms.missing("sendMessages", "embedLinks"); // ["embedLinks"]
+```
+
+With the client's caches, `client.permissionsFor(memberId, channelOrGuildId)`
+does the lookup for you and returns `null` when the guild or member is not
+cached.

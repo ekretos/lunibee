@@ -241,3 +241,36 @@ In addition to standard entity events (like `MessageCreate`), the client emits e
 - `Ready`: Emitted when the client connects and identifies successfully.
 - `Resumed`: Emitted when the client successfully resumes a dropped WebSocket connection without needing to re-identify.
 - `InvalidSession`: Emitted when the gateway rejects the session. Depending on the payload, the client will either attempt to resume or start a fresh session.
+
+## Collectors
+
+`client.createCollector(event, options)` collects the first argument of a
+client event and unsubscribes when it ends.
+
+```ts
+const collector = client.createCollector("interactionCreate", {
+  filter: (i) => i.isButton(),
+  idle: 30_000,               // stop after 30s without a match
+  max: 5,
+  signal: controller.signal,  // stop on abort
+});
+
+for await (const interaction of collector) {
+  await interaction.deferUpdate();
+}
+const collected = await collector.wait();
+```
+
+## Polls, Stickers, Soundboard and Monetization
+
+```ts
+await client.channels.endPoll(channelId, messageId);
+await client.channels.fetchPollVoters(channelId, messageId, answerId);
+
+await client.guilds.stickers(guildId).fetchAll();
+await client.guilds.soundboard(guildId).fetchAll();
+await client.channels.sendSoundboardSound(voiceChannelId, { soundId });
+
+await client.monetization?.fetchEntitlements({ userId });
+client.on("entitlementCreate", (entitlement) => { /* grant premium */ });
+```
