@@ -1,4 +1,6 @@
 import { InteractionResponseType } from "@lunibee/types";
+import { User } from "./base.js";
+import { GuildMember } from "./resources.js";
 
 /** Discord interaction type constants. */
 export const InteractionType = {
@@ -49,6 +51,32 @@ export interface InteractionClient {
         token: string,
         data: InteractionReplyOptions,
     ): Promise<unknown>;
+    /** Reads, edits or deletes an interaction webhook message (`@original` or a follow-up ID). Optional; required for {@link Interaction.fetchReply}, {@link Interaction.editFollowUp} and {@link Interaction.deleteFollowUp}. */
+    interactionWebhookMessage?(
+        method: "GET" | "PATCH" | "DELETE",
+        applicationId: string,
+        token: string,
+        messageId: string,
+        data?: InteractionReplyOptions,
+    ): Promise<unknown>;
+}
+
+/** Discord's ephemeral message flag. */
+const EPHEMERAL = 64;
+/** Interaction tokens stay valid for 15 minutes. */
+const TOKEN_LIFETIME_MS = 15 * 60_000;
+const DISCORD_EPOCH = 1_420_070_400_000n;
+
+/** Turns `{ ephemeral: true }` into Discord's flag and drops the local-only key. */
+function toMessageData(
+    options: InteractionReplyOptions | string,
+): InteractionReplyOptions {
+    if (typeof options === "string") return { content: options };
+    const { ephemeral, ...data } = options;
+    if (ephemeral)
+        data.flags =
+            (typeof data.flags === "number" ? data.flags : 0) | EPHEMERAL;
+    return data;
 }
 
 export { CommandOptions, type APIInteractionDataOption } from "./options.js";
@@ -78,14 +106,9 @@ export class InteractionResponse {
     /** Creates an immediate message response. @param options Response message options. @returns Callback payload. */ public static message(
         options: InteractionReplyOptions,
     ): InteractionResponse {
-        const data: InteractionReplyOptions = { ...options };
-        if (options.ephemeral) {
-            data.flags =
-                (typeof options.flags === "number" ? options.flags : 0) | 64;
-        }
         return new InteractionResponse(
             InteractionResponseType.ChannelMessage,
-            data,
+            toMessageData(options),
         );
     }
     /** Creates a deferred channel response. @param ephemeral Whether the eventual response is ephemeral. @returns Callback payload. */ public static defer(
@@ -93,7 +116,7 @@ export class InteractionResponse {
     ): InteractionResponse {
         return new InteractionResponse(
             InteractionResponseType.DeferredChannelMessage,
-            ephemeral ? { flags: 64 } : undefined,
+            ephemeral ? { flags: EPHEMERAL } : undefined,
         );
     }
     /** Creates a Pong response. @returns Callback payload. */ public static pong(): InteractionResponse {
@@ -115,6 +138,8 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     /** Whether the initial response was sent. */ public replied = false;
     /** Whether the initial response was deferred. */ public deferred = false;
     readonly #client: InteractionClient;
+    /** An initial response is in flight; a second one must not be sent. */
+    #acknowledging = false;
     /** Creates an interaction from a Gateway payload. @param client Interaction transport. @param data Gateway interaction payload. @throws {TypeError} If required identifiers are missing. */ public constructor(
         client: InteractionClient,
         data: TData,
@@ -170,8 +195,95 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         return [3, 5, 6, 7, 8].includes(this.#componentType());
     }
     /** Ensures the interaction has not already been acknowledged. @returns Nothing. @throws {Error} When already acknowledged. */ protected assertUnacknowledged(): void {
-        if (this.replied || this.deferred)
+        if (this.replied || this.deferred || this.#acknowledging)
             throw new Error("Interaction has already been acknowledged.");
+    }
+    /**
+     * Sends the initial response exactly once. The in-flight flag is set
+     * before the request, so two concurrent calls cannot both send; it is
+     * cleared if the request fails so the caller may try again.
+     */
+    protected async acknowledge(
+        response: InteractionResponse,
+        state: "replied" | "deferred",
+    ): Promise<unknown> {
+        this.assertUnacknowledged();
+        this.#acknowledging = true;
+        try {
+            const result = await this.postResponse(response);
+            this[state] = true;
+            return result;
+        } finally {
+            this.#acknowledging = false;
+        }
+    }
+    /** The invoking user (from `member.user` in guilds, `user` in DMs). */
+    public get user(): User | null {
+        const raw =
+            (this.data.member as { user?: unknown } | undefined)?.user ??
+            this.data.user;
+        return raw
+            ? new User(raw as ConstructorParameters<typeof User>[0])
+            : null;
+    }
+    /** The invoking guild member, or null outside a guild. */
+    public get member(): GuildMember | null {
+        const raw = this.data.member;
+        if (!raw || !this.guildId) return null;
+        return new GuildMember({
+            ...(raw as Omit<
+                ConstructorParameters<typeof GuildMember>[0],
+                "guild_id"
+            >),
+            guild_id: this.guildId,
+        });
+    }
+    /** Unix timestamp (ms) at which the interaction was created, from its snowflake. */
+    public get createdTimestamp(): number {
+        return Number((BigInt(this.id) >> 22n) + DISCORD_EPOCH);
+    }
+    /** When the interaction token stops working (15 minutes after creation). */
+    public get expiresAt(): Date {
+        return new Date(this.createdTimestamp + TOKEN_LIFETIME_MS);
+    }
+    /** Whether the token has expired; no response, edit or follow-up can succeed after that. */
+    public get isExpired(): boolean {
+        return Date.now() >= this.createdTimestamp + TOKEN_LIFETIME_MS;
+    }
+    #webhookMessage(
+        method: "GET" | "PATCH" | "DELETE",
+        messageId: string,
+        data?: InteractionReplyOptions,
+    ): Promise<unknown> {
+        if (!this.#client.interactionWebhookMessage)
+            return Promise.reject(
+                new Error(
+                    "This interaction client does not support webhook message access.",
+                ),
+            );
+        return this.#client.interactionWebhookMessage(
+            method,
+            this.applicationId,
+            this.token,
+            messageId,
+            data,
+        );
+    }
+    /** Fetches the original response message. */
+    public fetchReply(): Promise<unknown> {
+        this.assertAcknowledged();
+        return this.#webhookMessage("GET", "@original");
+    }
+    /** Edits a follow-up message. @param messageId Follow-up message ID. */
+    public editFollowUp(
+        messageId: string,
+        options: InteractionReplyOptions | string,
+    ): Promise<unknown> {
+        return this.#webhookMessage("PATCH", messageId, toMessageData(options));
+    }
+    /** Deletes a follow-up message. @param messageId Follow-up message ID. */
+    public async deleteFollowUp(messageId: string): Promise<void> {
+        await this.#webhookMessage("DELETE", messageId);
     }
     /** Ensures the interaction has been acknowledged. @returns Nothing. @throws {Error} When not acknowledged. */ protected assertAcknowledged(): void {
         if (!this.replied && !this.deferred)
@@ -188,33 +300,27 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     /** Sends the initial interaction response. @param options Response message options. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */ public async reply(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
-        this.assertUnacknowledged();
-        const payload =
-            typeof options === "string" ? { content: options } : options;
-        const result = await this.#client.postInteractionResponse(
-            this.id,
-            this.token,
-            InteractionResponse.message(payload),
+        return this.acknowledge(
+            InteractionResponse.message(toMessageData(options)),
+            "replied",
         );
-        this.replied = true;
-        return result;
     }
     /** Defers the initial interaction response. @param ephemeral Whether the eventual response is ephemeral. @returns Promise fulfilled after acknowledgement. @throws {Error} When already acknowledged or REST fails. */ public async deferReply(
         ephemeral = false,
     ): Promise<void> {
-        this.assertUnacknowledged();
-        await this.#client.postInteractionResponse(
-            this.id,
-            this.token,
+        await this.acknowledge(
             InteractionResponse.defer(ephemeral),
+            "deferred",
         );
-        this.deferred = true;
     }
     /** Edits the original response. @param options Replacement message options. @returns Discord response. @throws {Error} When not acknowledged or REST fails. */ public editReply(
         options: InteractionReplyOptions,
     ): Promise<unknown> {
         this.assertAcknowledged();
-        return this.#client.editInteractionReply(this.token, options);
+        return this.#client.editInteractionReply(
+            this.token,
+            toMessageData(options),
+        );
     }
     /** Deletes the original response. @returns Promise fulfilled after deletion. @throws {Error} When not acknowledged or REST fails. */ public deleteReply(): Promise<void> {
         this.assertAcknowledged();
@@ -223,26 +329,21 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     /** Sends a follow-up message using the interaction webhook. @param options Follow-up message options. @returns Discord response. @throws {Error} When REST fails. */ public followUp(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
-        const payload =
-            typeof options === "string" ? { content: options } : options;
-        return this.#client.followUpInteraction(this.token, payload);
+        return this.#client.followUpInteraction(
+            this.token,
+            toMessageData(options),
+        );
     }
     /** Updates the message for a component interaction. */ public async update(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
-        this.assertUnacknowledged();
-        const payload =
-            typeof options === "string" ? { content: options } : options;
-        const result = await this.#client.postInteractionResponse(
-            this.id,
-            this.token,
+        return this.acknowledge(
             new InteractionResponse(
                 InteractionResponseType.MessageUpdate,
-                payload,
+                toMessageData(options),
             ),
+            "replied",
         );
-        this.replied = true;
-        return result;
     }
     /** Opens a modal dialog in the user's client. @param modal Modal builder output or raw modal callback data. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */
     public async showModal(modal: {
@@ -251,17 +352,13 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         components: unknown[];
         [key: string]: unknown;
     }): Promise<unknown> {
-        this.assertUnacknowledged();
-        const result = await this.#client.postInteractionResponse(
-            this.id,
-            this.token,
+        return this.acknowledge(
             new InteractionResponse(
                 InteractionResponseType.Modal,
                 modal as InteractionReplyOptions,
             ),
+            "replied",
         );
-        this.replied = true;
-        return result;
     }
 }
 
@@ -309,29 +406,24 @@ export class ComponentInteraction extends Interaction {
     }
     /** Defers updating the message to which the component was attached. */
     public async deferUpdate(): Promise<void> {
-        this.assertUnacknowledged();
-        await this.postResponse(
+        await this.acknowledge(
             new InteractionResponse(
                 InteractionResponseType.DeferredMessageUpdate,
             ),
+            "deferred",
         );
-        this.deferred = true;
     }
     /** Updates the message to which the component was attached. */
     public override async update(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
-        this.assertUnacknowledged();
-        const payload =
-            typeof options === "string" ? { content: options } : options;
-        const result = await this.postResponse(
+        return this.acknowledge(
             new InteractionResponse(
                 InteractionResponseType.MessageUpdate,
-                payload,
+                toMessageData(options),
             ),
+            "replied",
         );
-        this.replied = true;
-        return result;
     }
 }
 
@@ -402,8 +494,7 @@ export class AutocompleteInteraction extends Interaction {
             InteractionResponseType.Autocomplete,
             { choices } as InteractionReplyOptions,
         );
-        await this.postResponse(response);
-        this.replied = true;
+        await this.acknowledge(response, "replied");
     }
 }
 

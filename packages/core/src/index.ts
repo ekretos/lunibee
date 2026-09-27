@@ -804,6 +804,21 @@ export class Client
             return Promise.reject(new Error("Client is unauthenticated."));
         return this.rest.post(`/webhooks/${this.user.id}/${token}`, data);
     }
+    public interactionWebhookMessage(
+        method: "GET" | "PATCH" | "DELETE",
+        applicationId: string,
+        token: string,
+        messageId: string,
+        data?: Record<string, unknown>,
+    ): Promise<unknown> {
+        const path =
+            messageId === "@original"
+                ? Routes.interactionOriginalResponse(applicationId, token)
+                : Routes.webhookMessage(applicationId, token, messageId);
+        if (method === "GET") return this.rest.get(path);
+        if (method === "PATCH") return this.rest.patch(path, data);
+        return this.rest.delete(path);
+    }
 
     // ── Client Utilities ─────────────────────────────────────────────────────
 
