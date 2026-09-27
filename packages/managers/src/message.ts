@@ -50,7 +50,7 @@ export class MessageManager {
             Object.assign(existing, message);
             return existing;
         }
-        this.cache.set(message.id, message);
+        this.cache.setWithoutTTL(message.id, message);
         return message;
     }
     public delete(messageId: string): boolean {

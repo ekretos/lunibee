@@ -2,7 +2,8 @@ import { Collection } from "@lunibee/collection";
 
 /** Generic cache manager. @typeParam K Cache key type. @typeParam V Cached value type. */
 export class Manager<K, V> {
-    /** Cached resources. */ public readonly cache = new Collection<K, V>();
+    /** Authoritative resource state. Entries never expire: see {@link Manager.set}. */ public readonly cache =
+        new Collection<K, V>();
     /** Gets a cached value. @param id Cache key. @returns Cached value. */ public get(
         id: K,
     ): V | undefined {
@@ -13,11 +14,11 @@ export class Manager<K, V> {
     ): boolean {
         return this.cache.has(id);
     }
-    /** Stores a value. @param id Cache key. @param value Value. @returns This manager. */ public set(
+    /** Stores a resource with `setWithoutTTL()`, so it leaves only on an explicit delete (e.g. a Gateway `*_DELETE`), never through TTL. @param id Cache key. @param value Value. @returns This manager. */ public set(
         id: K,
         value: V,
     ): this {
-        this.cache.set(id, value);
+        this.cache.setWithoutTTL(id, value);
         return this;
     }
     /** Deletes a cached value. @param id Cache key. @returns True when deleted. */ public delete(
