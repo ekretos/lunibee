@@ -23,3 +23,7 @@ Discord entities such as messages and interactions belong to `structures`. Trans
 Managers store Discord resources with `setWithoutTTL()`. A resource leaves the
 cache only through an explicit delete (e.g. a Gateway `*_DELETE` event), never
 through inactivity.
+
+Messages are temporary data, not resource state: they are not cached unless
+the client is given `messageCache: { maxSize?, ttl? }`, which enables a
+bounded per-channel TTL/LRU cache (default `maxSize` 100).

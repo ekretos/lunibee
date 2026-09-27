@@ -184,6 +184,8 @@ export interface ClientOptions {
     intents: GatewayIntentResolvable;
     gateway?: GatewayOptions;
     rest?: RESTOptions;
+    /** Opt-in bounded per-channel message cache. Messages are not cached by default. */
+    messageCache?: { maxSize?: number; ttl?: number };
 }
 /** Gateway connection configuration. */
 export interface GatewayOptions {

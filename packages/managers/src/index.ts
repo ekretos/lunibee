@@ -14,6 +14,7 @@ import {
 } from "@lunibee/structures";
 import {
     MessageManager,
+    type MessageCacheOptions,
     type MessageCreateOptions as ManagerMessageCreateOptions,
 } from "./message.js";
 import { ThreadManager } from "./thread.js";
@@ -58,9 +59,15 @@ export class ChannelManager extends Manager<string, Channel> {
     readonly #rest: REST;
     readonly #context: ResourceContext;
     readonly #messageManagers = new Map<string, MessageManager>();
-    public constructor(rest: REST) {
+    readonly #messageCache?: MessageCacheOptions;
+    /** @param options.messageCache Enables a bounded per-channel message cache; messages are not cached by default. */
+    public constructor(
+        rest: REST,
+        options: { messageCache?: MessageCacheOptions } = {},
+    ) {
         super();
         this.#rest = rest;
+        this.#messageCache = options.messageCache;
         this.#context = {
             sendMessage: (channelId, options) => this.send(channelId, options),
             editMessage: (channelId, messageId, options) =>
@@ -88,7 +95,12 @@ export class ChannelManager extends Manager<string, Channel> {
     public messages(channelId: string): MessageManager {
         let manager = this.#messageManagers.get(channelId);
         if (!manager) {
-            manager = new MessageManager(this.#rest, this.#context, channelId);
+            manager = new MessageManager(
+                this.#rest,
+                this.#context,
+                channelId,
+                this.#messageCache,
+            );
             this.#messageManagers.set(channelId, manager);
         }
         return manager;
@@ -406,7 +418,7 @@ function isMessageQuery(
     );
 }
 export type CreateMessageOptions = MessageCreateOptions;
-export { MessageManager } from "./message.js";
+export { MessageManager, type MessageCacheOptions } from "./message.js";
 export { ThreadManager } from "./thread.js";
 export {
     RoleManager,

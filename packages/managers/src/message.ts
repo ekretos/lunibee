@@ -1,4 +1,13 @@
 import { Collection } from "@lunibee/collection";
+
+/** Opt-in per-channel message cache. Messages are temporary data, so they
+ * use bounded TTL/LRU storage rather than permanent resource storage. */
+export interface MessageCacheOptions {
+    /** Messages kept per channel; least-recently-used are evicted. Default 100. */
+    maxSize?: number;
+    /** Sliding TTL in ms. Omit for no expiry. */
+    ttl?: number;
+}
 import { REST, Routes } from "@lunibee/rest";
 import { Message, type ResourceContext } from "@lunibee/structures";
 
@@ -8,7 +17,9 @@ export type MessageCreateOptions = Record<string, unknown> & {
 export type MessageEditOptions = Record<string, unknown> & { content?: string };
 
 export class MessageManager {
-    public readonly cache = new Collection<string, Message>();
+    /** Cached messages; always empty unless a message cache is configured. */
+    public readonly cache: Collection<string, Message>;
+    readonly #caching: boolean;
     readonly #rest: REST;
     readonly #context: ResourceContext;
     readonly #channelId: string;
@@ -17,11 +28,17 @@ export class MessageManager {
         rest: REST,
         context: ResourceContext,
         channelId: string,
+        cache?: MessageCacheOptions,
     ) {
         if (!channelId) throw new TypeError("Channel ID is required.");
         this.#rest = rest;
         this.#context = context;
         this.#channelId = channelId;
+        this.#caching = cache !== undefined;
+        this.cache = new Collection<string, Message>(null, {
+            ttl: cache?.ttl,
+            maxSize: cache ? (cache.maxSize ?? 100) : undefined,
+        });
     }
     public async resolve(messageId: string): Promise<Message> {
         return this.cache.get(messageId) ?? this.fetch(messageId);
@@ -44,13 +61,13 @@ export class MessageManager {
         );
     }
     public upsert(data: ConstructorParameters<typeof Message>[0]): Message {
-        const existing = this.cache.get(data.id);
+        const existing = this.cache.peek(data.id);
         const message = new Message(data, this.#context);
         if (existing) {
             Object.assign(existing, message);
             return existing;
         }
-        this.cache.setWithoutTTL(message.id, message);
+        if (this.#caching) this.cache.set(message.id, message);
         return message;
     }
     public delete(messageId: string): boolean {

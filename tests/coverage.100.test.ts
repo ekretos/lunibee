@@ -764,7 +764,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         const fetchedGuild = await guildMgr.fetch("201000000000000000");
         expect(fetchedGuild.id).toBe("201000000000000000");
 
-        const chanMgr = new ChannelManager(rest);
+        const chanMgr = new ChannelManager(rest, { messageCache: {} });
         const fetchedChan = await chanMgr.fetch("301000000000000000");
         expect(fetchedChan.id).toBe("301000000000000000");
         const resolvedChan = await chanMgr.resolve("301000000000000000");
@@ -812,6 +812,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             rest,
             {} as any,
             "301000000000000000",
+            {},
         );
         msgMgr.upsert({
             id: "990000000000000000",

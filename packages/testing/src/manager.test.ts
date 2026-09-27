@@ -16,7 +16,7 @@ describe("ChannelManager integration lifecycle", () => {
                 content: "hello",
             },
         });
-        const manager = new ChannelManager(rest);
+        const manager = new ChannelManager(rest, { messageCache: {} });
         const message = await manager.send("123", { content: "hello" });
         expect(message.id).toBe("456");
         expect(await manager.messages("123").resolve("456")).toBe(message);
@@ -33,7 +33,7 @@ describe("ChannelManager integration lifecycle", () => {
     test("resolve caches a fetched channel", async () => {
         const payload = { id: "123", type: 0, name: "general" };
         const rest = new MockREST({ "/channels/123": payload });
-        const manager = new ChannelManager(rest);
+        const manager = new ChannelManager(rest, { messageCache: {} });
         const first = await manager.resolve("123");
         const second = await manager.resolve("123");
         expect(first).toBe(second);
@@ -51,7 +51,7 @@ describe("ChannelManager integration lifecycle", () => {
                 content: "updated",
             },
         });
-        const manager = new ChannelManager(rest);
+        const manager = new ChannelManager(rest, { messageCache: {} });
         const existing = manager.messages("123").upsert({
             id: "456",
             channel_id: "123",
@@ -68,7 +68,7 @@ describe("ChannelManager integration lifecycle", () => {
     /** Verifies deletion removes the canonical cache entry after REST succeeds. */
     test("delete removes the canonical message", async () => {
         const rest = new MockREST({ "/channels/123/messages/456": null });
-        const manager = new ChannelManager(rest);
+        const manager = new ChannelManager(rest, { messageCache: {} });
         manager.messages("123").upsert({
             id: "456",
             channel_id: "123",

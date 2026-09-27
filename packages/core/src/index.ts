@@ -233,7 +233,9 @@ export class Client
         this.rest = new REST({ token: options.token, ...options.rest });
         this.users = new UserManager(this.rest);
         this.guilds = new GuildManager(this.rest);
-        this.channels = new ChannelManager(this.rest);
+        this.channels = new ChannelManager(this.rest, {
+            messageCache: options.messageCache,
+        });
         this.stageInstances = new StageInstanceManager(this.rest);
         const placeholderAppCommands = new ApplicationCommandManager(
             this.rest,
