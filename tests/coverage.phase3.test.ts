@@ -431,17 +431,51 @@ describe("ChannelManager paging", () => {
     test("bulkDelete validates count and posts ids", async () => {
         const { rest, calls } = recordingRest(() => undefined);
         const messages = new ChannelManager(rest);
-        await expect(messages.bulkDelete("1", ["1"])).rejects.toThrow(
-            RangeError,
+        const recent = (offset: bigint) =>
+            (
+                ((BigInt(Date.now()) - 1_420_070_400_000n) << 22n) +
+                offset
+            ).toString();
+        const [a, b] = [recent(1n), recent(2n)];
+        await expect(messages.bulkDelete("1", [])).rejects.toThrow(RangeError);
+        await expect(messages.bulkDelete("1", [a, "2"])).rejects.toThrow(
+            "older than 14 days",
         );
-        await messages.bulkDelete("1", ["1", "2"]);
+        await messages.bulkDelete("1", [a]);
+        await messages.bulkDelete("1", [a, b, a]);
         expect(calls).toEqual([
-            [
-                "post",
-                "/channels/1/messages/bulk-delete",
-                { messages: ["1", "2"] },
-            ],
+            ["delete", `/channels/1/messages/${a}`, undefined],
+            ["post", "/channels/1/messages/bulk-delete", { messages: [a, b] }],
         ]);
+    });
+
+    test("iterateMessages pages newest-first until exhausted or limit", async () => {
+        const pages = [
+            Array.from({ length: 100 }, (_, i) => ({ id: String(1000 - i) })),
+            [{ id: "800" }],
+        ];
+        const { rest } = recordingRest(() => []);
+        const calls: unknown[] = [];
+        const channels = new ChannelManager(rest);
+        (channels as unknown as { fetchMessages: unknown }).fetchMessages = (
+            _id: string,
+            query: { before?: string; limit: number },
+        ) => {
+            calls.push(["page", query.before, query.limit]);
+            return Promise.resolve(pages.shift() ?? []);
+        };
+        const seen: string[] = [];
+        for await (const message of channels.iterateMessages("1"))
+            seen.push(message.id);
+        expect(seen).toHaveLength(101);
+        expect(calls).toEqual([
+            ["page", undefined, 100],
+            ["page", "901", 100],
+        ]);
+        const limited: string[] = [];
+        for await (const message of channels.iterateMessages("1", { limit: 0 }))
+            limited.push(message.id);
+        expect(limited).toEqual([]);
     });
 });
 

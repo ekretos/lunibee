@@ -26,6 +26,12 @@ export { AuditLogEvent } from "./guild.js";
 
 export type MessageCreateOptions = ManagerMessageCreateOptions;
 export type MessageEditOptions = Record<string, unknown> & { content?: string };
+/** Discord only bulk-deletes messages younger than two weeks. */
+const BULK_DELETE_MAX_AGE_MS = 14 * 24 * 60 * 60_000;
+/** Creation time (ms) encoded in a snowflake. */
+function snowflakeTime(id: string): number {
+    return Number((BigInt(id) >> 22n) + 1_420_070_400_000n);
+}
 export interface MessageFetchOptions {
     cache?: boolean;
 }
@@ -263,21 +269,52 @@ export class ChannelManager extends Manager<string, Channel> {
             ),
         );
     }
-    /** Bulk-deletes messages in a channel.
-     * @throws {RangeError} If fewer than 2 or more than 100 message IDs are provided. */
+    /** Bulk-deletes messages in a channel. Duplicate IDs are ignored and a
+     * single ID falls back to a normal delete.
+     * @throws {RangeError} If no IDs or more than 100 are provided, or any
+     * message is older than 14 days (Discord refuses to bulk-delete those). */
     public async bulkDeleteMessages(
         channelId: string,
         messageIds: Iterable<string>,
     ): Promise<void> {
-        const ids = [...messageIds];
-        if (ids.length < 2 || ids.length > 100)
+        const ids = [...new Set(messageIds)];
+        if (ids.length < 1 || ids.length > 100)
             throw new RangeError(
-                "bulkDelete requires between 2 and 100 message IDs.",
+                "bulkDelete requires between 1 and 100 message IDs.",
+            );
+        if (ids.length === 1) return this.deleteMessage(channelId, ids[0]!);
+        const cutoff = Date.now() - BULK_DELETE_MAX_AGE_MS;
+        const tooOld = ids.filter((id) => snowflakeTime(id) < cutoff);
+        if (tooOld.length)
+            throw new RangeError(
+                `bulkDelete cannot delete messages older than 14 days: ${tooOld.join(", ")}`,
             );
         await this.#rest.post(Routes.channelBulkDelete(channelId), {
             messages: ids,
         });
         for (const id of ids) this.messages(channelId).delete(id);
+    }
+    /**
+     * Iterates a channel's history newest-first, 100 messages per request,
+     * starting before `before` (or the latest message) and stopping after
+     * `limit` messages or at the start of the channel.
+     */
+    public async *iterateMessages(
+        channelId: string,
+        options: { before?: string; limit?: number } = {},
+    ): AsyncGenerator<Message, void, undefined> {
+        let before = options.before;
+        let remaining = options.limit ?? Infinity;
+        while (remaining > 0) {
+            const page = await this.fetchMessages(channelId, {
+                before,
+                limit: Math.min(100, remaining),
+            });
+            for (const message of page) yield message;
+            remaining -= page.length;
+            if (page.length < 100) return;
+            before = page.at(-1)!.id;
+        }
     }
     public async addReaction(
         channelId: string,

@@ -91,16 +91,19 @@ test("fetches, edits, and deletes a message", async () => {
 test("supports crosspost and bulk delete", async () => {
     const { channels, calls } = manager();
     await channels.crosspostMessage(channelId, messageId);
-    await channels.bulkDeleteMessages(channelId, [
-        messageId,
-        "123456789012345685",
-    ]);
+    const recent = (offset: bigint) =>
+        (
+            ((BigInt(Date.now()) - 1_420_070_400_000n) << 22n) +
+            offset
+        ).toString();
+    const ids = [recent(1n), recent(2n)];
+    await channels.bulkDeleteMessages(channelId, ids);
     expect(calls[0]?.path).toBe(
         `/channels/${channelId}/messages/${messageId}/crosspost`,
     );
     expect(calls[1]?.path).toBe(`/channels/${channelId}/messages/bulk-delete`);
     expect(calls[1]?.body).toEqual({
-        messages: [messageId, "123456789012345685"],
+        messages: ids,
     });
 });
 
