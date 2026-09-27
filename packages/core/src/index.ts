@@ -37,6 +37,8 @@ import { REST, Routes } from "@lunibee/rest";
 import {
     User,
     Guild,
+    GuildMember,
+    Role,
     createChannel,
     Message,
     createInteraction,
@@ -86,6 +88,7 @@ import { ClientEvent, type ClientEvents } from "./events.js";
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
 type Listener<T extends unknown[]> = (...args: T) => unknown;
+type GuildMemberEvent = APIGuildMember & { guild_id: string };
 
 /** Minimal typed event emitter used by the client. */
 class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
@@ -309,8 +312,7 @@ export class Client
                 data as import("@lunibee/types").APIMessage,
                 this.#resourceContext,
             );
-            this.channels.set(message.channelId, message.channel);
-            this.users.set(message.author.id, message.author);
+            this.#observeMessage(message);
             this.emit(ClientEvent.MessageCreate, message);
         });
         this.#gateway.on("MESSAGE_UPDATE", (data) => {
@@ -318,19 +320,25 @@ export class Client
                 data as import("@lunibee/types").APIMessage,
                 this.#resourceContext,
             );
-            this.channels.set(message.channelId, message.channel);
-            this.users.set(message.author.id, message.author);
+            this.#observeMessage(message);
+            const messages = this.channels.cachedMessages(message.channelId);
+            if (messages?.cache.has(message.id))
+                messages.upsert(data as import("@lunibee/types").APIMessage);
             this.emit(ClientEvent.MessageUpdate, message);
         });
-        this.#gateway.on("MESSAGE_DELETE", (data) =>
-            this.emit(ClientEvent.MessageDelete, data as APIMessageDeleteEvent),
-        );
-        this.#gateway.on("MESSAGE_DELETE_BULK", (data) =>
-            this.emit(
-                ClientEvent.MessageDeleteBulk,
-                data as APIMessageDeleteBulkEvent,
-            ),
-        );
+        this.#gateway.on("MESSAGE_DELETE", (data) => {
+            const payload = data as APIMessageDeleteEvent;
+            this.channels
+                .cachedMessages(payload.channel_id)
+                ?.delete(payload.id);
+            this.emit(ClientEvent.MessageDelete, payload);
+        });
+        this.#gateway.on("MESSAGE_DELETE_BULK", (data) => {
+            const payload = data as APIMessageDeleteBulkEvent;
+            const messages = this.channels.cachedMessages(payload.channel_id);
+            if (messages) for (const id of payload.ids) messages.delete(id);
+            this.emit(ClientEvent.MessageDeleteBulk, payload);
+        });
 
         // ── Reactions ────────────────────────────────────────────────────────────
         this.#gateway.on("MESSAGE_REACTION_ADD", (data) =>
@@ -388,18 +396,20 @@ export class Client
             // or gateway resume) has become *available* rather than newly joined.
             // Mirrors Discord.js' guildAvailable vs. guildCreate distinction.
             const wasCached = this.guilds.has(payload.id);
-            const guild = new Guild(payload);
-            this.guilds.set(guild.id, guild);
+            this.guilds.patch(payload);
+            for (const role of payload.roles ?? [])
+                this.#upsertRole(payload.id, role);
+            const emojis = this.guilds.emojis(payload.id);
+            for (const emoji of payload.emojis ?? []) emojis.upsert(emoji);
             for (const member of payload.members ?? [])
-                this.users.set(member.user.id, new User(member.user));
+                this.#upsertMember(payload.id, member);
+            // Channels in GUILD_CREATE omit guild_id; restore it so the
+            // channel can be cleaned up with its guild.
             for (const channelData of [
                 ...(payload.channels ?? []),
                 ...(payload.threads ?? []),
             ])
-                this.channels.set(
-                    channelData.id,
-                    createChannel(channelData, this.#resourceContext),
-                );
+                this.channels.upsert({ ...channelData, guild_id: payload.id });
             this.emit(
                 wasCached
                     ? ClientEvent.GuildAvailable
@@ -408,8 +418,7 @@ export class Client
             );
         });
         this.#gateway.on("GUILD_UPDATE", (data) => {
-            const guild = new Guild(data as APIGuild);
-            this.guilds.update(guild);
+            this.guilds.patch(data as APIGuild);
             this.emit(ClientEvent.GuildUpdate, data as APIGuild);
         });
         this.#gateway.on("GUILD_DELETE", (data) => {
@@ -419,59 +428,79 @@ export class Client
                 return;
             }
             this.guilds.delete(payload.id);
+            this.channels.deleteGuildChannels(payload.id);
             this.emit(ClientEvent.GuildDelete, payload);
         });
 
         // ── Guild Members ────────────────────────────────────────────────────────
         this.#gateway.on("GUILD_MEMBER_ADD", (data) => {
-            const member = data as APIGuildMember;
-            this.users.set(member.user.id, new User(member.user));
+            const member = data as GuildMemberEvent;
+            this.#upsertMember(member.guild_id, member);
             this.emit(ClientEvent.GuildMemberAdd, member);
         });
         this.#gateway.on("GUILD_MEMBER_UPDATE", (data) => {
-            const member = data as APIGuildMember;
-            this.users.set(member.user.id, new User(member.user));
+            const member = data as GuildMemberEvent;
+            this.#upsertMember(member.guild_id, member);
             this.emit(ClientEvent.GuildMemberUpdate, member);
         });
-        this.#gateway.on("GUILD_MEMBER_REMOVE", (data) =>
-            this.emit(ClientEvent.GuildMemberRemove, data as APIGuildMember),
-        );
-        this.#gateway.on("GUILD_MEMBERS_CHUNK", (data) =>
-            this.emit(
-                ClientEvent.GuildMembersChunk,
-                data as APIGuildMembersChunk,
-            ),
-        );
+        this.#gateway.on("GUILD_MEMBER_REMOVE", (data) => {
+            const member = data as GuildMemberEvent;
+            this.guilds.members(member.guild_id).delete(member.user.id);
+            this.emit(ClientEvent.GuildMemberRemove, member);
+        });
+        this.#gateway.on("GUILD_MEMBERS_CHUNK", (data) => {
+            const chunk = data as APIGuildMembersChunk;
+            for (const member of chunk.members)
+                this.#upsertMember(chunk.guild_id, member);
+            this.emit(ClientEvent.GuildMembersChunk, chunk);
+        });
 
         // ── Guild Bans ───────────────────────────────────────────────────────────
-        this.#gateway.on("GUILD_BAN_ADD", (data) =>
-            this.emit(ClientEvent.GuildBanAdd, data as APIGuildBanEvent),
-        );
-        this.#gateway.on("GUILD_BAN_REMOVE", (data) =>
-            this.emit(ClientEvent.GuildBanRemove, data as APIGuildBanEvent),
-        );
+        this.#gateway.on("GUILD_BAN_ADD", (data) => {
+            const ban = data as APIGuildBanEvent;
+            const bans = this.guilds.bans(ban.guild_id);
+            // Keep a reason already fetched over REST; the event carries none.
+            bans.set(ban.user.id, {
+                reason: bans.get(ban.user.id)?.reason ?? null,
+                user: ban.user,
+            });
+            this.guilds.members(ban.guild_id).delete(ban.user.id);
+            this.emit(ClientEvent.GuildBanAdd, ban);
+        });
+        this.#gateway.on("GUILD_BAN_REMOVE", (data) => {
+            const ban = data as APIGuildBanEvent;
+            this.guilds.bans(ban.guild_id).delete(ban.user.id);
+            this.emit(ClientEvent.GuildBanRemove, ban);
+        });
 
         // ── Guild Roles ──────────────────────────────────────────────────────────
-        this.#gateway.on("GUILD_ROLE_CREATE", (data) =>
-            this.emit(ClientEvent.GuildRoleCreate, data as APIGuildRoleEvent),
-        );
-        this.#gateway.on("GUILD_ROLE_UPDATE", (data) =>
-            this.emit(ClientEvent.GuildRoleUpdate, data as APIGuildRoleEvent),
-        );
-        this.#gateway.on("GUILD_ROLE_DELETE", (data) =>
-            this.emit(
-                ClientEvent.GuildRoleDelete,
-                data as APIGuildRoleDeleteEvent,
-            ),
-        );
+        this.#gateway.on("GUILD_ROLE_CREATE", (data) => {
+            const event = data as APIGuildRoleEvent;
+            this.#upsertRole(event.guild_id, event.role);
+            this.emit(ClientEvent.GuildRoleCreate, event);
+        });
+        this.#gateway.on("GUILD_ROLE_UPDATE", (data) => {
+            const event = data as APIGuildRoleEvent;
+            this.#upsertRole(event.guild_id, event.role);
+            this.emit(ClientEvent.GuildRoleUpdate, event);
+        });
+        this.#gateway.on("GUILD_ROLE_DELETE", (data) => {
+            const event = data as APIGuildRoleDeleteEvent;
+            this.guilds.roles(event.guild_id).delete(event.role_id);
+            this.emit(ClientEvent.GuildRoleDelete, event);
+        });
 
         // ── Guild Emojis & Stickers ──────────────────────────────────────────────
-        this.#gateway.on("GUILD_EMOJIS_UPDATE", (data) =>
-            this.emit(
-                ClientEvent.GuildEmojisUpdate,
-                data as APIGuildEmojisUpdateEvent,
-            ),
-        );
+        this.#gateway.on("GUILD_EMOJIS_UPDATE", (data) => {
+            const event = data as APIGuildEmojisUpdateEvent;
+            // The event carries the guild's full emoji list.
+            const emojis = this.guilds.emojis(event.guild_id);
+            const current = new Set(event.emojis.map((emoji) => emoji.id));
+            for (const id of [...emojis.cache.keys()])
+                if (!current.has(id)) emojis.delete(id);
+            for (const emoji of event.emojis) emojis.upsert(emoji);
+            this.emit(ClientEvent.GuildEmojisUpdate, event);
+        });
         this.#gateway.on("GUILD_STICKERS_UPDATE", (data) =>
             this.emit(
                 ClientEvent.GuildStickersUpdate,
@@ -488,24 +517,21 @@ export class Client
         );
 
         // ── Guild Scheduled Events ───────────────────────────────────────────────
-        this.#gateway.on("GUILD_SCHEDULED_EVENT_CREATE", (data) =>
-            this.emit(
-                ClientEvent.GuildScheduledEventCreate,
-                data as APIGuildScheduledEvent,
-            ),
-        );
-        this.#gateway.on("GUILD_SCHEDULED_EVENT_UPDATE", (data) =>
-            this.emit(
-                ClientEvent.GuildScheduledEventUpdate,
-                data as APIGuildScheduledEvent,
-            ),
-        );
-        this.#gateway.on("GUILD_SCHEDULED_EVENT_DELETE", (data) =>
-            this.emit(
-                ClientEvent.GuildScheduledEventDelete,
-                data as APIGuildScheduledEvent,
-            ),
-        );
+        this.#gateway.on("GUILD_SCHEDULED_EVENT_CREATE", (data) => {
+            const event = data as APIGuildScheduledEvent;
+            this.guilds.scheduledEvents(event.guild_id).set(event.id, event);
+            this.emit(ClientEvent.GuildScheduledEventCreate, event);
+        });
+        this.#gateway.on("GUILD_SCHEDULED_EVENT_UPDATE", (data) => {
+            const event = data as APIGuildScheduledEvent;
+            this.guilds.scheduledEvents(event.guild_id).set(event.id, event);
+            this.emit(ClientEvent.GuildScheduledEventUpdate, event);
+        });
+        this.#gateway.on("GUILD_SCHEDULED_EVENT_DELETE", (data) => {
+            const event = data as APIGuildScheduledEvent;
+            this.guilds.scheduledEvents(event.guild_id).delete(event.id);
+            this.emit(ClientEvent.GuildScheduledEventDelete, event);
+        });
         this.#gateway.on("GUILD_SCHEDULED_EVENT_USER_ADD", (data) =>
             this.emit(
                 ClientEvent.GuildScheduledEventUserAdd,
@@ -547,19 +573,11 @@ export class Client
 
         // ── Channels ─────────────────────────────────────────────────────────────
         this.#gateway.on("CHANNEL_CREATE", (data) => {
-            const channel = createChannel(
-                data as APIChannel,
-                this.#resourceContext,
-            );
-            this.channels.update(channel);
+            const channel = this.channels.upsert(data as APIChannel);
             this.emit(ClientEvent.ChannelCreate, channel);
         });
         this.#gateway.on("CHANNEL_UPDATE", (data) => {
-            const channel = createChannel(
-                data as APIChannel,
-                this.#resourceContext,
-            );
-            this.channels.update(channel);
+            const channel = this.channels.upsert(data as APIChannel);
             this.emit(ClientEvent.ChannelUpdate, channel);
         });
         this.#gateway.on("CHANNEL_DELETE", (data) => {
@@ -576,19 +594,11 @@ export class Client
 
         // ── Threads ──────────────────────────────────────────────────────────────
         this.#gateway.on("THREAD_CREATE", (data) => {
-            const channel = createChannel(
-                data as APIThreadEvent,
-                this.#resourceContext,
-            );
-            this.channels.update(channel);
+            const channel = this.channels.upsert(data as APIThreadEvent);
             this.emit(ClientEvent.ThreadCreate, channel);
         });
         this.#gateway.on("THREAD_UPDATE", (data) => {
-            const channel = createChannel(
-                data as APIThreadEvent,
-                this.#resourceContext,
-            );
-            this.channels.update(channel);
+            const channel = this.channels.upsert(data as APIThreadEvent);
             this.emit(ClientEvent.ThreadUpdate, channel);
         });
         this.#gateway.on("THREAD_DELETE", (data) => {
@@ -596,9 +606,12 @@ export class Client
             this.channels.delete(payload.id);
             this.emit(ClientEvent.ThreadDelete, payload);
         });
-        this.#gateway.on("THREAD_LIST_SYNC", (data) =>
-            this.emit(ClientEvent.ThreadListSync, data as APIThreadListSync),
-        );
+        this.#gateway.on("THREAD_LIST_SYNC", (data) => {
+            const sync = data as APIThreadListSync;
+            for (const thread of sync.threads)
+                this.channels.upsert({ ...thread, guild_id: sync.guild_id });
+            this.emit(ClientEvent.ThreadListSync, sync);
+        });
         this.#gateway.on("THREAD_MEMBERS_UPDATE", (data) =>
             this.emit(
                 ClientEvent.ThreadMembersUpdate,
@@ -613,24 +626,21 @@ export class Client
         );
 
         // ── Stage Instances ──────────────────────────────────────────────────────
-        this.#gateway.on("STAGE_INSTANCE_CREATE", (data) =>
-            this.emit(
-                ClientEvent.StageInstanceCreate,
-                data as APIStageInstance,
-            ),
-        );
-        this.#gateway.on("STAGE_INSTANCE_UPDATE", (data) =>
-            this.emit(
-                ClientEvent.StageInstanceUpdate,
-                data as APIStageInstance,
-            ),
-        );
-        this.#gateway.on("STAGE_INSTANCE_DELETE", (data) =>
-            this.emit(
-                ClientEvent.StageInstanceDelete,
-                data as APIStageInstance,
-            ),
-        );
+        this.#gateway.on("STAGE_INSTANCE_CREATE", (data) => {
+            const stage = data as APIStageInstance;
+            this.stageInstances.set(stage.channel_id, stage);
+            this.emit(ClientEvent.StageInstanceCreate, stage);
+        });
+        this.#gateway.on("STAGE_INSTANCE_UPDATE", (data) => {
+            const stage = data as APIStageInstance;
+            this.stageInstances.set(stage.channel_id, stage);
+            this.emit(ClientEvent.StageInstanceUpdate, stage);
+        });
+        this.#gateway.on("STAGE_INSTANCE_DELETE", (data) => {
+            const stage = data as APIStageInstance;
+            this.stageInstances.delete(stage.channel_id);
+            this.emit(ClientEvent.StageInstanceDelete, stage);
+        });
 
         // ── Invites ──────────────────────────────────────────────────────────────
         this.#gateway.on("INVITE_CREATE", (data) =>
@@ -691,6 +701,46 @@ export class Client
      * @returns The token used to log in.
      * @throws {TypeError} If the resulting token is empty.
      */
+    /** Caches a message's author, and its channel only when none is cached: the
+     * message carries a stub channel that must not overwrite a full one. */
+    #observeMessage(message: Message): void {
+        if (!this.channels.has(message.channelId))
+            this.channels.set(message.channelId, message.channel);
+        this.#merge(this.users, message.author.id, message.author);
+    }
+
+    #upsertMember(guildId: string, data: APIGuildMember): GuildMember {
+        const member = new GuildMember({ ...data, guild_id: guildId });
+        this.#merge(this.users, member.user.id, member.user);
+        return this.#merge(
+            this.guilds.members(guildId),
+            member.user.id,
+            member,
+        );
+    }
+
+    #upsertRole(guildId: string, data: APIRole): Role {
+        return this.#merge(this.guilds.roles(guildId), data.id, new Role(data));
+    }
+
+    /** Merges `next` into the cached instance so references stay valid. */
+    #merge<T extends object>(
+        manager: {
+            get(id: string): T | undefined;
+            set(id: string, value: T): unknown;
+        },
+        id: string,
+        next: T,
+    ): T {
+        const existing = manager.get(id);
+        if (!existing) {
+            manager.set(id, next);
+            return next;
+        }
+        Object.assign(existing, next);
+        return existing;
+    }
+
     public async login(token?: string): Promise<string> {
         if (this.state === "destroyed")
             throw new Error("Cannot login a destroyed client.");

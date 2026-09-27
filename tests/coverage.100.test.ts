@@ -592,11 +592,11 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
         gw.emit("GUILD_ROLE_CREATE", {
             guild_id: "200000000000000000",
-            role: { id: "1" },
+            role: { id: "1", name: "role" },
         });
         gw.emit("GUILD_ROLE_UPDATE", {
             guild_id: "200000000000000000",
-            role: { id: "1" },
+            role: { id: "1", name: "role" },
         });
         gw.emit("GUILD_ROLE_DELETE", {
             guild_id: "200000000000000000",

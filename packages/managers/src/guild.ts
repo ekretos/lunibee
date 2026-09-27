@@ -1,4 +1,7 @@
 import { ResourceManager } from "./base.js";
+import { EmojiManager } from "./emoji.js";
+import { GuildMemberManager } from "./member.js";
+import { RoleManager } from "./role.js";
 import {
     GuildBanManager,
     GuildScheduledEventManager,
@@ -39,6 +42,9 @@ export class GuildManager extends ResourceManager<string, Guild> {
     readonly #rest: REST;
     readonly #bans = new Map<string, GuildBanManager>();
     readonly #scheduledEvents = new Map<string, GuildScheduledEventManager>();
+    readonly #members = new Map<string, GuildMemberManager>();
+    readonly #roles = new Map<string, RoleManager>();
+    readonly #emojis = new Map<string, EmojiManager>();
     public constructor(rest: REST) {
         super(
             async (id) =>
@@ -68,6 +74,58 @@ export class GuildManager extends ResourceManager<string, Guild> {
                 (manager = new GuildScheduledEventManager(this.#rest, guildId)),
             );
         return manager;
+    }
+
+    /** Member manager for a guild (one instance per guild, kept in sync by the Gateway). */
+    public members(guildId: string): GuildMemberManager {
+        let manager = this.#members.get(guildId);
+        if (!manager)
+            this.#members.set(
+                guildId,
+                (manager = new GuildMemberManager(guildId, this.#rest)),
+            );
+        return manager;
+    }
+
+    /** Role manager for a guild (one instance per guild, kept in sync by the Gateway). */
+    public roles(guildId: string): RoleManager {
+        let manager = this.#roles.get(guildId);
+        if (!manager)
+            this.#roles.set(
+                guildId,
+                (manager = new RoleManager(guildId, this.#rest)),
+            );
+        return manager;
+    }
+
+    /** Emoji manager for a guild (one instance per guild, kept in sync by the Gateway). */
+    public emojis(guildId: string): EmojiManager {
+        let manager = this.#emojis.get(guildId);
+        if (!manager)
+            this.#emojis.set(
+                guildId,
+                (manager = new EmojiManager(this.#rest, guildId)),
+            );
+        return manager;
+    }
+
+    /** Merges a guild payload into the cached instance, keeping object identity. */
+    public patch(data: GuildData): Guild {
+        const guild = new Guild(data);
+        const existing = this.get(guild.id);
+        if (!existing) return this.upsert(guild);
+        Object.assign(existing, guild);
+        return existing;
+    }
+
+    /** Removes a guild and every per-guild manager that belongs to it. */
+    public override delete(id: string): boolean {
+        this.#bans.delete(id);
+        this.#scheduledEvents.delete(id);
+        this.#members.delete(id);
+        this.#roles.delete(id);
+        this.#emojis.delete(id);
+        return super.delete(id);
     }
 
     /** Creates a new guild. (Bot must be in fewer than 10 guilds). */

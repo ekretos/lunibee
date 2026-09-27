@@ -113,7 +113,8 @@ export class ChannelManager extends Manager<string, Channel> {
     public upsert(data: ConstructorParameters<typeof Channel>[0]): Channel {
         const existing = this.get(data.id);
         const channel = createChannel(data, this.#context);
-        if (existing) {
+        // A type change (e.g. text -> announcement) needs the new subclass.
+        if (existing && existing.type === channel.type) {
             Object.assign(existing, channel);
             return existing;
         }
@@ -122,6 +123,18 @@ export class ChannelManager extends Manager<string, Channel> {
     }
     public update(channel: Channel): this {
         return this.set(channel.id, channel);
+    }
+    /** Removes every cached channel that belongs to a guild. @returns Number removed. */
+    public deleteGuildChannels(guildId: string): number {
+        let removed = 0;
+        for (const channel of this.values())
+            if (channel.guildId === guildId && this.delete(channel.id))
+                removed++;
+        return removed;
+    }
+    /** Returns the message manager for a channel only if one already exists. */
+    public cachedMessages(channelId: string): MessageManager | undefined {
+        return this.#messageManagers.get(channelId);
     }
     public async create(
         guildId: string,
