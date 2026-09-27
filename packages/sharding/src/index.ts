@@ -27,10 +27,31 @@ export interface ShardManagerOptions {
      * Discord's IDENTIFY rate limit (one per 5s per rate-limit key); set 0 to
      * opt out when an external scheduler already paces the handshakes.
      */ spawnDelay?: number;
+    /**
+     * Shards that may IDENTIFY at once (Discord's `max_concurrency`). Defaults
+     * to the value from `/gateway/bot` when it was fetched (auto shard count),
+     * else 1.
+     */ maxConcurrency?: number;
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */ autoScaleInterval?: number;
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */ onAutoScaleError?: (
         error: unknown,
     ) => void;
+}
+/** `/gateway/bot` information used to pace shard startup. */
+export interface GatewayBotInfo {
+    /** Recommended shard count. */ shards: number;
+    /** IDENTIFY budget, when Discord reported it. */ sessionStartLimit?: {
+        total: number;
+        remaining: number;
+        /** Milliseconds until `remaining` resets. */ resetAfter: number;
+        maxConcurrency: number;
+    };
+}
+/** Health snapshot for one shard. */
+export interface ShardHealth {
+    id: number;
+    /** Gateway connection state. */ state: Gateway["state"];
+    /** Last heartbeat round-trip in ms, or -1 before the first ACK. */ ping: number;
 }
 /** Runtime state for a managed shard. */
 export interface ShardInfo {
@@ -53,6 +74,8 @@ export class ShardManager {
     /** Whether the manager was created in auto shard-count mode. Preserved across reshards so auto-scaling keeps running. */
     readonly #auto: boolean;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
+    /** Last `/gateway/bot` answer, used for concurrency and the start limit. */
+    #gatewayInfo?: GatewayBotInfo;
     /** Creates a shard manager. @param options Sharding configuration. @throws {TypeError} If token or intents are invalid. @throws {RangeError} If shard count is invalid. */
     public constructor(options: ShardManagerOptions) {
         if (!options.token?.trim())
@@ -82,6 +105,12 @@ export class ShardManager {
             throw new RangeError(
                 "spawnDelay must be a non-negative finite number of milliseconds.",
             );
+        if (
+            options.maxConcurrency !== undefined &&
+            (!Number.isInteger(options.maxConcurrency) ||
+                options.maxConcurrency < 1)
+        )
+            throw new RangeError("maxConcurrency must be a positive integer.");
         this.#auto = options.shardCount === "auto";
         // Discord allows one IDENTIFY per 5s per rate-limit key. Spawning
         // shards back-to-back trips that limit and the gateway answers with
@@ -95,6 +124,10 @@ export class ShardManager {
     }
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
     public async fetchRecommendedShardCount(): Promise<number> {
+        return (await this.fetchGatewayInfo()).shards;
+    }
+    /** Retrieves `/gateway/bot`: recommended shards and the IDENTIFY budget. Remembered for pacing the next connect. @throws {Error} If discovery fails or returns invalid data. */
+    public async fetchGatewayInfo(): Promise<GatewayBotInfo> {
         const response = await fetch(
             "https://discord.com/api/v10/gateway/bot",
             {
@@ -108,7 +141,15 @@ export class ShardManager {
             throw new Error(
                 `Gateway discovery failed with status ${response.status}`,
             );
-        const data = (await response.json()) as { shards?: unknown };
+        const data = (await response.json()) as {
+            shards?: unknown;
+            session_start_limit?: {
+                total?: unknown;
+                remaining?: unknown;
+                reset_after?: unknown;
+                max_concurrency?: unknown;
+            };
+        };
         if (
             typeof data.shards !== "number" ||
             !Number.isInteger(data.shards) ||
@@ -117,7 +158,23 @@ export class ShardManager {
             throw new Error(
                 "Gateway discovery returned an invalid shard count.",
             );
-        return data.shards;
+        const limit = data.session_start_limit;
+        const info: GatewayBotInfo = { shards: data.shards };
+        if (
+            limit &&
+            typeof limit.total === "number" &&
+            typeof limit.remaining === "number" &&
+            typeof limit.reset_after === "number" &&
+            typeof limit.max_concurrency === "number"
+        )
+            info.sessionStartLimit = {
+                total: limit.total,
+                remaining: limit.remaining,
+                resetAfter: limit.reset_after,
+                maxConcurrency: Math.max(1, limit.max_concurrency),
+            };
+        this.#gatewayInfo = info;
+        return info;
     }
     /** Connects all shards sequentially. A destroyed manager is reinitialized before connecting. @returns A promise fulfilled after all shards connect. @throws {Error} If a shard fails to connect. */
     public async connect(): Promise<void> {
@@ -127,17 +184,34 @@ export class ShardManager {
             this.#autoScaleTimer = undefined;
         }
         await this.#ensureInitialized();
-        for (const [id, shard] of this.shards) {
-            try {
-                await shard.connect();
-            } catch (error) {
+        const limit = this.#gatewayInfo?.sessionStartLimit;
+        if (limit && limit.remaining < this.shardCount) {
+            const message = `Session start limit exhausted: ${limit.remaining} of ${limit.total} IDENTIFYs left for ${this.shardCount} shards; resets in ${Math.ceil(limit.resetAfter / 1000)}s.`;
+            this.destroy();
+            throw new Error(message);
+        }
+        // Shards whose IDs differ modulo max_concurrency use different
+        // IDENTIFY rate-limit keys, so each round of consecutive IDs may start
+        // together; rounds are spaced by spawnDelay.
+        const concurrency =
+            this.#options.maxConcurrency ?? limit?.maxConcurrency ?? 1;
+        const ids = [...this.shards.keys()];
+        for (let start = 0; start < ids.length; start += concurrency) {
+            const round = ids.slice(start, start + concurrency);
+            const results = await Promise.allSettled(
+                round.map((id) => this.shards.get(id)!.connect()),
+            );
+            const failed = results.findIndex(
+                (result) => result.status === "rejected",
+            );
+            if (failed !== -1) {
                 this.destroy();
-                throw new Error(`Failed to connect shard ${id}.`, {
-                    cause: error,
+                throw new Error(`Failed to connect shard ${round[failed]}.`, {
+                    cause: (results[failed] as PromiseRejectedResult).reason,
                 });
             }
             if (
-                id + 1 < this.shardCount &&
+                start + concurrency < ids.length &&
                 this.#options.spawnDelay &&
                 this.#options.spawnDelay > 0
             )
@@ -189,6 +263,14 @@ export class ShardManager {
         id: number,
     ): Gateway | undefined {
         return this.shards.get(id);
+    }
+    /** Returns each shard's connection state and heartbeat latency. */
+    public health(): ShardHealth[] {
+        return [...this.shards].map(([id, gateway]) => ({
+            id,
+            state: gateway.state,
+            ping: gateway.ping,
+        }));
     }
     /** Returns information for all managed shards. @returns Shard information snapshots. */ public values(): ShardInfo[] {
         return [...this.shards].map(([id, gateway]) => ({ id, gateway }));
