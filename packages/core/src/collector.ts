@@ -9,6 +9,10 @@ export interface CollectorOptions<T> {
     max?: number;
     /** Maximum number of processed elements. */
     maxProcessed?: number;
+    /** Stop after this many milliseconds without a collected item. */
+    idle?: number;
+    /** Stop (reason `"abort"`) when this signal aborts. */
+    signal?: AbortSignal;
 }
 
 /** General-purpose event collector for interactions and messages. */
@@ -19,6 +23,10 @@ export class Collector<K, V> extends EventEmitter {
     public endReason?: string;
     public totalProcessed = 0;
     readonly #timeoutTimer?: ReturnType<typeof setTimeout>;
+    #idleTimer?: ReturnType<typeof setTimeout>;
+    readonly #onAbort = (): void => this.stop("abort");
+    /** Cleanup hooks run once when the collector ends (e.g. event unsubscription). */
+    readonly #cleanup: (() => void)[] = [];
 
     public constructor(options: CollectorOptions<V> = {}) {
         super();
@@ -29,6 +37,28 @@ export class Collector<K, V> extends EventEmitter {
                 this.stop("time");
             }, options.time);
         }
+        this.#resetIdle();
+        if (options.signal?.aborted) this.stop("abort");
+        else
+            options.signal?.addEventListener("abort", this.#onAbort, {
+                once: true,
+            });
+    }
+
+    /** Registers a function to run once when the collector ends. Runs immediately if it already has. */
+    public onDispose(cleanup: () => void): this {
+        if (this.ended) cleanup();
+        else this.#cleanup.push(cleanup);
+        return this;
+    }
+
+    #resetIdle(): void {
+        if (!this.options.idle || this.options.idle <= 0) return;
+        if (this.#idleTimer) clearTimeout(this.#idleTimer);
+        this.#idleTimer = setTimeout(
+            () => this.stop("idle"),
+            this.options.idle,
+        );
     }
 
     /** Handles a candidate item for collection. */
@@ -58,6 +88,7 @@ export class Collector<K, V> extends EventEmitter {
         }
 
         this.collected.set(key, item);
+        this.#resetIdle();
         this.emit("collect", item);
 
         if (this.options.max && this.collected.size >= this.options.max) {
@@ -79,8 +110,60 @@ export class Collector<K, V> extends EventEmitter {
         this.ended = true;
         this.endReason = reason;
         if (this.#timeoutTimer) clearTimeout(this.#timeoutTimer);
+        if (this.#idleTimer) clearTimeout(this.#idleTimer);
+        this.options.signal?.removeEventListener("abort", this.#onAbort);
+        for (const cleanup of this.#cleanup.splice(0)) {
+            try {
+                cleanup();
+            } catch {
+                // A failing cleanup must not stop the others or the "end" event.
+            }
+        }
         this.emit("end", this.collected, reason);
         this.removeAllListeners();
+    }
+
+    /** Resolves with everything collected once the collector ends. */
+    public wait(): Promise<Map<K, V>> {
+        if (this.ended) return Promise.resolve(this.collected);
+        return new Promise((resolve) =>
+            this.once("end", (collected: Map<K, V>) => resolve(collected)),
+        );
+    }
+
+    /** Yields items as they are collected until the collector ends. Items
+     * collected between iterations are buffered, not dropped. */
+    public async *[Symbol.asyncIterator](): AsyncGenerator<V, void, undefined> {
+        const queue: V[] = [];
+        let wake: (() => void) | undefined;
+        const onCollect = (item: V): void => {
+            queue.push(item);
+            wake?.();
+        };
+        const onEnd = (): void => wake?.();
+        if (!this.ended) {
+            this.on("collect", onCollect);
+            this.on("end", onEnd);
+        }
+        try {
+            for (;;) {
+                if (queue.length > 0) {
+                    yield queue.shift()!;
+                    continue;
+                }
+                if (this.ended) return;
+                await new Promise<void>((resolve) => (wake = resolve));
+                wake = undefined;
+            }
+        } finally {
+            this.off("collect", onCollect);
+            this.off("end", onEnd);
+        }
+    }
+
+    /** Stops the collector (reason `"disposed"`); enables `using collector = ...`. */
+    public [Symbol.dispose](): void {
+        this.stop("disposed");
     }
 
     /** Returns a Promise that resolves with the next collected item or rejects on end/timeout. */

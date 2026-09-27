@@ -88,6 +88,7 @@ import type {
     ClientUser,
 } from "@lunibee/types";
 import { ClientEvent, type ClientEvents } from "./events.js";
+import { Collector, type CollectorOptions } from "./collector.js";
 
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
@@ -745,6 +746,41 @@ export class Client
         }
         Object.assign(existing, next);
         return existing;
+    }
+
+    /**
+     * Collects the first argument of a client event until a limit, timeout,
+     * idle timeout, abort or `stop()`. The collector unsubscribes itself when
+     * it ends. Items are keyed by `options.key`, else their `id`, else order.
+     */
+    public createCollector<E extends keyof ClientEvents>(
+        event: E,
+        options: CollectorOptions<ClientEvents[E][0]> & {
+            key?: (item: ClientEvents[E][0]) => string;
+        } = {},
+    ): Collector<string, ClientEvents[E][0]> {
+        const collector = new Collector<string, ClientEvents[E][0]>(options);
+        let order = 0;
+        const listener = (...args: ClientEvents[E]): void => {
+            const item = args[0];
+            const id = (item as { id?: unknown } | null | undefined)?.id;
+            const key =
+                options.key?.(item) ??
+                (typeof id === "string" ? id : String(order++));
+            collector
+                .handle(key, item)
+                .catch((error: unknown) =>
+                    this.emit(
+                        ClientEvent.Error,
+                        error instanceof Error
+                            ? error
+                            : new Error(String(error)),
+                    ),
+                );
+        };
+        this.on(event, listener);
+        collector.onDispose(() => this.off(event, listener));
+        return collector;
     }
 
     public async login(token?: string): Promise<string> {
