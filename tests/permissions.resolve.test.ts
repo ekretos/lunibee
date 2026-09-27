@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+    Client,
     Permission,
     PermissionOverwriteType,
     PermissionSet,
@@ -91,5 +92,45 @@ describe("computePermissions", () => {
             roles: [],
         });
         expect(set.bitfield).toBe(0n);
+    });
+});
+
+describe("Client.permissionsFor", () => {
+    test("uses cached guild, roles, member and channel overwrites", () => {
+        const client = new Client({ token: "a.b", intents: 0 });
+        const gw = client.gateway as unknown as {
+            emit(event: string, data: unknown): void;
+        };
+        const G = "200000000000000000";
+        const U = "300000000000000000";
+        const CH = "100000000000000000";
+        expect(client.permissionsFor(U, G)).toBeNull();
+        gw.emit("GUILD_CREATE", {
+            id: G,
+            name: "g",
+            owner_id: "1",
+            roles: [{ id: G, name: "@everyone", permissions: "3072" }],
+            members: [
+                {
+                    user: { id: U, username: "u" },
+                    roles: [],
+                    joined_at: "2020-01-01T00:00:00Z",
+                },
+            ],
+            channels: [
+                {
+                    id: CH,
+                    type: 0,
+                    name: "general",
+                    permission_overwrites: [
+                        { id: U, type: 1, allow: "0", deny: "2048" },
+                    ],
+                },
+            ],
+        });
+        expect(client.permissionsFor(U, G)?.has("sendMessages")).toBe(true);
+        const channel = client.permissionsFor(U, CH)!;
+        expect(channel.has("viewChannel")).toBe(true);
+        expect(channel.has("sendMessages")).toBe(false);
     });
 });

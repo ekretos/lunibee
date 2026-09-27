@@ -363,7 +363,7 @@ export interface APIChannel {
     type: number;
     guild_id?: Snowflake;
     position?: number;
-    permission_overwrites?: Array<Record<string, unknown>>;
+    permission_overwrites?: APIOverwrite[];
     name?: string | null;
     topic?: string | null;
     nsfw?: boolean;
@@ -886,4 +886,14 @@ export interface ApplicationCommandData {
     default_member_permissions?: string | null;
     dm_permission?: boolean;
     nsfw?: boolean;
+}
+
+/** A channel permission overwrite for a role (type 0) or member (type 1). */
+export interface APIOverwrite {
+    id: Snowflake;
+    type: 0 | 1;
+    /** Allowed permission bits as a decimal string. */
+    allow: string;
+    /** Denied permission bits as a decimal string. */
+    deny: string;
 }

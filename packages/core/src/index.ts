@@ -89,6 +89,7 @@ import type {
 } from "@lunibee/types";
 import { ClientEvent, type ClientEvents } from "./events.js";
 import { Collector, type CollectorOptions } from "./collector.js";
+import { computePermissions, type PermissionSet } from "./permissions.js";
 
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
@@ -781,6 +782,30 @@ export class Client
         this.on(event, listener);
         collector.onDispose(() => this.off(event, listener));
         return collector;
+    }
+
+    /**
+     * Resolves a member's permissions from cached state: guild-level for a
+     * guild ID, or channel-level (including overwrites) for a cached channel
+     * ID. Returns null when the guild or member is not cached.
+     */
+    public permissionsFor(
+        memberId: string,
+        guildOrChannelId: string,
+    ): PermissionSet | null {
+        const channel = this.channels.get(guildOrChannelId);
+        const guildId = channel?.guildId ?? guildOrChannelId;
+        const guild = this.guilds.get(guildId);
+        const member = this.guilds.members(guildId).get(memberId);
+        if (!guild || !member) return null;
+        return computePermissions({
+            guildId,
+            ownerId: guild.ownerId,
+            memberId,
+            memberRoleIds: member.roleIds,
+            roles: this.guilds.roles(guildId).values(),
+            overwrites: channel?.permissionOverwrites,
+        });
     }
 
     public async login(token?: string): Promise<string> {

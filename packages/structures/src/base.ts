@@ -147,6 +147,8 @@ export class Channel extends BaseStructure {
     public nsfw?: boolean;
     public rateLimitPerUser?: number;
     public position?: number;
+    /** Role and member permission overwrites (empty for DMs and when not provided). */
+    public permissionOverwrites: import("@lunibee/types").APIOverwrite[];
     readonly #context?: ResourceContext;
 
     /** Creates a channel structure from Discord channel data. */
@@ -167,6 +169,9 @@ export class Channel extends BaseStructure {
         this.nsfw = data.nsfw;
         this.rateLimitPerUser = data.rate_limit_per_user;
         this.position = data.position;
+        this.permissionOverwrites = (data.permission_overwrites ?? []).map(
+            (overwrite) => ({ ...overwrite }),
+        );
         this.#context = context;
     }
 
