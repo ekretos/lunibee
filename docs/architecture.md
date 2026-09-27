@@ -27,3 +27,24 @@ through inactivity.
 Messages are temporary data, not resource state: they are not cached unless
 the client is given `messageCache: { maxSize?, ttl? }`, which enables a
 bounded per-channel TTL/LRU cache (default `maxSize` 100).
+
+## Memory model for large bots
+
+Lunibee keeps three kinds of state apart:
+
+| Layer | What it holds | Storage | Lifetime |
+|---|---|---|---|
+| Authoritative resource state | Guilds, channels, roles, members, emojis, users | Manager caches, `setWithoutTTL()` | Until a Gateway delete event or an explicit `delete()` |
+| Temporary data | Messages (opt-in `messageCache`) | Bounded `Collection`, `set()` with TTL/LRU | Until TTL or LRU eviction |
+| Application caches | Your own data (config, cooldowns, REST results) | `new Collection(null, { ttl, maxSize, onEvict })` | Your policy |
+
+Guidelines:
+
+- TTL never decides whether a Discord resource exists. If memory is the
+  limit, turn caching off per resource with `ClientOptions.cache`
+  (`users`, `members`, `roles`, `emojis`) rather than expiring it; events
+  are still emitted with full objects.
+- `Collection.stats` (hits, misses, expired, evicted) and `onEvict` show
+  whether an application cache is sized right.
+- `ShardManager.health()` reports per-shard state and ping.
+- `benchmarks/collection.ts` measures the collection's hot paths.

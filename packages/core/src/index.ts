@@ -230,6 +230,8 @@ export class Client
         return this.#gateway.requestGuildMembers(data);
     }
     readonly #gateway: Gateway;
+    /** Which resources Gateway events are allowed to cache. */
+    readonly #cache: Required<NonNullable<ClientOptions["cache"]>>;
     readonly #resourceContext: ResourceContext;
 
     public constructor(public readonly options: ClientOptions) {
@@ -237,6 +239,13 @@ export class Client
         if (!options.token?.trim())
             throw new TypeError("Client token is required.");
         this.rest = new REST({ token: options.token, ...options.rest });
+        this.#cache = {
+            users: true,
+            members: true,
+            roles: true,
+            emojis: true,
+            ...options.cache,
+        };
         this.users = new UserManager(this.rest);
         this.guilds = new GuildManager(this.rest);
         this.channels = new ChannelManager(this.rest, {
@@ -407,8 +416,10 @@ export class Client
             this.guilds.patch(payload);
             for (const role of payload.roles ?? [])
                 this.#upsertRole(payload.id, role);
-            const emojis = this.guilds.emojis(payload.id);
-            for (const emoji of payload.emojis ?? []) emojis.upsert(emoji);
+            if (this.#cache.emojis) {
+                const emojis = this.guilds.emojis(payload.id);
+                for (const emoji of payload.emojis ?? []) emojis.upsert(emoji);
+            }
             for (const member of payload.members ?? [])
                 this.#upsertMember(payload.id, member);
             // Channels in GUILD_CREATE omit guild_id; restore it so the
@@ -502,11 +513,13 @@ export class Client
         this.#gateway.on("GUILD_EMOJIS_UPDATE", (data) => {
             const event = data as APIGuildEmojisUpdateEvent;
             // The event carries the guild's full emoji list.
-            const emojis = this.guilds.emojis(event.guild_id);
-            const current = new Set(event.emojis.map((emoji) => emoji.id));
-            for (const id of [...emojis.cache.keys()])
-                if (!current.has(id)) emojis.delete(id);
-            for (const emoji of event.emojis) emojis.upsert(emoji);
+            if (this.#cache.emojis) {
+                const emojis = this.guilds.emojis(event.guild_id);
+                const current = new Set(event.emojis.map((emoji) => emoji.id));
+                for (const id of [...emojis.cache.keys()])
+                    if (!current.has(id)) emojis.delete(id);
+                for (const emoji of event.emojis) emojis.upsert(emoji);
+            }
             this.emit(ClientEvent.GuildEmojisUpdate, event);
         });
         this.#gateway.on("GUILD_STICKERS_UPDATE", (data) =>
@@ -714,12 +727,15 @@ export class Client
     #observeMessage(message: Message): void {
         if (!this.channels.has(message.channelId))
             this.channels.set(message.channelId, message.channel);
-        this.#merge(this.users, message.author.id, message.author);
+        if (this.#cache.users)
+            this.#merge(this.users, message.author.id, message.author);
     }
 
     #upsertMember(guildId: string, data: APIGuildMember): GuildMember {
         const member = new GuildMember({ ...data, guild_id: guildId });
-        this.#merge(this.users, member.user.id, member.user);
+        if (this.#cache.users)
+            this.#merge(this.users, member.user.id, member.user);
+        if (!this.#cache.members) return member;
         return this.#merge(
             this.guilds.members(guildId),
             member.user.id,
@@ -728,6 +744,7 @@ export class Client
     }
 
     #upsertRole(guildId: string, data: APIRole): Role {
+        if (!this.#cache.roles) return new Role(data);
         return this.#merge(this.guilds.roles(guildId), data.id, new Role(data));
     }
 

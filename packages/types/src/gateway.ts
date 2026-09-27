@@ -186,6 +186,17 @@ export interface ClientOptions {
     rest?: RESTOptions;
     /** Opt-in bounded per-channel message cache. Messages are not cached by default. */
     messageCache?: { maxSize?: number; ttl?: number };
+    /**
+     * Which resources the client keeps from Gateway events. Everything is
+     * cached by default; large bots can turn off what they do not read.
+     * Events are still emitted either way.
+     */
+    cache?: {
+        users?: boolean;
+        members?: boolean;
+        roles?: boolean;
+        emojis?: boolean;
+    };
 }
 /** Gateway connection configuration. */
 export interface GatewayOptions {
