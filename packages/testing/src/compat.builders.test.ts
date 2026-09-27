@@ -95,8 +95,12 @@ describe("ActionRowBuilder → APIActionRowComponent payload", () => {
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId("a")
+                .setLabel("A")
                 .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId("b").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId("b")
+                .setLabel("B")
+                .setStyle(ButtonStyle.Danger),
         );
         const json = row.toJSON();
         expect(json.type).toBe(1);

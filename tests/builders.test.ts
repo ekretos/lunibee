@@ -197,7 +197,7 @@ describe("Builders Full Coverage", () => {
             .setCustomId("select_roles")
             .setPlaceholder("Choose a role")
             .setMinValues(1)
-            .setMaxValues(3)
+            .setMaxValues(2)
             .setDisabled(false)
             .addOptions(
                 {

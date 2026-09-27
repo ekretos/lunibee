@@ -272,7 +272,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         );
         expect(row.toJSON().components.length).toBe(1);
         row.clearComponents();
-        expect(row.toJSON().components.length).toBe(0);
+        expect(() => row.toJSON()).toThrow(RangeError);
         expect(() => row.addComponents()).toThrow();
 
         const strSelect = new StringSelectBuilder()
@@ -281,7 +281,13 @@ describe("100% Comprehensive Codebase Coverage", () => {
             .setRequired(true)
             .setDisabled(true)
             .setMinValues(1)
-            .setMaxValues(5);
+            .setMaxValues(5)
+            .addOptions(
+                ...["a", "b", "c", "d", "e"].map((v) => ({
+                    label: v,
+                    value: v,
+                })),
+            );
         const selJson = strSelect.toJSON();
         expect(selJson.required).toBe(true);
         expect(selJson.disabled).toBe(true);

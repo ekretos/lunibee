@@ -74,10 +74,12 @@ describe("component builders", () => {
         const button = new ButtonBuilder()
             .setCustomId("action")
             .setStyle(ButtonStyle.Primary)
-            .setURL("https://example.com");
+            .setURL("https://example.com")
+            .setLabel("Open");
         expect(button.toJSON()).toEqual({
             type: ComponentType.Button,
             style: ButtonStyle.Link,
+            label: "Open",
             url: "https://example.com/",
         });
     });

@@ -70,10 +70,12 @@ describe("Builders — payload contracts", () => {
         // setURL flips to a link button and drops custom_id.
         const link = new ButtonBuilder()
             .setCustomId("x")
-            .setURL("https://a.b/");
+            .setURL("https://a.b/")
+            .setLabel("Go");
         expect(link.toJSON()).toEqual({
             type: ComponentType.Button,
             style: ButtonStyle.Link,
+            label: "Go",
             url: "https://a.b/",
         });
         // A link button rejects custom ids.
@@ -120,9 +122,9 @@ describe("Builders — payload contracts", () => {
     });
 
     test("EntitySelectBuilder carries typed default_values", () => {
-        const select = new EntitySelectBuilder(
-            ComponentType.UserSelect,
-        ).setDefaultValues({ id: "1", type: "user" });
+        const select = new EntitySelectBuilder(ComponentType.UserSelect)
+            .setCustomId("users")
+            .setDefaultValues({ id: "1", type: "user" });
         const json: APIEntitySelectComponent = select.toJSON();
         expect(json.default_values).toEqual([{ id: "1", type: "user" }]);
         expect(

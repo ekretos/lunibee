@@ -35,6 +35,8 @@ export interface APIButtonComponent {
     label?: string;
     emoji?: APIComponentEmoji;
     url?: string;
+    /** SKU for premium (style 6) buttons. */
+    sku_id?: string;
     disabled?: boolean;
 }
 export interface APISelectOption {
@@ -175,10 +177,20 @@ export class ActionRowBuilder<
         return this;
     }
     public toJSON(): APIActionRowComponent {
-        return {
-            type: ComponentType.ActionRow,
-            components: this.#components.map((component) => component.toJSON()),
-        };
+        const components = this.#components.map((component) =>
+            component.toJSON(),
+        );
+        if (components.length === 0)
+            throw new RangeError("An action row needs at least one component.");
+        const types = components.map((component) => component.type);
+        if (
+            types.some((type) => type !== ComponentType.Button) &&
+            components.length > 1
+        )
+            throw new RangeError(
+                "A select menu or text input must be alone in its action row.",
+            );
+        return { type: ComponentType.ActionRow, components };
     }
 }
 export class StringSelectBuilder {
@@ -238,6 +250,14 @@ export class StringSelectBuilder {
         return this;
     }
     public toJSON(): APIStringSelectComponent {
+        assertSelect(this.#data);
+        const count = this.#data.options?.length ?? 0;
+        if (count === 0)
+            throw new RangeError("A string select needs at least one option.");
+        if ((this.#data.max_values ?? 1) > count)
+            throw new RangeError(
+                "max_values cannot exceed the number of options.",
+            );
         return structuredClone(this.#data);
     }
 }
@@ -278,6 +298,15 @@ export class ButtonBuilder {
         this.#data.url = url.toString();
         return this;
     }
+    /** Makes this a premium (purchase) button for a SKU. */
+    public setSKUId(skuId: string): this {
+        validateText(skuId, 20, "Button SKU ID");
+        this.#data.style = ButtonStyle.Premium;
+        delete this.#data.custom_id;
+        delete this.#data.url;
+        this.#data.sku_id = skuId;
+        return this;
+    }
     public setEmoji(emoji: APIComponentEmoji | string): this {
         this.#data.emoji =
             typeof emoji === "string" ? { name: emoji } : { ...emoji };
@@ -288,7 +317,17 @@ export class ButtonBuilder {
         return this;
     }
     public toJSON(): APIButtonComponent {
-        return structuredClone(this.#data);
+        const data = this.#data;
+        if (data.style === ButtonStyle.Link) {
+            if (!data.url) throw new TypeError("Link buttons require a URL.");
+        } else if (data.style === ButtonStyle.Premium) {
+            if (!data.sku_id)
+                throw new TypeError("Premium buttons require a SKU ID.");
+        } else if (!data.custom_id)
+            throw new TypeError("Non-link buttons require a custom ID.");
+        if (data.style !== ButtonStyle.Premium && !data.label && !data.emoji)
+            throw new TypeError("Buttons require a label or an emoji.");
+        return structuredClone(data);
     }
 }
 export class EntitySelectBuilder {
@@ -342,6 +381,7 @@ export class EntitySelectBuilder {
         return this;
     }
     public toJSON(): APIEntitySelectComponent {
+        assertSelect(this.#data);
         return structuredClone(this.#data);
     }
 }
@@ -372,6 +412,10 @@ export class ModalBuilder {
         return this;
     }
     public toJSON(): APIModalComponent {
+        if (!this.#custom_id || !this.#title)
+            throw new TypeError("Modals require a custom ID and a title.");
+        if (this.#components.length === 0)
+            throw new RangeError("Modals require at least one component.");
         return {
             type: 9,
             ...(this.#custom_id ? { custom_id: this.#custom_id } : {}),
@@ -424,7 +468,16 @@ export class TextInputBuilder {
         return this;
     }
     public toJSON(): APITextInputComponent {
-        return structuredClone(this.#data);
+        const data = this.#data;
+        if (!data.custom_id)
+            throw new TypeError("Text inputs require a custom ID.");
+        if (
+            data.min_length !== undefined &&
+            data.max_length !== undefined &&
+            data.min_length > data.max_length
+        )
+            throw new RangeError("min_length cannot exceed max_length.");
+        return structuredClone(data);
     }
 }
 
@@ -667,4 +720,16 @@ export class ChannelSelectMenuBuilder extends EntitySelectBuilder {
     public constructor() {
         super(ComponentType.ChannelSelect);
     }
+}
+
+/** Checks the fields every select menu needs. */
+function assertSelect(data: {
+    custom_id?: string;
+    min_values?: number;
+    max_values?: number;
+}): void {
+    if (!data.custom_id)
+        throw new TypeError("Select menus require a custom ID.");
+    if ((data.min_values ?? 1) > (data.max_values ?? 1))
+        throw new RangeError("min_values cannot exceed max_values.");
 }
