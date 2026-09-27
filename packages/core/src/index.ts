@@ -34,6 +34,9 @@ import {
     ApplicationCommandManager,
     ChannelManager,
     GuildManager,
+    MonetizationManager,
+    type APIEntitlement,
+    type APISoundboardSound,
     StageInstanceManager,
     UserManager,
 } from "@lunibee/managers";
@@ -189,6 +192,8 @@ export class Client
     /** Stage instances, cached by stage channel ID. */
     public readonly stageInstances: StageInstanceManager;
     public readonly application: { commands: ApplicationCommandManager };
+    /** SKUs, entitlements and subscriptions; available after READY (application ID known). */
+    public monetization?: MonetizationManager;
     public get ws(): Gateway {
         return this.#gateway;
     }
@@ -305,6 +310,8 @@ export class Client
             (
                 this.application as { commands: ApplicationCommandManager }
             ).commands = new ApplicationCommandManager(this.rest, appId);
+            if (this.monetization?.applicationId !== appId)
+                this.monetization = new MonetizationManager(this.rest, appId);
             this.emit(ClientEvent.Ready, this.user);
         });
         this.#gateway.on("RESUMED", () => {
@@ -522,12 +529,56 @@ export class Client
             }
             this.emit(ClientEvent.GuildEmojisUpdate, event);
         });
-        this.#gateway.on("GUILD_STICKERS_UPDATE", (data) =>
-            this.emit(
-                ClientEvent.GuildStickersUpdate,
-                data as APIGuildStickersUpdateEvent,
-            ),
-        );
+        this.#gateway.on("GUILD_STICKERS_UPDATE", (data) => {
+            const event = data as APIGuildStickersUpdateEvent;
+            // The event carries the guild's full sticker list.
+            this.guilds.stickers(event.guild_id).sync(event.stickers);
+            this.emit(ClientEvent.GuildStickersUpdate, event);
+        });
+
+        // ── Soundboard (cache only; raw events remain available) ────────────────
+        for (const event of [
+            "GUILD_SOUNDBOARD_SOUND_CREATE",
+            "GUILD_SOUNDBOARD_SOUND_UPDATE",
+        ])
+            this.#gateway.on(event, (data) => {
+                const sound = data as APISoundboardSound;
+                if (sound.guild_id)
+                    this.guilds
+                        .soundboard(sound.guild_id)
+                        .set(sound.sound_id, sound);
+            });
+        this.#gateway.on("GUILD_SOUNDBOARD_SOUND_DELETE", (data) => {
+            const event = data as { sound_id: string; guild_id: string };
+            this.guilds.soundboard(event.guild_id).delete(event.sound_id);
+        });
+        this.#gateway.on("GUILD_SOUNDBOARD_SOUNDS_UPDATE", (data) => {
+            const event = data as {
+                guild_id: string;
+                soundboard_sounds: APISoundboardSound[];
+            };
+            const sounds = this.guilds.soundboard(event.guild_id);
+            sounds.clear();
+            for (const sound of event.soundboard_sounds)
+                sounds.set(sound.sound_id, sound);
+        });
+
+        // ── Monetization ─────────────────────────────────────────────────────────
+        this.#gateway.on("ENTITLEMENT_CREATE", (data) => {
+            const entitlement = data as APIEntitlement;
+            this.monetization?.set(entitlement.id, entitlement);
+            this.emit(ClientEvent.EntitlementCreate, entitlement);
+        });
+        this.#gateway.on("ENTITLEMENT_UPDATE", (data) => {
+            const entitlement = data as APIEntitlement;
+            this.monetization?.set(entitlement.id, entitlement);
+            this.emit(ClientEvent.EntitlementUpdate, entitlement);
+        });
+        this.#gateway.on("ENTITLEMENT_DELETE", (data) => {
+            const entitlement = data as APIEntitlement;
+            this.monetization?.delete(entitlement.id);
+            this.emit(ClientEvent.EntitlementDelete, entitlement);
+        });
 
         // ── Guild Integrations ───────────────────────────────────────────────────
         this.#gateway.on("GUILD_INTEGRATIONS_UPDATE", (data) =>
@@ -823,6 +874,13 @@ export class Client
             roles: this.guilds.roles(guildId).values(),
             overwrites: channel?.permissionOverwrites,
         });
+    }
+
+    /** Fetches Discord's default soundboard sounds. */
+    public fetchDefaultSoundboardSounds(): Promise<APISoundboardSound[]> {
+        return this.rest.get<APISoundboardSound[]>(
+            Routes.soundboardDefaultSounds(),
+        );
     }
 
     public async login(token?: string): Promise<string> {

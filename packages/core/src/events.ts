@@ -1,3 +1,4 @@
+import type { APIEntitlement } from "@lunibee/managers";
 import type {
     APIAutoModerationActionExecution,
     APIAutoModerationRule,
@@ -77,6 +78,10 @@ export enum ClientEvent {
     // ── Guild Emojis & Stickers ───────────────────────────────────────────────
     GuildEmojisUpdate = "guildEmojisUpdate",
     GuildStickersUpdate = "guildStickersUpdate",
+    // ── Monetization ──────────────────────────────────────────────────────────
+    EntitlementCreate = "entitlementCreate",
+    EntitlementUpdate = "entitlementUpdate",
+    EntitlementDelete = "entitlementDelete",
     // ── Guild Integrations ────────────────────────────────────────────────────
     GuildIntegrationsUpdate = "guildIntegrationsUpdate",
     // ── Guild Scheduled Events ────────────────────────────────────────────────
@@ -176,6 +181,10 @@ export type ClientEvents = {
     // ── Guild Emojis & Stickers ───────────────────────────────────────────────
     guildEmojisUpdate: [data: APIGuildEmojisUpdateEvent];
     guildStickersUpdate: [data: APIGuildStickersUpdateEvent];
+    // ── Monetization ──────────────────────────────────────────────────────────
+    entitlementCreate: [entitlement: APIEntitlement];
+    entitlementUpdate: [entitlement: APIEntitlement];
+    entitlementDelete: [entitlement: APIEntitlement];
     // ── Guild Integrations ────────────────────────────────────────────────────
     guildIntegrationsUpdate: [data: { guild_id: string }];
     // ── Guild Scheduled Events ────────────────────────────────────────────────

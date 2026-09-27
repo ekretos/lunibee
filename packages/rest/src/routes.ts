@@ -191,7 +191,63 @@ export const Routes = {
         emojiId
             ? `/applications/${snowflake(applicationId, "Application ID")}/emojis/${snowflake(emojiId, "Emoji ID")}`
             : `/applications/${snowflake(applicationId, "Application ID")}/emojis`,
+
+    // ─── Polls ────────────────────────────────────────────────────────────────────
+    /** Ends a poll early. @param channelId Channel identifier. @param messageId Poll message identifier. */
+    pollExpire: (channelId: string, messageId: string) =>
+        `/channels/${snowflake(channelId, "Channel ID")}/polls/${snowflake(messageId, "Message ID")}/expire`,
+    /** Returns the users who voted for a poll answer. @param answerId Answer identifier (an integer, not a snowflake). */
+    pollAnswerVoters: (
+        channelId: string,
+        messageId: string,
+        answerId: number,
+    ) =>
+        `/channels/${snowflake(channelId, "Channel ID")}/polls/${snowflake(messageId, "Message ID")}/answers/${integer(answerId, "Answer ID")}`,
+
+    // ─── Stickers ─────────────────────────────────────────────────────────────────
+    /** Returns guild stickers, or one sticker. */
+    guildSticker: (guildId: string, stickerId?: string) =>
+        stickerId
+            ? `/guilds/${snowflake(guildId, "Guild ID")}/stickers/${snowflake(stickerId, "Sticker ID")}`
+            : `/guilds/${snowflake(guildId, "Guild ID")}/stickers`,
+
+    // ─── Soundboard ───────────────────────────────────────────────────────────────
+    /** Plays a soundboard sound in a voice channel. */
+    sendSoundboardSound: (channelId: string) =>
+        `/channels/${snowflake(channelId, "Channel ID")}/send-soundboard-sound`,
+    /** Returns Discord's default soundboard sounds. */
+    soundboardDefaultSounds: () => "/soundboard-default-sounds",
+    /** Returns guild soundboard sounds, or one sound. */
+    guildSoundboardSound: (guildId: string, soundId?: string) =>
+        soundId
+            ? `/guilds/${snowflake(guildId, "Guild ID")}/soundboard-sounds/${snowflake(soundId, "Sound ID")}`
+            : `/guilds/${snowflake(guildId, "Guild ID")}/soundboard-sounds`,
+
+    // ─── Monetization ─────────────────────────────────────────────────────────────
+    /** Returns an application's SKUs. */
+    applicationSkus: (applicationId: string) =>
+        `/applications/${snowflake(applicationId, "Application ID")}/skus`,
+    /** Returns an application's entitlements, or one entitlement. */
+    applicationEntitlement: (applicationId: string, entitlementId?: string) =>
+        entitlementId
+            ? `/applications/${snowflake(applicationId, "Application ID")}/entitlements/${snowflake(entitlementId, "Entitlement ID")}`
+            : `/applications/${snowflake(applicationId, "Application ID")}/entitlements`,
+    /** Marks a one-time-purchase entitlement as consumed. */
+    consumeEntitlement: (applicationId: string, entitlementId: string) =>
+        `/applications/${snowflake(applicationId, "Application ID")}/entitlements/${snowflake(entitlementId, "Entitlement ID")}/consume`,
+    /** Returns a SKU's subscriptions, or one subscription. */
+    skuSubscription: (skuId: string, subscriptionId?: string) =>
+        subscriptionId
+            ? `/skus/${snowflake(skuId, "SKU ID")}/subscriptions/${snowflake(subscriptionId, "Subscription ID")}`
+            : `/skus/${snowflake(skuId, "SKU ID")}/subscriptions`,
 } as const;
+
+/** Validates a non-negative integer route parameter. */
+function integer(value: number, field: string): string {
+    if (!Number.isInteger(value) || value < 0)
+        throw new TypeError(`${field} must be a non-negative integer.`);
+    return String(value);
+}
 
 /** Validates a Discord snowflake route parameter. Accepts any decimal id that fits an
  * unsigned 64-bit integer, matching the snowflake rule `BaseStructure` applies in

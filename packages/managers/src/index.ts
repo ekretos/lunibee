@@ -159,6 +159,53 @@ export class ChannelManager extends Manager<string, Channel> {
                 removed++;
         return removed;
     }
+    /** Ends a poll now; returns the updated message. */
+    public async endPoll(
+        channelId: string,
+        messageId: string,
+    ): Promise<Message> {
+        return this.messages(channelId).upsert(
+            await this.#rest.post<ConstructorParameters<typeof Message>[0]>(
+                Routes.pollExpire(channelId, messageId),
+            ),
+        );
+    }
+    /** Fetches users who voted for one poll answer. @param options.limit 1-100 (default 25). */
+    public async fetchPollVoters(
+        channelId: string,
+        messageId: string,
+        answerId: number,
+        options: { after?: string; limit?: number } = {},
+    ): Promise<User[]> {
+        if (
+            options.limit !== undefined &&
+            (!Number.isInteger(options.limit) ||
+                options.limit < 1 ||
+                options.limit > 100)
+        )
+            throw new RangeError("Poll voter limit must be 1-100.");
+        const params = new URLSearchParams();
+        if (options.after) params.set("after", options.after);
+        if (options.limit !== undefined)
+            params.set("limit", String(options.limit));
+        const suffix = params.toString();
+        const { users } = await this.#rest.get<{
+            users: ConstructorParameters<typeof User>[0][];
+        }>(
+            `${Routes.pollAnswerVoters(channelId, messageId, answerId)}${suffix ? `?${suffix}` : ""}`,
+        );
+        return users.map((user) => new User(user));
+    }
+    /** Plays a soundboard sound in a voice channel the bot is connected to. */
+    public async sendSoundboardSound(
+        channelId: string,
+        options: { soundId: string; sourceGuildId?: string },
+    ): Promise<void> {
+        await this.#rest.post(Routes.sendSoundboardSound(channelId), {
+            sound_id: options.soundId,
+            source_guild_id: options.sourceGuildId,
+        });
+    }
     /** Returns the message manager for a channel only if one already exists. */
     public cachedMessages(channelId: string): MessageManager | undefined {
         return this.#messageManagers.get(channelId);
@@ -494,3 +541,15 @@ export {
     type EmojiCreateOptions,
     type EmojiEditOptions,
 } from "./emoji.js";
+export {
+    GuildStickerManager,
+    GuildSoundboardManager,
+    MonetizationManager,
+    type APIEntitlement,
+    type APISKU,
+    type APISoundboardSound,
+    type APISubscription,
+    type EntitlementQuery,
+    type GuildStickerCreateOptions,
+    type SoundboardSoundCreateOptions,
+} from "./advanced.js";

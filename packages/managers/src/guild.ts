@@ -1,5 +1,6 @@
 import { ResourceManager } from "./base.js";
 import { EmojiManager } from "./emoji.js";
+import { GuildSoundboardManager, GuildStickerManager } from "./advanced.js";
 import { GuildMemberManager } from "./member.js";
 import { RoleManager } from "./role.js";
 import {
@@ -45,6 +46,8 @@ export class GuildManager extends ResourceManager<string, Guild> {
     readonly #members = new Map<string, GuildMemberManager>();
     readonly #roles = new Map<string, RoleManager>();
     readonly #emojis = new Map<string, EmojiManager>();
+    readonly #stickers = new Map<string, GuildStickerManager>();
+    readonly #soundboard = new Map<string, GuildSoundboardManager>();
     public constructor(rest: REST) {
         super(
             async (id) =>
@@ -109,6 +112,28 @@ export class GuildManager extends ResourceManager<string, Guild> {
         return manager;
     }
 
+    /** Sticker manager for a guild (one instance per guild, kept in sync by the Gateway). */
+    public stickers(guildId: string): GuildStickerManager {
+        let manager = this.#stickers.get(guildId);
+        if (!manager)
+            this.#stickers.set(
+                guildId,
+                (manager = new GuildStickerManager(this.#rest, guildId)),
+            );
+        return manager;
+    }
+
+    /** Soundboard manager for a guild (one instance per guild, kept in sync by the Gateway). */
+    public soundboard(guildId: string): GuildSoundboardManager {
+        let manager = this.#soundboard.get(guildId);
+        if (!manager)
+            this.#soundboard.set(
+                guildId,
+                (manager = new GuildSoundboardManager(this.#rest, guildId)),
+            );
+        return manager;
+    }
+
     /** Merges a guild payload into the cached instance, keeping object identity. */
     public patch(data: GuildData): Guild {
         const guild = new Guild(data);
@@ -125,6 +150,8 @@ export class GuildManager extends ResourceManager<string, Guild> {
         this.#members.delete(id);
         this.#roles.delete(id);
         this.#emojis.delete(id);
+        this.#stickers.delete(id);
+        this.#soundboard.delete(id);
         return super.delete(id);
     }
 
