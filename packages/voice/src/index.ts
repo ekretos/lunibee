@@ -163,6 +163,7 @@ export class VoiceConnection {
     public disconnect(): void {
         if (this.state === VoiceConnectionState.Destroyed) return;
         this.#closeTransports();
+        this.receiver.close();
         this.#transition(VoiceConnectionState.Disconnected);
     }
 
@@ -170,6 +171,7 @@ export class VoiceConnection {
     public destroy(): void {
         if (this.state === VoiceConnectionState.Destroyed) return;
         this.#closeTransports();
+        this.receiver.close();
         this.channelId = undefined;
         this.#transition(VoiceConnectionState.Destroyed);
         this.#listeners.clear();
@@ -549,6 +551,21 @@ export class VoiceReceiver {
             },
         });
         return new AudioStream(stream, { title: `User ${userId} Audio` });
+    }
+
+    /** Ends every subscriber stream and forgets SSRC mappings. Called when the
+     * connection disconnects or is destroyed, so readers do not wait forever. */
+    public close(): void {
+        for (const controllers of this.#streams.values())
+            for (const controller of controllers) {
+                try {
+                    controller.close();
+                } catch {
+                    // Already closed or errored by the consumer.
+                }
+            }
+        this.#streams.clear();
+        this.#ssrcMap.clear();
     }
 
     /** Processes an incoming UDP packet, extracting SSRC and routing the audio
