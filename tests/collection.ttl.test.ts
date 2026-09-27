@@ -112,3 +112,38 @@ describe("Manager resource storage", () => {
         expect(manager.values()).toEqual([{ id: "1" }]);
     });
 });
+
+describe("Collection eviction callbacks and stats", () => {
+    test("reports expired and evicted entries and counts reads", () => {
+        setSystemTime(new Date(5_000_000));
+        const log: string[] = [];
+        const c = new Collection<string, number>(null, {
+            ttl: 100,
+            maxSize: 1,
+            onEvict: (key, value, reason) => {
+                log.push(`${key}=${value}:${reason}`);
+                throw new Error("ignored");
+            },
+        });
+        c.set("a", 1);
+        c.set("b", 2);
+        expect(c.get("b")).toBe(2);
+        expect(c.get("a")).toBeUndefined();
+        expect(c.peek("b")).toBe(2);
+        expect(c.peek("zz")).toBeUndefined();
+        setSystemTime(new Date(5_000_200));
+        expect(c.get("b")).toBeUndefined();
+        c.set("c", 3);
+        setSystemTime(new Date(5_000_400));
+        expect(c.purge()).toBe(1);
+        expect(log).toEqual(["a=1:evicted", "b=2:expired", "c=3:expired"]);
+        expect(c.stats).toEqual({ hits: 2, misses: 3, expired: 2, evicted: 1 });
+    });
+
+    test("get() of a stored undefined value is a hit", () => {
+        const c = new Collection<string, undefined>();
+        c.set("u", undefined);
+        c.get("u");
+        expect(c.stats.hits).toBe(1);
+    });
+});

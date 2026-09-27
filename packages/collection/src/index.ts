@@ -1,9 +1,94 @@
+type RecencyNode<K> = {
+    key: K;
+    older?: RecencyNode<K>;
+    newer?: RecencyNode<K>;
+};
+
+/**
+ * Keys in recency order with O(1) touch, promote, delete and oldest. A Set
+ * cannot do this: repeatedly removing its first key leaves tombstones that
+ * every new iterator scans past.
+ */
+class RecencyList<K> {
+    readonly #nodes = new Map<K, RecencyNode<K>>();
+    #oldest?: RecencyNode<K>;
+    #newest?: RecencyNode<K>;
+
+    public get size(): number {
+        return this.#nodes.size;
+    }
+
+    public oldest(): K | undefined {
+        return this.#oldest?.key;
+    }
+
+    /** Adds the key as newest, or moves it there. */
+    public touch(key: K): void {
+        const node = this.#nodes.get(key);
+        if (node) return this.#moveNewest(node);
+        const created: RecencyNode<K> = { key, older: this.#newest };
+        if (this.#newest) this.#newest.newer = created;
+        else this.#oldest = created;
+        this.#newest = created;
+        this.#nodes.set(key, created);
+    }
+
+    /** Moves an existing key to newest; ignores unknown keys. */
+    public promote(key: K): void {
+        const node = this.#nodes.get(key);
+        if (node) this.#moveNewest(node);
+    }
+
+    public delete(key: K): boolean {
+        const node = this.#nodes.get(key);
+        if (!node) return false;
+        this.#unlink(node);
+        this.#nodes.delete(key);
+        return true;
+    }
+
+    public clear(): void {
+        this.#nodes.clear();
+        this.#oldest = this.#newest = undefined;
+    }
+
+    #unlink(node: RecencyNode<K>): void {
+        if (node.older) node.older.newer = node.newer;
+        else this.#oldest = node.newer;
+        if (node.newer) node.newer.older = node.older;
+        else this.#newest = node.older;
+        node.older = node.newer = undefined;
+    }
+
+    #moveNewest(node: RecencyNode<K>): void {
+        if (node === this.#newest) return;
+        this.#unlink(node);
+        node.older = this.#newest;
+        if (this.#newest) this.#newest.newer = node;
+        else this.#oldest = node;
+        this.#newest = node;
+    }
+}
+
 /** Retention policy for a {@link Collection}. */
-export interface CollectionOptions {
+export interface CollectionOptions<K = unknown, V = unknown> {
     /** Default sliding TTL in ms for `set()`. Omit for no expiry. */
     ttl?: number;
     /** Maximum entries stored with `set()`; least-recently-used are evicted past it. `setWithoutTTL()` entries are never counted or evicted. */
     maxSize?: number;
+    /** Called after an entry is removed automatically, with why. Exceptions are swallowed. */
+    onEvict?: (key: K, value: V, reason: EvictionReason) => void;
+}
+
+/** Why an entry was removed automatically. */
+export type EvictionReason = "expired" | "evicted";
+
+/** Cumulative counters from {@link Collection.stats}. */
+export interface CollectionStats {
+    /** `get`/`peek` calls that found a value. */ hits: number;
+    /** `get`/`peek` calls that found nothing. */ misses: number;
+    /** Entries removed because their TTL lapsed. */ expired: number;
+    /** Entries removed to stay within `maxSize`. */ evicted: number;
 }
 
 type Expiry = { deadline: number; window: number; filed: number };
@@ -28,10 +113,22 @@ function assertTTL(ttl: number | undefined): void {
 export class Collection<K, V> extends Map<K, V> {
     readonly #ttl?: number;
     readonly #maxSize?: number;
+    /** Stored loosely typed so the callback does not make Collection invariant in K and V. */
+    readonly #onEvict?: (
+        key: unknown,
+        value: unknown,
+        reason: EvictionReason,
+    ) => void;
     /** Deadlines of TTL entries only. */
     readonly #expiry = new Map<K, Expiry>();
-    /** `setWithoutTTL()` keys, tracked only when `maxSize` is set. */
-    readonly #pinned = new Set<K>();
+    /** `set()` keys in recency order (oldest first), tracked only when `maxSize` is set; `setWithoutTTL()` keys are never here. */
+    readonly #lru = new RecencyList<K>();
+    readonly #stats: CollectionStats = {
+        hits: 0,
+        misses: 0,
+        expired: 0,
+        evicted: 0,
+    };
     /** Min-heap of filed deadlines; stale records are dropped lazily. */
     readonly #heap: { key: K; deadline: number }[] = [];
     #timer?: ReturnType<typeof setTimeout>;
@@ -44,7 +141,7 @@ export class Collection<K, V> extends Map<K, V> {
      */
     public constructor(
         entries?: Iterable<readonly [K, V]> | null,
-        options: CollectionOptions = {},
+        options: CollectionOptions<K, V> = {},
     ) {
         super();
         assertTTL(options.ttl);
@@ -55,6 +152,9 @@ export class Collection<K, V> extends Map<K, V> {
             throw new RangeError("maxSize must be a positive integer.");
         this.#ttl = options.ttl;
         this.#maxSize = options.maxSize;
+        this.#onEvict = options.onEvict as
+            | ((key: unknown, value: unknown, reason: EvictionReason) => void)
+            | undefined;
         if (entries) for (const [key, value] of entries) this.set(key, value);
     }
 
@@ -67,8 +167,7 @@ export class Collection<K, V> extends Map<K, V> {
         assertTTL(ttl);
         const window = ttl ?? this.#ttl;
         if (this.#maxSize !== undefined) {
-            this.#pinned.delete(key);
-            super.delete(key);
+            this.#lru.touch(key);
         }
         super.set(key, value);
         if (window !== undefined) this.#schedule(key, window);
@@ -84,31 +183,42 @@ export class Collection<K, V> extends Map<K, V> {
      */
     public setWithoutTTL(key: K, value: V): this {
         if (this.#expiry.size > 0) this.#expiry.delete(key);
-        if (this.#maxSize !== undefined) this.#pinned.add(key);
+        if (this.#lru.size > 0) this.#lru.delete(key);
         super.set(key, value);
         return this;
     }
 
     /** Reads a value; restarts a TTL entry's window and promotes it. */
     public override get(key: K): V | undefined {
-        if (this.#expireIfDue(key)) return undefined;
+        if (this.#expireIfDue(key)) {
+            this.#stats.misses++;
+            return undefined;
+        }
         const value = super.get(key);
+        if (value === undefined && !super.has(key)) {
+            this.#stats.misses++;
+            return undefined;
+        }
+        this.#stats.hits++;
         const expiry = this.#expiry.get(key);
         if (expiry) expiry.deadline = Date.now() + expiry.window;
-        if (
-            this.#maxSize !== undefined &&
-            value !== undefined &&
-            !this.#pinned.has(key)
-        ) {
-            super.delete(key);
-            super.set(key, value);
-        }
+        this.#lru.promote(key);
         return value;
     }
 
     /** Reads a value without restarting its TTL or promoting it. */
     public peek(key: K): V | undefined {
-        return this.#expireIfDue(key) ? undefined : super.get(key);
+        if (!this.#expireIfDue(key) && super.has(key)) {
+            this.#stats.hits++;
+            return super.get(key);
+        }
+        this.#stats.misses++;
+        return undefined;
+    }
+
+    /** Cumulative hit, miss, expiry and eviction counters (a copy). */
+    public get stats(): CollectionStats {
+        return { ...this.#stats };
     }
 
     public override has(key: K): boolean {
@@ -118,14 +228,14 @@ export class Collection<K, V> extends Map<K, V> {
     public override delete(key: K): boolean {
         if (this.#expireIfDue(key)) return false;
         this.#expiry.delete(key);
-        this.#pinned.delete(key);
+        this.#lru.delete(key);
         return super.delete(key);
     }
 
     public override clear(): void {
         super.clear();
         this.#expiry.clear();
-        this.#pinned.clear();
+        this.#lru.clear();
         this.#heap.length = 0;
         if (this.#timer) clearTimeout(this.#timer);
         this.#timer = undefined;
@@ -176,33 +286,53 @@ export class Collection<K, V> extends Map<K, V> {
         if (this.#expiry.size === 0) return 0;
         const now = Date.now();
         let removed = 0;
+        const dropped: [K, V][] = [];
         while (this.#nextDeadline() <= now) {
             const due = this.#heapPop()!;
-            this.#expiry.delete(due.key);
-            super.delete(due.key);
+            dropped.push([due.key, super.get(due.key)!]);
+            this.#remove(due.key);
             removed++;
         }
+        this.#stats.expired += removed;
         this.#rearm();
+        for (const [key, value] of dropped) this.#notify(key, value, "expired");
         return removed;
     }
 
     #expireIfDue(key: K): boolean {
         const expiry = this.#expiry.get(key);
         if (!expiry || expiry.deadline > Date.now()) return false;
-        this.#expiry.delete(key);
-        super.delete(key);
+        const value = super.get(key)!;
+        this.#remove(key);
+        this.#stats.expired++;
+        this.#notify(key, value, "expired");
         return true;
     }
 
+    #remove(key: K): void {
+        this.#expiry.delete(key);
+        this.#lru.delete(key);
+        super.delete(key);
+    }
+
+    #notify(key: K, value: V, reason: EvictionReason): void {
+        if (!this.#onEvict) return;
+        try {
+            this.#onEvict(key, value, reason);
+        } catch {
+            // A throwing callback must not leave the collection inconsistent.
+        }
+    }
+
+    /** Evicts least-recently-used `set()` entries past `maxSize`; O(1) per eviction. */
     #enforceCap(): void {
         if (this.#maxSize === undefined) return;
-        while (super.size - this.#pinned.size > this.#maxSize) {
-            for (const key of super.keys()) {
-                if (this.#pinned.has(key)) continue;
-                this.#expiry.delete(key);
-                super.delete(key);
-                break;
-            }
+        while (this.#lru.size > this.#maxSize) {
+            const oldest = this.#lru.oldest()!;
+            const value = super.get(oldest)!;
+            this.#remove(oldest);
+            this.#stats.evicted++;
+            this.#notify(oldest, value, "evicted");
         }
     }
 
