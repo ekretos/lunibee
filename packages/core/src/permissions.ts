@@ -523,6 +523,12 @@ export class PermissionSet {
         return false;
     }
 
+    /** Returns the known permission names from `permissions` that this set lacks. @param permissions Permission names or raw bits. */
+    public missing(...permissions: PermissionResolvable[]): PermissionName[] {
+        const wanted = new PermissionSet(permissions);
+        return wanted.toArray().filter((name) => !this.has(name));
+    }
+
     /** Returns a new set with permissions added. @param permissions Permission names or raw bits. @returns A new permission set. */
     public add(...permissions: PermissionResolvable[]): PermissionSet {
         let bitfield = this.bitfield;
@@ -606,4 +612,80 @@ export class PermissionsBitField extends PermissionSet {
     public constructor(value: PermissionResolvable = 0n) {
         super(value);
     }
+}
+
+/** Every known permission bit. */
+const ALL_PERMISSIONS = Object.values(Permission).reduce(
+    (bits, bit) => bits | bit,
+    0n,
+);
+
+/** A role as needed for permission resolution. */
+export interface PermissionRole {
+    id: string;
+    permissions: PermissionResolvable;
+}
+
+/** A channel permission overwrite (Discord's `permission_overwrites` entry). */
+export interface PermissionOverwrite {
+    id: string;
+    type: PermissionOverwriteType | number;
+    allow: PermissionResolvable;
+    deny: PermissionResolvable;
+}
+
+/** Everything needed to resolve a member's permissions. */
+export interface PermissionContext {
+    guildId: string;
+    /** Guild owner ID; the owner has every permission. */
+    ownerId?: string;
+    memberId: string;
+    memberRoleIds: readonly string[];
+    /** Guild roles, including `@everyone` (whose ID is the guild ID). */
+    roles: readonly PermissionRole[];
+    /** Channel overwrites; omit for guild-level permissions. */
+    overwrites?: readonly PermissionOverwrite[];
+}
+
+const bits = (value: PermissionResolvable): bigint =>
+    new PermissionSet(value).bitfield;
+
+/**
+ * Resolves a member's effective permissions the way Discord does: base
+ * permissions from `@everyone` and the member's roles (owner and
+ * administrator get everything), then the channel's `@everyone` overwrite,
+ * the combined role overwrites, and finally the member overwrite.
+ */
+export function computePermissions(context: PermissionContext): PermissionSet {
+    if (context.ownerId !== undefined && context.ownerId === context.memberId)
+        return new PermissionSet(ALL_PERMISSIONS);
+    const roles = new Map(context.roles.map((role) => [role.id, role]));
+    let base = bits(roles.get(context.guildId)?.permissions ?? 0n);
+    for (const id of context.memberRoleIds)
+        base |= bits(roles.get(id)?.permissions ?? 0n);
+    if (base & Permission.administrator)
+        return new PermissionSet(ALL_PERMISSIONS);
+    const overwrites = context.overwrites ?? [];
+    const everyone = overwrites.find((o) => o.id === context.guildId);
+    if (everyone) base = (base & ~bits(everyone.deny)) | bits(everyone.allow);
+    const memberRoles = new Set(context.memberRoleIds);
+    let allow = 0n;
+    let deny = 0n;
+    for (const overwrite of overwrites)
+        if (
+            overwrite.type === PermissionOverwriteType.Role &&
+            overwrite.id !== context.guildId &&
+            memberRoles.has(overwrite.id)
+        ) {
+            allow |= bits(overwrite.allow);
+            deny |= bits(overwrite.deny);
+        }
+    base = (base & ~deny) | allow;
+    const member = overwrites.find(
+        (o) =>
+            o.type === PermissionOverwriteType.Member &&
+            o.id === context.memberId,
+    );
+    if (member) base = (base & ~bits(member.deny)) | bits(member.allow);
+    return new PermissionSet(base);
 }

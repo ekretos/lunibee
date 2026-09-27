@@ -5,6 +5,10 @@ export {
     PermissionSet,
     PermissionsBitField,
     PermissionOverwriteType,
+    computePermissions,
+    type PermissionContext,
+    type PermissionOverwrite,
+    type PermissionRole,
     type PermissionName,
 } from "./permissions.js";
 export {
