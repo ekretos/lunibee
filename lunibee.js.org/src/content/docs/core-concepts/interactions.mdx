@@ -296,7 +296,7 @@ await interaction.deferReply(true);              // ephemeral
 await interaction.editReply({ content: "Done" });
 const reply = await interaction.fetchReply();
 
-const note = await interaction.followUp({ content: "FYI", ephemeral: true });
+const note = (await interaction.followUp({ content: "FYI", ephemeral: true })) as { id: string };
 await interaction.editFollowUp(note.id, "Updated");
 await interaction.deleteFollowUp(note.id);
 
