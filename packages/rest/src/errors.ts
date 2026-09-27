@@ -1,5 +1,40 @@
+/** Why a REST request failed, for handling without matching on status codes. */
+export type RESTErrorKind =
+    /** Cancelled through an AbortSignal. */
+    | "aborted"
+    /** The attempt exceeded the transport timeout. */
+    | "timeout"
+    /** No response: DNS, TLS, connection reset. */
+    | "network"
+    /** 429 that outlived the retry budget. */
+    | "rateLimited"
+    /** 401: invalid or revoked token. */
+    | "authentication"
+    /** 403: missing access or permissions. */
+    | "permission"
+    /** 404: unknown resource. */
+    | "notFound"
+    /** 400 / 422: the request body or parameters were rejected. */
+    | "validation"
+    /** 5xx: Discord failed to handle the request. */
+    | "server"
+    /** Any other 4xx. */
+    | "client";
+
+function kindFromStatus(status: number): RESTErrorKind {
+    if (status === 429) return "rateLimited";
+    if (status === 401) return "authentication";
+    if (status === 403) return "permission";
+    if (status === 404) return "notFound";
+    if (status === 400 || status === 422) return "validation";
+    if (status >= 500) return "server";
+    if (status === 0) return "network";
+    return "client";
+}
+
 /** Error thrown when Discord rejects a REST request. */
 export class RESTError extends Error {
+    /** Failure category. */ public readonly kind: RESTErrorKind;
     /** HTTP status returned by Discord. */ public readonly status: number;
     /** Discord API error code, when provided. */ public readonly code?: number;
     /** Raw Discord validation/error payload. */ public readonly errors?: unknown;
@@ -11,7 +46,12 @@ export class RESTError extends Error {
         status: number,
         code?: number,
         errors?: unknown,
-        options: { method?: string; path?: string; cause?: unknown } = {},
+        options: {
+            method?: string;
+            path?: string;
+            cause?: unknown;
+            kind?: RESTErrorKind;
+        } = {},
     ) {
         super(
             message,
@@ -19,10 +59,22 @@ export class RESTError extends Error {
         );
         this.name = "RESTError";
         this.status = status;
+        this.kind = options.kind ?? kindFromStatus(status);
         this.code = code;
         this.errors = errors;
         this.method = options.method;
         this.path = options.path;
+    }
+
+    /** Whether sending the same request again later could succeed. Validation,
+     * permission, authentication and not-found failures never will. */
+    public get retryable(): boolean {
+        return (
+            this.kind === "rateLimited" ||
+            this.kind === "server" ||
+            this.kind === "network" ||
+            this.kind === "timeout"
+        );
     }
 }
 
@@ -35,7 +87,7 @@ export function abortError(path: string, reason: unknown): RESTError {
         0,
         undefined,
         undefined,
-        { path, cause: reason },
+        { path, cause: reason, kind: "aborted" },
     );
 }
 

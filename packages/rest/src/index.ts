@@ -367,6 +367,7 @@ export class REST {
                     method,
                     path,
                     cause: failure.cause ?? failure,
+                    kind: failure.timedOut ? "timeout" : "network",
                 });
             }
             this.#emit(this.#hooks.onResponse, {
@@ -607,7 +608,7 @@ export class REST {
 }
 
 export { Routes } from "./routes.js";
-export { RESTError, abortError } from "./errors.js";
+export { RESTError, abortError, type RESTErrorKind } from "./errors.js";
 export {
     createRouteKey,
     normalizeRoutePath,
