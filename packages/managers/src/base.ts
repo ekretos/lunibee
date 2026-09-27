@@ -70,10 +70,48 @@ export class ResourceManager<K, V> extends Manager<K, V> {
         return this.get(id) ?? this.fetch(id);
     }
 
-    public async fetch(id: K): Promise<V> {
-        const resource = await this.#fetcher(id);
-        this.set(id, resource);
-        return resource;
+    /** In-flight fetches; `dirty` is set when the key is written or deleted meanwhile. */
+    readonly #inflight = new Map<K, { promise: Promise<V>; dirty: boolean }>();
+
+    /**
+     * Fetches a resource over REST. Concurrent fetches of one key share a
+     * single request. If the key is written (e.g. by a Gateway update) or
+     * deleted while the request is in flight, the response is returned but
+     * not cached, so it cannot overwrite fresher state or resurrect a
+     * deleted resource.
+     */
+    public fetch(id: K): Promise<V> {
+        const pending = this.#inflight.get(id);
+        if (pending) return pending.promise;
+        const entry = {
+            promise: new Promise<V>((resolve) => resolve(this.#fetcher(id))),
+            dirty: false,
+        };
+        this.#inflight.set(id, entry);
+        entry.promise = entry.promise.then(
+            (resource) => {
+                this.#inflight.delete(id);
+                if (!entry.dirty) super.set(id, resource);
+                return entry.dirty ? (this.get(id) ?? resource) : resource;
+            },
+            (error: unknown) => {
+                this.#inflight.delete(id);
+                throw error;
+            },
+        );
+        return entry.promise;
+    }
+
+    public override set(id: K, value: V): this {
+        const pending = this.#inflight.get(id);
+        if (pending) pending.dirty = true;
+        return super.set(id, value);
+    }
+
+    public override delete(id: K): boolean {
+        const pending = this.#inflight.get(id);
+        if (pending) pending.dirty = true;
+        return super.delete(id);
     }
 
     public async fetchMany(ids: Iterable<K>): Promise<V[]> {
