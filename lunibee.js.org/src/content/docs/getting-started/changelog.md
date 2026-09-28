@@ -3,7 +3,7 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
-## 0.2.0
+## v0.2.0
 
 ### 💥 Breaking Changes
 
@@ -29,7 +29,7 @@ See [Upgrading to 0.2.0](/getting-started/upgrading/) for code changes.
 * **Sharding**: startup in rounds of `max_concurrency`, session-start-limit check, `fetchGatewayInfo()`, `health()`.
 * **New APIs**: guild stickers and soundboard managers, `client.monetization` (SKUs, entitlements, subscriptions) with `entitlementCreate/Update/Delete` events, soundboard events, `ButtonBuilder.setSKUId()`.
 
-### 🐛 Bug Fixes (this batch)
+### 🐛 Bug Fixes
 
 * **Message cache**: with `messageCache`, messages from `MESSAGE_CREATE` are cached; `messageUpdate`, `messageDelete` and `messageDeleteBulk` receive the previous/deleted cached message(s) as an extra argument.
 * **Buttons**: `setStyle()` clears fields the style cannot carry, and `toJSON()` rejects forbidden field combinations (e.g. a label on a premium button).
@@ -45,6 +45,10 @@ See [Upgrading to 0.2.0](/getting-started/upgrading/) for code changes.
 * **Messages**: `MESSAGE_CREATE` / `MESSAGE_UPDATE` no longer overwrite a cached channel with a stub.
 * **Voice**: receiver streams end on disconnect/destroy instead of waiting forever.
 * **Collection LRU**: eviction no longer scans deleted slots (about 65 µs → 0.55 µs per eviction at 100k entries).
+
+---
+
+## v0.1.8
 
 ### 🚨 Behaviour Changes
 
@@ -86,6 +90,12 @@ See [Upgrading to 0.2.0](/getting-started/upgrading/) for code changes.
 * Corrected the `ClusterManager` example: the method is `spawn()`, not `connect()`.
 * Corrected the `ShardManager` and `REST` option tables, which listed options that do not exist (`presence`, `autoScale`, `apiVersion`) and omitted the real ones.
 * Corrected the `Gateway` option table: `maxReconnectAttempts` defaults to `Infinity`, not `10`.
+* Every package now has a full README, and the docs site has a generated API reference under `/api/`.
+* Reference pages that described missing APIs were fixed, and the new APIs are documented.
+
+### 🧪 Testing
+
+* Line coverage raised to about 99.5%, with a per-file minimum enforced in CI.
 
 ---
 
