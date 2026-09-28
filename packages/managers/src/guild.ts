@@ -175,7 +175,11 @@ export class GuildManager extends ResourceManager<string, Guild> {
         const guild = new Guild(data);
         const existing = this.get(guild.id);
         if (!existing) return this.upsert(guild);
-        Object.assign(existing, guild);
+        // Partial payloads (e.g. GUILD_UPDATE has no member_count) leave
+        // optional fields undefined; those must not erase known values.
+        for (const [key, value] of Object.entries(guild))
+            if (value !== undefined)
+                (existing as unknown as Record<string, unknown>)[key] = value;
         return existing;
     }
 

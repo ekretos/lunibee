@@ -17,10 +17,9 @@ describe("VoiceReceiver cleanup", () => {
         expect((await reader.read()).value).toEqual(new Uint8Array([7, 0]));
         connection.destroy();
         expect((await reader.read()).done).toBe(true);
-        const late = connection.receiver.subscribe("u").stream.getReader();
-        connection.receiver.onPacket(rtp(5));
-        connection.receiver.close();
-        expect((await late.read()).done).toBe(true);
+        expect(() => connection.receiver.subscribe("u")).toThrow(
+            "Voice connection has been destroyed.",
+        );
     });
 
     test("disconnect also closes streams, even ones the consumer cancelled", async () => {

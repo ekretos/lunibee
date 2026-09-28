@@ -1,5 +1,5 @@
 import packageJson from "../package.json" with { type: "json" };
-import { Gateway } from "@lunibee/ws";
+import { Gateway, GatewayState } from "@lunibee/ws";
 
 /** Runtime-agnostic delay used between shard starts (works under Node and Bun). @param ms Milliseconds to wait. */
 const sleep = (ms: number): Promise<void> =>
@@ -15,6 +15,42 @@ export type {
 
 export { ClusterManager } from "./cluster.js";
 export type { ClusterManagerOptions, ClusterInfo } from "./cluster.js";
+
+/** Whether a shard has no live socket, so connecting it costs an IDENTIFY. */
+function needsConnection(gateway: Gateway): boolean {
+    return (
+        gateway.state === GatewayState.Connect ||
+        gateway.state === GatewayState.Reconnect ||
+        gateway.state === GatewayState.Closed
+    );
+}
+
+/** States reached only after IDENTIFY or RESUME has been sent. */
+const HANDSHAKE_SENT = new Set<string>([
+    GatewayState.Identify,
+    GatewayState.Resume,
+    GatewayState.Ready,
+    GatewayState.Dispatch,
+    GatewayState.Heartbeat,
+    GatewayState.Closed,
+]);
+
+/** Resolves once the shard has sent IDENTIFY/RESUME (or closed), or after `timeout` ms. */
+function handshakeSent(gateway: Gateway, timeout: number): Promise<void> {
+    if (HANDSHAKE_SENT.has(gateway.state)) return Promise.resolve();
+    return new Promise((resolve) => {
+        const done = (): void => {
+            clearTimeout(timer);
+            gateway.off("stateChange", onState);
+            resolve();
+        };
+        const onState = (change: unknown): void => {
+            if (HANDSHAKE_SENT.has((change as { next: string }).next)) done();
+        };
+        const timer = setTimeout(done, timeout);
+        gateway.on("stateChange", onState);
+    });
+}
 
 /** Configuration for a sharded Gateway client. */
 export interface ShardManagerOptions {
@@ -33,6 +69,10 @@ export interface ShardManagerOptions {
      * to the value from `/gateway/bot` when it was fetched (auto shard count),
      * else 1.
      */ maxConcurrency?: number;
+    /**
+     * How long a startup round waits for its shards to send IDENTIFY/RESUME
+     * before the next round's `spawnDelay` starts. Defaults to 15000 ms.
+     */ handshakeTimeout?: number;
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */ autoScaleInterval?: number;
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */ onAutoScaleError?: (
         error: unknown,
@@ -112,6 +152,14 @@ export class ShardManager {
                 options.maxConcurrency < 1)
         )
             throw new RangeError("maxConcurrency must be a positive integer.");
+        if (
+            options.handshakeTimeout !== undefined &&
+            (!Number.isFinite(options.handshakeTimeout) ||
+                options.handshakeTimeout < 0)
+        )
+            throw new RangeError(
+                "handshakeTimeout must be a non-negative number of milliseconds.",
+            );
         this.#auto = options.shardCount === "auto";
         // Discord allows one IDENTIFY per 5s per rate-limit key. Spawning
         // shards back-to-back trips that limit and the gateway answers with
@@ -186,17 +234,24 @@ export class ShardManager {
         }
         await this.#ensureInitialized();
         const limit = this.#gatewayInfo?.sessionStartLimit;
-        if (limit && limit.remaining < this.shardCount) {
-            const message = `Session start limit exhausted: ${limit.remaining} of ${limit.total} IDENTIFYs left for ${this.shardCount} shards; resets in ${Math.ceil(limit.resetAfter / 1000)}s.`;
-            this.destroy();
-            throw new Error(message);
-        }
+        // Only shards without a live socket spend an IDENTIFY; connect() is a
+        // no-op for the rest, so they are neither counted nor paced.
+        const ids = [...this.shards]
+            .filter(([, gateway]) => needsConnection(gateway))
+            .map(([id]) => id);
+        if (limit && limit.remaining < ids.length)
+            // Live shards are left running: the budget only blocks new ones.
+            throw new Error(
+                `Session start limit exhausted: ${limit.remaining} of ${limit.total} IDENTIFYs left for ${ids.length} shards; resets in ${Math.ceil(limit.resetAfter / 1000)}s.`,
+            );
         // Shards whose IDs differ modulo max_concurrency use different
         // IDENTIFY rate-limit keys, so each round of consecutive IDs may start
-        // together; rounds are spaced by spawnDelay.
-        const concurrency =
-            this.#options.maxConcurrency ?? limit?.maxConcurrency ?? 1;
-        const ids = [...this.shards.keys()];
+        // together; rounds are spaced by spawnDelay. An override may lower the
+        // concurrency but never exceed what Discord reported.
+        const concurrency = Math.min(
+            this.#options.maxConcurrency ?? limit?.maxConcurrency ?? 1,
+            limit?.maxConcurrency ?? Infinity,
+        );
         for (let start = 0; start < ids.length; start += concurrency) {
             const round = ids.slice(start, start + concurrency);
             const results = await Promise.allSettled(
@@ -215,8 +270,20 @@ export class ShardManager {
                 start + concurrency < ids.length &&
                 this.#options.spawnDelay &&
                 this.#options.spawnDelay > 0
-            )
+            ) {
+                // connect() resolves when the socket opens; IDENTIFY follows
+                // HELLO. Start the interval from the handshake itself so a late
+                // HELLO cannot squeeze two rounds' IDENTIFYs together.
+                await Promise.all(
+                    round.map((id) =>
+                        handshakeSent(
+                            this.shards.get(id)!,
+                            this.#options.handshakeTimeout ?? 15_000,
+                        ),
+                    ),
+                );
                 await sleep(this.#options.spawnDelay);
+            }
         }
         if (this.#options.autoScaleInterval && !this.#autoScaleTimer) {
             this.#autoScaleTimer = setInterval(() => {

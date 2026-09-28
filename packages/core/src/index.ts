@@ -337,7 +337,15 @@ export class Client
                 this.#resourceContext,
             );
             this.#observeMessage(message);
-            this.emit(ClientEvent.MessageCreate, message);
+            // With messageCache enabled, Gateway messages enter the bounded
+            // cache so later edits and deletes can see the previous content;
+            // listeners get the cached instance.
+            const cached = this.options.messageCache
+                ? this.channels
+                      .messages(message.channelId)
+                      .upsert(data as import("@lunibee/types").APIMessage)
+                : message;
+            this.emit(ClientEvent.MessageCreate, cached);
         });
         this.#gateway.on("MESSAGE_UPDATE", (data) => {
             const message = new Message(
@@ -345,23 +353,31 @@ export class Client
                 this.#resourceContext,
             );
             this.#observeMessage(message);
+            // The cached message is replaced, not merged, so listeners receive
+            // the previous version intact alongside the new one.
             const messages = this.channels.cachedMessages(message.channelId);
-            if (messages?.cache.has(message.id))
-                messages.upsert(data as import("@lunibee/types").APIMessage);
-            this.emit(ClientEvent.MessageUpdate, message);
+            const previous = messages?.cache.peek(message.id);
+            if (previous) messages!.cache.set(message.id, message);
+            this.emit(ClientEvent.MessageUpdate, message, previous);
         });
         this.#gateway.on("MESSAGE_DELETE", (data) => {
             const payload = data as APIMessageDeleteEvent;
-            this.channels
-                .cachedMessages(payload.channel_id)
-                ?.delete(payload.id);
-            this.emit(ClientEvent.MessageDelete, payload);
+            const messages = this.channels.cachedMessages(payload.channel_id);
+            const removed = messages?.cache.peek(payload.id);
+            messages?.delete(payload.id);
+            this.emit(ClientEvent.MessageDelete, payload, removed);
         });
         this.#gateway.on("MESSAGE_DELETE_BULK", (data) => {
             const payload = data as APIMessageDeleteBulkEvent;
             const messages = this.channels.cachedMessages(payload.channel_id);
-            if (messages) for (const id of payload.ids) messages.delete(id);
-            this.emit(ClientEvent.MessageDeleteBulk, payload);
+            const removed: Message[] = [];
+            if (messages)
+                for (const id of payload.ids) {
+                    const message = messages.cache.peek(id);
+                    if (message) removed.push(message);
+                    messages.delete(id);
+                }
+            this.emit(ClientEvent.MessageDeleteBulk, payload, removed);
         });
 
         // ── Reactions ────────────────────────────────────────────────────────────
@@ -821,7 +837,8 @@ export class Client
         return this.#merge(this.guilds.roles(guildId), data.id, new Role(data));
     }
 
-    /** Merges `next` into the cached instance so references stay valid. */
+    /** Merges `next` into the cached instance so references stay valid.
+     * Fields a partial payload left undefined keep their cached value. */
     #merge<T extends object>(
         manager: {
             get(id: string): T | undefined;
@@ -835,7 +852,9 @@ export class Client
             manager.set(id, next);
             return next;
         }
-        Object.assign(existing, next);
+        for (const [key, value] of Object.entries(next))
+            if (value !== undefined)
+                (existing as Record<string, unknown>)[key] = value;
         return existing;
     }
 
@@ -883,7 +902,16 @@ export class Client
         memberId: string,
         guildOrChannelId: string,
     ): PermissionSet | null {
-        const channel = this.channels.get(guildOrChannelId);
+        let channel = this.channels.get(guildOrChannelId);
+        // Threads have no overwrites of their own: they use the parent's.
+        // Without a cached parent the answer would be guild-level only, which
+        // could wrongly grant access, so report it as unknown instead.
+        if (channel?.isThread()) {
+            channel = channel.parentId
+                ? this.channels.get(channel.parentId)
+                : undefined;
+            if (!channel) return null;
+        }
         const guildId = channel?.guildId ?? guildOrChannelId;
         const guild = this.guilds.get(guildId);
         const member = this.guilds.members(guildId).get(memberId);

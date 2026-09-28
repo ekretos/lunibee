@@ -154,9 +154,12 @@ export type ClientEvents = {
     close: [data: { code: number; action: string }];
     // ── Messages ───────────────────────────────────────────────────────────────
     messageCreate: [message: Message];
-    messageUpdate: [message: Message];
-    messageDelete: [data: APIMessageDeleteEvent];
-    messageDeleteBulk: [data: APIMessageDeleteBulkEvent];
+    /** `previous` is the cached version, available when `messageCache` is enabled. */
+    messageUpdate: [message: Message, previous?: Message];
+    /** `message` is the cached message, available when `messageCache` is enabled. */
+    messageDelete: [data: APIMessageDeleteEvent, message?: Message];
+    /** `messages` are the cached messages that were deleted (empty without `messageCache`). */
+    messageDeleteBulk: [data: APIMessageDeleteBulkEvent, messages: Message[]];
     // ── Reactions ─────────────────────────────────────────────────────────────
     messageReactionAdd: [data: APIMessageReactionEvent];
     messageReactionRemove: [data: APIMessageReactionEvent];

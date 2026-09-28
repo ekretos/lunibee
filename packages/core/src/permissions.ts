@@ -53,8 +53,11 @@ export const Permission = {
     createEvents: 1n << 44n,
     useExternalSounds: 1n << 45n,
     sendVoiceMessages: 1n << 46n,
+    setVoiceChannelStatus: 1n << 48n,
     sendPolls: 1n << 49n,
     useExternalApps: 1n << 50n,
+    pinMessages: 1n << 51n,
+    bypassSlowmode: 1n << 52n,
 } as const;
 
 /** Canonical PascalCase permission constants. */
@@ -106,8 +109,11 @@ export const Permissions = {
     CreateEvents: 1n << 44n,
     UseExternalSounds: 1n << 45n,
     SendVoiceMessages: 1n << 46n,
+    SetVoiceChannelStatus: 1n << 48n,
     SendPolls: 1n << 49n,
     UseExternalApps: 1n << 50n,
+    PinMessages: 1n << 51n,
+    BypassSlowmode: 1n << 52n,
 } as const;
 
 /**
@@ -166,8 +172,11 @@ export const PermissionFlagsBits = {
     CreateEvents: 1n << 44n,
     UseExternalSounds: 1n << 45n,
     SendVoiceMessages: 1n << 46n,
+    SetVoiceChannelStatus: 1n << 48n,
     SendPolls: 1n << 49n,
     UseExternalApps: 1n << 50n,
+    PinMessages: 1n << 51n,
+    BypassSlowmode: 1n << 52n,
 } as const;
 
 /** Union of {@link PermissionFlagsBits} values (all bigint). */

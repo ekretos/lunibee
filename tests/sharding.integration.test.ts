@@ -17,6 +17,8 @@ describe("Sharding integration", () => {
             intents: 0,
             shardCount: 2,
             spawnDelay: 20,
+            // The stubbed connect never sends IDENTIFY; don't wait for it.
+            handshakeTimeout: 1,
         });
         // Avoid real gateway/network by stubbing each shard's connect.
         for (const shard of mgr.shards.values()) {

@@ -38,9 +38,13 @@ function kindFromStatus(status: number): RESTErrorKind {
  * credential.
  */
 export function redactPath(path: string): string {
-    return path
-        .replace(/^(\/webhooks\/\d+\/)[^/?]+/, "$1:token")
-        .replace(/^(\/interactions\/\d+\/)[^/?]+/, "$1:token");
+    return (
+        path
+            // The ID segment is matched loosely: a malformed ID must not stop the
+            // token that follows it from being redacted.
+            .replace(/^(\/webhooks\/[^/?]+\/)[^/?]+/, "$1:token")
+            .replace(/^(\/interactions\/[^/?]+\/)[^/?]+/, "$1:token")
+    );
 }
 
 /** Error thrown when Discord rejects a REST request. */

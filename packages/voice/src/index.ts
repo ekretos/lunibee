@@ -534,6 +534,10 @@ export class VoiceReceiver {
 
     /** Subscribes to incoming audio from a specific user. @param userId User identifier. @returns A binary readable stream of the audio. */
     public subscribe(userId: string): AudioStream {
+        // A destroyed connection never closes its receiver again, so a late
+        // subscriber would wait forever.
+        if (this.connection.state === VoiceConnectionState.Destroyed)
+            throw new VoiceError("Voice connection has been destroyed.");
         let controllerRef: ReadableStreamDefaultController<Uint8Array>;
         const stream = new ReadableStream<Uint8Array>({
             start: (controller) => {

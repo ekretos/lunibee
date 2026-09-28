@@ -248,16 +248,16 @@ describe("GatewayHeartbeat cadence (P0 audit)", () => {
     test("the interval starts after the jittered first beat, so beats never bunch up", async () => {
         const originalRandom = Math.random;
         Math.random = () => 0.9;
+        const h = harness({ ackTimeout: 200, zombieTimeout: 400 });
         try {
-            const h = harness({ ackTimeout: 200, zombieTimeout: 400 });
             h.heartbeat.start(40);
             await wait(45);
             // First beat at ~36ms; the old code also fired the interval at 40ms.
             expect(h.sent).toHaveLength(1);
             await wait(40);
             expect(h.sent).toHaveLength(2);
-            h.heartbeat.stop();
         } finally {
+            h.heartbeat.stop();
             Math.random = originalRandom;
         }
     });

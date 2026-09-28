@@ -266,9 +266,22 @@ export class ButtonBuilder {
         type: ComponentType.Button,
         style: ButtonStyle.Secondary,
     };
+    /** Sets the style and drops fields that style cannot carry. */
     public setStyle(style: APIButtonComponent["style"]): this {
-        this.#data.style = style;
-        if (style === ButtonStyle.Link) delete this.#data.custom_id;
+        const data = this.#data;
+        data.style = style;
+        if (style === ButtonStyle.Link) {
+            delete data.custom_id;
+            delete data.sku_id;
+        } else if (style === ButtonStyle.Premium) {
+            delete data.custom_id;
+            delete data.url;
+            delete data.label;
+            delete data.emoji;
+        } else {
+            delete data.url;
+            delete data.sku_id;
+        }
         return this;
     }
     public setCustomId(value: string): this {
@@ -293,17 +306,14 @@ export class ButtonBuilder {
                 cause: error,
             });
         }
-        this.#data.style = ButtonStyle.Link;
-        delete this.#data.custom_id;
+        this.setStyle(ButtonStyle.Link);
         this.#data.url = url.toString();
         return this;
     }
-    /** Makes this a premium (purchase) button for a SKU. */
+    /** Makes this a premium (purchase) button for a SKU. Premium buttons carry no label, emoji, custom ID or URL. */
     public setSKUId(skuId: string): this {
         validateText(skuId, 20, "Button SKU ID");
-        this.#data.style = ButtonStyle.Premium;
-        delete this.#data.custom_id;
-        delete this.#data.url;
+        this.setStyle(ButtonStyle.Premium);
         this.#data.sku_id = skuId;
         return this;
     }
@@ -320,11 +330,25 @@ export class ButtonBuilder {
         const data = this.#data;
         if (data.style === ButtonStyle.Link) {
             if (!data.url) throw new TypeError("Link buttons require a URL.");
+            if (data.custom_id || data.sku_id)
+                throw new TypeError(
+                    "Link buttons cannot have a custom ID or SKU ID.",
+                );
         } else if (data.style === ButtonStyle.Premium) {
             if (!data.sku_id)
                 throw new TypeError("Premium buttons require a SKU ID.");
-        } else if (!data.custom_id)
-            throw new TypeError("Non-link buttons require a custom ID.");
+            if (data.custom_id || data.url || data.label || data.emoji)
+                throw new TypeError(
+                    "Premium buttons cannot have a custom ID, URL, label or emoji.",
+                );
+        } else {
+            if (!data.custom_id)
+                throw new TypeError("Non-link buttons require a custom ID.");
+            if (data.url || data.sku_id)
+                throw new TypeError(
+                    "Only link buttons have a URL and only premium buttons have a SKU ID.",
+                );
+        }
         if (data.style !== ButtonStyle.Premium && !data.label && !data.emoji)
             throw new TypeError("Buttons require a label or an emoji.");
         return structuredClone(data);

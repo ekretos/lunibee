@@ -880,6 +880,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             intents: 513,
             shardCount: "auto",
             spawnDelay: 1,
+            handshakeTimeout: 1,
         });
         const count = await mgr.fetchRecommendedShardCount();
         expect(count).toBe(2);

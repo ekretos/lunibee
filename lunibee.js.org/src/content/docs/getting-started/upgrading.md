@@ -17,7 +17,18 @@ const client = new Client({
   intents,
   messageCache: { maxSize: 200, ttl: 30 * 60_000 },
 });
+
+client.on("messageUpdate", (message, previous) => {
+  // previous: the cached version before the edit, if it was still cached
+});
+client.on("messageDelete", (data, message) => {
+  // message: the cached message that was deleted, if any
+});
 ```
+
+With the cache enabled, messages from `MESSAGE_CREATE` and REST are cached.
+The previous version is only available for messages that arrived while the
+client was running and are still within the cache's `maxSize` and `ttl`.
 
 ## Builders throw on incomplete components
 
@@ -44,9 +55,13 @@ new ActionRowBuilder().addComponents(
 ## Cached objects are updated in place
 
 Updates from the Gateway and `upsert()` modify the object you already hold
-instead of swapping in a new one. If you compared old and new objects by
-reference to detect a change, copy the fields you need before the update
-(for example in your event handler) instead.
+instead of swapping in a new one. By the time a `guildUpdate` (or member,
+role, channel) handler runs, the cached object already has the new values, so
+copying fields inside the handler cannot recover the old state. If you need a
+before/after comparison, keep your own snapshot of the fields you care about
+(for example when you first see the resource) and compare against it in the
+handler. Messages are the exception: `messageUpdate` receives the previous
+cached message as its second argument.
 
 ## `RESTError.path` is redacted
 
