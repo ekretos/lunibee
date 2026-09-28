@@ -85,3 +85,7 @@ collect replies. See [Sharding](/core-concepts/sharding/#cross-shard-messaging-w
 ## When do I need sharding?
 
 A small bot normally starts with a single `Client`. Sharding becomes useful when the bot grows enough that Discord requires multiple Gateway sessions or when you want to distribute Gateway work across processes.
+
+## What's New in 0.2.0
+
+Startup in rounds of `max_concurrency` paced by sent IDENTIFYs (`maxConcurrency`, `handshakeTimeout`), session-start-limit check that keeps live shards, `fetchGatewayInfo()` and `health()`.

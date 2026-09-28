@@ -38,4 +38,8 @@ Options: `maxSize` (least-recently-set entries are evicted first), `ttl` in ms, 
 `sweepInterval`. The sweeper does not keep the process alive. Methods: `get`, `set`, `has`,
 `delete`, `clear`, `invalidate`, `sweep`, `values`, `entries`, `dispose`.
 
+## What's new in 0.2.0
+
+TTL/LRU options (`new Collection(null, { ttl, maxSize, onEvict })`), `set(key, value, ttl?)`, `setWithoutTTL()` for entries that never expire, `peek()`, `purge()`, `ttlRemaining()` and `stats`. Without options a Collection behaves like a Map.
+
 Docs: https://lunibee.js.org/reference/collection/

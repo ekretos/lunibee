@@ -41,4 +41,8 @@ console.log(replies.reduce((sum, reply) => sum + (reply.result ?? 0), 0));
   `respond`, `request` and `broadcastRequest`. This replaces discord.js's
   `broadcastEval` without evaluating received code.
 
+## What's new in 0.2.0
+
+Startup in rounds of `max_concurrency` paced by sent IDENTIFYs (`maxConcurrency`, `handshakeTimeout`), a session-start-limit check that keeps live shards, `fetchGatewayInfo()` and `health()`.
+
 Docs: https://lunibee.js.org/core-concepts/sharding/

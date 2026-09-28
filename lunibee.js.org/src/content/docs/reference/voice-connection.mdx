@@ -201,3 +201,9 @@ player.on("finish", () => {
 ```
 </TabItem>
 </Tabs>
+
+## Receiver Cleanup (0.2.0)
+
+`disconnect()` and `destroy()` end every stream from `receiver.subscribe()`
+and clear SSRC mappings (`receiver.close()` does the same manually).
+`receiver.subscribe()` throws a `VoiceError` once the connection is destroyed.

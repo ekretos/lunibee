@@ -147,3 +147,7 @@ await message.delete();
 ```
 
 Both approaches are valid. Resources are generally easier to read; managers are useful for bulk, lookup, or ID-based workflows.
+
+## What's New in 0.2.0
+
+Per-guild `members()`, `roles()`, `emojis()`, `stickers()`, `soundboard()`, `voiceStates()`, `autoModerationRules()` and `invites()`; `MonetizationManager`; fetch deduplication and stale-result protection; `iterateMessages()`, poll and soundboard helpers; opt-in message cache.

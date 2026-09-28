@@ -278,3 +278,16 @@ await interaction.reply({ embeds: [embed], ephemeral: true });
 ```
 </TabItem>
 </Tabs>
+
+## 0.2.0 Additions
+
+- `missing(...permissions)` returns the requested permission names the set lacks.
+- New flags: `setVoiceChannelStatus` (bit 48), `pinMessages` (51), `bypassSlowmode` (52).
+- `computePermissions({ guildId, ownerId, memberId, memberRoleIds, roles, overwrites })`
+  resolves effective permissions in Discord's order (`@everyone`, roles, member
+  overwrites); owners and administrators get every permission.
+
+```ts
+const perms = computePermissions({ guildId, ownerId, memberId, memberRoleIds, roles, overwrites });
+perms.missing("sendMessages", "embedLinks");
+```

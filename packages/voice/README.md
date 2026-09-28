@@ -58,4 +58,8 @@ player.on("finish", () => connection.destroy());
 - `@discordjs/voice`-style helpers: `joinVoiceChannel`, `getVoiceConnection`,
   `createAudioPlayer`, `createAudioResource`, `entersState`, `VoiceConnectionStatus`.
 
+## What's new in 0.2.0
+
+Receiver streams end on disconnect/destroy, and `receiver.subscribe()` throws after destroy.
+
 Docs: https://lunibee.js.org/core-concepts/voice/

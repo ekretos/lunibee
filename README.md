@@ -130,6 +130,8 @@ Resource managers maintain canonical instances by Discord resource ID. Re-resolv
 
 REST-created and Gateway-updated resources are routed through manager cache mutation APIs so the same resource is not represented by unrelated structure instances.
 
+Discord resources are stored with `Collection.setWithoutTTL()` and leave the cache only through Gateway delete events or an explicit `delete()`, never through expiry. Messages are cached only with the `messageCache: { maxSize?, ttl? }` client option, and `cache: { users, members, roles, emojis }` turns off per-resource caching on large bots. For your own data, `new Collection(null, { ttl, maxSize, onEvict })` is a TTL/LRU cache. See the [0.2.0 upgrade guide](https://lunibee.js.org/getting-started/upgrading/).
+
 ## Permissions
 
 `PermissionSet` provides named and raw permission checks:

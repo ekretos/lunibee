@@ -264,3 +264,26 @@ collector.on("end", (collected, reason) => {
 ```
 </TabItem>
 </Tabs>
+
+## Idle Timeout, Abort, Async Iteration (0.2.0)
+
+| Option / member | Description |
+|---|---|
+| `idle` | Stop (`"idle"`) after this many ms without a collected item. |
+| `signal` | Stop (`"abort"`) when the `AbortSignal` aborts. |
+| `for await (const item of collector)` | Yields items as they arrive until the collector ends; items between iterations are buffered. |
+| `wait()` | Resolves with the collected map when the collector ends. |
+| `onDispose(fn)` | Runs `fn` once when the collector ends. |
+| `[Symbol.dispose]()` | Stops with reason `"disposed"`, so `using collector = ...` works. |
+
+`client.createCollector(event, options)` builds a collector on a client event
+and unsubscribes it when it ends:
+
+```ts
+const collector = client.createCollector("interactionCreate", {
+  filter: (i) => i.isButton(),
+  idle: 30_000,
+  max: 5,
+});
+for await (const interaction of collector) await interaction.deferUpdate();
+```

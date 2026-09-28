@@ -60,3 +60,7 @@ Every dispatch is also emitted under its Discord name (`READY`, `MESSAGE_CREATE`
 
 Internally the gateway is split into transport, heartbeat, session, reconnect, protocol,
 decoder and send-budget modules.
+
+## What's new in 0.2.0
+
+Reconnects that should resume close with `4900` (never `1000`/`1001`), the heartbeat interval starts after the first jittered beat, and a lower sequence can never roll back the resume point.

@@ -40,4 +40,8 @@ console.log(member.displayName, member.displayAvatarURL());
 Structures attached to a client (via a `ResourceContext`) can call Discord directly;
 detached ones throw on those methods.
 
+## What's new in 0.2.0
+
+Interactions: single acknowledgement guard, `fetchReply()`, `editFollowUp()`, `deleteFollowUp()`, `user`, `member`, `expiresAt`/`isExpired`. Channels: typed `permissionOverwrites`.
+
 Docs: https://lunibee.js.org/core-concepts/caching/

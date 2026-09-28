@@ -251,3 +251,22 @@ await client.login();
 ```
 </TabItem>
 </Tabs>
+
+## 0.2.0 Additions
+
+### Options
+
+| Option | Description |
+|---|---|
+| `messageCache: { maxSize?, ttl? }` | Opt-in bounded per-channel message cache (`maxSize` defaults to 100). Without it messages are not cached. |
+| `cache: { users?, members?, roles?, emojis? }` | Turn off caching of a resource from Gateway events (all `true` by default). |
+
+### Members
+
+| Member | Description |
+|---|---|
+| `monetization` | `MonetizationManager` for SKUs, entitlements and subscriptions; set on READY. |
+| `permissionsFor(memberId, guildOrChannelId)` | Effective permissions from cached state; threads use their parent's overwrites. Returns `null` when the guild, member or thread parent is not cached. |
+| `createCollector(event, options)` | Collector over a client event. |
+| `fetchDefaultSoundboardSounds()` | Discord's default soundboard sounds. |
+| `interactionWebhookMessage(method, appId, token, messageId, data?)` | Reads, edits or deletes an interaction reply or follow-up. |

@@ -46,4 +46,8 @@ console.log(page.messages.length, page.hasMore);
 `Manager` and `ResourceManager` are the base classes; `CachedManager` is an alias of
 `ResourceManager`.
 
+## What's new in 0.2.0
+
+Per-guild `members()`, `roles()`, `emojis()`, `stickers()`, `soundboard()`, `voiceStates()`, `autoModerationRules()` and `invites()` kept in sync by the Gateway; `MonetizationManager`; shared fetches with stale-result protection; `iterateMessages()`, `endPoll()`, `fetchPollVoters()`, `sendSoundboardSound()`; opt-in message cache.
+
 Docs: https://lunibee.js.org/packages/managers/

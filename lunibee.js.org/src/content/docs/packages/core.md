@@ -166,3 +166,7 @@ await message.channel.editName("support");
 ```
 
 Use `client.rest` when you need direct control over a Discord endpoint that does not yet have a resource helper.
+
+## What's New in 0.2.0
+
+`messageCache` and `cache` client options, `client.permissionsFor()`, `client.createCollector()`, `client.monetization`, `computePermissions()`, collector `idle`/`signal`/async iteration, entitlement and soundboard events, and extra arguments on `messageUpdate`/`messageDelete`/`messageDeleteBulk`.

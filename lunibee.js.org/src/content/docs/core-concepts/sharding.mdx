@@ -94,3 +94,9 @@ const manager = new ShardManager({ token, intents, shardCount: "auto" });
 await manager.connect();
 manager.health(); // [{ id, state, ping }, ...]
 ```
+
+Rounds are spaced from the moment each shard sends IDENTIFY/RESUME, not from
+socket open (`handshakeTimeout`, default 15 s, bounds that wait). A
+`maxConcurrency` override is capped at Discord's value. Shards that are
+already connected do not count against the session start limit, and a
+too-small budget never tears down running shards.

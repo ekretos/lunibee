@@ -31,6 +31,14 @@ See [Upgrading to 0.2.0](/getting-started/upgrading/) for code changes.
 
 ### 🐛 Bug Fixes (this batch)
 
+* **Message cache**: with `messageCache`, messages from `MESSAGE_CREATE` are cached; `messageUpdate`, `messageDelete` and `messageDeleteBulk` receive the previous/deleted cached message(s) as an extra argument.
+* **Buttons**: `setStyle()` clears fields the style cannot carry, and `toJSON()` rejects forbidden field combinations (e.g. a label on a premium button).
+* **Permissions**: added bits 48 (`setVoiceChannelStatus`), 51 (`pinMessages`) and 52 (`bypassSlowmode`); owner/administrator results include them. `permissionsFor()` resolves threads through their parent channel.
+* **Guild updates**: fields a partial update omits (e.g. `memberCount`) keep their cached values.
+* **Redaction**: tokens are redacted even after a malformed webhook/interaction ID.
+* **Sharding**: rounds are paced by sent IDENTIFYs (`handshakeTimeout`); `maxConcurrency` is capped at Discord's limit; the session start budget counts only shards that need a connection and never destroys live shards.
+* **Voice**: `receiver.subscribe()` throws after the connection is destroyed.
+
 * **Gateway RESUME**: reconnect requests, zombie connections and heartbeat timeouts closed with `1001`, which makes Discord drop the session; they now close with `4900` so RESUME succeeds.
 * **Heartbeat**: the regular interval now starts after the jittered first beat instead of alongside it.
 * **Gateway sequence**: a lower sequence can no longer roll back the RESUME point.

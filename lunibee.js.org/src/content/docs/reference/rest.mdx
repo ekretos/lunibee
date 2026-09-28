@@ -384,3 +384,13 @@ await rest.post(Routes.channelMessages((dmChannel as any).id), {
 ```
 </TabItem>
 </Tabs>
+
+## Error Classification and Redaction (0.2.0)
+
+`RESTError.kind` is one of `aborted`, `timeout`, `network`, `rateLimited`,
+`authentication`, `permission`, `notFound`, `validation`, `server` or
+`client`; `RESTError.retryable` is `true` for `rateLimited`, `server`,
+`network` and `timeout`.
+
+`RESTError.path` and REST hook contexts replace webhook and interaction tokens
+with `:token`. `redactPath(path)` applies the same rule to your own logs.

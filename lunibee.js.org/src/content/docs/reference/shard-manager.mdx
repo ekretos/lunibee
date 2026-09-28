@@ -369,3 +369,17 @@ const cluster = new ClusterManager({
 await cluster.shutdownAll();  // SIGTERM, then SIGKILL after shutdownTimeout
 cluster.killAll();            // immediate, no grace period
 ```
+
+## Startup Pacing, Budget and Health (0.2.0)
+
+| Option / member | Description |
+|---|---|
+| `maxConcurrency` | Shards per startup round. Defaults to Discord's `max_concurrency` (auto shard count) or 1, and is capped at Discord's value when known. |
+| `handshakeTimeout` | How long a round waits for its shards to send IDENTIFY/RESUME before `spawnDelay` starts (default 15000 ms). |
+| `fetchGatewayInfo()` | Reads `/gateway/bot`: recommended shards and `sessionStartLimit`. |
+| `health()` | `[{ id, state, ping }]` per shard. |
+
+`connect()` spaces rounds from the moment IDENTIFY is sent, not from socket
+open. Only shards without a live socket count against the session start
+limit; if the budget is too small, `connect()` throws and leaves running shards
+alone.

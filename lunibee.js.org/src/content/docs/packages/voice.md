@@ -42,3 +42,7 @@ await entersState(voice, VoiceConnectionState.Connected, 5_000);
 
 Use `@lunibee/voice` when you need direct control over the voice connection or audio
 pipeline. Text-only bots don't need it.
+
+## What's New in 0.2.0
+
+Receiver streams end on disconnect/destroy; `subscribe()` throws after destroy.

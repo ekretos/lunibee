@@ -176,3 +176,7 @@ try {
 ```
 
 When your application owns an `AbortSignal`, pass it through the REST request options to cancel work that is no longer needed.
+
+## What's New in 0.2.0
+
+`RESTError.kind` / `retryable`, token redaction (`redactPath()`), and routes for polls, stickers, soundboard, SKUs, entitlements and subscriptions.

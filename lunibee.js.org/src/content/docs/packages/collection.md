@@ -86,3 +86,7 @@ const cache = new Cache<string, UserData>({
 cache.set("1001", userData);
 const user = cache.get("1001");
 ```
+
+## What's New in 0.2.0
+
+`Collection` gains TTL/LRU options, `setWithoutTTL()`, `peek()`, `purge()`, `ttlRemaining()`, `onEvict` and `stats`. See [Collection](/reference/collection/).

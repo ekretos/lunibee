@@ -55,4 +55,8 @@ console.log(embed.toJSON(), buttons.toJSON(), menu.toJSON(), ping.toJSON());
 
 Every builder validates Discord's limits as you set values and serialises with `toJSON()`.
 
+## What's new in 0.2.0
+
+`toJSON()` validates whole components (required fields, value bounds, action-row rules, button field exclusivity); `ButtonBuilder.setSKUId()` for premium buttons.
+
 Docs: https://lunibee.js.org/core-concepts/builders/

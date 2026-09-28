@@ -441,3 +441,16 @@ client.on("interactionCreate", async (interaction) => {
 ```
 </TabItem>
 </Tabs>
+
+## 0.2.0 Additions
+
+| Member | Description |
+|---|---|
+| `fetchReply()` | Fetches the original response (after acknowledging). |
+| `editFollowUp(id, options)` / `deleteFollowUp(id)` | Edit or delete a follow-up message. |
+| `user` / `member` | Invoking user, and member inside a guild (`null` otherwise). |
+| `createdTimestamp` / `expiresAt` / `isExpired` | Token lifetime (15 minutes). |
+
+Only one initial response can be sent; concurrent `reply`/`defer`/`update`
+calls throw instead of racing, and a failed acknowledgement can be retried.
+`{ ephemeral: true }` works on replies, edits and follow-ups.

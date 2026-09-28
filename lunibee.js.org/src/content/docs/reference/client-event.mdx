@@ -221,3 +221,15 @@ client.on(ClientEvent.Raw, ({ event, data }) => {
 ```
 </TabItem>
 </Tabs>
+
+## 0.2.0 Changes
+
+| Event | Arguments |
+|---|---|
+| `messageUpdate` | `(message, previous?)` — `previous` is the cached version when `messageCache` is enabled. |
+| `messageDelete` | `(data, message?)` — the cached message that was deleted, if any. |
+| `messageDeleteBulk` | `(data, messages)` — the cached messages that were deleted (empty without `messageCache`). |
+| `entitlementCreate` / `entitlementUpdate` / `entitlementDelete` | `(entitlement)` |
+| `soundboardSoundCreate` / `soundboardSoundUpdate` | `(sound)` |
+| `soundboardSoundDelete` | `({ sound_id, guild_id })` |
+| `soundboardSoundsUpdate` | `({ guild_id, soundboard_sounds })` |

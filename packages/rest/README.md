@@ -37,4 +37,8 @@ try {
 
 Both call styles work: `post(path, body, options)` and `post(path, { body, ...options })`.
 
+## What's new in 0.2.0
+
+`RESTError.kind` and `retryable`, token redaction in errors and hooks (`redactPath()`), and routes for polls, stickers, soundboard, SKUs, entitlements and subscriptions.
+
 Docs: https://lunibee.js.org/core-concepts/rest/

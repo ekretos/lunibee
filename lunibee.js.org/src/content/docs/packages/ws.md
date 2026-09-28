@@ -96,3 +96,7 @@ session id — including a compressed frame that finishes decoding after the swa
 
 `connect()` is idempotent: calling it on an already-connected Gateway returns without
 opening a second socket, and it cancels any pending reconnect rather than racing it.
+
+## What's New in 0.2.0
+
+Reconnects that should resume close with `4900` (never `1000`/`1001`), the heartbeat interval starts after the first jittered beat, and the sequence never moves backwards.

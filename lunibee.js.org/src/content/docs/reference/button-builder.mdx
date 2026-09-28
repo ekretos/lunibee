@@ -237,3 +237,13 @@ await channel.send({ content: "Need help?", components: [docsRow] });
 ```
 </TabItem>
 </Tabs>
+
+## Styles and Validation (0.2.0)
+
+- `setSKUId(skuId)` makes a premium (purchase) button.
+- `setStyle()` drops fields the new style cannot carry: link buttons have a
+  URL and no custom ID or SKU; premium buttons have only a SKU; other styles
+  have a custom ID and no URL or SKU.
+- `toJSON()` throws when required fields are missing (custom ID, URL or SKU
+  for the style; a label or emoji for non-premium buttons) or when fields that
+  the style forbids are set.

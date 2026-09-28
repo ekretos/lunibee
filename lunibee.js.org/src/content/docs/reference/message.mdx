@@ -182,3 +182,12 @@ client.on("messageCreate", async (message) => {
 ```
 </TabItem>
 </Tabs>
+
+## 0.2.0 Additions
+
+- Messages are cached only with the client's `messageCache` option.
+- `channels.iterateMessages(channelId, { before?, limit? })` pages history newest-first.
+- `channels.bulkDeleteMessages(channelId, ids)` takes 1–100 IDs, removes
+  duplicates, and throws for messages older than 14 days.
+- Polls: `channels.endPoll(channelId, messageId)` and
+  `channels.fetchPollVoters(channelId, messageId, answerId, { after?, limit? })`.

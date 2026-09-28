@@ -117,3 +117,7 @@ console.log(webhook.avatarURL());
 console.log(invite.code);
 console.log(invite.url);
 ```
+
+## What's New in 0.2.0
+
+Interaction `fetchReply()`, `editFollowUp()`, `deleteFollowUp()`, `user`, `member`, expiry helpers and a single acknowledgement guard; typed `channel.permissionOverwrites`.

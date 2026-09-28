@@ -139,3 +139,7 @@ Builder → toJSON() → Client/resource/REST → Discord
 ```
 
 Builders create and validate payloads; they do not send requests themselves.
+
+## What's New in 0.2.0
+
+`toJSON()` validates whole components; `ButtonBuilder.setSKUId()` and style-aware field clearing.

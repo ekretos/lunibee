@@ -220,3 +220,22 @@ client.on("interactionCreate", async (interaction) => {
 ```
 </TabItem>
 </Tabs>
+
+## Per-Guild Managers (0.2.0)
+
+`client.guilds` exposes one manager per guild, kept current by Gateway events
+and removed with the guild:
+
+| Method | Holds |
+|---|---|
+| `members(guildId)` | `GuildMember` by user ID |
+| `roles(guildId)` | `Role` by ID |
+| `emojis(guildId)` | `Emoji` by ID |
+| `stickers(guildId)` | Stickers (`fetchAll`, `create`, `edit`, `remove`) |
+| `soundboard(guildId)` | Soundboard sounds (`fetchAll`, `create`, `edit`, `remove`) |
+| `voiceStates(guildId)` | Voice states by user ID |
+| `autoModerationRules(guildId)` | Automod rules by ID |
+| `invites(guildId)` | Invites by code |
+
+`guilds.patch(data)` merges an update into the cached guild; fields the
+payload omits keep their cached values.
