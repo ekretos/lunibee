@@ -897,3 +897,53 @@ export interface APIOverwrite {
     /** Denied permission bits as a decimal string. */
     deny: string;
 }
+
+// ─── Soundboard & Monetization ───────────────────────────────────────────────
+/** Raw Discord soundboard sound. */
+export interface APISoundboardSound {
+    sound_id: string;
+    name: string;
+    volume: number;
+    emoji_id: string | null;
+    emoji_name: string | null;
+    guild_id?: string;
+    available: boolean;
+    user?: UserData;
+}
+
+/** Raw Discord SKU. */
+export interface APISKU {
+    id: string;
+    type: number;
+    application_id: string;
+    name: string;
+    slug: string;
+    flags: number;
+}
+
+/** Raw Discord entitlement. */
+export interface APIEntitlement {
+    id: string;
+    sku_id: string;
+    application_id: string;
+    user_id?: string;
+    guild_id?: string;
+    type: number;
+    deleted: boolean;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    consumed?: boolean;
+}
+
+/** Raw Discord subscription. */
+export interface APISubscription {
+    id: string;
+    user_id: string;
+    sku_ids: string[];
+    entitlement_ids: string[];
+    current_period_start: string;
+    current_period_end: string;
+    status: number;
+    canceled_at: string | null;
+    country?: string;
+}

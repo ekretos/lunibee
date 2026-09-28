@@ -1,4 +1,4 @@
-import { ResourceManager } from "./base.js";
+import { Manager, ResourceManager } from "./base.js";
 import { EmojiManager } from "./emoji.js";
 import { GuildSoundboardManager, GuildStickerManager } from "./advanced.js";
 import { GuildMemberManager } from "./member.js";
@@ -20,6 +20,8 @@ import {
     type APIInvite,
     type APIWebhook,
     type APIAutoModerationRule,
+    type APIInviteCreate,
+    type APIVoiceState,
     type APIGuildWelcomeScreen,
     type APIGuildOnboarding,
 } from "@lunibee/types";
@@ -48,6 +50,19 @@ export class GuildManager extends ResourceManager<string, Guild> {
     readonly #emojis = new Map<string, EmojiManager>();
     readonly #stickers = new Map<string, GuildStickerManager>();
     readonly #soundboard = new Map<string, GuildSoundboardManager>();
+    readonly #voiceStates = new Map<string, Manager<string, APIVoiceState>>();
+    readonly #autoModerationRules = new Map<
+        string,
+        Manager<string, APIAutoModerationRule>
+    >();
+    readonly #invites = new Map<string, Manager<string, APIInviteCreate>>();
+
+    /** Returns the per-guild entry of `map`, creating it on first use. */
+    #perGuild<M>(map: Map<string, M>, guildId: string, create: () => M): M {
+        let manager = map.get(guildId);
+        if (!manager) map.set(guildId, (manager = create()));
+        return manager;
+    }
     public constructor(rest: REST) {
         super(
             async (id) =>
@@ -134,6 +149,27 @@ export class GuildManager extends ResourceManager<string, Guild> {
         return manager;
     }
 
+    /** Voice states by user ID for a guild, kept in sync by `GUILD_CREATE` and `VOICE_STATE_UPDATE`. */
+    public voiceStates(guildId: string): Manager<string, APIVoiceState> {
+        return this.#perGuild(this.#voiceStates, guildId, () => new Manager());
+    }
+
+    /** Auto-moderation rules by ID for a guild, kept in sync by `AUTO_MODERATION_RULE_*` events. */
+    public autoModerationRules(
+        guildId: string,
+    ): Manager<string, APIAutoModerationRule> {
+        return this.#perGuild(
+            this.#autoModerationRules,
+            guildId,
+            () => new Manager(),
+        );
+    }
+
+    /** Invites by code for a guild, kept in sync by `INVITE_CREATE` / `INVITE_DELETE`. */
+    public invites(guildId: string): Manager<string, APIInviteCreate> {
+        return this.#perGuild(this.#invites, guildId, () => new Manager());
+    }
+
     /** Merges a guild payload into the cached instance, keeping object identity. */
     public patch(data: GuildData): Guild {
         const guild = new Guild(data);
@@ -152,6 +188,9 @@ export class GuildManager extends ResourceManager<string, Guild> {
         this.#emojis.delete(id);
         this.#stickers.delete(id);
         this.#soundboard.delete(id);
+        this.#voiceStates.delete(id);
+        this.#autoModerationRules.delete(id);
+        this.#invites.delete(id);
         return super.delete(id);
     }
 

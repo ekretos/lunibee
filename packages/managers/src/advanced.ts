@@ -1,6 +1,19 @@
 import { Manager } from "./base.js";
 import { Routes, type REST } from "@lunibee/rest";
-import type { APISticker, UserData } from "@lunibee/types";
+import type {
+    APIEntitlement,
+    APISKU,
+    APISoundboardSound,
+    APISticker,
+    APISubscription,
+} from "@lunibee/types";
+
+export type {
+    APIEntitlement,
+    APISKU,
+    APISoundboardSound,
+    APISubscription,
+} from "@lunibee/types";
 
 /** Appends encoded query parameters, skipping undefined values. */
 function withQuery(
@@ -116,18 +129,6 @@ export class GuildStickerManager extends Manager<string, APISticker> {
 
 // ─── Soundboard ──────────────────────────────────────────────────────────────
 
-/** Raw Discord soundboard sound. */
-export interface APISoundboardSound {
-    sound_id: string;
-    name: string;
-    volume: number;
-    emoji_id: string | null;
-    emoji_name: string | null;
-    guild_id?: string;
-    available: boolean;
-    user?: UserData;
-}
-
 /** Fields for {@link GuildSoundboardManager.create}. */
 export interface SoundboardSoundCreateOptions {
     name: string;
@@ -237,43 +238,6 @@ export class GuildSoundboardManager extends Manager<
 }
 
 // ─── Monetization ────────────────────────────────────────────────────────────
-
-/** Raw Discord SKU. */
-export interface APISKU {
-    id: string;
-    type: number;
-    application_id: string;
-    name: string;
-    slug: string;
-    flags: number;
-}
-
-/** Raw Discord entitlement. */
-export interface APIEntitlement {
-    id: string;
-    sku_id: string;
-    application_id: string;
-    user_id?: string;
-    guild_id?: string;
-    type: number;
-    deleted: boolean;
-    starts_at?: string | null;
-    ends_at?: string | null;
-    consumed?: boolean;
-}
-
-/** Raw Discord subscription. */
-export interface APISubscription {
-    id: string;
-    user_id: string;
-    sku_ids: string[];
-    entitlement_ids: string[];
-    current_period_start: string;
-    current_period_end: string;
-    status: number;
-    canceled_at: string | null;
-    country?: string;
-}
 
 /** Filters for {@link MonetizationManager.fetchEntitlements}. */
 export interface EntitlementQuery {

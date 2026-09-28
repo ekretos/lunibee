@@ -1,4 +1,4 @@
-import type { APIEntitlement } from "@lunibee/managers";
+import type { APIEntitlement, APISoundboardSound } from "@lunibee/types";
 import type {
     APIAutoModerationActionExecution,
     APIAutoModerationRule,
@@ -82,6 +82,11 @@ export enum ClientEvent {
     EntitlementCreate = "entitlementCreate",
     EntitlementUpdate = "entitlementUpdate",
     EntitlementDelete = "entitlementDelete",
+    // ── Soundboard ────────────────────────────────────────────────────────────
+    SoundboardSoundCreate = "soundboardSoundCreate",
+    SoundboardSoundUpdate = "soundboardSoundUpdate",
+    SoundboardSoundDelete = "soundboardSoundDelete",
+    SoundboardSoundsUpdate = "soundboardSoundsUpdate",
     // ── Guild Integrations ────────────────────────────────────────────────────
     GuildIntegrationsUpdate = "guildIntegrationsUpdate",
     // ── Guild Scheduled Events ────────────────────────────────────────────────
@@ -185,6 +190,13 @@ export type ClientEvents = {
     entitlementCreate: [entitlement: APIEntitlement];
     entitlementUpdate: [entitlement: APIEntitlement];
     entitlementDelete: [entitlement: APIEntitlement];
+    // ── Soundboard ────────────────────────────────────────────────────────────
+    soundboardSoundCreate: [sound: APISoundboardSound];
+    soundboardSoundUpdate: [sound: APISoundboardSound];
+    soundboardSoundDelete: [data: { sound_id: string; guild_id: string }];
+    soundboardSoundsUpdate: [
+        data: { guild_id: string; soundboard_sounds: APISoundboardSound[] },
+    ];
     // ── Guild Integrations ────────────────────────────────────────────────────
     guildIntegrationsUpdate: [data: { guild_id: string }];
     // ── Guild Scheduled Events ────────────────────────────────────────────────

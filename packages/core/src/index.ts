@@ -35,8 +35,6 @@ import {
     ChannelManager,
     GuildManager,
     MonetizationManager,
-    type APIEntitlement,
-    type APISoundboardSound,
     StageInstanceManager,
     UserManager,
 } from "@lunibee/managers";
@@ -55,6 +53,8 @@ import {
 } from "@lunibee/structures";
 import { Gateway } from "@lunibee/ws";
 import type {
+    APIEntitlement,
+    APISoundboardSound,
     APIChannel,
     APIGuild,
     APIGuildMember,
@@ -408,6 +408,7 @@ export class Client
         this.#gateway.on("GUILD_CREATE", (data) => {
             const payload = data as APIGuild & {
                 members?: APIGuildMember[];
+                voice_states?: APIVoiceState[];
                 channels?: APIChannel[];
                 threads?: APIChannel[];
                 unavailable?: boolean;
@@ -429,6 +430,8 @@ export class Client
             }
             for (const member of payload.members ?? [])
                 this.#upsertMember(payload.id, member);
+            for (const state of payload.voice_states ?? [])
+                this.#storeVoiceState(payload.id, state);
             // Channels in GUILD_CREATE omit guild_id; restore it so the
             // channel can be cleaned up with its guild.
             for (const channelData of [
@@ -536,21 +539,27 @@ export class Client
             this.emit(ClientEvent.GuildStickersUpdate, event);
         });
 
-        // ── Soundboard (cache only; raw events remain available) ────────────────
-        for (const event of [
-            "GUILD_SOUNDBOARD_SOUND_CREATE",
-            "GUILD_SOUNDBOARD_SOUND_UPDATE",
-        ])
-            this.#gateway.on(event, (data) => {
-                const sound = data as APISoundboardSound;
-                if (sound.guild_id)
-                    this.guilds
-                        .soundboard(sound.guild_id)
-                        .set(sound.sound_id, sound);
-            });
+        // ── Soundboard ───────────────────────────────────────────────────────────
+        this.#gateway.on("GUILD_SOUNDBOARD_SOUND_CREATE", (data) => {
+            const sound = data as APISoundboardSound;
+            if (sound.guild_id)
+                this.guilds
+                    .soundboard(sound.guild_id)
+                    .set(sound.sound_id, sound);
+            this.emit(ClientEvent.SoundboardSoundCreate, sound);
+        });
+        this.#gateway.on("GUILD_SOUNDBOARD_SOUND_UPDATE", (data) => {
+            const sound = data as APISoundboardSound;
+            if (sound.guild_id)
+                this.guilds
+                    .soundboard(sound.guild_id)
+                    .set(sound.sound_id, sound);
+            this.emit(ClientEvent.SoundboardSoundUpdate, sound);
+        });
         this.#gateway.on("GUILD_SOUNDBOARD_SOUND_DELETE", (data) => {
             const event = data as { sound_id: string; guild_id: string };
             this.guilds.soundboard(event.guild_id).delete(event.sound_id);
+            this.emit(ClientEvent.SoundboardSoundDelete, event);
         });
         this.#gateway.on("GUILD_SOUNDBOARD_SOUNDS_UPDATE", (data) => {
             const event = data as {
@@ -561,6 +570,7 @@ export class Client
             sounds.clear();
             for (const sound of event.soundboard_sounds)
                 sounds.set(sound.sound_id, sound);
+            this.emit(ClientEvent.SoundboardSoundsUpdate, event);
         });
 
         // ── Monetization ─────────────────────────────────────────────────────────
@@ -618,24 +628,21 @@ export class Client
         );
 
         // ── AutoMod ──────────────────────────────────────────────────────────────
-        this.#gateway.on("AUTO_MODERATION_RULE_CREATE", (data) =>
-            this.emit(
-                ClientEvent.AutoModerationRuleCreate,
-                data as APIAutoModerationRule,
-            ),
-        );
-        this.#gateway.on("AUTO_MODERATION_RULE_UPDATE", (data) =>
-            this.emit(
-                ClientEvent.AutoModerationRuleUpdate,
-                data as APIAutoModerationRule,
-            ),
-        );
-        this.#gateway.on("AUTO_MODERATION_RULE_DELETE", (data) =>
-            this.emit(
-                ClientEvent.AutoModerationRuleDelete,
-                data as APIAutoModerationRule,
-            ),
-        );
+        this.#gateway.on("AUTO_MODERATION_RULE_CREATE", (data) => {
+            const rule = data as APIAutoModerationRule;
+            this.guilds.autoModerationRules(rule.guild_id).set(rule.id, rule);
+            this.emit(ClientEvent.AutoModerationRuleCreate, rule);
+        });
+        this.#gateway.on("AUTO_MODERATION_RULE_UPDATE", (data) => {
+            const rule = data as APIAutoModerationRule;
+            this.guilds.autoModerationRules(rule.guild_id).set(rule.id, rule);
+            this.emit(ClientEvent.AutoModerationRuleUpdate, rule);
+        });
+        this.#gateway.on("AUTO_MODERATION_RULE_DELETE", (data) => {
+            const rule = data as APIAutoModerationRule;
+            this.guilds.autoModerationRules(rule.guild_id).delete(rule.id);
+            this.emit(ClientEvent.AutoModerationRuleDelete, rule);
+        });
         this.#gateway.on("AUTO_MODERATION_ACTION_EXECUTION", (data) =>
             this.emit(
                 ClientEvent.AutoModerationActionExecution,
@@ -715,12 +722,18 @@ export class Client
         });
 
         // ── Invites ──────────────────────────────────────────────────────────────
-        this.#gateway.on("INVITE_CREATE", (data) =>
-            this.emit(ClientEvent.InviteCreate, data as APIInviteCreate),
-        );
-        this.#gateway.on("INVITE_DELETE", (data) =>
-            this.emit(ClientEvent.InviteDelete, data as APIInviteDelete),
-        );
+        this.#gateway.on("INVITE_CREATE", (data) => {
+            const invite = data as APIInviteCreate;
+            if (invite.guild_id)
+                this.guilds.invites(invite.guild_id).set(invite.code, invite);
+            this.emit(ClientEvent.InviteCreate, invite);
+        });
+        this.#gateway.on("INVITE_DELETE", (data) => {
+            const invite = data as APIInviteDelete;
+            if (invite.guild_id)
+                this.guilds.invites(invite.guild_id).delete(invite.code);
+            this.emit(ClientEvent.InviteDelete, invite);
+        });
 
         // ── Webhooks ─────────────────────────────────────────────────────────────
         this.#gateway.on("WEBHOOKS_UPDATE", (data) =>
@@ -728,9 +741,11 @@ export class Client
         );
 
         // ── Voice ────────────────────────────────────────────────────────────────
-        this.#gateway.on("VOICE_STATE_UPDATE", (data) =>
-            this.emit(ClientEvent.VoiceStateUpdate, data as APIVoiceState),
-        );
+        this.#gateway.on("VOICE_STATE_UPDATE", (data) => {
+            const state = data as APIVoiceState;
+            if (state.guild_id) this.#storeVoiceState(state.guild_id, state);
+            this.emit(ClientEvent.VoiceStateUpdate, state);
+        });
         this.#gateway.on("VOICE_SERVER_UPDATE", (data) =>
             this.emit(
                 ClientEvent.VoiceServerUpdate,
@@ -792,6 +807,13 @@ export class Client
             member.user.id,
             member,
         );
+    }
+
+    /** A voice state without a channel means the user left voice. */
+    #storeVoiceState(guildId: string, state: APIVoiceState): void {
+        const states = this.guilds.voiceStates(guildId);
+        if (state.channel_id) states.set(state.user_id, state);
+        else states.delete(state.user_id);
     }
 
     #upsertRole(guildId: string, data: APIRole): Role {

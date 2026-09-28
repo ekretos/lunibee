@@ -31,12 +31,17 @@ export class EmojiManager extends Manager<string, Emoji> {
         this.#guildId = guildId;
     }
 
-    /** Fetches an emoji by ID from Discord. */
-    public async fetch(emojiId: string): Promise<Emoji> {
-        return this.upsert(
-            await this.#rest.get<ConstructorParameters<typeof Emoji>[0]>(
-                Routes.guildEmoji(this.#guildId, emojiId),
-            ),
+    /** Fetches an emoji by ID; concurrent fetches share a request and a stale result never overwrites newer state. */
+    public fetch(emojiId: string): Promise<Emoji> {
+        return this.fetchOnce(
+            emojiId,
+            async () =>
+                new Emoji(
+                    await this.#rest.get<
+                        ConstructorParameters<typeof Emoji>[0]
+                    >(Routes.guildEmoji(this.#guildId, emojiId)),
+                ),
+            (emoji) => this.#merge(emojiId, emoji),
         );
     }
 
@@ -82,8 +87,11 @@ export class EmojiManager extends Manager<string, Emoji> {
      * upserts reuse the same cached instance instead of allocating a new one each call. */
     public upsert(data: ConstructorParameters<typeof Emoji>[0]): Emoji {
         const key = data.id != null ? data.id : `unicode:${data.name ?? ""}`;
+        return this.#merge(key, new Emoji(data));
+    }
+
+    #merge(key: string, emoji: Emoji): Emoji {
         const existing = this.get(key);
-        const emoji = new Emoji(data);
         if (existing) {
             Object.assign(existing, emoji);
             return existing;
