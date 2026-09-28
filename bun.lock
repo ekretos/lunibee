@@ -27,11 +27,11 @@
     },
     "packages/builders": {
       "name": "@lunibee/builders",
-      "version": "0.1.7",
+      "version": "0.2.0",
     },
     "packages/cli": {
       "name": "@lunibee/cli",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "bin": {
         "lunibee": "./dist/index.js",
       },
@@ -41,11 +41,11 @@
     },
     "packages/collection": {
       "name": "@lunibee/collection",
-      "version": "0.1.7",
+      "version": "0.2.0",
     },
     "packages/core": {
       "name": "@lunibee/core",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "dependencies": {
         "@lunibee/builders": "workspace:*",
         "@lunibee/collection": "workspace:*",
@@ -58,22 +58,22 @@
     },
     "packages/create": {
       "name": "create-lunibee",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "bin": {
         "create-lunibee": "./dist/cli.js",
       },
     },
     "packages/formatters": {
       "name": "@lunibee/formatters",
-      "version": "0.1.7",
+      "version": "0.2.0",
     },
     "packages/handlers": {
       "name": "@lunibee/handlers",
-      "version": "0.1.7",
+      "version": "0.2.0",
     },
     "packages/managers": {
       "name": "@lunibee/managers",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "dependencies": {
         "@lunibee/collection": "workspace:*",
         "@lunibee/rest": "workspace:*",
@@ -82,25 +82,25 @@
     },
     "packages/rest": {
       "name": "@lunibee/rest",
-      "version": "0.1.7",
+      "version": "0.2.0",
     },
     "packages/sharding": {
       "name": "@lunibee/sharding",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "dependencies": {
         "@lunibee/ws": "workspace:*",
       },
     },
     "packages/structures": {
       "name": "@lunibee/structures",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
     },
     "packages/testing": {
       "name": "@lunibee/testing",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "dependencies": {
         "@lunibee/builders": "workspace:*",
         "@lunibee/collection": "workspace:*",
@@ -116,19 +116,19 @@
     },
     "packages/types": {
       "name": "@lunibee/types",
-      "version": "0.1.7",
+      "version": "0.2.0",
     },
     "packages/utils": {
       "name": "@lunibee/utils",
-      "version": "0.1.7",
+      "version": "0.2.0",
     },
     "packages/voice": {
       "name": "@lunibee/voice",
-      "version": "0.1.7",
+      "version": "0.2.0",
     },
     "packages/ws": {
       "name": "@lunibee/ws",
-      "version": "0.1.7",
+      "version": "0.2.0",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
