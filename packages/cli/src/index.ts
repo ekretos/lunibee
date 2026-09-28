@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import packageJson from "../package.json" with { type: "json" };
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { ClientEvent } from "@lunibee/core";
@@ -357,7 +358,7 @@ async function info(): Promise<void> {
         ? ((await file.json()) as { name?: string })
         : {};
     console.log(
-        `🐝 Lunibee\n\nProject: ${pkg.name ?? "unknown"}\nRuntime: Bun ${Bun.version}\nCLI: @lunibee/cli@0.1.6`,
+        `🐝 Lunibee\n\nProject: ${pkg.name ?? "unknown"}\nRuntime: Bun ${Bun.version}\nCLI: @lunibee/cli@${packageJson.version}`,
     );
 }
 

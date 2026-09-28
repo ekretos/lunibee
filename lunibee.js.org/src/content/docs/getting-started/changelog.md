@@ -3,11 +3,11 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
-## Unreleased
+## 0.2.0
 
 ### 💥 Breaking Changes
 
-See [Upgrading from 0.1.8](/getting-started/upgrading/) for code changes.
+See [Upgrading to 0.2.0](/getting-started/upgrading/) for code changes.
 
 * **Messages are not cached by default.** Pass `messageCache: { maxSize?, ttl? }` to the client to keep a bounded per-channel cache; without it `MessageManager.cache` stays empty and `resolve()` always fetches.
 * **Builders validate on `toJSON()`.** Buttons without a custom ID/URL/SKU or without a label/emoji, selects without a custom ID or with `min_values > max_values`, string selects whose `max_values` exceeds their options, mixed action rows, and modals without a custom ID, title or component now throw.

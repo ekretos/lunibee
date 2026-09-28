@@ -1,3 +1,4 @@
+import packageJson from "../package.json" with { type: "json" };
 import { fork, type ChildProcess } from "node:child_process";
 import { cpus } from "node:os";
 
@@ -98,7 +99,7 @@ export class ClusterManager {
             {
                 headers: {
                     Authorization: `Bot ${this.#options.token}`,
-                    "User-Agent": "Lunibee/0.1.0",
+                    "User-Agent": `Lunibee/${packageJson.version}`,
                 },
             },
         );

@@ -1,3 +1,4 @@
+import packageJson from "../package.json" with { type: "json" };
 import { Gateway } from "@lunibee/ws";
 
 /** Runtime-agnostic delay used between shard starts (works under Node and Bun). @param ms Milliseconds to wait. */
@@ -133,7 +134,7 @@ export class ShardManager {
             {
                 headers: {
                     Authorization: `Bot ${this.#options.token}`,
-                    "User-Agent": "Lunibee/0.1.0",
+                    "User-Agent": `Lunibee/${packageJson.version}`,
                 },
             },
         );

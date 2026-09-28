@@ -1,6 +1,6 @@
 ---
-title: Upgrading from 0.1.8
-description: Code changes needed for the unreleased version after 0.1.8.
+title: Upgrading to 0.2.0
+description: Code changes needed when upgrading from 0.1.8 to 0.2.0.
 ---
 
 Most bots need no changes. Check each item below that applies to you.
