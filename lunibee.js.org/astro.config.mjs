@@ -44,6 +44,7 @@ export default defineConfig({
             { label: "Installation", link: "/getting-started/installation" },
             { label: "Creating a Bot", link: "/getting-started/creating-a-bot" },
             { label: "Quick Start", link: "/getting-started/quick-start" },
+            { label: "Upgrading from 0.1.8", link: "/getting-started/upgrading" },
             { label: "Changelog", link: "/getting-started/changelog" },
           ],
         },

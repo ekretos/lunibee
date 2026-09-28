@@ -5,6 +5,39 @@ description: Lunibee version history and release notes.
 
 ## Unreleased
 
+### 💥 Breaking Changes
+
+See [Upgrading from 0.1.8](/getting-started/upgrading/) for code changes.
+
+* **Messages are not cached by default.** Pass `messageCache: { maxSize?, ttl? }` to the client to keep a bounded per-channel cache; without it `MessageManager.cache` stays empty and `resolve()` always fetches.
+* **Builders validate on `toJSON()`.** Buttons without a custom ID/URL/SKU or without a label/emoji, selects without a custom ID or with `min_values > max_values`, string selects whose `max_values` exceeds their options, mixed action rows, and modals without a custom ID, title or component now throw.
+* **`bulkDeleteMessages()`** accepts 1–100 IDs (one ID becomes a normal delete), removes duplicates, and throws a `RangeError` for messages older than 14 days.
+* **Cached objects are updated in place.** `ResourceManager.upsert()`, `GuildManager.patch()` and Gateway updates merge into the cached instance instead of replacing it.
+* **`RESTError.path`** shows `:token` in place of webhook and interaction tokens.
+
+### ✨ Features
+
+* **Resource state never expires**: `Collection` gains `set(key, value, ttl?)` (sliding TTL, O(1) LRU `maxSize`, `onEvict`, `stats`, `peek`, `purge`, `ttlRemaining`) and `setWithoutTTL()`; managers store Discord resources without TTL.
+* **Gateway cache sync**: guild create/update/delete, members, roles, emojis, stickers, bans, scheduled events, stage instances, channels, threads, voice states, automod rules, invites and soundboard sounds are kept current. New `guilds.members(id)`, `roles(id)`, `emojis(id)`, `stickers(id)`, `soundboard(id)`, `voiceStates(id)`, `autoModerationRules(id)`, `invites(id)`.
+* **Large bots**: `ClientOptions.cache` (`users`, `members`, `roles`, `emojis`) turns caching off per resource.
+* **Fetch safety**: concurrent fetches of one resource share a request; a fetch that finishes after a newer Gateway update or delete is returned but not cached.
+* **Interactions**: single acknowledgement guard, `ephemeral` on edits and follow-ups, `fetchReply()`, `editFollowUp()`, `deleteFollowUp()`, `user`, `member`, `createdTimestamp`, `expiresAt`, `isExpired`.
+* **Permissions**: `PermissionSet.missing()`, `computePermissions()`, `client.permissionsFor()`, typed `channel.permissionOverwrites`.
+* **Collectors**: `idle`, `signal`, `for await`, `wait()`, `Symbol.dispose`, `onDispose()` and `client.createCollector()`.
+* **REST**: `RESTError.kind` / `retryable`, `redactPath()`.
+* **Messages**: `iterateMessages()`, `endPoll()`, `fetchPollVoters()`, `sendSoundboardSound()`.
+* **Sharding**: startup in rounds of `max_concurrency`, session-start-limit check, `fetchGatewayInfo()`, `health()`.
+* **New APIs**: guild stickers and soundboard managers, `client.monetization` (SKUs, entitlements, subscriptions) with `entitlementCreate/Update/Delete` events, soundboard events, `ButtonBuilder.setSKUId()`.
+
+### 🐛 Bug Fixes (this batch)
+
+* **Gateway RESUME**: reconnect requests, zombie connections and heartbeat timeouts closed with `1001`, which makes Discord drop the session; they now close with `4900` so RESUME succeeds.
+* **Heartbeat**: the regular interval now starts after the jittered first beat instead of alongside it.
+* **Gateway sequence**: a lower sequence can no longer roll back the RESUME point.
+* **Messages**: `MESSAGE_CREATE` / `MESSAGE_UPDATE` no longer overwrite a cached channel with a stub.
+* **Voice**: receiver streams end on disconnect/destroy instead of waiting forever.
+* **Collection LRU**: eviction no longer scans deleted slots (about 65 µs → 0.55 µs per eviction at 100k entries).
+
 ### 🚨 Behaviour Changes
 
 * **`ShardManager.spawnDelay` now defaults to `5000` ms** (`ShardManager.IDENTIFY_INTERVAL`). Discord permits one IDENTIFY per 5 seconds; starting shards back to back earned close code `4008` and invalid-session churn. An *N*-shard bot now takes about `(N - 1) × 5s` to connect. Pass `spawnDelay: 0` to opt out.
