@@ -143,11 +143,14 @@ export class GatewayHeartbeat {
         this.#clearBeatTimers();
         this.#interval = interval;
         this.#acknowledged = true;
-        this.#initialTimer = setTimeout(
-            () => this.sendHeartbeat(),
-            Math.random() * interval,
-        );
-        this.#timer = setInterval(() => this.sendHeartbeat(), interval);
+        // The regular cadence starts from the first beat, not from HELLO:
+        // arming both at once can fire two beats back to back when the
+        // jitter lands near the full interval.
+        this.#initialTimer = setTimeout(() => {
+            this.#initialTimer = undefined;
+            this.sendHeartbeat();
+            this.#timer = setInterval(() => this.sendHeartbeat(), interval);
+        }, Math.random() * interval);
     }
 
     /** Stops every timer. Safe to call more than once. */
@@ -181,6 +184,8 @@ export class GatewayHeartbeat {
 
     /** Records a heartbeat ACK and updates {@link latency}. */
     public acknowledge(): void {
+        // An ACK with no heartbeat outstanding carries no round trip to measure.
+        if (this.#acknowledged) return;
         this.#acknowledged = true;
         this.#latency = this.#now() - this.#sentAt;
         this.#clearAckTimer();

@@ -243,3 +243,34 @@ describe("GatewayHeartbeat staleness watch", () => {
         expect(h.timeouts).toEqual([]);
     });
 });
+
+describe("GatewayHeartbeat cadence (P0 audit)", () => {
+    test("the interval starts after the jittered first beat, so beats never bunch up", async () => {
+        const originalRandom = Math.random;
+        Math.random = () => 0.9;
+        try {
+            const h = harness({ ackTimeout: 200, zombieTimeout: 400 });
+            h.heartbeat.start(40);
+            await wait(45);
+            // First beat at ~36ms; the old code also fired the interval at 40ms.
+            expect(h.sent).toHaveLength(1);
+            await wait(40);
+            expect(h.sent).toHaveLength(2);
+            h.heartbeat.stop();
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
+
+    test("an ACK with no heartbeat outstanding does not change latency", () => {
+        const h = harness();
+        h.heartbeat.acknowledge();
+        expect(h.heartbeat.latency).toBe(-1);
+        h.heartbeat.sendHeartbeat();
+        h.heartbeat.acknowledge();
+        const latency = h.heartbeat.latency;
+        h.heartbeat.acknowledge();
+        expect(h.heartbeat.latency).toBe(latency);
+        h.heartbeat.stop();
+    });
+});

@@ -105,6 +105,12 @@ export interface GatewayOptions {
     createSocket?: SocketFactory;
 }
 /** Discord's main Gateway endpoint, used when no resume host is known. */
+/**
+ * Close code for connections Lunibee means to RESUME. Discord invalidates the
+ * session when a client closes with 1000 or 1001, so a reconnect that should
+ * keep its session must close with anything else.
+ */
+const RESUMABLE_CLOSE_CODE = 4900;
 const DEFAULT_GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
 
 /** Gateway event listener. */
@@ -270,7 +276,7 @@ export class Gateway {
             );
         }
         this.#transport.close(
-            1001,
+            RESUMABLE_CLOSE_CODE,
             timeout.type === "zombie"
                 ? "Zombie Gateway connection"
                 : "Heartbeat timeout",
@@ -462,7 +468,10 @@ export class Gateway {
                 this.#emit("heartbeatAck", action.data);
                 return;
             case "reconnect":
-                this.#transport.close(1001, "Server requested reconnect");
+                this.#transport.close(
+                    RESUMABLE_CLOSE_CODE,
+                    "Server requested reconnect",
+                );
                 return;
             case "invalid-session": {
                 // A resumable invalidation keeps the session; a non-resumable

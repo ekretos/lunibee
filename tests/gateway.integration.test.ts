@@ -192,7 +192,7 @@ describe("Gateway integration lifecycle", () => {
         await promise;
         await new Promise((resolve) => setTimeout(resolve, 40));
         expect(zombies.length).toBe(1);
-        expect(socket.closeCode).toBe(1001);
+        expect(socket.closeCode).toBe(4900);
         gateway.close();
     });
 
@@ -212,7 +212,7 @@ describe("Gateway integration lifecycle", () => {
             d: { heartbeat_interval: 20 },
         });
         await Bun.sleep(60);
-        expect(socket.closeCode).toBe(1001);
+        expect(socket.closeCode).toBe(4900);
         gateway.close();
 
         const gwCloseErr = new Gateway({
@@ -495,6 +495,23 @@ describe("Gateway integration lifecycle", () => {
         // Test requires a valid zlib-stream deflate-raw chunk of '{"op":10,"d":{"heartbeat_interval":50}}'
         // But since we can't easily mock DecompressionStream without native zlib, we can mock DecompressionStream
 
+        gateway.close();
+    });
+});
+
+describe("resumable client closes", () => {
+    test("a server reconnect request closes with 4900, not 1000/1001", async () => {
+        const gateway = new Gateway({
+            token: "token",
+            intents: 1,
+            reconnect: false,
+        });
+        const promise = gateway.connect();
+        const socket = FakeWebSocket.instances.at(-1)!;
+        socket.open();
+        await promise;
+        socket.receive({ op: GatewayOpcodes.Reconnect, d: null });
+        expect(socket.closeCode).toBe(4900);
         gateway.close();
     });
 });
