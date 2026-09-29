@@ -38,5 +38,20 @@ Lunibee with the closed issues of Lilybird, another Bun-first library.
    - Support it on `reply()` / `update()` (and deferred variants) and return
      a `Message`, instead of the empty callback response; `fetchReply()` stays.
 
+5. **`showModal()` should accept `ModalBuilder.toJSON()` output.** The raw
+   form requires an index signature (`[key: string]: unknown`), which the
+   `APIModalComponent` interface lacks, so passing `builder.toJSON()` does not
+   type-check (passing the builder does). Drop the index signature or accept
+   `APIModalComponent`. Found while moving ZedBot to 0.2.1.
+6. **Export the component payload types from `lunibee`.** `APIComponent`,
+   `APIActionRowChild`, `APIActionRowComponent` and the other
+   `@lunibee/builders` payload types are not exported from the main package,
+   so consumers derive them from builder signatures. Found while moving
+   ZedBot to 0.2.1.
+7. **Message fields AutoMod-style bots need.** `Message` has no
+   `stickers` / `sticker_items`, `poll` or `message_snapshots` (forwards),
+   so bots read the raw Gateway payload for them. Expose them (raw API shapes
+   are fine).
+
 Not planned: a "cache flow" guide beyond the existing Caching & Structures
 page, and anything Lilybird-specific (rebranding).
