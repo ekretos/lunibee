@@ -101,7 +101,7 @@ A two-column layout with text on the left and an optional accessory (thumbnail o
 <TabItem label="TypeScript">
 ```ts
 const section = new SectionBuilder()
-  .addComponents(new TextDisplayBuilder().setContent("**Lunibee v0.1.7** is here!"))
+  .addComponents(new TextDisplayBuilder().setContent("**Lunibee v0.2.0** is here!"))
   .setAccessory(
     new ThumbnailBuilder()
       .setUrl("https://example.com/release.png")
@@ -112,7 +112,7 @@ const section = new SectionBuilder()
 <TabItem label="JavaScript">
 ```js
 const section = new SectionBuilder()
-  .addComponents(new TextDisplayBuilder().setContent("**Lunibee v0.1.7** is here!"))
+  .addComponents(new TextDisplayBuilder().setContent("**Lunibee v0.2.0** is here!"))
   .setAccessory(
     new ThumbnailBuilder()
       .setUrl("https://example.com/release.png")
@@ -287,7 +287,7 @@ import {
 const layout = new ContainerBuilder().addComponents(
   // Header section
   new SectionBuilder()
-    .addComponents(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.1.7"))
+    .addComponents(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.2.0"))
     .setAccessory(new ThumbnailBuilder().setUrl("https://example.com/bee.png")),
 
   new SeparatorBuilder().setSpacing(1),
@@ -332,7 +332,7 @@ import {
 const layout = new ContainerBuilder().addComponents(
   // Header section
   new SectionBuilder()
-    .addComponents(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.1.7"))
+    .addComponents(new TextDisplayBuilder().setContent("## 🐝 Release Notes — v0.2.0"))
     .setAccessory(new ThumbnailBuilder().setUrl("https://example.com/bee.png")),
 
   new SeparatorBuilder().setSpacing(1),
