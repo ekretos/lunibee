@@ -67,5 +67,15 @@ Lunibee with the closed issues of Lilybird, another Bun-first library.
    so bots read the raw Gateway payload for them. Expose them (raw API shapes
    are fine).
 
+8. **Previous state on update/delete events.** `guildRoleCreate/Update/Delete`,
+   `guildEmojisUpdate` and `guildStickersUpdate` emit raw payloads after the
+   cache is updated, so a handler cannot see the old role/emoji/sticker (or a
+   deleted one). Emit the cached structure (and the previous one on update)
+   like channel events do. ZedBot's AntiNuke restore needs this.
+
+CLI (landed on `dev`): handlers are called as `handler(client, ...args)`,
+`lunibee create handler <event> [name]` works without prompts, and
+`lunibee sync handlers` regenerates the binder.
+
 Not planned: a "cache flow" guide beyond the existing Caching & Structures
 page, and anything Lilybird-specific (rebranding).
