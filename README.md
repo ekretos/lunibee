@@ -162,12 +162,12 @@ Available lifecycle methods include `reply()`, `deferReply()`, `editReply()`, `d
 
 Lunibee provides strict builders for Discord payloads (Discord.js V2 compatible), including:
 
-- `ActionRowBuilder`
-- `ButtonBuilder`
-- `StringSelectBuilder`
-- `EmbedBuilder`
-- `ModalBuilder`
-- `TextInputBuilder`
+- `CreateActionRow`
+- `CreateButton`
+- `CreateStringSelect`
+- `CreateEmbed`
+- `CreateModal`
+- `CreateTextInput`
 
 Builders validate Discord limits before serialization and expose typed `toJSON()` payloads.
 

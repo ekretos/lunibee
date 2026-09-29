@@ -11,7 +11,7 @@ bun add lunibee
 ```
 
 ```ts
-import { Client, GatewayIntentBits, EmbedBuilder } from "lunibee";
+import { Client, GatewayIntentBits, CreateEmbed } from "lunibee";
 
 const client = new Client({
     token: process.env.DISCORD_TOKEN!,
@@ -21,7 +21,7 @@ const client = new Client({
 client.on("messageCreate", async (message) => {
     if (message.content === "!ping")
         await message.channel.send({
-            embeds: [new EmbedBuilder().setTitle("Pong!").toJSON()],
+            embeds: [new CreateEmbed().setTitle("Pong!").toJSON()],
         });
 });
 

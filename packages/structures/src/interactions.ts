@@ -1,17 +1,23 @@
-import { InteractionResponseType } from "@lunibee/types";
+import { InteractionResponseEnum } from "@lunibee/types";
 import { User, type ResourceContext } from "./base.js";
 import { GuildMember } from "./resources.js";
 
 /** Discord interaction type constants. */
-export const InteractionType = {
+export const InteractionEnum = {
     Ping: 1,
     ApplicationCommand: 2,
     MessageComponent: 3,
     ApplicationCommandAutocomplete: 4,
     ModalSubmit: 5,
 } as const;
+/** One {@link InteractionEnum} value, usable as a type. */
+export type InteractionEnum =
+    (typeof InteractionEnum)[keyof typeof InteractionEnum];
 // Re-export for consumers who import from structures directly
-export { InteractionResponseType } from "@lunibee/types";
+export {
+    InteractionResponseEnum,
+    InteractionResponseType,
+} from "@lunibee/types";
 /** Data shared by Discord interactions. */
 export interface InteractionData {
     /** Interaction identifier. */ id: string;
@@ -109,7 +115,7 @@ export class InteractionResponse {
         options: InteractionReplyOptions,
     ): InteractionResponse {
         return new InteractionResponse(
-            InteractionResponseType.ChannelMessage,
+            InteractionResponseEnum.ChannelMessage,
             toMessageData(options),
         );
     }
@@ -117,12 +123,12 @@ export class InteractionResponse {
         ephemeral = false,
     ): InteractionResponse {
         return new InteractionResponse(
-            InteractionResponseType.DeferredChannelMessage,
+            InteractionResponseEnum.DeferredChannelMessage,
             ephemeral ? { flags: EPHEMERAL } : undefined,
         );
     }
     /** Creates a Pong response. @returns Callback payload. */ public static pong(): InteractionResponse {
-        return new InteractionResponse(InteractionResponseType.Pong);
+        return new InteractionResponse(InteractionResponseEnum.Pong);
     }
 }
 
@@ -158,7 +164,7 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         this.data = data;
     }
     /** Whether this interaction is an application command. @returns True for application command interactions. */ public isChatInputCommand(): this is CommandInteraction {
-        return this.type === InteractionType.ApplicationCommand;
+        return this.type === InteractionEnum.ApplicationCommand;
     }
     /**
      * Waits for this user to submit a modal, typically one this interaction
@@ -197,13 +203,13 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         return collector.next() as Promise<ModalSubmitInteraction>;
     }
     /** Whether this interaction is a message component. @returns True for component interactions. */ public isMessageComponent(): this is ComponentInteraction {
-        return this.type === InteractionType.MessageComponent;
+        return this.type === InteractionEnum.MessageComponent;
     }
     /** Whether this interaction is a modal submission. @returns True for modal submissions. */ public isModalSubmit(): this is ModalSubmitInteraction {
-        return this.type === InteractionType.ModalSubmit;
+        return this.type === InteractionEnum.ModalSubmit;
     }
     /** Whether this interaction is autocomplete. @returns True for autocomplete interactions. */ public isAutocomplete(): this is AutocompleteInteraction {
-        return this.type === InteractionType.ApplicationCommandAutocomplete;
+        return this.type === InteractionEnum.ApplicationCommandAutocomplete;
     }
     /** Message component type of this interaction, or 0 when it is not a component. */
     #componentType(): number {
@@ -382,7 +388,7 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     ): Promise<unknown> {
         return this.acknowledge(
             new InteractionResponse(
-                InteractionResponseType.MessageUpdate,
+                InteractionResponseEnum.MessageUpdate,
                 toMessageData(options),
             ),
             "replied",
@@ -411,7 +417,7 @@ export class Interaction<TData extends InteractionData = InteractionData> {
                 : modal;
         return this.acknowledge(
             new InteractionResponse(
-                InteractionResponseType.Modal,
+                InteractionResponseEnum.Modal,
                 data as InteractionReplyOptions,
             ),
             "replied",
@@ -469,7 +475,7 @@ export class ComponentInteraction extends Interaction {
     public async deferUpdate(): Promise<void> {
         await this.acknowledge(
             new InteractionResponse(
-                InteractionResponseType.DeferredMessageUpdate,
+                InteractionResponseEnum.DeferredMessageUpdate,
             ),
             "deferred",
         );
@@ -480,7 +486,7 @@ export class ComponentInteraction extends Interaction {
     ): Promise<unknown> {
         return this.acknowledge(
             new InteractionResponse(
-                InteractionResponseType.MessageUpdate,
+                InteractionResponseEnum.MessageUpdate,
                 toMessageData(options),
             ),
             "replied",
@@ -552,7 +558,7 @@ export class AutocompleteInteraction extends Interaction {
         if (!Array.isArray(choices))
             throw new TypeError("Autocomplete choices must be an array.");
         const response = new InteractionResponse(
-            InteractionResponseType.Autocomplete,
+            InteractionResponseEnum.Autocomplete,
             { choices } as InteractionReplyOptions,
         );
         await this.acknowledge(response, "replied");
@@ -588,15 +594,20 @@ export function createInteraction(
     data: InteractionData,
 ): Interaction {
     switch (data.type) {
-        case InteractionType.ApplicationCommand:
+        case InteractionEnum.ApplicationCommand:
             return new CommandInteraction(client, data);
-        case InteractionType.ApplicationCommandAutocomplete:
+        case InteractionEnum.ApplicationCommandAutocomplete:
             return new AutocompleteInteraction(client, data);
-        case InteractionType.MessageComponent:
+        case InteractionEnum.MessageComponent:
             return new ComponentInteraction(client, data);
-        case InteractionType.ModalSubmit:
+        case InteractionEnum.ModalSubmit:
             return new ModalSubmitInteraction(client, data);
         default:
             return new Interaction(client, data);
     }
 }
+
+/** @deprecated Use {@link InteractionEnum}. Removed in 2.0. */
+export const InteractionType = InteractionEnum;
+/** @deprecated Use {@link InteractionEnum}. Removed in 2.0. */
+export type InteractionType = InteractionEnum;

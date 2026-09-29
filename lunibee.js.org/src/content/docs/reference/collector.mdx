@@ -143,9 +143,9 @@ Extend `EventEmitter` — use `collector.on(event, listener)`:
 import { Collector } from "lunibee";
 
 async function confirmAction(channel, userId: string): Promise<boolean> {
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("confirm").setLabel("Confirm").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("cancel").setLabel("Cancel").setStyle(ButtonStyle.Danger),
+  const row = new CreateActionRow<CreateButton>().addComponents(
+    new CreateButton().setCustomId("confirm").setLabel("Confirm").setStyle(ButtonType.Success),
+    new CreateButton().setCustomId("cancel").setLabel("Cancel").setStyle(ButtonType.Danger),
   );
   const msg = await channel.send({ content: "Are you sure?", components: [row] });
 
@@ -186,9 +186,9 @@ async function confirmAction(channel, userId: string): Promise<boolean> {
 import { Collector } from "lunibee";
 
 async function confirmAction(channel, userId) {
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("confirm").setLabel("Confirm").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("cancel").setLabel("Cancel").setStyle(ButtonStyle.Danger),
+  const row = new CreateActionRow().addComponents(
+    new CreateButton().setCustomId("confirm").setLabel("Confirm").setStyle(ButtonType.Success),
+    new CreateButton().setCustomId("cancel").setLabel("Cancel").setStyle(ButtonType.Danger),
   );
   const msg = await channel.send({ content: "Are you sure?", components: [row] });
 

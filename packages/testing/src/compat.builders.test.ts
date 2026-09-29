@@ -1,25 +1,25 @@
 /**
  * Builder → Discord API payload compatibility. Builders are Discord.js-familiar
- * (EmbedBuilder, ButtonBuilder, ActionRowBuilder, SlashCommandBuilder, ...); their
+ * (CreateEmbed, CreateButton, CreateActionRow, CreateSlashCommand, ...); their
  * toJSON() output is sent to Discord verbatim, so the payload shape (snake_case keys,
  * numeric type/style, nesting) must match the Discord REST contract.
  */
 import { describe, expect, test } from "bun:test";
 import {
-    EmbedBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    ComponentType,
-    ActionRowBuilder,
-    StringSelectBuilder,
-    ModalBuilder,
-    TextInputBuilder,
-    SlashCommandBuilder,
+    CreateEmbed,
+    CreateButton,
+    ButtonType,
+    ComponentEnum,
+    CreateActionRow,
+    CreateStringSelect,
+    CreateModal,
+    CreateTextInput,
+    CreateSlashCommand,
 } from "@lunibee/builders";
 
-describe("EmbedBuilder → APIEmbed payload", () => {
+describe("CreateEmbed → APIEmbed payload", () => {
     test("serializes snake_case footer/author/field keys", () => {
-        const embed = new EmbedBuilder()
+        const embed = new CreateEmbed()
             .setTitle("Title")
             .setDescription("Desc")
             .setColor(0x5865f2)
@@ -40,20 +40,18 @@ describe("EmbedBuilder → APIEmbed payload", () => {
         ]);
     });
     test("toJSON returns an independent (deep-cloned) payload", () => {
-        const embed = new EmbedBuilder().addFields({ name: "a", value: "b" });
+        const embed = new CreateEmbed().addFields({ name: "a", value: "b" });
         const a = embed.toJSON();
         a.fields![0]!.name = "mutated";
         expect(embed.toJSON().fields![0]!.name).toBe("a");
     });
     test("rejects out-of-range color like Discord", () => {
-        expect(() => new EmbedBuilder().setColor(0x1000000)).toThrow(
-            RangeError,
-        );
+        expect(() => new CreateEmbed().setColor(0x1000000)).toThrow(RangeError);
     });
-    // discord.js EmbedBuilder.addFields accepts BOTH spread and a single array
+    // discord.js CreateEmbed.addFields accepts BOTH spread and a single array
     // (RestOrArray); Lunibee matches.
     test("addFields accepts an array argument (discord.js RestOrArray)", () => {
-        const embed = new EmbedBuilder().addFields([
+        const embed = new CreateEmbed().addFields([
             { name: "f1", value: "v1" },
             { name: "f2", value: "v2" },
         ] as unknown as { name: string; value: string });
@@ -61,46 +59,46 @@ describe("EmbedBuilder → APIEmbed payload", () => {
     });
 });
 
-describe("ButtonBuilder → APIButtonComponent payload", () => {
+describe("CreateButton → APIButtonComponent payload", () => {
     test("primary button carries type 2 and the chosen style", () => {
-        const json = new ButtonBuilder()
+        const json = new CreateButton()
             .setCustomId("btn")
             .setLabel("Click")
-            .setStyle(ButtonStyle.Primary)
+            .setStyle(ButtonType.Primary)
             .toJSON();
-        expect(json.type).toBe(ComponentType.Button);
+        expect(json.type).toBe(ComponentEnum.Button);
         expect(json.type).toBe(2);
-        expect(json.style).toBe(ButtonStyle.Primary);
+        expect(json.style).toBe(ButtonType.Primary);
         expect(json.custom_id).toBe("btn");
         expect(json.label).toBe("Click");
     });
     test("link button uses url and drops custom_id", () => {
-        const json = new ButtonBuilder()
+        const json = new CreateButton()
             .setLabel("Docs")
             .setURL("https://lunibee.dev")
             .toJSON();
-        expect(json.style).toBe(ButtonStyle.Link);
+        expect(json.style).toBe(ButtonType.Link);
         expect(json.url).toBe("https://lunibee.dev/");
         expect(json.custom_id).toBeUndefined();
     });
     test("rejects a custom id on a link button", () => {
         expect(() =>
-            new ButtonBuilder().setURL("https://x.dev").setCustomId("nope"),
+            new CreateButton().setURL("https://x.dev").setCustomId("nope"),
         ).toThrow(TypeError);
     });
 });
 
-describe("ActionRowBuilder → APIActionRowComponent payload", () => {
+describe("CreateActionRow → APIActionRowComponent payload", () => {
     test("wraps children with type 1 and nested toJSON payloads", () => {
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
+        const row = new CreateActionRow().addComponents(
+            new CreateButton()
                 .setCustomId("a")
                 .setLabel("A")
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
+                .setStyle(ButtonType.Secondary),
+            new CreateButton()
                 .setCustomId("b")
                 .setLabel("B")
-                .setStyle(ButtonStyle.Danger),
+                .setStyle(ButtonType.Danger),
         );
         const json = row.toJSON();
         expect(json.type).toBe(1);
@@ -108,19 +106,19 @@ describe("ActionRowBuilder → APIActionRowComponent payload", () => {
         expect(json.components[0]!.type).toBe(2);
     });
     test("enforces the Discord 5-component row limit", () => {
-        const row = new ActionRowBuilder();
+        const row = new CreateActionRow();
         const buttons = Array.from({ length: 6 }, (_, i) =>
-            new ButtonBuilder()
+            new CreateButton()
                 .setCustomId(`b${i}`)
-                .setStyle(ButtonStyle.Secondary),
+                .setStyle(ButtonType.Secondary),
         );
         expect(() => row.addComponents(...buttons)).toThrow(RangeError);
     });
 });
 
-describe("StringSelectBuilder → APIStringSelectComponent payload", () => {
+describe("CreateStringSelect → APIStringSelectComponent payload", () => {
     test("carries type 3 and snake_case option/limit keys", () => {
-        const json = new StringSelectBuilder()
+        const json = new CreateStringSelect()
             .setCustomId("sel")
             .setPlaceholder("pick")
             .setMinValues(1)
@@ -143,14 +141,14 @@ describe("StringSelectBuilder → APIStringSelectComponent payload", () => {
     });
 });
 
-describe("ModalBuilder → APIModalComponent payload", () => {
+describe("CreateModal → APIModalComponent payload", () => {
     test("nests text inputs inside action rows with correct types", () => {
-        const modal = new ModalBuilder()
+        const modal = new CreateModal()
             .setCustomId("m")
             .setTitle("Feedback")
             .addComponents(
-                new ActionRowBuilder().addComponents(
-                    new TextInputBuilder()
+                new CreateActionRow().addComponents(
+                    new CreateTextInput()
                         .setCustomId("field")
                         .setLabel("Your feedback")
                         .setStyle(2),
@@ -164,9 +162,9 @@ describe("ModalBuilder → APIModalComponent payload", () => {
     });
 });
 
-describe("SlashCommandBuilder → application command payload", () => {
+describe("CreateSlashCommand → application command payload", () => {
     test("serializes name/description/options with numeric option types", () => {
-        const json = new SlashCommandBuilder()
+        const json = new CreateSlashCommand()
             .setName("ban")
             .setDescription("Ban a user")
             .addUserOption((o) =>
@@ -185,7 +183,7 @@ describe("SlashCommandBuilder → application command payload", () => {
     });
     test("enforces required-before-optional ordering like Discord", () => {
         expect(() =>
-            new SlashCommandBuilder()
+            new CreateSlashCommand()
                 .setName("cmd")
                 .setDescription("d")
                 .addStringOption((o) => o.setName("opt").setDescription("d"))

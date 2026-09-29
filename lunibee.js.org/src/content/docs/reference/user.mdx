@@ -141,7 +141,7 @@ console.log(`Hello ${user}!`); // → "Hello <@123456789>!"
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "whois") return;
   const target = interaction.options.getUser("user") ?? interaction.user;
-  const embed = new EmbedBuilder()
+  const embed = new CreateEmbed()
     .setTitle(target.displayName)
     .setThumbnail(target.displayAvatarURL({ size: 256 }))
     .addFields(
@@ -160,7 +160,7 @@ client.on("interactionCreate", async (interaction) => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "whois") return;
   const target = interaction.options.getUser("user") ?? interaction.user;
-  const embed = new EmbedBuilder()
+  const embed = new CreateEmbed()
     .setTitle(target.displayName)
     .setThumbnail(target.displayAvatarURL({ size: 256 }))
     .addFields(

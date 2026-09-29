@@ -192,7 +192,7 @@ client.on("interactionCreate", async (interaction) => {
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { Client, IntentBits, EmbedBuilder } from "lunibee";
+import { Client, IntentBits, CreateEmbed } from "lunibee";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
@@ -206,7 +206,7 @@ client.on("ready", (user) => {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (message.content === "!status") {
-    const embed = new EmbedBuilder()
+    const embed = new CreateEmbed()
       .setTitle("Bot Status")
       .addFields(
         { name: "Ping", value: `${client.ping}ms`, inline: true },
@@ -222,7 +222,7 @@ await client.login();
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { Client, IntentBits, EmbedBuilder } from "lunibee";
+import { Client, IntentBits, CreateEmbed } from "lunibee";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN,
@@ -236,7 +236,7 @@ client.on("ready", (user) => {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (message.content === "!status") {
-    const embed = new EmbedBuilder()
+    const embed = new CreateEmbed()
       .setTitle("Bot Status")
       .addFields(
         { name: "Ping", value: `${client.ping}ms`, inline: true },

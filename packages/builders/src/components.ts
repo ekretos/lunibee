@@ -1,10 +1,10 @@
-// Re-export the canonical ButtonStyle from @lunibee/types so the builders package
+// Re-export the canonical ButtonType from @lunibee/types so the builders package
 // never ships a drifting duplicate (the old local copy was missing `Premium: 6`).
-import { ButtonStyle } from "@lunibee/types";
-export { ButtonStyle };
+import { ButtonType } from "@lunibee/types";
+export { ButtonType };
 
 /** Component type constants exposed by Lunibee. */
-export const ComponentType = {
+export const ComponentEnum = {
     ActionRow: 1,
     Button: 2,
     StringSelect: 3,
@@ -22,19 +22,18 @@ export const ComponentType = {
     ContentInventoryEntry: 16,
     Container: 17,
 } as const;
-export const TextInputStyle = { Short: 1, Paragraph: 2 } as const;
-/** One {@link TextInputStyle} value, usable as a type. */
-export type TextInputStyle =
-    (typeof TextInputStyle)[keyof typeof TextInputStyle];
-/** One {@link ComponentType} value, usable as a type. */
-export type ComponentType = (typeof ComponentType)[keyof typeof ComponentType];
+export const TextInputType = { Short: 1, Paragraph: 2 } as const;
+/** One {@link TextInputType} value, usable as a type. */
+export type TextInputType = (typeof TextInputType)[keyof typeof TextInputType];
+/** One {@link ComponentEnum} value, usable as a type. */
+export type ComponentEnum = (typeof ComponentEnum)[keyof typeof ComponentEnum];
 export interface APIComponentEmoji {
     id?: string | null;
     name?: string | null;
     animated?: boolean;
 }
 export interface APIButtonComponent {
-    type: typeof ComponentType.Button;
+    type: typeof ComponentEnum.Button;
     style: 1 | 2 | 3 | 4 | 5 | 6;
     custom_id?: string;
     label?: string;
@@ -52,7 +51,7 @@ export interface APISelectOption {
     default?: boolean;
 }
 export interface APIStringSelectComponent {
-    type: typeof ComponentType.StringSelect;
+    type: typeof ComponentEnum.StringSelect;
     custom_id?: string;
     placeholder?: string;
     min_values?: number;
@@ -63,10 +62,10 @@ export interface APIStringSelectComponent {
 }
 export interface APIEntitySelectComponent {
     type:
-        | typeof ComponentType.UserSelect
-        | typeof ComponentType.RoleSelect
-        | typeof ComponentType.MentionableSelect
-        | typeof ComponentType.ChannelSelect;
+        | typeof ComponentEnum.UserSelect
+        | typeof ComponentEnum.RoleSelect
+        | typeof ComponentEnum.MentionableSelect
+        | typeof ComponentEnum.ChannelSelect;
     custom_id?: string;
     placeholder?: string;
     min_values?: number;
@@ -76,8 +75,8 @@ export interface APIEntitySelectComponent {
     default_values?: APISelectDefaultValue[];
 }
 export interface APITextInputComponent {
-    type: typeof ComponentType.TextInput;
-    style: typeof TextInputStyle.Short | typeof TextInputStyle.Paragraph;
+    type: typeof ComponentEnum.TextInput;
+    style: typeof TextInputType.Short | typeof TextInputType.Paragraph;
     custom_id?: string;
     label?: string;
     placeholder?: string;
@@ -98,20 +97,20 @@ export type APIActionRowChild =
     | APIEntitySelectComponent
     | APITextInputComponent;
 export interface APIActionRowComponent {
-    type: typeof ComponentType.ActionRow;
+    type: typeof ComponentEnum.ActionRow;
     components: APIActionRowChild[];
 }
 export interface APISectionComponent {
-    type: typeof ComponentType.Section;
+    type: typeof ComponentEnum.Section;
     components?: APIComponent[]; // text displays
     accessory?: APIComponent; // buttons, thumbnails, etc.
 }
 export interface APITextDisplayComponent {
-    type: typeof ComponentType.TextDisplay;
+    type: typeof ComponentEnum.TextDisplay;
     content: string;
 }
 export interface APIMediaGalleryComponent {
-    type: typeof ComponentType.MediaGallery;
+    type: typeof ComponentEnum.MediaGallery;
     items: { media: { url: string; description?: string } }[];
 }
 /** Default values accepted by an auto-populated entity select. */
@@ -120,17 +119,17 @@ export interface APISelectDefaultValue {
     type: "user" | "role" | "channel";
 }
 export interface APIFileComponent {
-    type: typeof ComponentType.File;
+    type: typeof ComponentEnum.File;
     file: { url: string };
     spoiler?: boolean;
 }
 export interface APISeparatorComponent {
-    type: typeof ComponentType.Separator;
+    type: typeof ComponentEnum.Separator;
     spacing?: 1 | 2;
     divider?: boolean;
 }
 export interface APIThumbnailComponent {
-    type: typeof ComponentType.Thumbnail;
+    type: typeof ComponentEnum.Thumbnail;
     url: string;
     proxy_url?: string;
     width?: number;
@@ -139,11 +138,11 @@ export interface APIThumbnailComponent {
     spoiler?: boolean;
 }
 export interface APIContentInventoryEntryComponent {
-    type: typeof ComponentType.ContentInventoryEntry;
+    type: typeof ComponentEnum.ContentInventoryEntry;
     id: string;
 }
 export interface APIContainerComponent {
-    type: typeof ComponentType.Container;
+    type: typeof ComponentEnum.Container;
     components: APIComponent[];
     accent_color?: number;
     spoiler?: boolean;
@@ -163,7 +162,7 @@ export type APIComponent =
     | APIContentInventoryEntryComponent
     | APIContainerComponent;
 
-export class ActionRowBuilder<
+export class CreateActionRow<
     T extends { toJSON(): APIActionRowChild } = { toJSON(): APIActionRowChild },
 > {
     readonly #components: T[] = [];
@@ -189,18 +188,18 @@ export class ActionRowBuilder<
             throw new RangeError("An action row needs at least one component.");
         const types = components.map((component) => component.type);
         if (
-            types.some((type) => type !== ComponentType.Button) &&
+            types.some((type) => type !== ComponentEnum.Button) &&
             components.length > 1
         )
             throw new RangeError(
                 "A select menu or text input must be alone in its action row.",
             );
-        return { type: ComponentType.ActionRow, components };
+        return { type: ComponentEnum.ActionRow, components };
     }
 }
-export class StringSelectBuilder {
+export class CreateStringSelect {
     readonly #data: APIStringSelectComponent = {
-        type: ComponentType.StringSelect,
+        type: ComponentEnum.StringSelect,
     };
     public setCustomId(value: string): this {
         validateText(value, 100, "Component custom ID");
@@ -266,19 +265,19 @@ export class StringSelectBuilder {
         return structuredClone(this.#data);
     }
 }
-export class ButtonBuilder {
+export class CreateButton {
     readonly #data: APIButtonComponent = {
-        type: ComponentType.Button,
-        style: ButtonStyle.Secondary,
+        type: ComponentEnum.Button,
+        style: ButtonType.Secondary,
     };
     /** Sets the style and drops fields that style cannot carry. */
     public setStyle(style: APIButtonComponent["style"]): this {
         const data = this.#data;
         data.style = style;
-        if (style === ButtonStyle.Link) {
+        if (style === ButtonType.Link) {
             delete data.custom_id;
             delete data.sku_id;
-        } else if (style === ButtonStyle.Premium) {
+        } else if (style === ButtonType.Premium) {
             delete data.custom_id;
             delete data.url;
             delete data.label;
@@ -291,7 +290,7 @@ export class ButtonBuilder {
     }
     public setCustomId(value: string): this {
         validateText(value, 100, "Button custom ID");
-        if (this.#data.style === ButtonStyle.Link)
+        if (this.#data.style === ButtonType.Link)
             throw new TypeError("Link buttons cannot use custom IDs.");
         this.#data.custom_id = value;
         return this;
@@ -311,14 +310,14 @@ export class ButtonBuilder {
                 cause: error,
             });
         }
-        this.setStyle(ButtonStyle.Link);
+        this.setStyle(ButtonType.Link);
         this.#data.url = url.toString();
         return this;
     }
     /** Makes this a premium (purchase) button for a SKU. Premium buttons carry no label, emoji, custom ID or URL. */
     public setSKUId(skuId: string): this {
         validateText(skuId, 20, "Button SKU ID");
-        this.setStyle(ButtonStyle.Premium);
+        this.setStyle(ButtonType.Premium);
         this.#data.sku_id = skuId;
         return this;
     }
@@ -333,13 +332,13 @@ export class ButtonBuilder {
     }
     public toJSON(): APIButtonComponent {
         const data = this.#data;
-        if (data.style === ButtonStyle.Link) {
+        if (data.style === ButtonType.Link) {
             if (!data.url) throw new TypeError("Link buttons require a URL.");
             if (data.custom_id || data.sku_id)
                 throw new TypeError(
                     "Link buttons cannot have a custom ID or SKU ID.",
                 );
-        } else if (data.style === ButtonStyle.Premium) {
+        } else if (data.style === ButtonType.Premium) {
             if (!data.sku_id)
                 throw new TypeError("Premium buttons require a SKU ID.");
             if (data.custom_id || data.url || data.label || data.emoji)
@@ -354,25 +353,25 @@ export class ButtonBuilder {
                     "Only link buttons have a URL and only premium buttons have a SKU ID.",
                 );
         }
-        if (data.style !== ButtonStyle.Premium && !data.label && !data.emoji)
+        if (data.style !== ButtonType.Premium && !data.label && !data.emoji)
             throw new TypeError("Buttons require a label or an emoji.");
         return structuredClone(data);
     }
 }
-export class EntitySelectBuilder {
+export class CreateEntitySelect {
     readonly #data: APIEntitySelectComponent;
     public constructor(
         type:
-            | typeof ComponentType.UserSelect
-            | typeof ComponentType.RoleSelect
-            | typeof ComponentType.MentionableSelect
-            | typeof ComponentType.ChannelSelect,
+            | typeof ComponentEnum.UserSelect
+            | typeof ComponentEnum.RoleSelect
+            | typeof ComponentEnum.MentionableSelect
+            | typeof ComponentEnum.ChannelSelect,
     ) {
         if (
-            type !== ComponentType.UserSelect &&
-            type !== ComponentType.RoleSelect &&
-            type !== ComponentType.MentionableSelect &&
-            type !== ComponentType.ChannelSelect
+            type !== ComponentEnum.UserSelect &&
+            type !== ComponentEnum.RoleSelect &&
+            type !== ComponentEnum.MentionableSelect &&
+            type !== ComponentEnum.ChannelSelect
         )
             throw new TypeError("Invalid select component type.");
         this.#data = { type };
@@ -414,7 +413,7 @@ export class EntitySelectBuilder {
         return structuredClone(this.#data);
     }
 }
-export class ModalBuilder {
+export class CreateModal {
     readonly #components: Array<{ toJSON(): APIActionRowComponent }> = [];
     #custom_id?: string;
     #title?: string;
@@ -441,10 +440,10 @@ export class ModalBuilder {
         return this;
     }
     /** Adds text inputs, each in its own action row (Discord's modal layout). @param inputs Text inputs, at most 5 per modal. */
-    public addTextInputs(...inputs: TextInputBuilder[]): this {
+    public addTextInputs(...inputs: CreateTextInput[]): this {
         return this.addComponents(
             ...inputs.map((input) =>
-                new ActionRowBuilder<TextInputBuilder>().addComponents(input),
+                new CreateActionRow<CreateTextInput>().addComponents(input),
             ),
         );
     }
@@ -461,10 +460,10 @@ export class ModalBuilder {
         };
     }
 }
-export class TextInputBuilder {
+export class CreateTextInput {
     readonly #data: APITextInputComponent = {
-        type: ComponentType.TextInput,
-        style: TextInputStyle.Short,
+        type: ComponentEnum.TextInput,
+        style: TextInputType.Short,
     };
     public setStyle(style: APITextInputComponent["style"]): this {
         this.#data.style = style;
@@ -518,7 +517,7 @@ export class TextInputBuilder {
     }
 }
 
-export class ContainerBuilder {
+export class CreateContainer {
     readonly #components: { toJSON(): APIComponent }[] = [];
     #accentColor?: number;
     #spoiler?: boolean;
@@ -544,7 +543,7 @@ export class ContainerBuilder {
     }
     public toJSON(): APIContainerComponent {
         const data: APIContainerComponent = {
-            type: ComponentType.Container,
+            type: ComponentEnum.Container,
             components: this.#components.map((c) => c.toJSON()),
         };
         if (this.#accentColor !== undefined)
@@ -554,7 +553,7 @@ export class ContainerBuilder {
     }
 }
 
-export class SectionBuilder {
+export class CreateSection {
     readonly #components: { toJSON(): APIComponent }[] = [];
     #accessory?: { toJSON(): APIComponent };
     public addComponents(...components: { toJSON(): APIComponent }[]): this {
@@ -569,7 +568,7 @@ export class SectionBuilder {
     }
     public toJSON(): APISectionComponent {
         return {
-            type: ComponentType.Section,
+            type: ComponentEnum.Section,
             components: this.#components.length
                 ? this.#components.map((c) => c.toJSON())
                 : undefined,
@@ -578,7 +577,7 @@ export class SectionBuilder {
     }
 }
 
-export class TextDisplayBuilder {
+export class CreateTextDisplay {
     #content = "";
     public setContent(content: string): this {
         validateText(content, 4000, "Text display content");
@@ -587,13 +586,13 @@ export class TextDisplayBuilder {
     }
     public toJSON(): APITextDisplayComponent {
         return {
-            type: ComponentType.TextDisplay,
+            type: ComponentEnum.TextDisplay,
             content: this.#content,
         };
     }
 }
 
-export class MediaGalleryBuilder {
+export class CreateMediaGallery {
     readonly #items: { media: { url: string; description?: string } }[] = [];
     public addItems(...items: { url: string; description?: string }[]): this {
         if (!items.length) {
@@ -609,13 +608,13 @@ export class MediaGalleryBuilder {
     }
     public toJSON(): APIMediaGalleryComponent {
         return {
-            type: ComponentType.MediaGallery,
+            type: ComponentEnum.MediaGallery,
             items: structuredClone(this.#items),
         };
     }
 }
 
-export class FileComponentBuilder {
+export class CreateFileComponent {
     #url = "";
     #spoiler?: boolean;
     public setUrl(url: string): this {
@@ -630,7 +629,7 @@ export class FileComponentBuilder {
     public toJSON(): APIFileComponent {
         if (!this.#url) throw new Error("File component must have a URL.");
         const data: APIFileComponent = {
-            type: ComponentType.File,
+            type: ComponentEnum.File,
             file: { url: this.#url },
         };
         if (this.#spoiler !== undefined) data.spoiler = this.#spoiler;
@@ -638,7 +637,7 @@ export class FileComponentBuilder {
     }
 }
 
-export class SeparatorBuilder {
+export class CreateSeparator {
     #spacing?: 1 | 2;
     #divider?: boolean;
     public setSpacing(spacing: 1 | 2): this {
@@ -651,7 +650,7 @@ export class SeparatorBuilder {
     }
     public toJSON(): APISeparatorComponent {
         const data: APISeparatorComponent = {
-            type: ComponentType.Separator,
+            type: ComponentEnum.Separator,
         };
         if (this.#spacing !== undefined) data.spacing = this.#spacing;
         if (this.#divider !== undefined) data.divider = this.#divider;
@@ -659,7 +658,7 @@ export class SeparatorBuilder {
     }
 }
 
-export class ThumbnailBuilder {
+export class CreateThumbnail {
     #url = "";
     #description?: string;
     #spoiler?: boolean;
@@ -681,7 +680,7 @@ export class ThumbnailBuilder {
     }
     public toJSON(): APIThumbnailComponent {
         const data: APIThumbnailComponent = {
-            type: ComponentType.Thumbnail,
+            type: ComponentEnum.Thumbnail,
             url: this.#url,
         };
         if (this.#description !== undefined)
@@ -691,7 +690,7 @@ export class ThumbnailBuilder {
     }
 }
 
-export class ContentInventoryEntryBuilder {
+export class CreateContentInventoryEntry {
     #id = "";
     public setId(id: string): this {
         validateText(id, 100, "Content inventory entry ID");
@@ -700,7 +699,7 @@ export class ContentInventoryEntryBuilder {
     }
     public toJSON(): APIContentInventoryEntryComponent {
         return {
-            type: ComponentType.ContentInventoryEntry,
+            type: ComponentEnum.ContentInventoryEntry,
             id: this.#id,
         };
     }
@@ -732,30 +731,30 @@ function validateLength(value: number, field: string, max = 4000): void {
         );
 }
 
-/** Discord.js-familiar alias for {@link StringSelectBuilder}. */
-export { StringSelectBuilder as StringSelectMenuBuilder };
+/** Discord.js-familiar alias for {@link CreateStringSelect}. */
+export { CreateStringSelect as CreateStringSelectMenu };
 /** User select menu builder (Discord.js-familiar). */
-export class UserSelectMenuBuilder extends EntitySelectBuilder {
+export class CreateUserSelectMenu extends CreateEntitySelect {
     public constructor() {
-        super(ComponentType.UserSelect);
+        super(ComponentEnum.UserSelect);
     }
 }
 /** Role select menu builder (Discord.js-familiar). */
-export class RoleSelectMenuBuilder extends EntitySelectBuilder {
+export class CreateRoleSelectMenu extends CreateEntitySelect {
     public constructor() {
-        super(ComponentType.RoleSelect);
+        super(ComponentEnum.RoleSelect);
     }
 }
 /** Mentionable select menu builder (Discord.js-familiar). */
-export class MentionableSelectMenuBuilder extends EntitySelectBuilder {
+export class CreateMentionableSelectMenu extends CreateEntitySelect {
     public constructor() {
-        super(ComponentType.MentionableSelect);
+        super(ComponentEnum.MentionableSelect);
     }
 }
 /** Channel select menu builder (Discord.js-familiar). */
-export class ChannelSelectMenuBuilder extends EntitySelectBuilder {
+export class CreateChannelSelectMenu extends CreateEntitySelect {
     public constructor() {
-        super(ComponentType.ChannelSelect);
+        super(ComponentEnum.ChannelSelect);
     }
 }
 
@@ -779,7 +778,7 @@ const IS_COMPONENTS_V2 = 1 << 15;
  * Discord requires for them. A V2 message cannot also carry `content` or `embeds`.
  * @param components Top-level components (containers, sections, text displays, action rows...).
  * @param options Extra message fields, such as `allowed_mentions` or `ephemeral`; `flags` are combined.
- * @example channel.send(componentsV2Message(new ContainerBuilder().addComponents(new TextDisplayBuilder().setContent("Hi"))))
+ * @example channel.send(componentsV2Message(new CreateContainer().addComponents(new CreateTextDisplay().setContent("Hi"))))
  */
 export function componentsV2Message<
     T extends Record<string, unknown> = Record<string, never>,
@@ -798,3 +797,119 @@ export function componentsV2Message<
         flags: (options?.flags ?? 0) | IS_COMPONENTS_V2,
     };
 }
+
+// ─── Deprecated names (0.2.2), removed in 2.0 ────────────────────────────────
+// Builders are now `CreateX` (`ButtonBuilder` → `CreateButton`); `…Style` became
+// `…Type` and `…Type` became `…Enum`.
+
+/** @deprecated Use {@link CreateButton}. Removed in 2.0. */
+export const ButtonBuilder = CreateButton;
+/** @deprecated Use {@link CreateButton}. Removed in 2.0. */
+export type ButtonBuilder = CreateButton;
+
+/** @deprecated Use {@link CreateChannelSelectMenu}. Removed in 2.0. */
+export const ChannelSelectMenuBuilder = CreateChannelSelectMenu;
+/** @deprecated Use {@link CreateChannelSelectMenu}. Removed in 2.0. */
+export type ChannelSelectMenuBuilder = CreateChannelSelectMenu;
+
+/** @deprecated Use {@link CreateContainer}. Removed in 2.0. */
+export const ContainerBuilder = CreateContainer;
+/** @deprecated Use {@link CreateContainer}. Removed in 2.0. */
+export type ContainerBuilder = CreateContainer;
+
+/** @deprecated Use {@link CreateContentInventoryEntry}. Removed in 2.0. */
+export const ContentInventoryEntryBuilder = CreateContentInventoryEntry;
+/** @deprecated Use {@link CreateContentInventoryEntry}. Removed in 2.0. */
+export type ContentInventoryEntryBuilder = CreateContentInventoryEntry;
+
+/** @deprecated Use {@link CreateEntitySelect}. Removed in 2.0. */
+export const EntitySelectBuilder = CreateEntitySelect;
+/** @deprecated Use {@link CreateEntitySelect}. Removed in 2.0. */
+export type EntitySelectBuilder = CreateEntitySelect;
+
+/** @deprecated Use {@link CreateFileComponent}. Removed in 2.0. */
+export const FileComponentBuilder = CreateFileComponent;
+/** @deprecated Use {@link CreateFileComponent}. Removed in 2.0. */
+export type FileComponentBuilder = CreateFileComponent;
+
+/** @deprecated Use {@link CreateMediaGallery}. Removed in 2.0. */
+export const MediaGalleryBuilder = CreateMediaGallery;
+/** @deprecated Use {@link CreateMediaGallery}. Removed in 2.0. */
+export type MediaGalleryBuilder = CreateMediaGallery;
+
+/** @deprecated Use {@link CreateMentionableSelectMenu}. Removed in 2.0. */
+export const MentionableSelectMenuBuilder = CreateMentionableSelectMenu;
+/** @deprecated Use {@link CreateMentionableSelectMenu}. Removed in 2.0. */
+export type MentionableSelectMenuBuilder = CreateMentionableSelectMenu;
+
+/** @deprecated Use {@link CreateModal}. Removed in 2.0. */
+export const ModalBuilder = CreateModal;
+/** @deprecated Use {@link CreateModal}. Removed in 2.0. */
+export type ModalBuilder = CreateModal;
+
+/** @deprecated Use {@link CreateRoleSelectMenu}. Removed in 2.0. */
+export const RoleSelectMenuBuilder = CreateRoleSelectMenu;
+/** @deprecated Use {@link CreateRoleSelectMenu}. Removed in 2.0. */
+export type RoleSelectMenuBuilder = CreateRoleSelectMenu;
+
+/** @deprecated Use {@link CreateSection}. Removed in 2.0. */
+export const SectionBuilder = CreateSection;
+/** @deprecated Use {@link CreateSection}. Removed in 2.0. */
+export type SectionBuilder = CreateSection;
+
+/** @deprecated Use {@link CreateSeparator}. Removed in 2.0. */
+export const SeparatorBuilder = CreateSeparator;
+/** @deprecated Use {@link CreateSeparator}. Removed in 2.0. */
+export type SeparatorBuilder = CreateSeparator;
+
+/** @deprecated Use {@link CreateStringSelect}. Removed in 2.0. */
+export const StringSelectBuilder = CreateStringSelect;
+/** @deprecated Use {@link CreateStringSelect}. Removed in 2.0. */
+export type StringSelectBuilder = CreateStringSelect;
+
+/** @deprecated Use {@link CreateStringSelectMenu}. Removed in 2.0. */
+export const StringSelectMenuBuilder = CreateStringSelect;
+/** @deprecated Use {@link CreateStringSelectMenu}. Removed in 2.0. */
+export type StringSelectMenuBuilder = CreateStringSelect;
+
+/** @deprecated Use {@link CreateTextDisplay}. Removed in 2.0. */
+export const TextDisplayBuilder = CreateTextDisplay;
+/** @deprecated Use {@link CreateTextDisplay}. Removed in 2.0. */
+export type TextDisplayBuilder = CreateTextDisplay;
+
+/** @deprecated Use {@link CreateTextInput}. Removed in 2.0. */
+export const TextInputBuilder = CreateTextInput;
+/** @deprecated Use {@link CreateTextInput}. Removed in 2.0. */
+export type TextInputBuilder = CreateTextInput;
+
+/** @deprecated Use {@link CreateThumbnail}. Removed in 2.0. */
+export const ThumbnailBuilder = CreateThumbnail;
+/** @deprecated Use {@link CreateThumbnail}. Removed in 2.0. */
+export type ThumbnailBuilder = CreateThumbnail;
+
+/** @deprecated Use {@link CreateUserSelectMenu}. Removed in 2.0. */
+export const UserSelectMenuBuilder = CreateUserSelectMenu;
+/** @deprecated Use {@link CreateUserSelectMenu}. Removed in 2.0. */
+export type UserSelectMenuBuilder = CreateUserSelectMenu;
+
+/** @deprecated Use {@link CreateActionRow}. Removed in 2.0. */
+export const ActionRowBuilder = CreateActionRow;
+/** @deprecated Use {@link CreateActionRow}. Removed in 2.0. */
+export type ActionRowBuilder<
+    T extends { toJSON(): APIActionRowChild } = { toJSON(): APIActionRowChild },
+> = CreateActionRow<T>;
+
+/** @deprecated Use {@link ButtonType}. Removed in 2.0. */
+export const ButtonStyle = ButtonType;
+/** @deprecated Use {@link ButtonType}. Removed in 2.0. */
+export type ButtonStyle = ButtonType;
+
+/** @deprecated Use {@link TextInputType}. Removed in 2.0. */
+export const TextInputStyle = TextInputType;
+/** @deprecated Use {@link TextInputType}. Removed in 2.0. */
+export type TextInputStyle = TextInputType;
+
+/** @deprecated Use {@link ComponentEnum}. Removed in 2.0. */
+export const ComponentType = ComponentEnum;
+/** @deprecated Use {@link ComponentEnum}. Removed in 2.0. */
+export type ComponentType = ComponentEnum;

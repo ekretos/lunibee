@@ -30,7 +30,7 @@ export interface APIEmbed {
 }
 
 /** Builds compile-time-safe rich embed payloads for Discord API requests. */
-export class EmbedBuilder {
+export class CreateEmbed {
     readonly #data: APIEmbed = {};
     /** Sets the embed title. @param value Title text, or null to clear. @returns This builder. @throws {RangeError} If title exceeds Discord's limit. */ public setTitle(
         value: string | null,
@@ -203,3 +203,12 @@ function url(value: string, field: string): string {
         throw new TypeError(`${field} must be a valid URL.`, { cause: error });
     }
 }
+
+// ─── Deprecated names (0.2.2), removed in 2.0 ────────────────────────────────
+// Builders are now `CreateX` (`ButtonBuilder` → `CreateButton`); `…Style` became
+// `…Type` and `…Type` became `…Enum`.
+
+/** @deprecated Use {@link CreateEmbed}. Removed in 2.0. */
+export const EmbedBuilder = CreateEmbed;
+/** @deprecated Use {@link CreateEmbed}. Removed in 2.0. */
+export type EmbedBuilder = CreateEmbed;

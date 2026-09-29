@@ -41,7 +41,7 @@ Triggered when a user executes a Slash Command.
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { Client, EmbedBuilder, MessageFlags } from "lunibee";
+import { Client, CreateEmbed, MessageFlags } from "lunibee";
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
@@ -51,7 +51,7 @@ client.on("interactionCreate", async (interaction) => {
   if (commandName === "userinfo") {
     const targetUser = options.getUser("target") ?? interaction.user;
 
-    const embed = new EmbedBuilder()
+    const embed = new CreateEmbed()
       .setTitle(`User Info - ${targetUser.username}`)
       .setThumbnail(`https://cdn.discordapp.com/avatars/${targetUser.id}/${targetUser.avatar}.png`)
       .addFields(
@@ -69,7 +69,7 @@ client.on("interactionCreate", async (interaction) => {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { Client, EmbedBuilder, MessageFlags } from "lunibee";
+import { Client, CreateEmbed, MessageFlags } from "lunibee";
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
@@ -79,7 +79,7 @@ client.on("interactionCreate", async (interaction) => {
   if (commandName === "userinfo") {
     const targetUser = options.getUser("target") ?? interaction.user;
 
-    const embed = new EmbedBuilder()
+    const embed = new CreateEmbed()
       .setTitle(`User Info - ${targetUser.username}`)
       .setThumbnail(`https://cdn.discordapp.com/avatars/${targetUser.id}/${targetUser.avatar}.png`)
       .addFields(

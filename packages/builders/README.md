@@ -8,31 +8,31 @@ bun add @lunibee/builders
 
 ```ts
 import {
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    StringSelectMenuBuilder,
-    SlashCommandBuilder,
+    CreateEmbed,
+    CreateActionRow,
+    CreateButton,
+    ButtonType,
+    CreateStringSelectMenu,
+    CreateSlashCommand,
 } from "@lunibee/builders";
 
-const embed = new EmbedBuilder()
+const embed = new CreateEmbed()
     .setTitle("Welcome")
     .setDescription("Pick a role below.")
     .setColor(0xf5c542)
     .addFields([{ name: "Server", value: "Lunibee" }]);
 
-const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("yes").setLabel("Yes").setStyle(ButtonStyle.Success),
+const buttons = new CreateActionRow().addComponents(
+    new CreateButton().setCustomId("yes").setLabel("Yes").setStyle(ButtonType.Success),
 );
 
-const menu = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
+const menu = new CreateActionRow().addComponents(
+    new CreateStringSelectMenu()
         .setCustomId("role")
         .addOptions({ label: "Developer", value: "dev" }),
 );
 
-const ping = new SlashCommandBuilder()
+const ping = new CreateSlashCommand()
     .setName("ping")
     .setDescription("Replies with pong")
     .addStringOption((option) => option.setName("message").setDescription("Echo text"));
@@ -44,26 +44,26 @@ console.log(embed.toJSON(), buttons.toJSON(), menu.toJSON(), ping.toJSON());
 
 | Area | Builders |
 |---|---|
-| Embeds | `EmbedBuilder` |
-| Buttons & rows | `ButtonBuilder`, `ActionRowBuilder` |
-| Select menus | `StringSelectBuilder` (alias `StringSelectMenuBuilder`), `EntitySelectBuilder`, `UserSelectMenuBuilder`, `RoleSelectMenuBuilder`, `ChannelSelectMenuBuilder`, `MentionableSelectMenuBuilder` |
-| Modals | `ModalBuilder`, `TextInputBuilder` |
-| Slash commands | `SlashCommandBuilder`, `SubcommandBuilder`, `SubcommandGroupBuilder`, option builders |
-| Context menus | `ContextMenuCommandBuilder` (`setType(2 \| 3)`), `UserCommandBuilder`, `MessageCommandBuilder` |
-| Components V2 | `ContainerBuilder`, `SectionBuilder`, `TextDisplayBuilder`, `MediaGalleryBuilder`, `FileComponentBuilder`, `SeparatorBuilder`, `ThumbnailBuilder` |
-| Files | `AttachmentBuilder` |
+| Embeds | `CreateEmbed` |
+| Buttons & rows | `CreateButton`, `CreateActionRow` |
+| Select menus | `CreateStringSelect` (alias `CreateStringSelectMenu`), `CreateEntitySelect`, `CreateUserSelectMenu`, `CreateRoleSelectMenu`, `CreateChannelSelectMenu`, `CreateMentionableSelectMenu` |
+| Modals | `CreateModal`, `CreateTextInput` |
+| Slash commands | `CreateSlashCommand`, `CreateSubcommand`, `CreateSubcommandGroup`, option builders |
+| Context menus | `CreateContextMenuCommand` (`setType(2 \| 3)`), `CreateUserCommand`, `CreateMessageCommand` |
+| Components V2 | `CreateContainer`, `CreateSection`, `CreateTextDisplay`, `CreateMediaGallery`, `CreateFileComponent`, `CreateSeparator`, `CreateThumbnail` |
+| Files | `CreateAttachment` |
 
 Every builder validates Discord's limits as you set values and serialises with `toJSON()`.
 
 ## What's new in 0.2.1
 
-- `ModalBuilder.addTextInputs(...inputs)` wraps each text input in its own row.
+- `CreateModal.addTextInputs(...inputs)` wraps each text input in its own row.
 - `componentsV2Message(components, options?)` builds a Components V2 message with the required flag.
-- `EmbedBuilder` setters (`setTitle`, `setDescription`, `setURL`, `setThumbnail`, `setImage`) clear the field with `null`.
-- `TextInputStyle` and `ComponentType` are usable as types; `ModalBuilder.toJSON()` is typed with a required `custom_id` and `title`.
+- `CreateEmbed` setters (`setTitle`, `setDescription`, `setURL`, `setThumbnail`, `setImage`) clear the field with `null`.
+- `TextInputType` and `ComponentEnum` are usable as types; `CreateModal.toJSON()` is typed with a required `custom_id` and `title`.
 
 ## What's new in 0.2.0
 
-`toJSON()` validates whole components (required fields, value bounds, action-row rules, button field exclusivity); `ButtonBuilder.setSKUId()` for premium buttons.
+`toJSON()` validates whole components (required fields, value bounds, action-row rules, button field exclusivity); `CreateButton.setSKUId()` for premium buttons.
 
 Docs: https://lunibee.js.org/core-concepts/builders/

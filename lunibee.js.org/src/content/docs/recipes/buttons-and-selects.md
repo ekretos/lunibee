@@ -9,18 +9,18 @@ Discord components allow users to trigger bot actions directly from message atta
 ## Sending Buttons
 
 ```ts
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
+import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
 client.on("messageCreate", async (message) => {
   if (message.content === "!buttons") {
-    const accept = new ButtonBuilder()
+    const accept = new CreateButton()
       .setCustomId("btn_accept")
       .setLabel("Accept")
-      .setStyle(ButtonStyle.Success);
-    const decline = new ButtonBuilder()
+      .setStyle(ButtonType.Success);
+    const decline = new CreateButton()
       .setCustomId("btn_decline")
       .setLabel("Decline")
-      .setStyle(ButtonStyle.Danger);
-    const row = new ActionRowBuilder().addComponents(accept, decline);
+      .setStyle(ButtonType.Danger);
+    const row = new CreateActionRow().addComponents(accept, decline);
     await message.reply({
       content: "Do you agree to the server rules?",
       components: [row],

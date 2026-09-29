@@ -8,7 +8,7 @@ export interface AttachmentData {
 }
 
 /** Builder for message attachments and file uploads. */
-export class AttachmentBuilder {
+export class CreateAttachment {
     public name: string;
     public description?: string;
     public file: Uint8Array | ArrayBuffer | Blob | Buffer | string;
@@ -68,3 +68,12 @@ export class AttachmentBuilder {
         );
     }
 }
+
+// ─── Deprecated names (0.2.2), removed in 2.0 ────────────────────────────────
+// Builders are now `CreateX` (`ButtonBuilder` → `CreateButton`); `…Style` became
+// `…Type` and `…Type` became `…Enum`.
+
+/** @deprecated Use {@link CreateAttachment}. Removed in 2.0. */
+export const AttachmentBuilder = CreateAttachment;
+/** @deprecated Use {@link CreateAttachment}. Removed in 2.0. */
+export type AttachmentBuilder = CreateAttachment;

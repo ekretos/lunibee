@@ -187,7 +187,7 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "serverinfo") return;
   const guild = client.guilds.get(interaction.guildId!);
   if (!guild) return;
-  const embed = new EmbedBuilder()
+  const embed = new CreateEmbed()
     .setTitle(guild.name)
     .setThumbnail(guild.iconURL({ size: 128 }) ?? "")
     .addFields(
@@ -206,7 +206,7 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "serverinfo") return;
   const guild = client.guilds.get(interaction.guildId);
   if (!guild) return;
-  const embed = new EmbedBuilder()
+  const embed = new CreateEmbed()
     .setTitle(guild.name)
     .setThumbnail(guild.iconURL({ size: 128 }) ?? "")
     .addFields(

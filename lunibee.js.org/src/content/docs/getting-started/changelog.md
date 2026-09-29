@@ -3,6 +3,21 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
+## Unreleased (0.2.2)
+
+### ✏️ New names
+
+Builders are now `CreateX`, `…Style` constants are `…Type`, and `…Type` constants are `…Enum`; every `…Enum` and `…Type` also works as a type. **The old names still work** as deprecated aliases (your editor shows them struck through) and are removed in 2.0. See [Upgrading](/getting-started/upgrading/).
+
+| Before | Now |
+|---|---|
+| `ButtonBuilder`, `EmbedBuilder`, `ModalBuilder`, `SlashCommandBuilder`… (every `XBuilder`) | `CreateButton`, `CreateEmbed`, `CreateModal`, `CreateSlashCommand`… (`CreateX`) |
+| `ButtonStyle`, `TextInputStyle` | `ButtonType`, `TextInputType` |
+| `ChannelType`, `ComponentType`, `InteractionType`, `InteractionResponseType` | `ChannelEnum`, `ComponentEnum`, `InteractionEnum`, `InteractionResponseEnum` |
+| `ApplicationCommandType`, `ApplicationCommandOptionType` | `ApplicationCommandEnum`, `ApplicationCommandOptionEnum` |
+| `StickerType`, `StickerFormatType`, `WebhookType`, `PermissionOverwriteType` | `StickerEnum`, `StickerFormatEnum`, `WebhookEnum`, `PermissionOverwriteEnum` |
+| *(new)* | `ActivityEnum` (`Playing`, `Streaming`, `Listening`, `Watching`, `Custom`, `Competing`) |
+
 ## v0.2.1
 
 ### ✨ Friendlier API

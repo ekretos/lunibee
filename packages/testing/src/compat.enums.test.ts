@@ -5,19 +5,19 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
-    ComponentType as TypesComponentType,
-    ButtonStyle as TypesButtonStyle,
-    ChannelType,
+    ComponentEnum as TypesComponentType,
+    ButtonType as TypesButtonStyle,
+    ChannelEnum,
     GatewayIntentBits,
-    InteractionResponseType,
-    TextInputStyle,
+    InteractionResponseEnum,
+    TextInputType,
 } from "@lunibee/types";
 import {
-    ComponentType as BuildersComponentType,
-    ButtonStyle as BuildersButtonStyle,
+    ComponentEnum as BuildersComponentType,
+    ButtonType as BuildersButtonStyle,
 } from "@lunibee/builders";
 
-describe("Enum wire values — ComponentType", () => {
+describe("Enum wire values — ComponentEnum", () => {
     test("match Discord's documented component type numbers", () => {
         expect(TypesComponentType.ActionRow).toBe(1);
         expect(TypesComponentType.Button).toBe(2);
@@ -35,7 +35,7 @@ describe("Enum wire values — ComponentType", () => {
         expect(TypesComponentType.Separator).toBe(14);
         expect(TypesComponentType.Container).toBe(17);
     });
-    test("builders ComponentType does not drift from the canonical types ComponentType", () => {
+    test("builders ComponentEnum does not drift from the canonical types ComponentEnum", () => {
         for (const key of Object.keys(TypesComponentType) as Array<
             keyof typeof TypesComponentType
         >)
@@ -43,7 +43,7 @@ describe("Enum wire values — ComponentType", () => {
     });
 });
 
-describe("Enum wire values — ButtonStyle", () => {
+describe("Enum wire values — ButtonType", () => {
     test("match Discord's documented button style numbers", () => {
         expect(TypesButtonStyle.Primary).toBe(1);
         expect(TypesButtonStyle.Secondary).toBe(2);
@@ -52,9 +52,9 @@ describe("Enum wire values — ButtonStyle", () => {
         expect(TypesButtonStyle.Link).toBe(5);
         expect(TypesButtonStyle.Premium).toBe(6);
     });
-    // @lunibee/builders' ButtonStyle must not drift from @lunibee/types (e.g. `Premium: 6`),
-    // or .setStyle(ButtonStyle.Premium) would build an invalid Discord payload.
-    test("builders ButtonStyle does not drift from the canonical types ButtonStyle", () => {
+    // @lunibee/builders' ButtonType must not drift from @lunibee/types (e.g. `Premium: 6`),
+    // or .setStyle(ButtonType.Premium) would build an invalid Discord payload.
+    test("builders ButtonType does not drift from the canonical types ButtonType", () => {
         for (const key of Object.keys(TypesButtonStyle) as Array<
             keyof typeof TypesButtonStyle
         >)
@@ -62,20 +62,20 @@ describe("Enum wire values — ButtonStyle", () => {
     });
 });
 
-describe("Enum wire values — ChannelType", () => {
+describe("Enum wire values — ChannelEnum", () => {
     test("match Discord's documented channel type numbers", () => {
-        expect(ChannelType.GuildText).toBe(0);
-        expect(ChannelType.DM).toBe(1);
-        expect(ChannelType.GuildVoice).toBe(2);
-        expect(ChannelType.GroupDM).toBe(3);
-        expect(ChannelType.GuildCategory).toBe(4);
-        expect(ChannelType.GuildAnnouncement).toBe(5);
-        expect(ChannelType.AnnouncementThread).toBe(10);
-        expect(ChannelType.PublicThread).toBe(11);
-        expect(ChannelType.PrivateThread).toBe(12);
-        expect(ChannelType.GuildStageVoice).toBe(13);
-        expect(ChannelType.GuildForum).toBe(15);
-        expect(ChannelType.GuildMedia).toBe(16);
+        expect(ChannelEnum.GuildText).toBe(0);
+        expect(ChannelEnum.DM).toBe(1);
+        expect(ChannelEnum.GuildVoice).toBe(2);
+        expect(ChannelEnum.GroupDM).toBe(3);
+        expect(ChannelEnum.GuildCategory).toBe(4);
+        expect(ChannelEnum.GuildAnnouncement).toBe(5);
+        expect(ChannelEnum.AnnouncementThread).toBe(10);
+        expect(ChannelEnum.PublicThread).toBe(11);
+        expect(ChannelEnum.PrivateThread).toBe(12);
+        expect(ChannelEnum.GuildStageVoice).toBe(13);
+        expect(ChannelEnum.GuildForum).toBe(15);
+        expect(ChannelEnum.GuildMedia).toBe(16);
     });
 });
 
@@ -94,20 +94,20 @@ describe("Enum wire values — GatewayIntentBits", () => {
     });
 });
 
-describe("Enum wire values — InteractionResponseType & TextInputStyle", () => {
+describe("Enum wire values — InteractionResponseEnum & TextInputType", () => {
     test("interaction response callback types match Discord numbers", () => {
         // Discord names differ (ChannelMessageWithSource, UpdateMessage, ...),
         // but the wire numbers must match exactly.
-        expect(InteractionResponseType.Pong).toBe(1);
-        expect(InteractionResponseType.ChannelMessage).toBe(4);
-        expect(InteractionResponseType.DeferredChannelMessage).toBe(5);
-        expect(InteractionResponseType.DeferredMessageUpdate).toBe(6);
-        expect(InteractionResponseType.MessageUpdate).toBe(7);
-        expect(InteractionResponseType.Autocomplete).toBe(8);
-        expect(InteractionResponseType.Modal).toBe(9);
+        expect(InteractionResponseEnum.Pong).toBe(1);
+        expect(InteractionResponseEnum.ChannelMessage).toBe(4);
+        expect(InteractionResponseEnum.DeferredChannelMessage).toBe(5);
+        expect(InteractionResponseEnum.DeferredMessageUpdate).toBe(6);
+        expect(InteractionResponseEnum.MessageUpdate).toBe(7);
+        expect(InteractionResponseEnum.Autocomplete).toBe(8);
+        expect(InteractionResponseEnum.Modal).toBe(9);
     });
     test("text input styles match Discord numbers", () => {
-        expect(TextInputStyle.Short).toBe(1);
-        expect(TextInputStyle.Paragraph).toBe(2);
+        expect(TextInputType.Short).toBe(1);
+        expect(TextInputType.Paragraph).toBe(2);
     });
 });

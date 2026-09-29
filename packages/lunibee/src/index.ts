@@ -104,13 +104,20 @@ export {
     IntentsBitField,
     resolveGatewayIntents,
     MessageFlags,
+    ChannelEnum,
+    ApplicationCommandOptionEnum,
+    ApplicationCommandEnum,
+    StickerFormatEnum,
+    StickerEnum,
+    ActivityEnum,
+    VerificationLevel,
+    PremiumTier,
+    // Deprecated names, removed in 2.0 (`…Type` became `…Enum`).
     ChannelType,
     ApplicationCommandOptionType,
     ApplicationCommandType,
     StickerFormatType,
     StickerType,
-    VerificationLevel,
-    PremiumTier,
 } from "@lunibee/types";
 
 // ── Builders (takes priority over types for component enums) ──────────────────
@@ -134,17 +141,17 @@ export {
 } from "@lunibee/structures";
 
 export {
-    EmbedBuilder,
-    SlashCommandBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    StringSelectBuilder,
-    EntitySelectBuilder,
-    ModalBuilder,
-    TextInputBuilder,
-    TextInputStyle,
-    ActionRowBuilder,
-    AttachmentBuilder,
+    CreateEmbed,
+    CreateSlashCommand,
+    CreateButton,
+    ButtonType,
+    CreateStringSelect,
+    CreateEntitySelect,
+    CreateModal,
+    CreateTextInput,
+    TextInputType,
+    CreateActionRow,
+    CreateAttachment,
 } from "@lunibee/builders";
 
 export { Gateway } from "@lunibee/ws";

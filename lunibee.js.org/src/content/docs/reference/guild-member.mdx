@@ -120,7 +120,7 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "memberinfo") return;
   const member = interaction.member;
   if (!member) return;
-  const embed = new EmbedBuilder()
+  const embed = new CreateEmbed()
     .setTitle(member.displayName)
     .setThumbnail(member.displayAvatarURL({ size: 128 }))
     .addFields(
@@ -138,7 +138,7 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "memberinfo") return;
   const member = interaction.member;
   if (!member) return;
-  const embed = new EmbedBuilder()
+  const embed = new CreateEmbed()
     .setTitle(member.displayName)
     .setThumbnail(member.displayAvatarURL({ size: 128 }))
     .addFields(

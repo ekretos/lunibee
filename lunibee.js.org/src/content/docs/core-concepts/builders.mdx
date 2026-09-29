@@ -13,8 +13,8 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { EmbedBuilder } from "lunibee";
-const embed = new EmbedBuilder()
+import { CreateEmbed } from "lunibee";
+const embed = new CreateEmbed()
   .setTitle("Lunibee Status 🐝")
   .setDescription("All systems fully operational.")
   .setColor(0xf59e0b)
@@ -29,8 +29,8 @@ const embed = new EmbedBuilder()
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { EmbedBuilder } from "lunibee";
-const embed = new EmbedBuilder()
+import { CreateEmbed } from "lunibee";
+const embed = new CreateEmbed()
   .setTitle("Lunibee Status 🐝")
   .setDescription("All systems fully operational.")
   .setColor(0xf59e0b)
@@ -50,17 +50,17 @@ const embed = new EmbedBuilder()
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
-const primaryBtn = new ButtonBuilder()
+import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
+const primaryBtn = new CreateButton()
   .setCustomId("primary_action")
   .setLabel("Click Me!")
-  .setStyle(ButtonStyle.Primary)
+  .setStyle(ButtonType.Primary)
   .setEmoji("🚀");
-const linkBtn = new ButtonBuilder()
+const linkBtn = new CreateButton()
   .setLabel("Documentation")
-  .setStyle(ButtonStyle.Link)
+  .setStyle(ButtonType.Link)
   .setURL("https://github.com/Ekretos/lunibee");
-const row = new ActionRowBuilder().addComponents(primaryBtn, linkBtn);
+const row = new CreateActionRow().addComponents(primaryBtn, linkBtn);
 await channel.send({
   content: "Choose an option:",
   components: [row],
@@ -69,17 +69,17 @@ await channel.send({
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
-const primaryBtn = new ButtonBuilder()
+import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
+const primaryBtn = new CreateButton()
   .setCustomId("primary_action")
   .setLabel("Click Me!")
-  .setStyle(ButtonStyle.Primary)
+  .setStyle(ButtonType.Primary)
   .setEmoji("🚀");
-const linkBtn = new ButtonBuilder()
+const linkBtn = new CreateButton()
   .setLabel("Documentation")
-  .setStyle(ButtonStyle.Link)
+  .setStyle(ButtonType.Link)
   .setURL("https://github.com/Ekretos/lunibee");
-const row = new ActionRowBuilder().addComponents(primaryBtn, linkBtn);
+const row = new CreateActionRow().addComponents(primaryBtn, linkBtn);
 await channel.send({
   content: "Choose an option:",
   components: [row],
@@ -93,28 +93,28 @@ await channel.send({
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { ActionRowBuilder, StringSelectBuilder } from "lunibee";
-const select = new StringSelectBuilder()
+import { CreateActionRow, CreateStringSelect } from "lunibee";
+const select = new CreateStringSelect()
   .setCustomId("select_role")
   .setPlaceholder("Select a role...")
   .addOptions(
     { label: "Developer", value: "dev", emoji: "💻" },
     { label: "Designer", value: "designer", emoji: "🎨" }
   );
-const row = new ActionRowBuilder().addComponents(select);
+const row = new CreateActionRow().addComponents(select);
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { ActionRowBuilder, StringSelectBuilder } from "lunibee";
-const select = new StringSelectBuilder()
+import { CreateActionRow, CreateStringSelect } from "lunibee";
+const select = new CreateStringSelect()
   .setCustomId("select_role")
   .setPlaceholder("Select a role...")
   .addOptions(
     { label: "Developer", value: "dev", emoji: "💻" },
     { label: "Designer", value: "designer", emoji: "🎨" }
   );
-const row = new ActionRowBuilder().addComponents(select);
+const row = new CreateActionRow().addComponents(select);
 ```
 </TabItem>
 </Tabs>
@@ -122,28 +122,28 @@ const row = new ActionRowBuilder().addComponents(select);
 ## Entity Select Menus
 
 For user, role, mentionable and channel pickers, use the fixed-type builders (or
-`EntitySelectBuilder` with a component type). `StringSelectMenuBuilder` is an alias of
-`StringSelectBuilder`.
+`CreateEntitySelect` with a component type). `CreateStringSelectMenu` is an alias of
+`CreateStringSelect`.
 
 ```ts
 import {
-  UserSelectMenuBuilder,
-  RoleSelectMenuBuilder,
-  ChannelSelectMenuBuilder,
-  MentionableSelectMenuBuilder,
+  CreateUserSelectMenu,
+  CreateRoleSelectMenu,
+  CreateChannelSelectMenu,
+  CreateMentionableSelectMenu,
 } from "lunibee";
 
-const pickUser = new UserSelectMenuBuilder().setCustomId("pick_user");
+const pickUser = new CreateUserSelectMenu().setCustomId("pick_user");
 ```
 
 ## Context Menu Commands
 
 ```ts
-import { ContextMenuCommandBuilder, UserCommandBuilder, MessageCommandBuilder } from "lunibee";
+import { CreateContextMenuCommand, CreateUserCommand, CreateMessageCommand } from "lunibee";
 
-new ContextMenuCommandBuilder().setName("Report").setType(3); // 2 = USER, 3 = MESSAGE
-new UserCommandBuilder().setName("View Profile");             // type 2
-new MessageCommandBuilder().setName("Quote");                  // type 3
+new CreateContextMenuCommand().setName("Report").setType(3); // 2 = USER, 3 = MESSAGE
+new CreateUserCommand().setName("View Profile");             // type 2
+new CreateMessageCommand().setName("Quote");                  // type 3
 ```
 
 ## Validation on Serialization

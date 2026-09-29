@@ -243,7 +243,7 @@ async function createCommand(): Promise<void> {
         throw new Error(`Command already exists: ${file}`);
     await writeFile(
         target,
-        `import { SlashCommandBuilder } from "lunibee";\n\nexport default new SlashCommandBuilder()\n  .setName(${JSON.stringify(name.replace(/\.ts$/, ""))})\n  .setDescription(${JSON.stringify(description)});\n`,
+        `import { CreateSlashCommand } from "lunibee";\n\nexport default new CreateSlashCommand()\n  .setName(${JSON.stringify(name.replace(/\.ts$/, ""))})\n  .setDescription(${JSON.stringify(description)});\n`,
     );
     console.log(`✓ created commands/${file}`);
 }

@@ -12,7 +12,7 @@ bunx lunibee help
 | Command | What it does |
 |---|---|
 | `lunibee create handler` | Pick client events interactively and create `src/events/<event>/<name>.ts` handlers, then regenerate `src/handlers/event.ts`, which exports `registerEvents(client)`. |
-| `lunibee create command` | Create `src/commands/<name>.ts` exporting a `SlashCommandBuilder`. |
+| `lunibee create command` | Create `src/commands/<name>.ts` exporting a `CreateSlashCommand`. |
 | `lunibee create component` | Create a button, string-select or modal stub in `src/components/`. |
 | `lunibee list handlers` / `lunibee list commands` | List what's under `src/events` / `src/commands`. |
 | `lunibee check` | Check for a Lunibee dependency and the `src`, `src/events` and `src/commands` folders. |

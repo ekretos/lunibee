@@ -1,23 +1,23 @@
 ---
-title: StringSelectBuilder
+title: CreateStringSelect
 description: Fluent builder for Discord string select menu components with options, placeholder, and limits.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`StringSelectBuilder` creates a string-based select menu component where users pick from a predefined list of text options.
+`CreateStringSelect` creates a string-based select menu component where users pick from a predefined list of text options.
 
 ## Import
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { StringSelectBuilder } from "lunibee";
+import { CreateStringSelect } from "lunibee";
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { StringSelectBuilder } from "lunibee";
+import { CreateStringSelect } from "lunibee";
 ```
 </TabItem>
 </Tabs>
@@ -155,10 +155,10 @@ Serializes to a raw Discord API-compatible component object.
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { ActionRowBuilder, StringSelectBuilder } from "lunibee";
+import { CreateActionRow, CreateStringSelect } from "lunibee";
 
-const row = new ActionRowBuilder<StringSelectBuilder>().addComponents(
-  new StringSelectBuilder()
+const row = new CreateActionRow<CreateStringSelect>().addComponents(
+  new CreateStringSelect()
     .setCustomId("role_select")
     .setPlaceholder("Pick up to 2 roles")
     .setMinValues(1)
@@ -186,10 +186,10 @@ client.on("interactionCreate", async (interaction) => {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { ActionRowBuilder, StringSelectBuilder } from "lunibee";
+import { CreateActionRow, CreateStringSelect } from "lunibee";
 
-const row = new ActionRowBuilder().addComponents(
-  new StringSelectBuilder()
+const row = new CreateActionRow().addComponents(
+  new CreateStringSelect()
     .setCustomId("role_select")
     .setPlaceholder("Pick up to 2 roles")
     .setMinValues(1)

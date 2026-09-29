@@ -1,23 +1,23 @@
 ---
-title: ModalBuilder
+title: CreateModal
 description: Fluent builder for Discord modal popup dialogs with text input fields.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`ModalBuilder` creates a modal popup form that Discord displays to a user. Modals can contain 1–5 `ActionRowBuilder<TextInputBuilder>` rows.
+`CreateModal` creates a modal popup form that Discord displays to a user. Modals can contain 1–5 `CreateActionRow<CreateTextInput>` rows.
 
 ## Import
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle } from "lunibee";
+import { CreateModal, CreateActionRow, CreateTextInput, TextInputType } from "lunibee";
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle } from "lunibee";
+import { CreateModal, CreateActionRow, CreateTextInput, TextInputType } from "lunibee";
 ```
 </TabItem>
 </Tabs>
@@ -60,17 +60,17 @@ modal.setTitle("Open a Support Ticket");
 
 ### `addComponents(...rows)`
 
-Adds `ActionRowBuilder<TextInputBuilder>` rows to the modal (1–5).
+Adds `CreateActionRow<CreateTextInput>` rows to the modal (1–5).
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
 modal.addComponents(
-  new ActionRowBuilder<TextInputBuilder>().addComponents(
-    new TextInputBuilder()
+  new CreateActionRow<CreateTextInput>().addComponents(
+    new CreateTextInput()
       .setCustomId("subject")
       .setLabel("Subject")
-      .setStyle(TextInputStyle.Short)
+      .setStyle(TextInputType.Short)
       .setRequired(true),
   ),
 );
@@ -79,11 +79,11 @@ modal.addComponents(
 <TabItem label="JavaScript">
 ```js
 modal.addComponents(
-  new ActionRowBuilder().addComponents(
-    new TextInputBuilder()
+  new CreateActionRow().addComponents(
+    new CreateTextInput()
       .setCustomId("subject")
       .setLabel("Subject")
-      .setStyle(TextInputStyle.Short)
+      .setStyle(TextInputType.Short)
       .setRequired(true),
   ),
 );
@@ -97,7 +97,7 @@ Serializes to a raw Discord API-compatible modal object.
 
 ---
 
-## `TextInputBuilder`
+## `CreateTextInput`
 
 ### Methods
 
@@ -105,7 +105,7 @@ Serializes to a raw Discord API-compatible modal object.
 |---|---|
 | `setCustomId(id)` | Unique ID for this field (used in `getRequiredInputValue()`). |
 | `setLabel(label)` | The visible field label (max 45 chars). |
-| `setStyle(style)` | `TextInputStyle.Short` (single line) or `TextInputStyle.Paragraph` (multi-line). |
+| `setStyle(style)` | `TextInputType.Short` (single line) or `TextInputType.Paragraph` (multi-line). |
 | `setRequired(required)` | Whether the field is required. |
 | `setValue(value)` | Pre-filled default value. |
 | `setPlaceholder(text)` | Placeholder text (max 100 chars). |
@@ -118,29 +118,29 @@ Serializes to a raw Discord API-compatible modal object.
 <TabItem label="TypeScript">
 ```ts
 import {
-  ModalBuilder,
-  ActionRowBuilder,
-  TextInputBuilder,
-  TextInputStyle,
+  CreateModal,
+  CreateActionRow,
+  CreateTextInput,
+  TextInputType,
 } from "lunibee";
 
 // Build the modal
-const modal = new ModalBuilder()
+const modal = new CreateModal()
   .setCustomId("report_form")
   .setTitle("Report a User")
   .addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
+    new CreateActionRow<CreateTextInput>().addComponents(
+      new CreateTextInput()
         .setCustomId("reported_user")
         .setLabel("Reported User ID or Username")
-        .setStyle(TextInputStyle.Short)
+        .setStyle(TextInputType.Short)
         .setRequired(true),
     ),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
+    new CreateActionRow<CreateTextInput>().addComponents(
+      new CreateTextInput()
         .setCustomId("reason")
         .setLabel("Reason for reporting")
-        .setStyle(TextInputStyle.Paragraph)
+        .setStyle(TextInputType.Paragraph)
         .setRequired(true)
         .setMaxLength(1000),
     ),
@@ -167,29 +167,29 @@ client.on("interactionCreate", async (interaction) => {
 <TabItem label="JavaScript">
 ```js
 import {
-  ModalBuilder,
-  ActionRowBuilder,
-  TextInputBuilder,
-  TextInputStyle,
+  CreateModal,
+  CreateActionRow,
+  CreateTextInput,
+  TextInputType,
 } from "lunibee";
 
 // Build the modal
-const modal = new ModalBuilder()
+const modal = new CreateModal()
   .setCustomId("report_form")
   .setTitle("Report a User")
   .addComponents(
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
+    new CreateActionRow().addComponents(
+      new CreateTextInput()
         .setCustomId("reported_user")
         .setLabel("Reported User ID or Username")
-        .setStyle(TextInputStyle.Short)
+        .setStyle(TextInputType.Short)
         .setRequired(true),
     ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
+    new CreateActionRow().addComponents(
+      new CreateTextInput()
         .setCustomId("reason")
         .setLabel("Reason for reporting")
-        .setStyle(TextInputStyle.Paragraph)
+        .setStyle(TextInputType.Paragraph)
         .setRequired(true)
         .setMaxLength(1000),
     ),
@@ -222,12 +222,12 @@ client.on("interactionCreate", async (interaction) => {
 Adds text inputs, each in its own action row (the layout Discord requires), so you do not build the rows yourself. A modal holds at most five.
 
 ```ts
-new ModalBuilder()
+new CreateModal()
   .setCustomId("feedback")
   .setTitle("Feedback")
   .addTextInputs(
-    new TextInputBuilder().setCustomId("title").setLabel("Subject").setStyle(TextInputStyle.Short),
-    new TextInputBuilder().setCustomId("body").setLabel("Details").setStyle(TextInputStyle.Paragraph),
+    new CreateTextInput().setCustomId("title").setLabel("Subject").setStyle(TextInputType.Short),
+    new CreateTextInput().setCustomId("body").setLabel("Details").setStyle(TextInputType.Paragraph),
   );
 ```
 

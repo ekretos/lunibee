@@ -11,7 +11,7 @@ import {
     GatewayIntentBits,
     IntentsBitField,
     resolveGatewayIntents,
-    ChannelType,
+    ChannelEnum,
     MessageFlags,
     type APIMessage,
 } from "@lunibee/types";
@@ -21,7 +21,7 @@ intents.add(GatewayIntentBits.MessageContent);
 resolveGatewayIntents(["Guilds", "GuildMessages"]); // number bitfield
 
 function isText(message: APIMessage, channelType: number): boolean {
-    return channelType === ChannelType.GuildText && !(message.flags! & MessageFlags.Ephemeral);
+    return channelType === ChannelEnum.GuildText && !(message.flags! & MessageFlags.Ephemeral);
 }
 ```
 
@@ -30,9 +30,9 @@ function isText(message: APIMessage, channelType: number): boolean {
 - `API*` payload interfaces: messages, channels, guilds, members, roles, emoji, stickers,
   invites, webhooks, automod, audit logs, scheduled events, stage instances, application
   commands, interactions and every gateway event (`APIReadyEvent`, `APIGuildBanEvent`, …).
-- Enums/consts: `ChannelType`, `ComponentType`, `ButtonStyle`, `MessageFlags`,
-  `ApplicationCommandType`, `ApplicationCommandOptionType`,
-  `InteractionResponseType`, `VerificationLevel`, `PremiumTier`, `StickerType`, …
+- Enums/consts: `ChannelEnum`, `ComponentEnum`, `ButtonType`, `MessageFlags`,
+  `ApplicationCommandEnum`, `ApplicationCommandOptionEnum`,
+  `InteractionResponseEnum`, `VerificationLevel`, `PremiumTier`, `StickerEnum`, …
 - Intents: `GatewayIntentBits` (PascalCase), `IntentBits` / `Intents` (camelCase),
   `IntentsBitField`, `resolveGatewayIntents`, `GatewayIntentResolvable`.
 - Gateway config types: `GatewayOptions`, `GatewayPresence`, `GatewayProperties`.
@@ -41,6 +41,6 @@ The package has no runtime dependencies.
 
 ## What's new in 0.2.1
 
-- `ButtonStyle`, `TextInputStyle`, `ComponentType` and `MessageFlags` are usable as types.
+- `ButtonType`, `TextInputType`, `ComponentEnum` and `MessageFlags` are usable as types.
 - `APIMessage.member`: the author's guild member on Gateway messages.
 

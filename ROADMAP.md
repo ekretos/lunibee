@@ -23,7 +23,9 @@ Day-to-day workflow (P0–P3 audits, the release checklist) lives in
   processes, and voice playback.
 - **Supported runtime**: Bun (the documented minimum version is tested in CI).
 
-1.0 keeps today's names (`Client`, `Guild`, `GuildManager`, `Collection`…).
+1.0 keeps today's names (`Client`, `Guild`, `GuildManager`, `Collection`…),
+with the 0.2.2 naming convention: builders `CreateX`, constant sets `…Enum`
+(`…Type` for styles). The pre-0.2.2 names are removed in 2.0, not in 1.x.
 The renames in [docs/lunibee-2-architecture.md](docs/lunibee-2-architecture.md)
 (`GuildResource`, `GuildService`, `Store`, `Fleet`…) are **2.0 work**: its own
 staging rule forbids breaking the public API before its Stage 4. The internal
@@ -66,12 +68,17 @@ Done and covered by tests (see the changelog and the audit docs):
 Each milestone is a normal release following AGENT.md's checklist (CI, coverage
 gate, docs build, changelog, upgrade notes).
 
-### 0.2.2 — small, non-breaking fixes
+### 0.2.2 — new names and small, non-breaking fixes
 
-The seven items in [CLAUDE.md](CLAUDE.md): context-menu commands, default
-`allowed_mentions`, CDN exports, `reply({ withResponse })`, `showModal()`
-accepting `toJSON()` output, exported component payload types, and message
-stickers/poll/snapshots.
+- **Naming (landed on `dev`):** builders are `CreateX` (`ButtonBuilder` →
+  `CreateButton`), `…Style` constants are `…Type` (`ButtonStyle` →
+  `ButtonType`), `…Type` constants are `…Enum` (`ChannelType` →
+  `ChannelEnum`), plus the new `ActivityEnum`. Old names stay as deprecated
+  aliases until 2.0. New code, docs and examples use the new names.
+- The seven items in [CLAUDE.md](CLAUDE.md): context-menu commands, default
+  `allowed_mentions`, CDN exports, `reply({ withResponse })`, `showModal()`
+  accepting `toJSON()` output, exported component payload types, and message
+  stickers/poll/snapshots.
 
 ### 0.3.0 — complete the platform
 
@@ -139,6 +146,7 @@ Ship when every item below is true.
 - [ ] Upgrade guide 0.2.x → 1.0 published
 - [ ] At least one production bot running the release candidate for two weeks without a Lunibee-caused incident
 - [ ] Semver and deprecation policy published in the README and docs
+- [ ] New constant sets follow the naming convention (`CreateX`, `…Enum`, `…Type` for styles)
 - [ ] `CHANGELOG`, package READMEs and `AGENT.md` release target set to 1.0.0
 
 ## Not in 1.0

@@ -147,7 +147,7 @@ The raw REST client is an escape hatch, not something you need for every Discord
 
 ```ts
 import { WebhookClient } from "@lunibee/rest";
-import { EmbedBuilder } from "@lunibee/builders";
+import { CreateEmbed } from "@lunibee/builders";
 
 const webhook = new WebhookClient({
   url: "https://discord.com/api/webhooks/123456789/abcdef...",
@@ -156,7 +156,7 @@ const webhook = new WebhookClient({
 await webhook.send({
   content: "Deployment Notification",
   embeds: [
-    new EmbedBuilder()
+    new CreateEmbed()
       .setTitle("Release v1.0")
       .setColor(0x57f287),
   ],

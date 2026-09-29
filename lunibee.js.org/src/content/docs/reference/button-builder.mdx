@@ -1,23 +1,23 @@
 ---
-title: ButtonBuilder
+title: CreateButton
 description: Fluent builder for Discord button components with style, label, emoji, and custom ID.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`ButtonBuilder` creates Discord button components for use inside `ActionRowBuilder`.
+`CreateButton` creates Discord button components for use inside `CreateActionRow`.
 
 ## Import
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { ButtonBuilder, ButtonStyle } from "lunibee";
+import { CreateButton, ButtonType } from "lunibee";
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { ButtonBuilder, ButtonStyle } from "lunibee";
+import { CreateButton, ButtonType } from "lunibee";
 ```
 </TabItem>
 </Tabs>
@@ -62,42 +62,42 @@ button.setLabel("Confirm");
 
 ### `setStyle(style)`
 
-Sets the button style. Use the `ButtonStyle` enum:
+Sets the button style. Use the `ButtonType` enum:
 
 | Constant | Value | Appearance |
 |---|---|---|
-| `ButtonStyle.Primary` | `1` | Blue |
-| `ButtonStyle.Secondary` | `2` | Gray |
-| `ButtonStyle.Success` | `3` | Green |
-| `ButtonStyle.Danger` | `4` | Red |
-| `ButtonStyle.Link` | `5` | URL link (gray, opens in browser) |
+| `ButtonType.Primary` | `1` | Blue |
+| `ButtonType.Secondary` | `2` | Gray |
+| `ButtonType.Success` | `3` | Green |
+| `ButtonType.Danger` | `4` | Red |
+| `ButtonType.Link` | `5` | URL link (gray, opens in browser) |
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-button.setStyle(ButtonStyle.Danger);
+button.setStyle(ButtonType.Danger);
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-button.setStyle(ButtonStyle.Danger);
+button.setStyle(ButtonType.Danger);
 ```
 </TabItem>
 </Tabs>
 
 ### `setURL(url)`
 
-Sets the URL for link buttons (`ButtonStyle.Link`). Link buttons cannot have a `customId`.
+Sets the URL for link buttons (`ButtonType.Link`). Link buttons cannot have a `customId`.
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-button.setStyle(ButtonStyle.Link).setURL("https://lunibee.js.org");
+button.setStyle(ButtonType.Link).setURL("https://lunibee.js.org");
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-button.setStyle(ButtonStyle.Link).setURL("https://lunibee.js.org");
+button.setStyle(ButtonType.Link).setURL("https://lunibee.js.org");
 ```
 </TabItem>
 </Tabs>
@@ -149,18 +149,18 @@ Serializes to a raw Discord component object.
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
+import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
 
-const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-  new ButtonBuilder()
+const row = new CreateActionRow<CreateButton>().addComponents(
+  new CreateButton()
     .setCustomId("confirm")
     .setLabel("Confirm")
-    .setStyle(ButtonStyle.Success)
+    .setStyle(ButtonType.Success)
     .setEmoji("✅"),
-  new ButtonBuilder()
+  new CreateButton()
     .setCustomId("cancel")
     .setLabel("Cancel")
-    .setStyle(ButtonStyle.Danger)
+    .setStyle(ButtonType.Danger)
     .setEmoji("❌"),
 );
 
@@ -179,18 +179,18 @@ client.on("interactionCreate", async (interaction) => {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "lunibee";
+import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
 
-const row = new ActionRowBuilder().addComponents(
-  new ButtonBuilder()
+const row = new CreateActionRow().addComponents(
+  new CreateButton()
     .setCustomId("confirm")
     .setLabel("Confirm")
-    .setStyle(ButtonStyle.Success)
+    .setStyle(ButtonType.Success)
     .setEmoji("✅"),
-  new ButtonBuilder()
+  new CreateButton()
     .setCustomId("cancel")
     .setLabel("Cancel")
-    .setStyle(ButtonStyle.Danger)
+    .setStyle(ButtonType.Danger)
     .setEmoji("❌"),
 );
 
@@ -214,10 +214,10 @@ client.on("interactionCreate", async (interaction) => {
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-const docsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-  new ButtonBuilder()
+const docsRow = new CreateActionRow<CreateButton>().addComponents(
+  new CreateButton()
     .setLabel("View Docs")
-    .setStyle(ButtonStyle.Link)
+    .setStyle(ButtonType.Link)
     .setURL("https://lunibee.js.org")
     .setEmoji("📚"),
 );
@@ -226,10 +226,10 @@ await channel.send({ content: "Need help?", components: [docsRow] });
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const docsRow = new ActionRowBuilder().addComponents(
-  new ButtonBuilder()
+const docsRow = new CreateActionRow().addComponents(
+  new CreateButton()
     .setLabel("View Docs")
-    .setStyle(ButtonStyle.Link)
+    .setStyle(ButtonType.Link)
     .setURL("https://lunibee.js.org")
     .setEmoji("📚"),
 );

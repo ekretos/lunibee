@@ -262,7 +262,7 @@ client.on("interactionCreate", async (interaction) => {
 <TabItem label="TypeScript">
 ```ts
 const activePerms = member.permissions.toArray();
-const embed = new EmbedBuilder()
+const embed = new CreateEmbed()
   .setTitle("Your Permissions")
   .setDescription(activePerms.map(p => `✅ ${p}`).join("\n") || "None");
 await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -271,7 +271,7 @@ await interaction.reply({ embeds: [embed], ephemeral: true });
 <TabItem label="JavaScript">
 ```js
 const activePerms = member.permissions.toArray();
-const embed = new EmbedBuilder()
+const embed = new CreateEmbed()
   .setTitle("Your Permissions")
   .setDescription(activePerms.map(p => `✅ ${p}`).join("\n") || "None");
 await interaction.reply({ embeds: [embed], ephemeral: true });

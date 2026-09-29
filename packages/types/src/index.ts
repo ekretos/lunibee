@@ -51,7 +51,7 @@ export const MessageFlags = {
 export type MessageFlags = (typeof MessageFlags)[keyof typeof MessageFlags];
 
 /** Discord channel types. */
-export const ChannelType = {
+export const ChannelEnum = {
     GuildText: 0,
     DM: 1,
     GuildVoice: 2,
@@ -66,9 +66,11 @@ export const ChannelType = {
     GuildForum: 15,
     GuildMedia: 16,
 } as const;
+/** One {@link ChannelEnum} value, usable as a type. */
+export type ChannelEnum = (typeof ChannelEnum)[keyof typeof ChannelEnum];
 
 /** Discord component types. */
-export const ComponentType = {
+export const ComponentEnum = {
     ActionRow: 1,
     Button: 2,
     StringSelect: 3,
@@ -86,11 +88,11 @@ export const ComponentType = {
     ContentInventoryEntry: 16,
     Container: 17,
 } as const;
-/** One {@link ComponentType} value, usable as a type. */
-export type ComponentType = (typeof ComponentType)[keyof typeof ComponentType];
+/** One {@link ComponentEnum} value, usable as a type. */
+export type ComponentEnum = (typeof ComponentEnum)[keyof typeof ComponentEnum];
 
 /** Discord button style types. */
-export const ButtonStyle = {
+export const ButtonType = {
     Primary: 1,
     Secondary: 2,
     Success: 3,
@@ -98,20 +100,19 @@ export const ButtonStyle = {
     Link: 5,
     Premium: 6,
 } as const;
-/** One {@link ButtonStyle} value, usable as a type: `style: ButtonStyle`. */
-export type ButtonStyle = (typeof ButtonStyle)[keyof typeof ButtonStyle];
+/** One {@link ButtonType} value, usable as a type: `style: ButtonType`. */
+export type ButtonType = (typeof ButtonType)[keyof typeof ButtonType];
 
 /** Discord text input style types. */
-export const TextInputStyle = {
+export const TextInputType = {
     Short: 1,
     Paragraph: 2,
 } as const;
-/** One {@link TextInputStyle} value, usable as a type. */
-export type TextInputStyle =
-    (typeof TextInputStyle)[keyof typeof TextInputStyle];
+/** One {@link TextInputType} value, usable as a type. */
+export type TextInputType = (typeof TextInputType)[keyof typeof TextInputType];
 
 /** Discord interaction response types. */
-export const InteractionResponseType = {
+export const InteractionResponseEnum = {
     Pong: 1,
     ChannelMessage: 4,
     DeferredChannelMessage: 5,
@@ -120,20 +121,28 @@ export const InteractionResponseType = {
     Autocomplete: 8,
     Modal: 9,
 } as const;
+/** One {@link InteractionResponseEnum} value, usable as a type. */
+export type InteractionResponseEnum =
+    (typeof InteractionResponseEnum)[keyof typeof InteractionResponseEnum];
 
 /** Discord sticker format types. */
-export const StickerFormatType = {
+export const StickerFormatEnum = {
     PNG: 1,
     APNG: 2,
     Lottie: 3,
     GIF: 4,
 } as const;
+/** One {@link StickerFormatEnum} value, usable as a type. */
+export type StickerFormatEnum =
+    (typeof StickerFormatEnum)[keyof typeof StickerFormatEnum];
 
 /** Discord sticker types. */
-export const StickerType = {
+export const StickerEnum = {
     Standard: 1,
     Guild: 2,
 } as const;
+/** One {@link StickerEnum} value, usable as a type. */
+export type StickerEnum = (typeof StickerEnum)[keyof typeof StickerEnum];
 
 /** Discord verification levels. */
 export const VerificationLevel = {
@@ -598,6 +607,18 @@ export interface APIVoiceServerUpdate {
 // ─── Presence ────────────────────────────────────────────────────────────────
 
 /** Raw Discord activity object. */
+/** Discord activity types, for presences (`setPresence({ activities: [{ name, type: ActivityEnum.Watching }] })`). */
+export const ActivityEnum = {
+    Playing: 0,
+    Streaming: 1,
+    Listening: 2,
+    Watching: 3,
+    Custom: 4,
+    Competing: 5,
+} as const;
+/** One {@link ActivityEnum} value, usable as a type. */
+export type ActivityEnum = (typeof ActivityEnum)[keyof typeof ActivityEnum];
+
 export interface APIActivity {
     name: string;
     type: number;
@@ -836,7 +857,7 @@ export interface APIStageInstance {
 // ─── Application Commands ─────────────────────────────────────────────────────
 
 /** Discord application command option types. */
-export const ApplicationCommandOptionType = {
+export const ApplicationCommandOptionEnum = {
     SubCommand: 1,
     SubCommandGroup: 2,
     String: 3,
@@ -849,13 +870,19 @@ export const ApplicationCommandOptionType = {
     Number: 10,
     Attachment: 11,
 } as const;
+/** One {@link ApplicationCommandOptionEnum} value, usable as a type. */
+export type ApplicationCommandOptionEnum =
+    (typeof ApplicationCommandOptionEnum)[keyof typeof ApplicationCommandOptionEnum];
 
 /** Discord application command types. */
-export const ApplicationCommandType = {
+export const ApplicationCommandEnum = {
     ChatInput: 1,
     User: 2,
     Message: 3,
 } as const;
+/** One {@link ApplicationCommandEnum} value, usable as a type. */
+export type ApplicationCommandEnum =
+    (typeof ApplicationCommandEnum)[keyof typeof ApplicationCommandEnum];
 
 /** Raw Discord application command option. */
 export interface APIApplicationCommandOption {
@@ -958,3 +985,44 @@ export interface APISubscription {
     canceled_at: string | null;
     country?: string;
 }
+
+// ─── Deprecated names (0.2.2) ────────────────────────────────────────────────
+// Kept so existing bots keep working; removed in 2.0. `…Style` became `…Type`
+// and `…Type` became `…Enum`.
+
+/** @deprecated Use {@link ButtonType}. Removed in 2.0. */
+export const ButtonStyle = ButtonType;
+/** @deprecated Use {@link ButtonType}. Removed in 2.0. */
+export type ButtonStyle = ButtonType;
+/** @deprecated Use {@link TextInputType}. Removed in 2.0. */
+export const TextInputStyle = TextInputType;
+/** @deprecated Use {@link TextInputType}. Removed in 2.0. */
+export type TextInputStyle = TextInputType;
+/** @deprecated Use {@link ChannelEnum}. Removed in 2.0. */
+export const ChannelType = ChannelEnum;
+/** @deprecated Use {@link ChannelEnum}. Removed in 2.0. */
+export type ChannelType = ChannelEnum;
+/** @deprecated Use {@link ComponentEnum}. Removed in 2.0. */
+export const ComponentType = ComponentEnum;
+/** @deprecated Use {@link ComponentEnum}. Removed in 2.0. */
+export type ComponentType = ComponentEnum;
+/** @deprecated Use {@link InteractionResponseEnum}. Removed in 2.0. */
+export const InteractionResponseType = InteractionResponseEnum;
+/** @deprecated Use {@link InteractionResponseEnum}. Removed in 2.0. */
+export type InteractionResponseType = InteractionResponseEnum;
+/** @deprecated Use {@link ApplicationCommandEnum}. Removed in 2.0. */
+export const ApplicationCommandType = ApplicationCommandEnum;
+/** @deprecated Use {@link ApplicationCommandEnum}. Removed in 2.0. */
+export type ApplicationCommandType = ApplicationCommandEnum;
+/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 2.0. */
+export const ApplicationCommandOptionType = ApplicationCommandOptionEnum;
+/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 2.0. */
+export type ApplicationCommandOptionType = ApplicationCommandOptionEnum;
+/** @deprecated Use {@link StickerEnum}. Removed in 2.0. */
+export const StickerType = StickerEnum;
+/** @deprecated Use {@link StickerEnum}. Removed in 2.0. */
+export type StickerType = StickerEnum;
+/** @deprecated Use {@link StickerFormatEnum}. Removed in 2.0. */
+export const StickerFormatType = StickerFormatEnum;
+/** @deprecated Use {@link StickerFormatEnum}. Removed in 2.0. */
+export type StickerFormatType = StickerFormatEnum;

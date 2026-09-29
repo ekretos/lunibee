@@ -329,6 +329,7 @@ export {
     TextChannel,
     Invite,
     Webhook,
+    WebhookEnum,
     WebhookType,
     Emoji,
     AutoModerationRule,

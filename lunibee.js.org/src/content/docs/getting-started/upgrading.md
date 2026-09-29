@@ -3,6 +3,30 @@ title: Upgrading
 description: Code changes needed when upgrading from 0.1.8 to 0.2.0, and from 0.2.0 to 0.2.1.
 ---
 
+## 0.2.1 → 0.2.2
+
+No code changes are required: the old names keep working until 2.0. To move to
+the new names, rename imports and uses:
+
+| Before | Now |
+|---|---|
+| `ButtonBuilder`, `EmbedBuilder`, `ModalBuilder`, `SlashCommandBuilder`… (every `XBuilder`) | `CreateButton`, `CreateEmbed`, `CreateModal`, `CreateSlashCommand`… (`CreateX`) |
+| `ButtonStyle`, `TextInputStyle` | `ButtonType`, `TextInputType` |
+| `ChannelType`, `ComponentType`, `InteractionType`, `InteractionResponseType` | `ChannelEnum`, `ComponentEnum`, `InteractionEnum`, `InteractionResponseEnum` |
+| `ApplicationCommandType`, `ApplicationCommandOptionType` | `ApplicationCommandEnum`, `ApplicationCommandOptionEnum` |
+| `StickerType`, `StickerFormatType`, `WebhookType`, `PermissionOverwriteType` | `StickerEnum`, `StickerFormatEnum`, `WebhookEnum`, `PermissionOverwriteEnum` |
+| *(new)* | `ActivityEnum` (`Playing`, `Streaming`, `Listening`, `Watching`, `Custom`, `Competing`) |
+
+```ts
+// before
+import { ButtonBuilder, ButtonStyle, ChannelType } from "lunibee";
+new ButtonBuilder().setStyle(ButtonStyle.Primary);
+
+// now
+import { CreateButton, ButtonType, ChannelEnum } from "lunibee";
+new CreateButton().setStyle(ButtonType.Primary);
+```
+
 ## 0.2.0 → 0.2.1
 
 0.2.1 adds APIs and needs no code changes, with two things to know:
@@ -13,7 +37,7 @@ description: Code changes needed when upgrading from 0.1.8 to 0.2.0, and from 0.
   cached roles, read fresh each time. If you relied on `0` meaning "unknown",
   check `client.guilds.roles(guildId).size` instead. Interaction members still
   report Discord's value.
-- **`ModalBuilder.toJSON()`** is typed with a required `custom_id` and `title`
+- **`CreateModal.toJSON()`** is typed with a required `custom_id` and `title`
   (it already required them at runtime).
 
 See the [changelog](/getting-started/changelog/) for the new APIs.
@@ -53,13 +77,13 @@ client was running and are still within the cache's `maxSize` and `ttl`.
 
 ```ts
 // Before: accepted locally, rejected by Discord
-new ButtonBuilder().setCustomId("ok");
+new CreateButton().setCustomId("ok");
 // After: give it a label or an emoji
-new ButtonBuilder().setCustomId("ok").setLabel("OK");
+new CreateButton().setCustomId("ok").setLabel("OK");
 
 // A select must be alone in its action row, and needs a custom ID.
-new ActionRowBuilder().addComponents(
-  new StringSelectBuilder().setCustomId("pick").addOptions({ label: "A", value: "a" }),
+new CreateActionRow().addComponents(
+  new CreateStringSelect().setCustomId("pick").addOptions({ label: "A", value: "a" }),
 );
 ```
 

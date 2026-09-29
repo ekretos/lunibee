@@ -14,9 +14,9 @@ bun add @lunibee/builders
 ## Embeds
 
 ```ts
-import { EmbedBuilder } from "@lunibee/builders";
+import { CreateEmbed } from "@lunibee/builders";
 
-const embed = new EmbedBuilder()
+const embed = new CreateEmbed()
   .setTitle("Server Moderation Log")
   .setDescription("A member was banned from the server.")
   .setColor(0xed4245)
@@ -30,9 +30,9 @@ You can add authors, footers, thumbnails, images, URLs, and fields as needed.
 ## Slash Commands
 
 ```ts
-import { SlashCommandBuilder } from "@lunibee/builders";
+import { CreateSlashCommand } from "@lunibee/builders";
 
-const command = new SlashCommandBuilder()
+const command = new CreateSlashCommand()
   .setName("ban")
   .setDescription("Bans a member from the server")
   .addUserOption(option =>
@@ -51,16 +51,16 @@ const payload = command.toJSON();
 
 ```ts
 import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
+  CreateActionRow,
+  CreateButton,
+  ButtonType,
 } from "@lunibee/builders";
 
-const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-  new ButtonBuilder()
+const row = new CreateActionRow<CreateButton>().addComponents(
+  new CreateButton()
     .setCustomId("ticket_close")
     .setLabel("Close ticket")
-    .setStyle(ButtonStyle.Danger),
+    .setStyle(ButtonType.Danger),
 );
 
 await channel.send({
@@ -73,12 +73,12 @@ await channel.send({
 
 ```ts
 import {
-  ActionRowBuilder,
-  StringSelectBuilder,
+  CreateActionRow,
+  CreateStringSelect,
 } from "@lunibee/builders";
 
-const row = new ActionRowBuilder<StringSelectBuilder>().addComponents(
-  new StringSelectBuilder()
+const row = new CreateActionRow<CreateStringSelect>().addComponents(
+  new CreateStringSelect()
     .setCustomId("select_roles")
     .setPlaceholder("Choose a role")
     .addOptions(
@@ -88,30 +88,30 @@ const row = new ActionRowBuilder<StringSelectBuilder>().addComponents(
 );
 ```
 
-Entity pickers: `UserSelectMenuBuilder`, `RoleSelectMenuBuilder`,
-`ChannelSelectMenuBuilder`, `MentionableSelectMenuBuilder`. `StringSelectMenuBuilder` is an
-alias of `StringSelectBuilder`. Context menu commands: `ContextMenuCommandBuilder`
-(`setType(2 | 3)`), `UserCommandBuilder`, `MessageCommandBuilder`.
+Entity pickers: `CreateUserSelectMenu`, `CreateRoleSelectMenu`,
+`CreateChannelSelectMenu`, `CreateMentionableSelectMenu`. `CreateStringSelectMenu` is an
+alias of `CreateStringSelect`. Context menu commands: `CreateContextMenuCommand`
+(`setType(2 | 3)`), `CreateUserCommand`, `CreateMessageCommand`.
 
 ## Modals
 
 ```ts
 import {
-  ModalBuilder,
-  ActionRowBuilder,
-  TextInputBuilder,
-  TextInputStyle,
+  CreateModal,
+  CreateActionRow,
+  CreateTextInput,
+  TextInputType,
 } from "@lunibee/builders";
 
-const modal = new ModalBuilder()
+const modal = new CreateModal()
   .setCustomId("modal_ticket")
   .setTitle("Create Support Ticket")
   .addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder()
+    new CreateActionRow<CreateTextInput>().addComponents(
+      new CreateTextInput()
         .setCustomId("ticket_subject")
         .setLabel("Subject")
-        .setStyle(TextInputStyle.Short)
+        .setStyle(TextInputType.Short)
         .setRequired(true),
     ),
   );
@@ -120,9 +120,9 @@ const modal = new ModalBuilder()
 ## Attachments
 
 ```ts
-import { AttachmentBuilder } from "@lunibee/builders";
+import { CreateAttachment } from "@lunibee/builders";
 
-const file = new AttachmentBuilder(imageBuffer, {
+const file = new CreateAttachment(imageBuffer, {
   name: "welcome.png",
   description: "Custom welcome banner",
 });
@@ -142,4 +142,4 @@ Builders create and validate payloads; they do not send requests themselves.
 
 ## What's New in 0.2.0
 
-`toJSON()` validates whole components; `ButtonBuilder.setSKUId()` and style-aware field clearing.
+`toJSON()` validates whole components; `CreateButton.setSKUId()` and style-aware field clearing.

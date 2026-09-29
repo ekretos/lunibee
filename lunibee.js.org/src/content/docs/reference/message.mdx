@@ -202,8 +202,8 @@ client.on("messageCreate", async (message) => {
 ```ts
 const panel = await message.reply({
   content: "Delete this?",
-  components: [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("yes").setLabel("Yes").setStyle(ButtonStyle.Danger),
+  components: [new CreateActionRow().addComponents(
+    new CreateButton().setCustomId("yes").setLabel("Yes").setStyle(ButtonType.Danger),
   ).toJSON()],
 });
 try {

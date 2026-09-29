@@ -1,27 +1,27 @@
 ---
-title: EmbedBuilder
+title: CreateEmbed
 description: Fluent builder for Discord rich embed message payloads with validation.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`EmbedBuilder` creates Discord embed payloads using a chainable API. All limits (title length, field count, total character count) are validated before `toJSON()` is called.
+`CreateEmbed` creates Discord embed payloads using a chainable API. All limits (title length, field count, total character count) are validated before `toJSON()` is called.
 
 ## Import
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { EmbedBuilder } from "lunibee";
+import { CreateEmbed } from "lunibee";
 // or from the sub-package:
-import { EmbedBuilder } from "@lunibee/builders";
+import { CreateEmbed } from "@lunibee/builders";
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { EmbedBuilder } from "lunibee";
+import { CreateEmbed } from "lunibee";
 // or from the sub-package:
-import { EmbedBuilder } from "@lunibee/builders";
+import { CreateEmbed } from "@lunibee/builders";
 ```
 </TabItem>
 </Tabs>
@@ -250,9 +250,9 @@ const payload = embed.toJSON();
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { EmbedBuilder } from "lunibee";
+import { CreateEmbed } from "lunibee";
 
-const embed = new EmbedBuilder()
+const embed = new CreateEmbed()
   .setTitle("Moderation Log 🔨")
   .setDescription("A member was banned from the server.")
   .setColor(0xed4245)
@@ -270,9 +270,9 @@ await logChannel.send({ embeds: [embed] });
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { EmbedBuilder } from "lunibee";
+import { CreateEmbed } from "lunibee";
 
-const embed = new EmbedBuilder()
+const embed = new CreateEmbed()
   .setTitle("Moderation Log 🔨")
   .setDescription("A member was banned from the server.")
   .setColor(0xed4245)

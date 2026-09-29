@@ -1,5 +1,5 @@
 /** Discord application command option types. */
-export const ApplicationCommandOptionType = {
+export const ApplicationCommandOptionEnum = {
     Subcommand: 1,
     SubcommandGroup: 2,
     String: 3,
@@ -12,9 +12,12 @@ export const ApplicationCommandOptionType = {
     Number: 10,
     Attachment: 11,
 } as const;
+/** One {@link ApplicationCommandOptionEnum} value, usable as a type. */
+export type ApplicationCommandOptionEnum =
+    (typeof ApplicationCommandOptionEnum)[keyof typeof ApplicationCommandOptionEnum];
 
 /** Builds Discord application command payloads. */
-export class SlashCommandBuilder {
+export class CreateSlashCommand {
     readonly #data: Record<string, unknown> = { type: 1 };
     /** Sets the command name. */ public setName(name: string): this {
         validateName(name, "Command name");
@@ -57,61 +60,59 @@ export class SlashCommandBuilder {
         return this;
     }
     /** Adds a string option. */ public addStringOption(
-        configure: (option: StringOptionBuilder) => StringOptionBuilder,
+        configure: (option: CreateStringOption) => CreateStringOption,
     ): this {
-        return this.addOption(configure(new StringOptionBuilder()));
+        return this.addOption(configure(new CreateStringOption()));
     }
     /** Adds an integer option. */ public addIntegerOption(
-        configure: (option: IntegerOptionBuilder) => IntegerOptionBuilder,
+        configure: (option: CreateIntegerOption) => CreateIntegerOption,
     ): this {
-        return this.addOption(configure(new IntegerOptionBuilder()));
+        return this.addOption(configure(new CreateIntegerOption()));
     }
     /** Adds a number option. */ public addNumberOption(
-        configure: (option: NumberOptionBuilder) => NumberOptionBuilder,
+        configure: (option: CreateNumberOption) => CreateNumberOption,
     ): this {
-        return this.addOption(configure(new NumberOptionBuilder()));
+        return this.addOption(configure(new CreateNumberOption()));
     }
     /** Adds a boolean option. */ public addBooleanOption(
-        configure: (option: BooleanOptionBuilder) => BooleanOptionBuilder,
+        configure: (option: CreateBooleanOption) => CreateBooleanOption,
     ): this {
-        return this.addOption(configure(new BooleanOptionBuilder()));
+        return this.addOption(configure(new CreateBooleanOption()));
     }
     /** Adds a user option. */ public addUserOption(
-        configure: (option: UserOptionBuilder) => UserOptionBuilder,
+        configure: (option: CreateUserOption) => CreateUserOption,
     ): this {
-        return this.addOption(configure(new UserOptionBuilder()));
+        return this.addOption(configure(new CreateUserOption()));
     }
     /** Adds a channel option. */ public addChannelOption(
-        configure: (option: ChannelOptionBuilder) => ChannelOptionBuilder,
+        configure: (option: CreateChannelOption) => CreateChannelOption,
     ): this {
-        return this.addOption(configure(new ChannelOptionBuilder()));
+        return this.addOption(configure(new CreateChannelOption()));
     }
     /** Adds a role option. */ public addRoleOption(
-        configure: (option: RoleOptionBuilder) => RoleOptionBuilder,
+        configure: (option: CreateRoleOption) => CreateRoleOption,
     ): this {
-        return this.addOption(configure(new RoleOptionBuilder()));
+        return this.addOption(configure(new CreateRoleOption()));
     }
     /** Adds a mentionable option. */ public addMentionableOption(
-        configure: (
-            option: MentionableOptionBuilder,
-        ) => MentionableOptionBuilder,
+        configure: (option: CreateMentionableOption) => CreateMentionableOption,
     ): this {
-        return this.addOption(configure(new MentionableOptionBuilder()));
+        return this.addOption(configure(new CreateMentionableOption()));
     }
     /** Adds an attachment option. */ public addAttachmentOption(
-        configure: (option: AttachmentOptionBuilder) => AttachmentOptionBuilder,
+        configure: (option: CreateAttachmentOption) => CreateAttachmentOption,
     ): this {
-        return this.addOption(configure(new AttachmentOptionBuilder()));
+        return this.addOption(configure(new CreateAttachmentOption()));
     }
     /** Adds a subcommand. */ public addSubcommand(
-        configure: (option: SubcommandBuilder) => SubcommandBuilder,
+        configure: (option: CreateSubcommand) => CreateSubcommand,
     ): this {
-        return this.addOption(configure(new SubcommandBuilder()));
+        return this.addOption(configure(new CreateSubcommand()));
     }
     /** Adds a subcommand group. */ public addSubcommandGroup(
-        configure: (option: SubcommandGroupBuilder) => SubcommandGroupBuilder,
+        configure: (option: CreateSubcommandGroup) => CreateSubcommandGroup,
     ): this {
-        return this.addOption(configure(new SubcommandGroupBuilder()));
+        return this.addOption(configure(new CreateSubcommandGroup()));
     }
     /** Serializes the command payload. */ public toJSON(): Record<
         string,
@@ -120,7 +121,7 @@ export class SlashCommandBuilder {
         return structuredClone(this.#data);
     }
     /** Adds a validated top-level command option. */ protected addOption(
-        option: CommandOptionBuilder,
+        option: CreateCommandOption,
     ): this {
         const options = (this.#data.options as unknown[] | undefined) ?? [];
         if (options.length >= 25)
@@ -154,7 +155,7 @@ export class SlashCommandBuilder {
 }
 
 /** Base builder for command options. */
-export class CommandOptionBuilder {
+export class CreateCommandOption {
     protected readonly data: Record<string, unknown>;
     /** Creates an option builder. */ public constructor(type: number) {
         this.data = { type };
@@ -190,9 +191,9 @@ export class CommandOptionBuilder {
 }
 
 /** Builds a string command option. */
-export class StringOptionBuilder extends CommandOptionBuilder {
+export class CreateStringOption extends CreateCommandOption {
     /** Creates a string option. */ public constructor() {
-        super(ApplicationCommandOptionType.String);
+        super(ApplicationCommandOptionEnum.String);
     }
     /** Adds string choices. */ public addChoices(
         ...choices: Array<{ name: string; value: string }>
@@ -237,9 +238,9 @@ export class StringOptionBuilder extends CommandOptionBuilder {
     }
 }
 /** Builds an integer command option. */
-export class IntegerOptionBuilder extends CommandOptionBuilder {
+export class CreateIntegerOption extends CreateCommandOption {
     public constructor() {
-        super(ApplicationCommandOptionType.Integer);
+        super(ApplicationCommandOptionEnum.Integer);
     }
     public setMinValue(value: number): this {
         validateNumberRange(
@@ -293,9 +294,9 @@ export class IntegerOptionBuilder extends CommandOptionBuilder {
     }
 }
 /** Builds a number command option. */
-export class NumberOptionBuilder extends CommandOptionBuilder {
+export class CreateNumberOption extends CreateCommandOption {
     public constructor() {
-        super(ApplicationCommandOptionType.Number);
+        super(ApplicationCommandOptionEnum.Number);
     }
     public setMinValue(value: number): this {
         validateNumberRange(
@@ -348,34 +349,34 @@ export class NumberOptionBuilder extends CommandOptionBuilder {
         return this;
     }
 }
-/** Builds a boolean command option. */ export class BooleanOptionBuilder extends CommandOptionBuilder {
+/** Builds a boolean command option. */ export class CreateBooleanOption extends CreateCommandOption {
     /** Creates a boolean option. */ public constructor() {
-        super(ApplicationCommandOptionType.Boolean);
+        super(ApplicationCommandOptionEnum.Boolean);
     }
 }
-/** Builds a user command option. */ export class UserOptionBuilder extends CommandOptionBuilder {
+/** Builds a user command option. */ export class CreateUserOption extends CreateCommandOption {
     /** Creates a user option. */ public constructor() {
-        super(ApplicationCommandOptionType.User);
+        super(ApplicationCommandOptionEnum.User);
     }
 }
-/** Builds a role command option. */ export class RoleOptionBuilder extends CommandOptionBuilder {
+/** Builds a role command option. */ export class CreateRoleOption extends CreateCommandOption {
     /** Creates a role option. */ public constructor() {
-        super(ApplicationCommandOptionType.Role);
+        super(ApplicationCommandOptionEnum.Role);
     }
 }
-/** Builds a mentionable command option. */ export class MentionableOptionBuilder extends CommandOptionBuilder {
+/** Builds a mentionable command option. */ export class CreateMentionableOption extends CreateCommandOption {
     /** Creates a mentionable option. */ public constructor() {
-        super(ApplicationCommandOptionType.Mentionable);
+        super(ApplicationCommandOptionEnum.Mentionable);
     }
 }
-/** Builds an attachment command option. */ export class AttachmentOptionBuilder extends CommandOptionBuilder {
+/** Builds an attachment command option. */ export class CreateAttachmentOption extends CreateCommandOption {
     /** Creates an attachment option. */ public constructor() {
-        super(ApplicationCommandOptionType.Attachment);
+        super(ApplicationCommandOptionEnum.Attachment);
     }
 }
-/** Builds a channel command option. */ export class ChannelOptionBuilder extends CommandOptionBuilder {
+/** Builds a channel command option. */ export class CreateChannelOption extends CreateCommandOption {
     /** Creates a channel option. */ public constructor() {
-        super(ApplicationCommandOptionType.Channel);
+        super(ApplicationCommandOptionEnum.Channel);
     }
     /** Restricts accepted channel types. */ public addChannelTypes(
         ...types: number[]
@@ -388,58 +389,56 @@ export class NumberOptionBuilder extends CommandOptionBuilder {
         return this;
     }
 }
-/** Builds a nested subcommand. */ export class SubcommandBuilder extends CommandOptionBuilder {
+/** Builds a nested subcommand. */ export class CreateSubcommand extends CreateCommandOption {
     /** Creates a subcommand. */ public constructor() {
-        super(ApplicationCommandOptionType.Subcommand);
+        super(ApplicationCommandOptionEnum.Subcommand);
     }
     /** Adds a string option to this subcommand. */ public addStringOption(
-        configure: (option: StringOptionBuilder) => StringOptionBuilder,
+        configure: (option: CreateStringOption) => CreateStringOption,
     ): this {
-        return this.addChildOption(configure(new StringOptionBuilder()));
+        return this.addChildOption(configure(new CreateStringOption()));
     }
     /** Adds an integer option to this subcommand. */ public addIntegerOption(
-        configure: (option: IntegerOptionBuilder) => IntegerOptionBuilder,
+        configure: (option: CreateIntegerOption) => CreateIntegerOption,
     ): this {
-        return this.addChildOption(configure(new IntegerOptionBuilder()));
+        return this.addChildOption(configure(new CreateIntegerOption()));
     }
     /** Adds a number option to this subcommand. */ public addNumberOption(
-        configure: (option: NumberOptionBuilder) => NumberOptionBuilder,
+        configure: (option: CreateNumberOption) => CreateNumberOption,
     ): this {
-        return this.addChildOption(configure(new NumberOptionBuilder()));
+        return this.addChildOption(configure(new CreateNumberOption()));
     }
     /** Adds a boolean option to this subcommand. */ public addBooleanOption(
-        configure: (option: BooleanOptionBuilder) => BooleanOptionBuilder,
+        configure: (option: CreateBooleanOption) => CreateBooleanOption,
     ): this {
-        return this.addChildOption(configure(new BooleanOptionBuilder()));
+        return this.addChildOption(configure(new CreateBooleanOption()));
     }
     /** Adds a user option to this subcommand. */ public addUserOption(
-        configure: (option: UserOptionBuilder) => UserOptionBuilder,
+        configure: (option: CreateUserOption) => CreateUserOption,
     ): this {
-        return this.addChildOption(configure(new UserOptionBuilder()));
+        return this.addChildOption(configure(new CreateUserOption()));
     }
     /** Adds a channel option to this subcommand. */ public addChannelOption(
-        configure: (option: ChannelOptionBuilder) => ChannelOptionBuilder,
+        configure: (option: CreateChannelOption) => CreateChannelOption,
     ): this {
-        return this.addChildOption(configure(new ChannelOptionBuilder()));
+        return this.addChildOption(configure(new CreateChannelOption()));
     }
     /** Adds a role option to this subcommand. */ public addRoleOption(
-        configure: (option: RoleOptionBuilder) => RoleOptionBuilder,
+        configure: (option: CreateRoleOption) => CreateRoleOption,
     ): this {
-        return this.addChildOption(configure(new RoleOptionBuilder()));
+        return this.addChildOption(configure(new CreateRoleOption()));
     }
     /** Adds a mentionable option to this subcommand. */ public addMentionableOption(
-        configure: (
-            option: MentionableOptionBuilder,
-        ) => MentionableOptionBuilder,
+        configure: (option: CreateMentionableOption) => CreateMentionableOption,
     ): this {
-        return this.addChildOption(configure(new MentionableOptionBuilder()));
+        return this.addChildOption(configure(new CreateMentionableOption()));
     }
     /** Adds an attachment option to this subcommand. */ public addAttachmentOption(
-        configure: (option: AttachmentOptionBuilder) => AttachmentOptionBuilder,
+        configure: (option: CreateAttachmentOption) => CreateAttachmentOption,
     ): this {
-        return this.addChildOption(configure(new AttachmentOptionBuilder()));
+        return this.addChildOption(configure(new CreateAttachmentOption()));
     }
-    protected addChildOption(option: CommandOptionBuilder): this {
+    protected addChildOption(option: CreateCommandOption): this {
         const options = (this.data.options as unknown[] | undefined) ?? [];
         if (options.length >= 25)
             throw new RangeError(
@@ -469,7 +468,7 @@ export class NumberOptionBuilder extends CommandOptionBuilder {
             options.some(
                 (existing) =>
                     (existing as Record<string, unknown>).type ===
-                    ApplicationCommandOptionType.Subcommand,
+                    ApplicationCommandOptionEnum.Subcommand,
             )
         )
             throw new RangeError(
@@ -480,19 +479,19 @@ export class NumberOptionBuilder extends CommandOptionBuilder {
         return this;
     }
 }
-/** Builds a nested subcommand group. */ export class SubcommandGroupBuilder extends CommandOptionBuilder {
+/** Builds a nested subcommand group. */ export class CreateSubcommandGroup extends CreateCommandOption {
     /** Creates a subcommand group. */ public constructor() {
-        super(ApplicationCommandOptionType.SubcommandGroup);
+        super(ApplicationCommandOptionEnum.SubcommandGroup);
     }
     /** Adds a subcommand to this group. */ public addSubcommand(
-        configure: (option: SubcommandBuilder) => SubcommandBuilder,
+        configure: (option: CreateSubcommand) => CreateSubcommand,
     ): this {
         const options = (this.data.options as unknown[] | undefined) ?? [];
         if (options.length >= 25)
             throw new RangeError(
                 "A subcommand group cannot contain more than 25 subcommands.",
             );
-        const payload = configure(new SubcommandBuilder()).toJSON();
+        const payload = configure(new CreateSubcommand()).toJSON();
         if (
             options.some(
                 (existing) =>
@@ -502,7 +501,7 @@ export class NumberOptionBuilder extends CommandOptionBuilder {
             throw new RangeError(
                 `Duplicate subcommand name: ${String(payload.name)}.`,
             );
-        if (payload.type !== ApplicationCommandOptionType.Subcommand)
+        if (payload.type !== ApplicationCommandOptionEnum.Subcommand)
             throw new TypeError(
                 "Subcommand group children must be subcommands.",
             );
@@ -553,8 +552,8 @@ function validateNumberRange(
 // ─── Context Menu Builders ────────────────────────────────────────────────────
 
 /** Builder for application commands that appear in right-click context menus.
- * Discord.js-familiar: `new ContextMenuCommandBuilder().setName("x").setType(2)`. */
-export class ContextMenuCommandBuilder {
+ * Discord.js-familiar: `new CreateContextMenuCommand().setName("x").setType(2)`. */
+export class CreateContextMenuCommand {
     protected readonly data: Record<string, unknown>;
     public constructor(type: 2 | 3 = 2) {
         this.data = { type };
@@ -610,9 +609,9 @@ export class ContextMenuCommandBuilder {
 
 /** Builds a User context menu command (appears when right-clicking a user, type 2).
  * @example
- * new UserCommandBuilder().setName("View Profile").toJSON()
+ * new CreateUserCommand().setName("View Profile").toJSON()
  */
-export class UserCommandBuilder extends ContextMenuCommandBuilder {
+export class CreateUserCommand extends CreateContextMenuCommand {
     public constructor() {
         super(2);
     }
@@ -620,10 +619,99 @@ export class UserCommandBuilder extends ContextMenuCommandBuilder {
 
 /** Builds a Message context menu command (appears when right-clicking a message, type 3).
  * @example
- * new MessageCommandBuilder().setName("Translate Message").toJSON()
+ * new CreateMessageCommand().setName("Translate Message").toJSON()
  */
-export class MessageCommandBuilder extends ContextMenuCommandBuilder {
+export class CreateMessageCommand extends CreateContextMenuCommand {
     public constructor() {
         super(3);
     }
 }
+
+// ─── Deprecated names (0.2.2), removed in 2.0 ────────────────────────────────
+// Builders are now `CreateX` (`ButtonBuilder` → `CreateButton`); `…Style` became
+// `…Type` and `…Type` became `…Enum`.
+
+/** @deprecated Use {@link CreateAttachmentOption}. Removed in 2.0. */
+export const AttachmentOptionBuilder = CreateAttachmentOption;
+/** @deprecated Use {@link CreateAttachmentOption}. Removed in 2.0. */
+export type AttachmentOptionBuilder = CreateAttachmentOption;
+
+/** @deprecated Use {@link CreateBooleanOption}. Removed in 2.0. */
+export const BooleanOptionBuilder = CreateBooleanOption;
+/** @deprecated Use {@link CreateBooleanOption}. Removed in 2.0. */
+export type BooleanOptionBuilder = CreateBooleanOption;
+
+/** @deprecated Use {@link CreateChannelOption}. Removed in 2.0. */
+export const ChannelOptionBuilder = CreateChannelOption;
+/** @deprecated Use {@link CreateChannelOption}. Removed in 2.0. */
+export type ChannelOptionBuilder = CreateChannelOption;
+
+/** @deprecated Use {@link CreateCommandOption}. Removed in 2.0. */
+export const CommandOptionBuilder = CreateCommandOption;
+/** @deprecated Use {@link CreateCommandOption}. Removed in 2.0. */
+export type CommandOptionBuilder = CreateCommandOption;
+
+/** @deprecated Use {@link CreateContextMenuCommand}. Removed in 2.0. */
+export const ContextMenuCommandBuilder = CreateContextMenuCommand;
+/** @deprecated Use {@link CreateContextMenuCommand}. Removed in 2.0. */
+export type ContextMenuCommandBuilder = CreateContextMenuCommand;
+
+/** @deprecated Use {@link CreateIntegerOption}. Removed in 2.0. */
+export const IntegerOptionBuilder = CreateIntegerOption;
+/** @deprecated Use {@link CreateIntegerOption}. Removed in 2.0. */
+export type IntegerOptionBuilder = CreateIntegerOption;
+
+/** @deprecated Use {@link CreateMentionableOption}. Removed in 2.0. */
+export const MentionableOptionBuilder = CreateMentionableOption;
+/** @deprecated Use {@link CreateMentionableOption}. Removed in 2.0. */
+export type MentionableOptionBuilder = CreateMentionableOption;
+
+/** @deprecated Use {@link CreateMessageCommand}. Removed in 2.0. */
+export const MessageCommandBuilder = CreateMessageCommand;
+/** @deprecated Use {@link CreateMessageCommand}. Removed in 2.0. */
+export type MessageCommandBuilder = CreateMessageCommand;
+
+/** @deprecated Use {@link CreateNumberOption}. Removed in 2.0. */
+export const NumberOptionBuilder = CreateNumberOption;
+/** @deprecated Use {@link CreateNumberOption}. Removed in 2.0. */
+export type NumberOptionBuilder = CreateNumberOption;
+
+/** @deprecated Use {@link CreateRoleOption}. Removed in 2.0. */
+export const RoleOptionBuilder = CreateRoleOption;
+/** @deprecated Use {@link CreateRoleOption}. Removed in 2.0. */
+export type RoleOptionBuilder = CreateRoleOption;
+
+/** @deprecated Use {@link CreateSlashCommand}. Removed in 2.0. */
+export const SlashCommandBuilder = CreateSlashCommand;
+/** @deprecated Use {@link CreateSlashCommand}. Removed in 2.0. */
+export type SlashCommandBuilder = CreateSlashCommand;
+
+/** @deprecated Use {@link CreateStringOption}. Removed in 2.0. */
+export const StringOptionBuilder = CreateStringOption;
+/** @deprecated Use {@link CreateStringOption}. Removed in 2.0. */
+export type StringOptionBuilder = CreateStringOption;
+
+/** @deprecated Use {@link CreateSubcommand}. Removed in 2.0. */
+export const SubcommandBuilder = CreateSubcommand;
+/** @deprecated Use {@link CreateSubcommand}. Removed in 2.0. */
+export type SubcommandBuilder = CreateSubcommand;
+
+/** @deprecated Use {@link CreateSubcommandGroup}. Removed in 2.0. */
+export const SubcommandGroupBuilder = CreateSubcommandGroup;
+/** @deprecated Use {@link CreateSubcommandGroup}. Removed in 2.0. */
+export type SubcommandGroupBuilder = CreateSubcommandGroup;
+
+/** @deprecated Use {@link CreateUserCommand}. Removed in 2.0. */
+export const UserCommandBuilder = CreateUserCommand;
+/** @deprecated Use {@link CreateUserCommand}. Removed in 2.0. */
+export type UserCommandBuilder = CreateUserCommand;
+
+/** @deprecated Use {@link CreateUserOption}. Removed in 2.0. */
+export const UserOptionBuilder = CreateUserOption;
+/** @deprecated Use {@link CreateUserOption}. Removed in 2.0. */
+export type UserOptionBuilder = CreateUserOption;
+
+/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 2.0. */
+export const ApplicationCommandOptionType = ApplicationCommandOptionEnum;
+/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 2.0. */
+export type ApplicationCommandOptionType = ApplicationCommandOptionEnum;

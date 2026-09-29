@@ -134,7 +134,7 @@ client.on("guildMemberAdd", async (memberData) => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "roleinfo") return;
   const roleData = interaction.options.getRole("role", true) as any;
-  const embed = new EmbedBuilder()
+  const embed = new CreateEmbed()
     .setTitle(roleData.name)
     .setColor(roleData.color || 0x99aab5)
     .addFields(
@@ -151,7 +151,7 @@ client.on("interactionCreate", async (interaction) => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "roleinfo") return;
   const roleData = interaction.options.getRole("role", true) as any;
-  const embed = new EmbedBuilder()
+  const embed = new CreateEmbed()
     .setTitle(roleData.name)
     .setColor(roleData.color || 0x99aab5)
     .addFields(

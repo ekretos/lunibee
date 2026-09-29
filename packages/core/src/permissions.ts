@@ -1,8 +1,12 @@
 /** Permission overwrite target types. */
-export enum PermissionOverwriteType {
+export enum PermissionOverwriteEnum {
     Role = 0,
     Member = 1,
 }
+/** @deprecated Use {@link PermissionOverwriteEnum}. Removed in 2.0. */
+export const PermissionOverwriteType = PermissionOverwriteEnum;
+/** @deprecated Use {@link PermissionOverwriteEnum}. Removed in 2.0. */
+export type PermissionOverwriteType = PermissionOverwriteEnum;
 
 /** Lunibee idiomatic camelCase permission bitflags. */
 export const Permission = {
@@ -647,7 +651,7 @@ export interface PermissionRole {
 /** A channel permission overwrite (Discord's `permission_overwrites` entry). */
 export interface PermissionOverwrite {
     id: string;
-    type: PermissionOverwriteType | number;
+    type: PermissionOverwriteEnum | number;
     allow: PermissionResolvable;
     deny: PermissionResolvable;
 }
@@ -691,7 +695,7 @@ export function computePermissions(context: PermissionContext): PermissionSet {
     let deny = 0n;
     for (const overwrite of overwrites)
         if (
-            overwrite.type === PermissionOverwriteType.Role &&
+            overwrite.type === PermissionOverwriteEnum.Role &&
             overwrite.id !== context.guildId &&
             memberRoles.has(overwrite.id)
         ) {
@@ -701,7 +705,7 @@ export function computePermissions(context: PermissionContext): PermissionSet {
     base = (base & ~deny) | allow;
     const member = overwrites.find(
         (o) =>
-            o.type === PermissionOverwriteType.Member &&
+            o.type === PermissionOverwriteEnum.Member &&
             o.id === context.memberId,
     );
     if (member) base = (base & ~bits(member.deny)) | bits(member.allow);

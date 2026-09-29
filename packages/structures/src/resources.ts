@@ -378,11 +378,13 @@ export class Invite {
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
 /** Webhook type constants. */
-export const WebhookType = {
+export const WebhookEnum = {
     Incoming: 1,
     ChannelFollower: 2,
     Application: 3,
 } as const;
+/** One {@link WebhookEnum} value, usable as a type. */
+export type WebhookEnum = (typeof WebhookEnum)[keyof typeof WebhookEnum];
 
 /** A Discord webhook — an HTTP endpoint that can post messages to a channel. */
 export class Webhook extends BaseStructure {
@@ -410,7 +412,7 @@ export class Webhook extends BaseStructure {
         token?: string;
     }) {
         super(data.id);
-        this.type = data.type ?? WebhookType.Incoming;
+        this.type = data.type ?? WebhookEnum.Incoming;
         this.name = data.name ?? null;
         this.avatarHash = data.avatar ?? null;
         this.channelId = data.channel_id ?? null;
@@ -628,3 +630,8 @@ export class GuildOnboarding extends BaseStructure {
         this.mode = data.mode;
     }
 }
+
+/** @deprecated Use {@link WebhookEnum}. Removed in 2.0. */
+export const WebhookType = WebhookEnum;
+/** @deprecated Use {@link WebhookEnum}. Removed in 2.0. */
+export type WebhookType = WebhookEnum;

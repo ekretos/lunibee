@@ -167,7 +167,7 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.commandName === "userinfo") {
     await interaction.deferReply();
     const user = interaction.options.getUser("target") ?? interaction.user;
-    const embed = new EmbedBuilder()
+    const embed = new CreateEmbed()
       .setTitle(`User Info: ${(user as any).username}`)
       .addFields({ name: "ID", value: (user as any).id });
     await interaction.editReply({ embeds: [embed] });
@@ -183,7 +183,7 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.commandName === "userinfo") {
     await interaction.deferReply();
     const user = interaction.options.getUser("target") ?? interaction.user;
-    const embed = new EmbedBuilder()
+    const embed = new CreateEmbed()
       .setTitle(`User Info: ${(user as any).username}`)
       .addFields({ name: "ID", value: (user as any).id });
     await interaction.editReply({ embeds: [embed] });
@@ -401,15 +401,15 @@ Any non-autocomplete interaction can show a modal as its initial response:
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "report") return;
 
-  const modal = new ModalBuilder()
+  const modal = new CreateModal()
     .setCustomId("report_modal")
     .setTitle("Report a User")
     .addComponents(
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
+      new CreateActionRow<CreateTextInput>().addComponents(
+        new CreateTextInput()
           .setCustomId("reason")
           .setLabel("Reason")
-          .setStyle(TextInputStyle.Paragraph)
+          .setStyle(TextInputType.Paragraph)
           .setRequired(true),
       ),
     );
@@ -423,15 +423,15 @@ client.on("interactionCreate", async (interaction) => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "report") return;
 
-  const modal = new ModalBuilder()
+  const modal = new CreateModal()
     .setCustomId("report_modal")
     .setTitle("Report a User")
     .addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
+      new CreateActionRow().addComponents(
+        new CreateTextInput()
           .setCustomId("reason")
           .setLabel("Reason")
-          .setStyle(TextInputStyle.Paragraph)
+          .setStyle(TextInputType.Paragraph)
           .setRequired(true),
       ),
     );
@@ -458,7 +458,7 @@ calls throw instead of racing, and a failed acknowledgement can be retried.
 ## 0.2.1 Additions
 
 - `deferReply(options)` also takes `{ ephemeral: true }` (a boolean still works).
-- `showModal(modal)` takes a `ModalBuilder` directly, so no `.toJSON()` or cast is needed.
+- `showModal(modal)` takes a `CreateModal` directly, so no `.toJSON()` or cast is needed.
 - `awaitModalSubmit({ time, customId?, filter? })` waits for this user to submit a modal and returns the `ModalSubmitInteraction`. `time` is required.
 - `reply`, `editReply`, `followUp` and `update` accept `files: [{ name, data, contentType? }]`.
 - `interaction.member` can act on itself (`kick()`, `timeout()`...), as can other members from the client.
@@ -467,8 +467,8 @@ calls throw instead of racing, and a failed acknowledgement can be retried.
 
 ```ts
 await interaction.showModal(
-  new ModalBuilder().setCustomId("report").setTitle("Report")
-    .addTextInputs(new TextInputBuilder().setCustomId("why").setLabel("What happened?").setStyle(TextInputStyle.Paragraph)),
+  new CreateModal().setCustomId("report").setTitle("Report")
+    .addTextInputs(new CreateTextInput().setCustomId("why").setLabel("What happened?").setStyle(TextInputType.Paragraph)),
 );
 const submitted = await interaction.awaitModalSubmit({ time: 5 * 60_000, customId: "report" });
 await submitted.reply({ content: "Thanks!", ephemeral: true });

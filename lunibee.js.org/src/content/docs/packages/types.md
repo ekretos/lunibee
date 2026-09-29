@@ -18,15 +18,15 @@ Most applications can import these from `lunibee` instead of installing this pac
 ```ts
 import {
   IntentBits,
-  ChannelType,
+  ChannelEnum,
   MessageFlags,
-  ApplicationCommandType,
-  ApplicationCommandOptionType,
-  InteractionType,
+  ApplicationCommandEnum,
+  ApplicationCommandOptionEnum,
+  InteractionEnum,
 } from "@lunibee/types";
 
 const intents = IntentBits.guilds | IntentBits.guildMessages;
-const channelType = ChannelType.GuildText;
+const channelType = ChannelEnum.GuildText;
 const flags = MessageFlags.Ephemeral;
 ```
 
@@ -51,10 +51,10 @@ Some intents are privileged and must also be enabled for your bot in the Discord
 
 ## Channel Types
 
-Use `ChannelType` when an API expects a Discord channel type rather than a string.
+Use `ChannelEnum` when an API expects a Discord channel type rather than a string.
 
 ```ts
-if (channel.type === ChannelType.GuildText) {
+if (channel.type === ChannelEnum.GuildText) {
   console.log("Text channel");
 }
 ```
@@ -71,6 +71,6 @@ if ((message.flags & MessageFlags.Ephemeral) !== 0) {
 
 ## Interaction Types
 
-`InteractionType` identifies the kind of Discord interaction being handled, while application-command option types describe command arguments.
+`InteractionEnum` identifies the kind of Discord interaction being handled, while application-command option types describe command arguments.
 
 Use the types package when you are writing lower-level integrations or need precise payload typing. For everyday bot code, Lunibee's structures, builders, and interaction classes are usually easier to work with.

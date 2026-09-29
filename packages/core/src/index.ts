@@ -4,6 +4,7 @@ export {
     PermissionFlagsBits,
     PermissionSet,
     PermissionsBitField,
+    PermissionOverwriteEnum,
     PermissionOverwriteType,
     computePermissions,
     type PermissionContext,

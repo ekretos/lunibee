@@ -5,6 +5,20 @@
 Follow every rule in AGENT.md above. This file adds the planned work that
 future sessions should pick up.
 
+## Naming convention (from 0.2.2)
+
+- Builders are `CreateX`: `CreateButton`, `CreateEmbed`, `CreateSlashCommand`.
+- Constant sets of Discord types are `…Enum`: `ChannelEnum`, `ComponentEnum`,
+  `ActivityEnum`. Sets of styles are `…Type`: `ButtonType`, `TextInputType`.
+  Each is a `const` object plus a same-named value-union type (not a TS
+  `enum`: bigint sets such as permissions cannot be enums, and `const enum`
+  breaks under Bun's per-file transpiler). `PermissionOverwriteEnum` is the
+  one existing TS `enum` among them and stays one.
+- Pre-0.2.2 names stay as `@deprecated` aliases, defined at the bottom of the
+  file that defines the new name, until 2.0. New code, docs and examples use
+  the new names only. `PermissionFlagsBits`, `GatewayIntentBits`, `Routes`,
+  `MessageFlags` and the Gateway code sets keep their names.
+
 ## Next release: 0.2.2 (planned)
 
 Small, general, non-breaking. Each item needs code, a test that keeps
