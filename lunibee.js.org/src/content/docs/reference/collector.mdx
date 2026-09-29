@@ -287,3 +287,10 @@ const collector = client.createCollector("interactionCreate", {
 });
 for await (const interaction of collector) await interaction.deferUpdate();
 ```
+
+## Component and Modal Collectors (next release)
+
+For the common cases there are shortcuts that filter for you and always end:
+
+- `message.createComponentCollector({ filter?, componentType?, time?, idle?, max? })` and `message.awaitComponent(...)` (see [Message](/reference/message/)).
+- `interaction.awaitModalSubmit({ time, customId?, filter? })` (see [Interactions](/reference/interactions/)).

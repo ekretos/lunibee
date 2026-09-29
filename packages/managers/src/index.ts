@@ -14,6 +14,7 @@ import {
 } from "@lunibee/structures";
 import {
     MessageManager,
+    toRequest,
     type MessageCacheOptions,
     type MessageCreateOptions as ManagerMessageCreateOptions,
 } from "./message.js";
@@ -113,7 +114,11 @@ export class ChannelManager extends Manager<string, Channel> {
     }
     /** Permission overwrite manager for a channel. */
     public permissionOverwrites(channelId: string): PermissionOverwriteManager {
-        return new PermissionOverwriteManager(this.#rest, channelId);
+        return new PermissionOverwriteManager(
+            this.#rest,
+            channelId,
+            () => this.get(channelId)?.permissionOverwrites,
+        );
     }
     public threads(channelId: string): ThreadManager {
         return new ThreadManager(this.#rest, this.#context, channelId);
@@ -301,7 +306,7 @@ export class ChannelManager extends Manager<string, Channel> {
         return this.messages(channelId).upsert(
             await this.#rest.patch<ConstructorParameters<typeof Message>[0]>(
                 Routes.message(channelId, messageId),
-                options,
+                toRequest(options),
             ),
         );
     }
@@ -511,7 +516,12 @@ function isMessageQuery(
     );
 }
 export type CreateMessageOptions = MessageCreateOptions;
-export { MessageManager, type MessageCacheOptions } from "./message.js";
+export {
+    MessageManager,
+    toRequest,
+    type MessageCacheOptions,
+    type MessageFile,
+} from "./message.js";
 export { ThreadManager } from "./thread.js";
 export {
     RoleManager,
@@ -535,6 +545,7 @@ export {
     type StageInstanceCreateOptions,
     type PermissionOverwriteOptions,
     type PermissionOverwriteTargetType,
+    type PermissionOverwriteUpdate,
 } from "./guild-resources.js";
 export {
     EmojiManager,

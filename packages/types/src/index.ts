@@ -47,6 +47,8 @@ export const MessageFlags = {
     Loading: 128,
     IsComponentsV2: 32768,
 } as const;
+/** One {@link MessageFlags} value, usable as a type. */
+export type MessageFlags = (typeof MessageFlags)[keyof typeof MessageFlags];
 
 /** Discord channel types. */
 export const ChannelType = {
@@ -84,6 +86,8 @@ export const ComponentType = {
     ContentInventoryEntry: 16,
     Container: 17,
 } as const;
+/** One {@link ComponentType} value, usable as a type. */
+export type ComponentType = (typeof ComponentType)[keyof typeof ComponentType];
 
 /** Discord button style types. */
 export const ButtonStyle = {
@@ -94,12 +98,17 @@ export const ButtonStyle = {
     Link: 5,
     Premium: 6,
 } as const;
+/** One {@link ButtonStyle} value, usable as a type: `style: ButtonStyle`. */
+export type ButtonStyle = (typeof ButtonStyle)[keyof typeof ButtonStyle];
 
 /** Discord text input style types. */
 export const TextInputStyle = {
     Short: 1,
     Paragraph: 2,
 } as const;
+/** One {@link TextInputStyle} value, usable as a type. */
+export type TextInputStyle =
+    (typeof TextInputStyle)[keyof typeof TextInputStyle];
 
 /** Discord interaction response types. */
 export const InteractionResponseType = {
@@ -353,6 +362,8 @@ export interface APIMessage {
     purchase_notification?: Record<string, unknown>;
     poll?: Record<string, unknown>;
     guild_id?: Snowflake;
+    /** The author's guild member, on guild messages from the Gateway (without `user`; the author is the user). */
+    member?: Omit<APIGuildMember, "user"> & { user?: UserData };
 }
 
 // ─── Channels ────────────────────────────────────────────────────────────────

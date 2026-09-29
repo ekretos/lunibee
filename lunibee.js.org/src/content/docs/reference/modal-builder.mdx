@@ -214,3 +214,21 @@ client.on("interactionCreate", async (interaction) => {
 ```
 </TabItem>
 </Tabs>
+
+## Next Release Additions
+
+### `addTextInputs(...inputs)`
+
+Adds text inputs, each in its own action row (the layout Discord requires), so you do not build the rows yourself. A modal holds at most five.
+
+```ts
+new ModalBuilder()
+  .setCustomId("feedback")
+  .setTitle("Feedback")
+  .addTextInputs(
+    new TextInputBuilder().setCustomId("title").setLabel("Subject").setStyle(TextInputStyle.Short),
+    new TextInputBuilder().setCustomId("body").setLabel("Details").setStyle(TextInputStyle.Paragraph),
+  );
+```
+
+`toJSON()` is now typed with a required `custom_id` and `title`, matching what it validates.

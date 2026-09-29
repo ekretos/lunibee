@@ -1,6 +1,6 @@
 import { BaseStructure, Channel, User, CDN_BASE, cdnURL } from "./base.js";
 import { PermissionsBitField } from "@lunibee/core";
-import type { ImageURLOptions } from "./base.js";
+import type { ImageURLOptions, ResourceContext } from "./base.js";
 
 /** Parses a Discord ISO timestamp into a Date, returning null for absent or invalid values. */
 function toDateOrNull(value?: string | null): Date | null {
@@ -19,37 +19,43 @@ export class GuildMember {
     /** Role IDs assigned to the member. */ public readonly roleIds: string[];
     /** Whether the member is pending membership screening. */ public pending: boolean;
     /** Member join timestamp. */ public joinedAt?: Date;
-    /** Raw effective permission bitfield supplied by Discord. */ public readonly permissions: PermissionsBitField;
     /** Member-specific avatar hash, if set. */ public avatarHash:
         string | null;
     /** When the member started boosting the guild. */ public premiumSince: Date | null;
     /** When the member's timeout expires (null if not timed out). */ public timedOutUntil: Date | null;
     /** Member flags bitfield. */ public flags: number;
+    /** Permissions Discord sent with the member (interactions only). */
+    readonly #suppliedPermissions?: PermissionsBitField;
+    readonly #context?: ResourceContext;
 
     /** Creates a guild member from Discord data. @param data Discord guild-member payload. @throws {TypeError} If the guild ID is invalid. @throws {RangeError} If joined_at is invalid. */
-    public constructor(data: {
-        user: {
-            id: string;
-            username: string;
-            global_name?: string | null;
+    public constructor(
+        data: {
+            user: {
+                id: string;
+                username: string;
+                global_name?: string | null;
+                avatar?: string | null;
+                bot?: boolean;
+                system?: boolean;
+                public_flags?: number;
+                discriminator?: string;
+            };
+            guild_id: string;
+            nick?: string | null;
+            roles?: string[];
+            pending?: boolean;
+            joined_at?: string;
+            permissions?: string;
             avatar?: string | null;
-            bot?: boolean;
-            system?: boolean;
-            public_flags?: number;
-            discriminator?: string;
-        };
-        guild_id: string;
-        nick?: string | null;
-        roles?: string[];
-        pending?: boolean;
-        joined_at?: string;
-        permissions?: string;
-        avatar?: string | null;
-        premium_since?: string | null;
-        communication_disabled_until?: string | null;
-        flags?: number;
-    }) {
+            premium_since?: string | null;
+            communication_disabled_until?: string | null;
+            flags?: number;
+        },
+        context?: ResourceContext,
+    ) {
         this.user = new User(data.user);
+        this.#context = context;
         if (!/^\d{1,20}$/.test(data.guild_id))
             throw new TypeError("Member guild_id must be a valid snowflake.");
         this.guildId = data.guild_id;
@@ -59,12 +65,125 @@ export class GuildMember {
         this.joinedAt = data.joined_at ? new Date(data.joined_at) : undefined;
         if (this.joinedAt?.toString() === "Invalid Date")
             throw new RangeError("Member joined_at must be a valid date.");
-        this.permissions = new PermissionsBitField(data.permissions ?? 0n);
+        if (data.permissions !== undefined)
+            this.#suppliedPermissions = new PermissionsBitField(
+                data.permissions,
+            );
         this.avatarHash = data.avatar ?? null;
         // Like joinedAt, coerce malformed timestamps to null instead of an Invalid Date.
         this.premiumSince = toDateOrNull(data.premium_since);
         this.timedOutUntil = toDateOrNull(data.communication_disabled_until);
         this.flags = data.flags ?? 0;
+    }
+
+    /**
+     * The member's permissions. Discord sends them with interactions (already
+     * resolved for the channel); anywhere else they are computed at guild
+     * level from the cached roles each time they are read, so they follow role
+     * changes. Empty when the guild's roles are not cached.
+     */
+    public get permissions(): PermissionsBitField {
+        if (this.#suppliedPermissions) return this.#suppliedPermissions;
+        return new PermissionsBitField(
+            this.#context?.memberPermissions?.(
+                this.guildId,
+                this.user.id,
+                this.roleIds,
+            ) ?? 0n,
+        );
+    }
+
+    /** The member's permissions in a channel, with its overwrites. Null when the channel or guild is not cached. @param channelId Channel ID. */
+    public permissionsIn(channelId: string): PermissionsBitField | null {
+        const computed = this.#context?.memberPermissions?.(
+            this.guildId,
+            this.user.id,
+            this.roleIds,
+            channelId,
+        );
+        return computed ? new PermissionsBitField(computed) : null;
+    }
+
+    #action<K extends keyof ResourceContext>(
+        name: K,
+    ): NonNullable<ResourceContext[K]> {
+        const action = this.#context?.[name];
+        if (!action)
+            throw new Error("This member is not attached to a client.");
+        return action as NonNullable<ResourceContext[K]>;
+    }
+
+    /** Kicks this member. @param reason Audit-log reason. */
+    public kick(reason?: string): Promise<void> {
+        return this.#action("kickMember")(this.guildId, this.user.id, reason);
+    }
+
+    /** Bans this member. @param options Audit-log reason and seconds of messages to delete. */
+    public ban(
+        options: { reason?: string; deleteMessageSeconds?: number } = {},
+    ): Promise<void> {
+        return this.#action("banMember")(this.guildId, this.user.id, options);
+    }
+
+    /** Edits this member (nickname, roles, voice state, timeout). @param options Discord member fields. @param reason Audit-log reason. */
+    public edit(
+        options: Record<string, unknown>,
+        reason?: string,
+    ): Promise<GuildMember> {
+        return this.#action("editMember")(
+            this.guildId,
+            this.user.id,
+            options,
+            reason,
+        );
+    }
+
+    /** Times this member out, or clears the timeout with null. @param milliseconds Timeout length (Discord allows up to 28 days). @param reason Audit-log reason. */
+    public timeout(
+        milliseconds: number | null,
+        reason?: string,
+    ): Promise<GuildMember> {
+        if (milliseconds !== null && !(milliseconds > 0))
+            throw new RangeError(
+                "Timeout length must be a positive number of milliseconds.",
+            );
+        return this.edit(
+            {
+                communication_disabled_until:
+                    milliseconds === null
+                        ? null
+                        : new Date(Date.now() + milliseconds).toISOString(),
+            },
+            reason,
+        );
+    }
+
+    /** Sets or clears (null) this member's nickname. @param nickname New nickname. @param reason Audit-log reason. */
+    public setNickname(
+        nickname: string | null,
+        reason?: string,
+    ): Promise<GuildMember> {
+        return this.edit({ nick: nickname }, reason);
+    }
+
+    /** Gives this member a role. @param roleId Role ID. @param reason Audit-log reason. */
+    public addRole(roleId: string, reason?: string): Promise<void> {
+        return this.#action("addMemberRole")(
+            this.guildId,
+            this.user.id,
+            roleId,
+            reason,
+        );
+    }
+
+    /** Takes a role from this member. @param roleId Role ID. @param reason Audit-log reason. */
+    public removeRole(roleId: string, reason?: string): Promise<void> {
+        return this.#action("removeMemberRole")(
+            this.guildId,
+            this.user.id,
+            roleId,
+            reason,
+        );
     }
 
     /** Effective member display name — nickname, falling back to user display name. */

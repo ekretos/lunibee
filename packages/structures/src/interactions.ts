@@ -1,5 +1,5 @@
 import { InteractionResponseType } from "@lunibee/types";
-import { User } from "./base.js";
+import { User, type ResourceContext } from "./base.js";
 import { GuildMember } from "./resources.js";
 
 /** Discord interaction type constants. */
@@ -59,6 +59,8 @@ export interface InteractionClient {
         messageId: string,
         data?: InteractionReplyOptions,
     ): Promise<unknown>;
+    /** Lets structures built from an interaction (such as {@link Interaction.member}) act through the client. Optional. */
+    readonly resourceContext?: ResourceContext;
 }
 
 /** Discord's ephemeral message flag. */
@@ -158,6 +160,42 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     /** Whether this interaction is an application command. @returns True for application command interactions. */ public isChatInputCommand(): this is CommandInteraction {
         return this.type === InteractionType.ApplicationCommand;
     }
+    /**
+     * Waits for this user to submit a modal, typically one this interaction
+     * just opened with {@link showModal}.
+     * @param options `time` (required, ms); optional `customId` and `filter`.
+     * @returns The submission. @throws {Error} When time runs out first or no client is attached.
+     * @example const submitted = await interaction.awaitModalSubmit({ time: 60_000, customId: "feedback" });
+     */
+    public awaitModalSubmit(options: {
+        time: number;
+        customId?: string;
+        filter?: (
+            interaction: ModalSubmitInteraction,
+        ) => boolean | Promise<boolean>;
+    }): Promise<ModalSubmitInteraction> {
+        const collect = this.#client.resourceContext?.collectInteractions;
+        if (!collect)
+            return Promise.reject(
+                new Error("This interaction is not attached to a client."),
+            );
+        if (!(options.time > 0))
+            return Promise.reject(
+                new RangeError("awaitModalSubmit needs a positive time."),
+            );
+        const userId = this.user?.id;
+        const collector = collect({
+            time: options.time,
+            max: 1,
+            filter: async (interaction) =>
+                interaction.isModalSubmit() &&
+                interaction.user?.id === userId &&
+                (options.customId === undefined ||
+                    interaction.customId === options.customId) &&
+                (options.filter ? await options.filter(interaction) : true),
+        });
+        return collector.next() as Promise<ModalSubmitInteraction>;
+    }
     /** Whether this interaction is a message component. @returns True for component interactions. */ public isMessageComponent(): this is ComponentInteraction {
         return this.type === InteractionType.MessageComponent;
     }
@@ -230,13 +268,16 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     public get member(): GuildMember | null {
         const raw = this.data.member;
         if (!raw || !this.guildId) return null;
-        return new GuildMember({
-            ...(raw as Omit<
-                ConstructorParameters<typeof GuildMember>[0],
-                "guild_id"
-            >),
-            guild_id: this.guildId,
-        });
+        return new GuildMember(
+            {
+                ...(raw as Omit<
+                    ConstructorParameters<typeof GuildMember>[0],
+                    "guild_id"
+                >),
+                guild_id: this.guildId,
+            },
+            this.#client.resourceContext,
+        );
     }
     /** Unix timestamp (ms) at which the interaction was created, from its snowflake. */
     public get createdTimestamp(): number {
@@ -305,9 +346,11 @@ export class Interaction<TData extends InteractionData = InteractionData> {
             "replied",
         );
     }
-    /** Defers the initial interaction response. @param ephemeral Whether the eventual response is ephemeral. @returns Promise fulfilled after acknowledgement. @throws {Error} When already acknowledged or REST fails. */ public async deferReply(
-        ephemeral = false,
+    /** Defers the initial interaction response. @param options `true` or `{ ephemeral: true }` makes the eventual response private. @returns Promise fulfilled after acknowledgement. @throws {Error} When already acknowledged or REST fails. */ public async deferReply(
+        options: boolean | { ephemeral?: boolean } = false,
     ): Promise<void> {
+        const ephemeral =
+            typeof options === "boolean" ? options : options.ephemeral === true;
         await this.acknowledge(
             InteractionResponse.defer(ephemeral),
             "deferred",
@@ -346,16 +389,30 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         );
     }
     /** Opens a modal dialog in the user's client. @param modal Modal builder output or raw modal callback data. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */
-    public async showModal(modal: {
-        custom_id: string;
-        title: string;
-        components: unknown[];
-        [key: string]: unknown;
-    }): Promise<unknown> {
+    public async showModal(
+        modal:
+            | {
+                  toJSON(): {
+                      custom_id: string;
+                      title: string;
+                      components: unknown[];
+                  };
+              }
+            | {
+                  custom_id: string;
+                  title: string;
+                  components: unknown[];
+                  [key: string]: unknown;
+              },
+    ): Promise<unknown> {
+        const data =
+            "toJSON" in modal && typeof modal.toJSON === "function"
+                ? modal.toJSON()
+                : modal;
         return this.acknowledge(
             new InteractionResponse(
                 InteractionResponseType.Modal,
-                modal as InteractionReplyOptions,
+                data as InteractionReplyOptions,
             ),
             "replied",
         );
@@ -395,6 +452,10 @@ export class ComponentInteraction extends Interaction {
     /** Gets component custom ID. */
     public get customId(): string {
         return (this.data as any)?.data?.custom_id ?? "";
+    }
+    /** ID of the message the component is on. */
+    public get messageId(): string | undefined {
+        return (this.data as any)?.message?.id;
     }
     /** Gets component type. */
     public get componentType(): number {

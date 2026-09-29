@@ -3,6 +3,25 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
+## Unreleased
+
+### ✨ Friendlier API
+
+* **Members on messages**: `message.member` (roles, nickname) on guild messages, with `permissions` computed from the cached roles, so prefix commands can check permissions. Message authors' members are kept current in the member cache.
+* **Live member permissions**: `GuildMember.permissions` is computed from the cached roles whenever Discord did not send them (everywhere but interactions), and `permissionsIn(channelId)` adds channel overwrites.
+* **Member actions**: `member.kick()`, `ban()`, `timeout()`, `setNickname()`, `addRole()`, `removeRole()` and `edit()`, each with an optional audit-log reason; `GuildMemberManager` methods take a `reason` too.
+* **Overwrites that merge**: `channel.editPermissionOverwrite(id, { ViewChannel: true, SendMessages: false })` and `permissionOverwrites(id).update()` change only the named permissions.
+* **Files**: `files` on `send`, `reply`, `edit` and interaction replies upload attachments.
+* **Collectors**: `message.createComponentCollector()`, `message.awaitComponent()` and `interaction.awaitModalSubmit()`, always time-limited.
+* **Prefix commands**: `parsePrefixArgs()`, `tokenizeArgs()`, `argsFromCommandOptions()` and mention parsers in `@lunibee/utils` (see [Prefix Commands](/recipes/prefix-commands/)).
+* **Builders & typing**: `ModalBuilder.addTextInputs()`, `showModal()` takes a builder, `componentsV2Message()`, embed setters clear with `null`, `deferReply({ ephemeral })`, `options.getMentionableType()`, `ComponentInteraction.messageId`, and `ButtonStyle`, `TextInputStyle`, `ComponentType` and `MessageFlags` usable as types.
+* **Permissions**: renamed permission names (`ManageEmojisAndStickers`, `ManageEmojis`, `UseSlashCommands`) still resolve.
+
+### ⚠️ Behaviour changes
+
+* `GuildMember.permissions` is a getter. Members from the Gateway or REST used to report `0`; they now report their computed guild-level permissions.
+* `APIModalComponent` (the type `ModalBuilder.toJSON()` returns) now has a required `custom_id` and `title`.
+
 ## v0.2.0
 
 ### 💥 Breaking Changes

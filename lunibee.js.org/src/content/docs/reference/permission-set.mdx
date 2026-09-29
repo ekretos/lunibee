@@ -291,3 +291,9 @@ await interaction.reply({ embeds: [embed], ephemeral: true });
 const perms = computePermissions({ guildId, ownerId, memberId, memberRoleIds, roles, overwrites });
 perms.missing("sendMessages", "embedLinks");
 ```
+
+## Next Release Additions
+
+Permission names Discord has since renamed still resolve: `ManageEmojisAndStickers` and `ManageEmojis` (now `ManageGuildExpressions`), and `UseSlashCommands` (now `UseApplicationCommands`).
+
+`GuildMember.permissions` is computed from the cached roles for members that did not come with permissions from Discord (see [GuildMember](/reference/guild-member/)).

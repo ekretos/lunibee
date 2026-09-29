@@ -57,7 +57,69 @@ export interface ResourceContext {
     removeAllReactions?(channelId: string, messageId: string): Promise<void>;
     pinMessage?(channelId: string, messageId: string): Promise<void>;
     unpinMessage?(channelId: string, messageId: string): Promise<void>;
+    /**
+     * A member's permissions from cached state: guild-level, or channel-level
+     * (with overwrites) when a channel ID is given. Null when the guild (or
+     * channel) is not cached.
+     */
+    memberPermissions?(
+        guildId: string,
+        memberId: string,
+        roleIds: readonly string[],
+        channelId?: string,
+    ): import("@lunibee/core").PermissionSet | null;
+    kickMember?(
+        guildId: string,
+        userId: string,
+        reason?: string,
+    ): Promise<void>;
+    banMember?(
+        guildId: string,
+        userId: string,
+        options?: { reason?: string; deleteMessageSeconds?: number },
+    ): Promise<void>;
+    editMember?(
+        guildId: string,
+        userId: string,
+        options: Record<string, unknown>,
+        reason?: string,
+    ): Promise<import("./resources.js").GuildMember>;
+    addMemberRole?(
+        guildId: string,
+        userId: string,
+        roleId: string,
+        reason?: string,
+    ): Promise<void>;
+    removeMemberRole?(
+        guildId: string,
+        userId: string,
+        roleId: string,
+        reason?: string,
+    ): Promise<void>;
+    /** Collects the client's interactions (a `Collector` over `interactionCreate`). Used by message and interaction collectors. */
+    collectInteractions?(
+        options: import("@lunibee/core").CollectorOptions<
+            import("./interactions.js").Interaction
+        >,
+    ): import("@lunibee/core").Collector<
+        string,
+        import("./interactions.js").Interaction
+    >;
+    editPermissionOverwrite?(
+        channelId: string,
+        targetId: string,
+        changes: PermissionOverwriteChanges,
+        options?: { type?: 0 | 1; reason?: string },
+    ): Promise<void>;
 }
+
+/**
+ * Permissions to change on one overwrite: `true` allows, `false` denies,
+ * `null` goes back to inheriting. Permissions not named keep their state.
+ */
+export type PermissionOverwriteChanges = Partial<
+    Record<import("@lunibee/core").PermissionName, boolean | null>
+>;
 
 // ─── CDN helpers ──────────────────────────────────────────────────────────────
 
@@ -210,6 +272,28 @@ export class Channel extends BaseStructure {
     }
 
     /** Moves this channel to another parent category. @param parentId Parent category ID, or null to remove the parent. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
+    /**
+     * Changes some permissions of one overwrite and keeps the rest: `true`
+     * allows, `false` denies, `null` resets to inherited.
+     * @param targetId Role or member ID. @param changes Permissions to change.
+     * @param options `type` (0 role, 1 member) when the overwrite does not exist yet; audit-log `reason`.
+     * @example channel.editPermissionOverwrite(userId, { ViewChannel: true, SendMessages: false }, { type: 1 })
+     */
+    public editPermissionOverwrite(
+        targetId: string,
+        changes: PermissionOverwriteChanges,
+        options?: { type?: 0 | 1; reason?: string },
+    ): Promise<void> {
+        if (!this.#context?.editPermissionOverwrite)
+            throw new Error("This channel is not attached to a client.");
+        return this.#context.editPermissionOverwrite(
+            this.id,
+            targetId,
+            changes,
+            options,
+        );
+    }
+
     public editParent(parentId: string | null): Promise<Channel> {
         return this.edit({ parent_id: parentId });
     }

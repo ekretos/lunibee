@@ -12,6 +12,7 @@ import {
     AutoModerationRule,
     GuildWelcomeScreen,
     GuildOnboarding,
+    type ResourceContext,
 } from "@lunibee/structures";
 import { type REST, Routes } from "@lunibee/rest";
 import {
@@ -56,6 +57,12 @@ export class GuildManager extends ResourceManager<string, Guild> {
         Manager<string, APIAutoModerationRule>
     >();
     readonly #invites = new Map<string, Manager<string, APIInviteCreate>>();
+    #context?: ResourceContext;
+
+    /** Lets members from this manager act through a client (`member.kick()`...). Called by the client. */
+    public attachContext(context: ResourceContext): void {
+        this.#context = context;
+    }
 
     /** Returns the per-guild entry of `map`, creating it on first use. */
     #perGuild<M>(map: Map<string, M>, guildId: string, create: () => M): M {
@@ -100,7 +107,11 @@ export class GuildManager extends ResourceManager<string, Guild> {
         if (!manager)
             this.#members.set(
                 guildId,
-                (manager = new GuildMemberManager(guildId, this.#rest)),
+                (manager = new GuildMemberManager(
+                    guildId,
+                    this.#rest,
+                    () => this.#context,
+                )),
             );
         return manager;
     }

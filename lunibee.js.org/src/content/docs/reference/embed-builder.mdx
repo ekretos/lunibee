@@ -302,3 +302,11 @@ await logChannel.send({ embeds: [embed] });
 | Footer text | 2,048 characters |
 | Author name | 256 characters |
 | Total embed characters | 6,000 |
+
+## Next Release Additions
+
+`setTitle`, `setDescription`, `setURL`, `setThumbnail` and `setImage` accept `null` to clear the field, so a value that may be missing needs no separate branch:
+
+```ts
+embed.setThumbnail(guild.iconURL()); // cleared when the guild has no icon
+```

@@ -247,3 +247,17 @@ client.on("interactionCreate", async (interaction) => {
 ```
 </TabItem>
 </Tabs>
+
+## Next Release Additions
+
+### `editPermissionOverwrite(targetId, changes, options?)`
+
+Changes some permissions of one role's or member's overwrite and keeps the rest (unlike `permissionOverwrites(id).edit()`, which replaces the whole overwrite). `true` allows, `false` denies, `null` resets to inherited. Pass `type` (`0` role, `1` member) when the overwrite does not exist yet.
+
+```ts
+await channel.editPermissionOverwrite(userId, { ViewChannel: true, SendMessages: false }, { type: 1, reason: "Ticket locked" });
+```
+
+The manager form is `client.channels.permissionOverwrites(channelId).update(id, { allow?, deny?, inherit? }, { type?, reason? })` with bitfields. It reads the cached overwrites and fetches the channel when they are unknown.
+
+`send` also accepts `files` (see [Message](/reference/message/)).

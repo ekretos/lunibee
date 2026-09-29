@@ -581,6 +581,13 @@ export class PermissionSet {
     }
 
     /** Resolves a named permission, enum value, or raw bit. @param permission Permission name, enum value, or raw bit. @returns Numeric permission bit. */
+    /** Names Discord has since renamed, still accepted when resolving a permission by name. */
+    static readonly #renamed: Readonly<Record<string, string>> = {
+        ManageEmojisAndStickers: "ManageGuildExpressions",
+        ManageEmojis: "ManageGuildExpressions",
+        UseSlashCommands: "UseApplicationCommands",
+    };
+
     #resolve(permission: PermissionResolvable): bigint {
         if (typeof permission === "bigint") return permission;
         if (typeof permission === "number") return BigInt(permission);
@@ -592,6 +599,8 @@ export class PermissionSet {
             return bit;
         }
         if (typeof permission === "string") {
+            const renamed = PermissionSet.#renamed[permission];
+            if (renamed) return this.#resolve(renamed);
             if (permission in Permission)
                 return (Permission as Record<string, bigint>)[permission]!;
             if (permission in Permissions)

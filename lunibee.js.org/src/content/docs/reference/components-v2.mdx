@@ -361,3 +361,18 @@ await channel.send({
 ```
 </TabItem>
 </Tabs>
+
+## Next Release Additions
+
+### `componentsV2Message(components, options?)`
+
+Builds a Components V2 message payload: the components' JSON plus the `IsComponentsV2` flag Discord requires. `options` adds other message fields; their `flags` are combined with the V2 flag (for example `64` for ephemeral). A V2 message cannot also carry `content` or `embeds`.
+
+```ts
+import { componentsV2Message, ContainerBuilder, TextDisplayBuilder } from "lunibee";
+
+await channel.send(componentsV2Message(
+  new ContainerBuilder().setAccentColor(0x57f287).addComponents(new TextDisplayBuilder().setContent("## Settings")),
+  { allowed_mentions: { parse: [] } },
+));
+```

@@ -45,3 +45,29 @@ Use `isSnowflake()` when validating user-supplied Discord IDs before sending the
 ## Why these helpers are separate
 
 Utilities are intentionally independent of the Discord client. You can use them in commands, scripts, workers, tests, or other parts of your application without creating a Lunibee client.
+
+## Prefix-command arguments (next release)
+
+Read the text after a prefix command as typed values, the way slash-command options are read.
+
+| Function | Description |
+|---|---|
+| `tokenizeArgs(text)` | Splits on whitespace; `"double"` or `'single'` quotes keep spaces; `\` escapes. |
+| `parsePrefixArgs(text \| args, specs)` | Reads arguments by position. Returns `{ ok: true, values }` or `{ ok: false, arg, error }`, and never throws on user input. |
+| `argsFromCommandOptions(options, restLast?)` | Specs from a slash command's `options`, so one definition serves `/command` and the prefix command. With `restLast`, the last string option takes the rest of the message. |
+| `parseUserMention`, `parseRoleMention`, `parseChannelMention` | The ID in `<@id>` / `<@&id>` / `<#id>`, or a bare ID; `null` otherwise. |
+| `parseMentionable(value)` | `{ id, type: "user" \| "role" }`; a bare ID reads as a user. |
+
+A spec is `{ name, type, required?, min?, max?, maxLength?, choices? }` where `type` is `string`, `integer`, `number`, `boolean` (yes/no, on/off, true/false...), `user`, `role`, `channel`, `mentionable` or `rest` (everything left, one string; must be last).
+
+```ts
+import { parsePrefixArgs } from "lunibee";
+
+const result = parsePrefixArgs(message.content.slice("!timeout".length), [
+  { name: "user", type: "user", required: true },
+  { name: "minutes", type: "integer", min: 1, max: 40320 },
+  { name: "reason", type: "rest", maxLength: 500 },
+]);
+if (!result.ok) return message.reply(`\`${result.arg}\` ${result.error}.`);
+const { user, minutes = 10, reason } = result.values;
+```

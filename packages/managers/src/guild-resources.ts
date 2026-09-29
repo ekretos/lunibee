@@ -1,6 +1,8 @@
 import { Manager } from "./base.js";
 import { Routes, type REST } from "@lunibee/rest";
 import type {
+    APIChannel,
+    APIOverwrite,
     APIGuildScheduledEvent,
     APIStageInstance,
     UserData,
@@ -289,14 +291,64 @@ export interface PermissionOverwriteOptions {
     deny?: bigint | number | string;
 }
 
+/** Bits to change on one overwrite by {@link PermissionOverwriteManager.update}; bits in none of them keep their state. */
+export interface PermissionOverwriteUpdate {
+    /** Bits to allow. */
+    allow?: bigint;
+    /** Bits to deny. */
+    deny?: bigint;
+    /** Bits to reset to inherited (neither allowed nor denied). */
+    inherit?: bigint;
+}
+
 /** Manages a channel's permission overwrites. Discord.js-familiar. */
 export class PermissionOverwriteManager {
     readonly #rest: REST;
+    readonly #current: () => readonly APIOverwrite[] | undefined;
     public readonly channelId: string;
 
-    public constructor(rest: REST, channelId: string) {
+    /** @param current The channel's cached overwrites, read by {@link update}; the channel is fetched when they are unknown. */
+    public constructor(
+        rest: REST,
+        channelId: string,
+        current: () => readonly APIOverwrite[] | undefined = () => undefined,
+    ) {
         this.#rest = rest;
         this.channelId = channelId;
+        this.#current = current;
+    }
+
+    /**
+     * Changes some bits of one overwrite and keeps the rest -- unlike
+     * {@link edit}, which replaces the whole overwrite. Creates the overwrite
+     * when there is none (then `options.type` is required).
+     * @throws {TypeError} When the overwrite does not exist and no type is given.
+     */
+    public async update(
+        overwriteId: string,
+        changes: PermissionOverwriteUpdate,
+        options: { type?: PermissionOverwriteTargetType; reason?: string } = {},
+    ): Promise<void> {
+        const overwrites =
+            this.#current() ??
+            (await this.#rest.get<APIChannel>(Routes.channel(this.channelId)))
+                .permission_overwrites ??
+            [];
+        const existing = overwrites.find((entry) => entry.id === overwriteId);
+        const type = existing?.type ?? options.type;
+        if (type !== 0 && type !== 1)
+            throw new TypeError(
+                "A new permission overwrite needs a type: 0 for a role, 1 for a member.",
+            );
+        const touched =
+            (changes.allow ?? 0n) |
+            (changes.deny ?? 0n) |
+            (changes.inherit ?? 0n);
+        const allow =
+            (BigInt(existing?.allow ?? 0) & ~touched) | (changes.allow ?? 0n);
+        const deny =
+            (BigInt(existing?.deny ?? 0) & ~touched) | (changes.deny ?? 0n);
+        await this.edit(overwriteId, { type, allow, deny }, options.reason);
     }
 
     /** Creates or replaces the overwrite for a role or member. */

@@ -32,22 +32,26 @@ export interface APIEmbed {
 /** Builds compile-time-safe rich embed payloads for Discord API requests. */
 export class EmbedBuilder {
     readonly #data: APIEmbed = {};
-    /** Sets the embed title. @param value Title text. @returns This builder. @throws {RangeError} If title exceeds Discord's limit. */ public setTitle(
-        value: string,
+    /** Sets the embed title. @param value Title text, or null to clear. @returns This builder. @throws {RangeError} If title exceeds Discord's limit. */ public setTitle(
+        value: string | null,
     ): this {
-        this.#data.title = validate(value, 256, "Embed title");
+        if (value === null) delete this.#data.title;
+        else this.#data.title = validate(value, 256, "Embed title");
         return this;
     }
-    /** Sets the embed description. @param value Description text. @returns This builder. @throws {RangeError} If description exceeds Discord's limit. */ public setDescription(
-        value: string,
+    /** Sets the embed description. @param value Description text, or null to clear. @returns This builder. @throws {RangeError} If description exceeds Discord's limit. */ public setDescription(
+        value: string | null,
     ): this {
-        this.#data.description = validate(value, 4096, "Embed description");
+        if (value === null) delete this.#data.description;
+        else
+            this.#data.description = validate(value, 4096, "Embed description");
         return this;
     }
-    /** Sets the embed URL. @param value Absolute URL. @returns This builder. @throws {TypeError} If URL is invalid. */ public setURL(
-        value: string,
+    /** Sets the embed URL. @param value Absolute URL, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */ public setURL(
+        value: string | null,
     ): this {
-        this.#data.url = url(value, "Embed URL");
+        if (value === null) delete this.#data.url;
+        else this.#data.url = url(value, "Embed URL");
         return this;
     }
     /** Sets the embed color. @param value RGB integer. @returns This builder. @throws {RangeError} If color is outside 24-bit RGB range. */ public setColor(
@@ -92,16 +96,24 @@ export class EmbedBuilder {
         };
         return this;
     }
-    /** Sets the thumbnail URL. @param value Thumbnail URL or payload. @returns This builder. @throws {TypeError} If URL is invalid. */ public setThumbnail(
-        value: { url: string } | string,
+    /** Sets the thumbnail URL. @param value Thumbnail URL or payload, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */ public setThumbnail(
+        value: { url: string } | string | null,
     ): this {
+        if (value === null) {
+            delete this.#data.thumbnail;
+            return this;
+        }
         const valueURL = typeof value === "string" ? value : value.url;
         this.#data.thumbnail = { url: url(valueURL, "Thumbnail URL") };
         return this;
     }
-    /** Sets the image URL. @param value Image URL or payload. @returns This builder. @throws {TypeError} If URL is invalid. */ public setImage(
-        value: { url: string } | string,
+    /** Sets the image URL. @param value Image URL or payload, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */ public setImage(
+        value: { url: string } | string | null,
     ): this {
+        if (value === null) {
+            delete this.#data.image;
+            return this;
+        }
         const valueURL = typeof value === "string" ? value : value.url;
         this.#data.image = { url: url(valueURL, "Image URL") };
         return this;

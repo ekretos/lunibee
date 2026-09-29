@@ -286,6 +286,16 @@ export class CommandOptions {
         return resolved;
     }
 
+    /** Whether a mentionable option picked a user or a role; null when the option is missing. @param name Option name. */
+    public getMentionableType(name: string): "user" | "role" | null {
+        const opt = this.#get(name);
+        if (!opt || opt.type !== OptionType.Mentionable) return null;
+        const id = String(opt.value);
+        if ((this.#resolved as any)?.users?.[id]) return "user";
+        if ((this.#resolved as any)?.roles?.[id]) return "role";
+        return null;
+    }
+
     /** Gets the raw resolved attachment data for an attachment option. @param name Option name. @param required If true, throws when missing. */
     public getAttachment(
         name: string,

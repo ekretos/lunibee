@@ -23,6 +23,7 @@ export {
     SeparatorBuilder,
     ThumbnailBuilder,
     ContentInventoryEntryBuilder,
+    componentsV2Message,
 } from "./components.js";
 export {
     SlashCommandBuilder,

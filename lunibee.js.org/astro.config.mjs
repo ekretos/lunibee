@@ -165,6 +165,7 @@ export default defineConfig({
           label: "Guides & Recipes",
           items: [
             { label: "Slash Command Deployment", link: "/recipes/slash-commands" },
+            { label: "Prefix Commands", link: "/recipes/prefix-commands" },
             { label: "Buttons & Select Menus", link: "/recipes/buttons-and-selects" },
             { label: "Modals & Form Inputs", link: "/recipes/modals" },
             { label: "Paginator Component", link: "/recipes/paginators" },

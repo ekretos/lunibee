@@ -191,3 +191,27 @@ client.on("messageCreate", async (message) => {
   duplicates, and throws for messages older than 14 days.
 - Polls: `channels.endPoll(channelId, messageId)` and
   `channels.fetchPollVoters(channelId, messageId, answerId, { after?, limit? })`.
+
+## Next Release Additions
+
+- **`member`**: on guild messages from the Gateway, the author as a `GuildMember` (or `null`). Its `permissions` are computed from the cached roles, so prefix commands can check permissions like slash commands do, and its actions (`kick()`, `timeout()`...) work. The client also keeps the cached member current from each message.
+- **Files**: `send`, `reply` and `edit` accept `files: [{ name, data, contentType? }]` (`data` is a `Blob`, bytes or a string) and upload them.
+- **`createComponentCollector(options?)`**: collects clicks and picks on this message's components. Options are the `Collector` options plus `componentType`. It always ends: after `time`, or 15 minutes (an interaction token's life) when neither `time` nor `idle` is set.
+- **`awaitComponent(options?)`**: the next click or pick (rejects when time runs out).
+
+```ts
+const panel = await message.reply({
+  content: "Delete this?",
+  components: [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("yes").setLabel("Yes").setStyle(ButtonStyle.Danger),
+  ).toJSON()],
+});
+try {
+  const click = await panel.awaitComponent({ filter: (i) => i.user?.id === message.author.id, time: 30_000 });
+  await click.update({ content: "Deleted.", components: [] });
+} catch {
+  await panel.edit({ content: "Timed out.", components: [] });
+}
+
+await channel.send({ content: "Your transcript", files: [{ name: "transcript.html", data: html }] });
+```

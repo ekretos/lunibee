@@ -23,6 +23,11 @@ export const ComponentType = {
     Container: 17,
 } as const;
 export const TextInputStyle = { Short: 1, Paragraph: 2 } as const;
+/** One {@link TextInputStyle} value, usable as a type. */
+export type TextInputStyle =
+    (typeof TextInputStyle)[keyof typeof TextInputStyle];
+/** One {@link ComponentType} value, usable as a type. */
+export type ComponentType = (typeof ComponentType)[keyof typeof ComponentType];
 export interface APIComponentEmoji {
     id?: string | null;
     name?: string | null;
@@ -83,8 +88,8 @@ export interface APITextInputComponent {
 }
 export interface APIModalComponent {
     type: 9;
-    custom_id?: string;
-    title?: string;
+    custom_id: string;
+    title: string;
     components: APIActionRowComponent[];
 }
 export type APIActionRowChild =
@@ -435,6 +440,14 @@ export class ModalBuilder {
         this.#components.push(...components);
         return this;
     }
+    /** Adds text inputs, each in its own action row (Discord's modal layout). @param inputs Text inputs, at most 5 per modal. */
+    public addTextInputs(...inputs: TextInputBuilder[]): this {
+        return this.addComponents(
+            ...inputs.map((input) =>
+                new ActionRowBuilder<TextInputBuilder>().addComponents(input),
+            ),
+        );
+    }
     public toJSON(): APIModalComponent {
         if (!this.#custom_id || !this.#title)
             throw new TypeError("Modals require a custom ID and a title.");
@@ -442,8 +455,8 @@ export class ModalBuilder {
             throw new RangeError("Modals require at least one component.");
         return {
             type: 9,
-            ...(this.#custom_id ? { custom_id: this.#custom_id } : {}),
-            ...(this.#title ? { title: this.#title } : {}),
+            custom_id: this.#custom_id,
+            title: this.#title,
             components: this.#components.map((component) => component.toJSON()),
         };
     }
@@ -756,4 +769,32 @@ function assertSelect(data: {
         throw new TypeError("Select menus require a custom ID.");
     if ((data.min_values ?? 1) > (data.max_values ?? 1))
         throw new RangeError("min_values cannot exceed max_values.");
+}
+
+/** Discord's flag for a message laid out with Components V2 (containers, text displays...). */
+const IS_COMPONENTS_V2 = 1 << 15;
+
+/**
+ * A message payload laid out with Components V2: the components, and the flag
+ * Discord requires for them. A V2 message cannot also carry `content` or `embeds`.
+ * @param components Top-level components (containers, sections, text displays, action rows...).
+ * @param options Extra message fields, such as `allowed_mentions` or `ephemeral`; `flags` are combined.
+ * @example channel.send(componentsV2Message(new ContainerBuilder().addComponents(new TextDisplayBuilder().setContent("Hi"))))
+ */
+export function componentsV2Message<
+    T extends Record<string, unknown> = Record<string, never>,
+>(
+    components: { toJSON(): APIComponent } | Array<{ toJSON(): APIComponent }>,
+    options?: T & { flags?: number },
+): { components: APIComponent[]; flags: number } & T {
+    const list = Array.isArray(components) ? components : [components];
+    if (!list.length)
+        throw new TypeError(
+            "A Components V2 message needs at least one component.",
+        );
+    return {
+        ...(options ?? ({} as T)),
+        components: list.map((component) => component.toJSON()),
+        flags: (options?.flags ?? 0) | IS_COMPONENTS_V2,
+    };
 }

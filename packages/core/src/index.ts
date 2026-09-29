@@ -37,6 +37,7 @@ import {
     MonetizationManager,
     StageInstanceManager,
     UserManager,
+    toRequest,
 } from "@lunibee/managers";
 import { REST, Routes } from "@lunibee/rest";
 import {
@@ -92,7 +93,7 @@ import type {
 } from "@lunibee/types";
 import { ClientEvent, type ClientEvents } from "./events.js";
 import { Collector, type CollectorOptions } from "./collector.js";
-import { computePermissions, type PermissionSet } from "./permissions.js";
+import { computePermissions, PermissionSet } from "./permissions.js";
 
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
@@ -292,7 +293,51 @@ export class Client
                 this.channels.pinMessage(channelId, messageId),
             unpinMessage: (channelId, messageId) =>
                 this.channels.unpinMessage(channelId, messageId),
+            collectInteractions: (options) =>
+                this.createCollector(ClientEvent.InteractionCreate, options),
+            memberPermissions: (guildId, memberId, roleIds, channelId) =>
+                this.#memberPermissions(guildId, memberId, roleIds, channelId),
+            kickMember: (guildId, userId, reason) =>
+                this.guilds.members(guildId).kick(userId, reason),
+            banMember: (guildId, userId, options) =>
+                this.guilds.members(guildId).ban(userId, options),
+            editMember: (guildId, userId, options, reason) =>
+                this.guilds.members(guildId).edit(userId, options, reason),
+            addMemberRole: (guildId, userId, roleId, reason) =>
+                this.guilds.members(guildId).addRole(userId, roleId, reason),
+            removeMemberRole: (guildId, userId, roleId, reason) =>
+                this.guilds.members(guildId).removeRole(userId, roleId, reason),
+            editPermissionOverwrite: async (
+                channelId,
+                targetId,
+                changes,
+                options,
+            ) => {
+                const bits = { allow: 0n, deny: 0n, inherit: 0n };
+                for (const [name, value] of Object.entries(changes)) {
+                    // Names only: a number or bit string here is a mistake, not a permission.
+                    if (!/^[A-Za-z]+$/.test(name))
+                        throw new TypeError(`Unknown permission: ${name}`);
+                    let bit: bigint;
+                    try {
+                        bit = new PermissionSet(name).bitfield;
+                    } catch {
+                        throw new TypeError(`Unknown permission: ${name}`);
+                    }
+                    const key =
+                        value === true
+                            ? "allow"
+                            : value === false
+                              ? "deny"
+                              : "inherit";
+                    bits[key] |= bit;
+                }
+                return this.channels
+                    .permissionOverwrites(channelId)
+                    .update(targetId, bits, options);
+            },
         };
+        this.guilds.attachContext(this.#resourceContext);
         this.#gateway = new Gateway({
             token: options.token,
             intents: options.intents,
@@ -332,11 +377,20 @@ export class Client
 
         // ── Messages ─────────────────────────────────────────────────────────────
         this.#gateway.on("MESSAGE_CREATE", (data) => {
-            const message = new Message(
-                data as import("@lunibee/types").APIMessage,
-                this.#resourceContext,
-            );
+            const payload = data as import("@lunibee/types").APIMessage;
+            const message = new Message(payload, this.#resourceContext);
             this.#observeMessage(message);
+            // The author's member (roles, nickname) comes with every guild
+            // message; keep the cached member current with it.
+            if (
+                payload.member &&
+                payload.guild_id &&
+                this.guilds.has(payload.guild_id)
+            )
+                this.#upsertMember(payload.guild_id, {
+                    ...payload.member,
+                    user: payload.member.user ?? payload.author,
+                } as APIGuildMember);
             // With messageCache enabled, Gateway messages enter the bounded
             // cache so later edits and deletes can see the previous content;
             // listeners get the cached instance.
@@ -814,7 +868,10 @@ export class Client
     }
 
     #upsertMember(guildId: string, data: APIGuildMember): GuildMember {
-        const member = new GuildMember({ ...data, guild_id: guildId });
+        const member = new GuildMember(
+            { ...data, guild_id: guildId },
+            this.#resourceContext,
+        );
         if (this.#cache.users)
             this.#merge(this.users, member.user.id, member.user);
         if (!this.#cache.members) return member;
@@ -893,6 +950,39 @@ export class Client
         return collector;
     }
 
+    /** Structures built by this client (members from interactions...) act through this. */
+    public get resourceContext(): ResourceContext {
+        return this.#resourceContext;
+    }
+
+    /** Guild- or channel-level permissions from a member's role IDs and the cached roles and overwrites. */
+    #memberPermissions(
+        guildId: string,
+        memberId: string,
+        roleIds: readonly string[],
+        channelId?: string,
+    ): PermissionSet | null {
+        const guild = this.guilds.get(guildId);
+        if (!guild) return null;
+        let channel = channelId ? this.channels.get(channelId) : undefined;
+        if (channelId) {
+            // Threads use their parent's overwrites; without it the answer is unknown.
+            if (channel?.isThread())
+                channel = channel.parentId
+                    ? this.channels.get(channel.parentId)
+                    : undefined;
+            if (!channel || channel.guildId !== guildId) return null;
+        }
+        return computePermissions({
+            guildId,
+            ownerId: guild.ownerId,
+            memberId,
+            memberRoleIds: [...roleIds],
+            roles: this.guilds.roles(guildId).values(),
+            overwrites: channel?.permissionOverwrites,
+        });
+    }
+
     /**
      * Resolves a member's permissions from cached state: guild-level for a
      * guild ID, or channel-level (including overwrites) for a cached channel
@@ -963,10 +1053,17 @@ export class Client
         token: string,
         response: import("@lunibee/structures").InteractionResponse,
     ): Promise<unknown> {
-        return this.rest.post(
-            Routes.interactionCallback(id, token),
-            response.toJSON(),
-        );
+        const json = response.toJSON();
+        // Files in the reply turn the callback into an upload.
+        const upload = json.data ? toRequest(json.data) : undefined;
+        if (upload && typeof upload === "object" && "files" in upload) {
+            const { body, files } = upload as { body: unknown; files: never[] };
+            return this.rest.post(Routes.interactionCallback(id, token), {
+                body: { ...json, data: body },
+                files,
+            });
+        }
+        return this.rest.post(Routes.interactionCallback(id, token), json);
     }
     public editInteractionReply(
         token: string,
@@ -976,7 +1073,7 @@ export class Client
             return Promise.reject(new Error("Client is unauthenticated."));
         return this.rest.patch(
             Routes.interactionOriginalResponse(this.user.id, token),
-            data,
+            toRequest(data),
         );
     }
     public deleteInteractionReply(token: string): Promise<void> {
@@ -992,7 +1089,10 @@ export class Client
     ): Promise<unknown> {
         if (!this.user)
             return Promise.reject(new Error("Client is unauthenticated."));
-        return this.rest.post(`/webhooks/${this.user.id}/${token}`, data);
+        return this.rest.post(
+            `/webhooks/${this.user.id}/${token}`,
+            toRequest(data),
+        );
     }
     public interactionWebhookMessage(
         method: "GET" | "PATCH" | "DELETE",

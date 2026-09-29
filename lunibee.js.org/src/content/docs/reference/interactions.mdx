@@ -454,3 +454,22 @@ client.on("interactionCreate", async (interaction) => {
 Only one initial response can be sent; concurrent `reply`/`defer`/`update`
 calls throw instead of racing, and a failed acknowledgement can be retried.
 `{ ephemeral: true }` works on replies, edits and follow-ups.
+
+## Next Release Additions
+
+- `deferReply(options)` also takes `{ ephemeral: true }` (a boolean still works).
+- `showModal(modal)` takes a `ModalBuilder` directly, so no `.toJSON()` or cast is needed.
+- `awaitModalSubmit({ time, customId?, filter? })` waits for this user to submit a modal and returns the `ModalSubmitInteraction`. `time` is required.
+- `reply`, `editReply`, `followUp` and `update` accept `files: [{ name, data, contentType? }]`.
+- `interaction.member` can act on itself (`kick()`, `timeout()`...), as can other members from the client.
+- `ComponentInteraction.messageId`: the ID of the message the component is on.
+- `options.getMentionableType(name)`: `"user"`, `"role"` or `null`, for mentionable options.
+
+```ts
+await interaction.showModal(
+  new ModalBuilder().setCustomId("report").setTitle("Report")
+    .addTextInputs(new TextInputBuilder().setCustomId("why").setLabel("What happened?").setStyle(TextInputStyle.Paragraph)),
+);
+const submitted = await interaction.awaitModalSubmit({ time: 5 * 60_000, customId: "report" });
+await submitted.reply({ content: "Thanks!", ephemeral: true });
+```

@@ -11,10 +11,36 @@ export interface MessageCacheOptions {
 import { REST, Routes } from "@lunibee/rest";
 import { Message, type ResourceContext } from "@lunibee/structures";
 
+/** A file to upload with a message. */
+export interface MessageFile {
+    name: string;
+    data: Blob | Uint8Array | ArrayBuffer | string;
+    contentType?: string;
+}
+
 export type MessageCreateOptions = Record<string, unknown> & {
     content?: string;
+    /** Files to upload; the message is sent as multipart. */
+    files?: MessageFile[];
 };
-export type MessageEditOptions = Record<string, unknown> & { content?: string };
+export type MessageEditOptions = MessageCreateOptions;
+
+/** Splits `files` out of a message payload into a REST upload, encoding string data as UTF-8. */
+export function toRequest(options: MessageCreateOptions): unknown {
+    const { files, ...body } = options;
+    if (!files?.length) return body;
+    return {
+        body,
+        files: files.map((file) => ({
+            name: file.name,
+            data:
+                typeof file.data === "string"
+                    ? new TextEncoder().encode(file.data)
+                    : file.data,
+            contentType: file.contentType,
+        })),
+    };
+}
 
 export class MessageManager {
     /** Cached messages; always empty unless a message cache is configured. */
@@ -46,7 +72,7 @@ export class MessageManager {
     public async send(options: MessageCreateOptions): Promise<Message> {
         const data = await this.#rest.post<
             ConstructorParameters<typeof Message>[0]
-        >(Routes.channelMessages(this.#channelId), options);
+        >(Routes.channelMessages(this.#channelId), toRequest(options));
         return this.upsert(data);
     }
     public async fetch(messageId: string): Promise<Message> {

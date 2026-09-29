@@ -1,5 +1,17 @@
 /** Resource structures for Discord messages and related entities. */
 import { BaseStructure, Channel, User } from "./base.js";
+import { GuildMember } from "./resources.js";
+import type { ComponentInteraction } from "./interactions.js";
+import type { Collector, CollectorOptions } from "@lunibee/core";
+
+/** Interaction tokens last 15 minutes, so a component collector with no limit of its own stops then. */
+const COMPONENT_COLLECTOR_DEFAULT_TIME = 15 * 60_000;
+
+/** Options for {@link Message.createComponentCollector}. */
+export interface ComponentCollectorOptions extends CollectorOptions<ComponentInteraction> {
+    /** Only this component type (2 button, 3 string select...). */
+    componentType?: number;
+}
 import type { ResourceContext } from "./base.js";
 
 /** discord.js user-authored (non-system) message types: Default, Reply,
@@ -28,6 +40,12 @@ export class Message extends BaseStructure {
     public readonly reference?: import("@lunibee/types").APIMessageReference;
     public readonly components: import("@lunibee/types").APIMessageComponent[];
     public readonly referencedMessage?: Message | null;
+    /**
+     * The author as a guild member, on guild messages from the Gateway. Its
+     * `permissions` are computed from the cached roles; `member.kick()` and the
+     * other member actions work when the message came from a client.
+     */
+    public member: GuildMember | null;
     readonly #context?: ResourceContext;
 
     /** Creates a message structure from Discord message data. */
@@ -63,6 +81,17 @@ export class Message extends BaseStructure {
               ? null
               : undefined;
         this.#context = context;
+        this.member =
+            data.member && data.guild_id
+                ? new GuildMember(
+                      {
+                          ...data.member,
+                          user: data.member.user ?? data.author,
+                          guild_id: data.guild_id,
+                      },
+                      context,
+                  )
+                : null;
         this.channel = new Channel(
             { id: data.channel_id, type: 0, guild_id: data.guild_id },
             context,
@@ -130,6 +159,46 @@ export class Message extends BaseStructure {
         if (!this.#context)
             throw new Error("This message is not attached to a client.");
         return this.#context.crosspostMessage(this.channelId, this.id);
+    }
+
+    /**
+     * Collects clicks and picks on this message's components. It always ends:
+     * after `time`, or 15 minutes (an interaction token's life) when neither
+     * `time` nor `idle` is set.
+     * @example
+     * const collector = message.createComponentCollector({ filter: (i) => i.user?.id === authorId, time: 60_000 });
+     * collector.on("collect", (i) => i.update({ content: `Picked ${i.customId}` }));
+     */
+    public createComponentCollector(
+        options: ComponentCollectorOptions = {},
+    ): Collector<string, ComponentInteraction> {
+        const collect = this.#context?.collectInteractions;
+        if (!collect)
+            throw new Error("This message is not attached to a client.");
+        const { componentType, filter, ...rest } = options;
+        return collect({
+            ...rest,
+            time:
+                rest.time ??
+                (rest.idle ? undefined : COMPONENT_COLLECTOR_DEFAULT_TIME),
+            filter: async (interaction) =>
+                interaction.isMessageComponent() &&
+                interaction.messageId === this.id &&
+                (componentType === undefined ||
+                    interaction.componentType === componentType) &&
+                (filter ? await filter(interaction) : true),
+        }) as unknown as Collector<string, ComponentInteraction>;
+    }
+
+    /**
+     * Waits for the next click or pick on this message's components.
+     * @param options `time` (default 15 minutes), `filter`, `componentType`.
+     * @returns The interaction. @throws {Error} When time runs out first.
+     */
+    public awaitComponent(
+        options: Omit<ComponentCollectorOptions, "max"> = {},
+    ): Promise<ComponentInteraction> {
+        return this.createComponentCollector({ ...options, max: 1 }).next();
     }
 
     /** Adds a reaction to this message. @param emoji Emoji identifier. @returns A promise fulfilled when the reaction is added. @throws {Error} If reactions are unavailable. */

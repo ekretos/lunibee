@@ -1,5 +1,5 @@
 import { REST, Routes } from "@lunibee/rest";
-import { GuildMember } from "@lunibee/structures";
+import { GuildMember, type ResourceContext } from "@lunibee/structures";
 import { ResourceManager } from "./base.js";
 
 export interface MemberEditOptions {
@@ -19,26 +19,38 @@ export interface BanOptions {
 /** Manages Discord guild members. */
 export class GuildMemberManager extends ResourceManager<string, GuildMember> {
     readonly #rest: REST;
+    readonly #context: () => ResourceContext | undefined;
     public readonly guildId: string;
 
-    public constructor(guildId: string, rest: REST) {
+    /** @param context Gives fetched members their actions (`member.kick()`...). */
+    public constructor(
+        guildId: string,
+        rest: REST,
+        context: () => ResourceContext | undefined = () => undefined,
+    ) {
         super(
             (id: string) =>
                 rest
                     .get(Routes.guildMember(guildId, id))
                     .then(
                         (data: any) =>
-                            new GuildMember({ ...data, guild_id: guildId }),
+                            new GuildMember(
+                                { ...data, guild_id: guildId },
+                                context(),
+                            ),
                     ),
             (member: GuildMember) => member.user.id,
         );
         this.guildId = guildId;
         this.#rest = rest;
+        this.#context = context;
     }
 
-    /** Kicks a member from the guild. */
-    public async kick(userId: string): Promise<void> {
-        await this.#rest.delete(Routes.guildMember(this.guildId, userId));
+    /** Kicks a member from the guild. @param reason Audit-log reason. */
+    public async kick(userId: string, reason?: string): Promise<void> {
+        await this.#rest.delete(Routes.guildMember(this.guildId, userId), {
+            reason,
+        });
         this.delete(userId);
     }
 
@@ -57,42 +69,62 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
         await this.#rest.delete(Routes.guildBan(this.guildId, userId));
     }
 
-    /** Edits a guild member (nickname, roles, timeout, mute, deaf). */
+    /** Edits a guild member (nickname, roles, timeout, mute, deaf). @param reason Audit-log reason. */
     public async edit(
         userId: string,
         options: MemberEditOptions,
+        reason?: string,
     ): Promise<GuildMember> {
         const data = await this.#rest.patch<
             import("@lunibee/types").APIGuildMember
-        >(Routes.guildMember(this.guildId, userId), options);
-        const member = new GuildMember({ ...data, guild_id: this.guildId });
+        >(Routes.guildMember(this.guildId, userId), options, { reason });
+        const member = new GuildMember(
+            { ...data, guild_id: this.guildId },
+            this.#context(),
+        );
         this.set(member.user.id, member);
         return member;
     }
 
-    /** Adds a role to a member. */
-    public async addRole(userId: string, roleId: string): Promise<void> {
+    /** Adds a role to a member. @param reason Audit-log reason. */
+    public async addRole(
+        userId: string,
+        roleId: string,
+        reason?: string,
+    ): Promise<void> {
         await this.#rest.put(
             Routes.guildMemberRole(this.guildId, userId, roleId),
+            undefined,
+            { reason },
         );
     }
 
-    /** Removes a role from a member. */
-    public async removeRole(userId: string, roleId: string): Promise<void> {
+    /** Removes a role from a member. @param reason Audit-log reason. */
+    public async removeRole(
+        userId: string,
+        roleId: string,
+        reason?: string,
+    ): Promise<void> {
         await this.#rest.delete(
             Routes.guildMemberRole(this.guildId, userId, roleId),
+            { reason },
         );
     }
 
-    /** Times out a member for a given duration in milliseconds (or clears timeout if null). */
+    /** Times out a member for a given duration in milliseconds (or clears timeout if null). @param reason Audit-log reason. */
     public async timeout(
         userId: string,
         milliseconds: number | null,
+        reason?: string,
     ): Promise<GuildMember> {
         const timeoutDate =
             milliseconds === null
                 ? null
                 : new Date(Date.now() + milliseconds).toISOString();
-        return this.edit(userId, { communication_disabled_until: timeoutDate });
+        return this.edit(
+            userId,
+            { communication_disabled_until: timeoutDate },
+            reason,
+        );
     }
 }
