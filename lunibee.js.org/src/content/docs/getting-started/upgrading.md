@@ -1,7 +1,24 @@
 ---
-title: Upgrading to 0.2.0
-description: Code changes needed when upgrading from 0.1.8 to 0.2.0.
+title: Upgrading
+description: Code changes needed when upgrading from 0.1.8 to 0.2.0, and from 0.2.0 to 0.2.1.
 ---
+
+## 0.2.0 → 0.2.1
+
+0.2.1 adds APIs and needs no code changes, with two things to know:
+
+- **`GuildMember.permissions` is computed.** Members that did not come with
+  permissions from Discord (from the Gateway, the member cache or a fetch)
+  used to report `0`. They now report their guild-level permissions from the
+  cached roles, read fresh each time. If you relied on `0` meaning "unknown",
+  check `client.guilds.roles(guildId).size` instead. Interaction members still
+  report Discord's value.
+- **`ModalBuilder.toJSON()`** is typed with a required `custom_id` and `title`
+  (it already required them at runtime).
+
+See the [changelog](/getting-started/changelog/) for the new APIs.
+
+## 0.1.8 → 0.2.0
 
 Most bots need no changes. Check each item below that applies to you.
 

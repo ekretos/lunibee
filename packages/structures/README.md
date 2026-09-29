@@ -40,6 +40,15 @@ console.log(member.displayName, member.displayAvatarURL());
 Structures attached to a client (via a `ResourceContext`) can call Discord directly;
 detached ones throw on those methods.
 
+## What's new in 0.2.1
+
+- `message.member`: the author as a guild member on guild messages.
+- `GuildMember.permissions` is computed from the cached roles when Discord did not send it; `permissionsIn(channelId)`.
+- `GuildMember` actions: `kick`, `ban`, `timeout`, `setNickname`, `addRole`, `removeRole`, `edit`.
+- `channel.editPermissionOverwrite(id, { ViewChannel: true, SendMessages: false })`.
+- `message.createComponentCollector()`, `message.awaitComponent()`, `interaction.awaitModalSubmit()`.
+- `showModal()` takes a builder; `deferReply({ ephemeral })`; `options.getMentionableType()`; `ComponentInteraction.messageId`.
+
 ## What's new in 0.2.0
 
 Interactions: single acknowledgement guard, `fetchReply()`, `editFollowUp()`, `deleteFollowUp()`, `user`, `member`, `expiresAt`/`isExpired`. Channels: typed `permissionOverwrites`.

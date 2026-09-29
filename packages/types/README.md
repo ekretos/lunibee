@@ -38,3 +38,9 @@ function isText(message: APIMessage, channelType: number): boolean {
 - Gateway config types: `GatewayOptions`, `GatewayPresence`, `GatewayProperties`.
 
 The package has no runtime dependencies.
+
+## What's new in 0.2.1
+
+- `ButtonStyle`, `TextInputStyle`, `ComponentType` and `MessageFlags` are usable as types.
+- `APIMessage.member`: the author's guild member on Gateway messages.
+

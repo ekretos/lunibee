@@ -3,7 +3,7 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
-## Unreleased
+## v0.2.1
 
 ### ✨ Friendlier API
 
@@ -21,6 +21,14 @@ description: Lunibee version history and release notes.
 
 * `GuildMember.permissions` is a getter. Members from the Gateway or REST used to report `0`; they now report their computed guild-level permissions.
 * `APIModalComponent` (the type `ModalBuilder.toJSON()` returns) now has a required `custom_id` and `title`.
+
+### 📚 Documentation
+
+* New [Prefix Commands](/recipes/prefix-commands/) recipe; "0.2.1 Additions" on the GuildMember, Message, Channel, Interactions, ModalBuilder, Components V2, EmbedBuilder, PermissionSet, Collector and Utils pages; an [upgrade note](/getting-started/upgrading/).
+
+### 🧪 Testing
+
+* `tests/friendly-api.test.ts` covers prefix arguments, member permissions and actions, overwrite merging, file uploads, component collectors and the builder additions.
 
 ## v0.2.0
 

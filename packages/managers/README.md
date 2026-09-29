@@ -46,6 +46,12 @@ console.log(page.messages.length, page.hasMore);
 `Manager` and `ResourceManager` are the base classes; `CachedManager` is an alias of
 `ResourceManager`.
 
+## What's new in 0.2.1
+
+- `permissionOverwrites(channelId).update(id, { allow?, deny?, inherit? }, { type?, reason? })` changes only the given bits.
+- `GuildMemberManager` `kick`, `edit`, `addRole`, `removeRole` and `timeout` take an audit-log `reason`.
+- `files` on message send and edit are uploaded; `toRequest()` exposes the conversion.
+
 ## What's new in 0.2.0
 
 Per-guild `members()`, `roles()`, `emojis()`, `stickers()`, `soundboard()`, `voiceStates()`, `autoModerationRules()` and `invites()` kept in sync by the Gateway; `MonetizationManager`; shared fetches with stale-result protection; `iterateMessages()`, `endPoll()`, `fetchPollVoters()`, `sendSoundboardSound()`; opt-in message cache.

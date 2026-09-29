@@ -455,7 +455,7 @@ Only one initial response can be sent; concurrent `reply`/`defer`/`update`
 calls throw instead of racing, and a failed acknowledgement can be retried.
 `{ ephemeral: true }` works on replies, edits and follow-ups.
 
-## Next Release Additions
+## 0.2.1 Additions
 
 - `deferReply(options)` also takes `{ ephemeral: true }` (a boolean still works).
 - `showModal(modal)` takes a `ModalBuilder` directly, so no `.toJSON()` or cast is needed.

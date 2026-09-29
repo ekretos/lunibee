@@ -192,7 +192,7 @@ client.on("messageCreate", async (message) => {
 - Polls: `channels.endPoll(channelId, messageId)` and
   `channels.fetchPollVoters(channelId, messageId, answerId, { after?, limit? })`.
 
-## Next Release Additions
+## 0.2.1 Additions
 
 - **`member`**: on guild messages from the Gateway, the author as a `GuildMember` (or `null`). Its `permissions` are computed from the cached roles, so prefix commands can check permissions like slash commands do, and its actions (`kick()`, `timeout()`...) work. The client also keeps the cached member current from each message.
 - **Files**: `send`, `reply` and `edit` accept `files: [{ name, data, contentType? }]` (`data` is a `Blob`, bytes or a string) and upload them.

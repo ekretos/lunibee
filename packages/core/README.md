@@ -37,6 +37,13 @@ Utility methods on the client include `generateInvite()`, `fetchInvite()`,
 `fetchWebhook()`, `fetchVoiceRegions()`, `fetchSticker()`, `setPresence()` and
 `requestGuildMembers()`. Call `client.destroy()` on shutdown.
 
+## What's new in 0.2.1
+
+- Members built by the client can act on themselves and compute their permissions from the cached roles (see `@lunibee/structures`).
+- `client.resourceContext` is shared with structures from interactions.
+- Files in interaction replies (`reply`, `editReply`, `followUp`, `update`) are uploaded.
+- Renamed permission names (`ManageEmojisAndStickers`, `ManageEmojis`, `UseSlashCommands`) still resolve.
+
 ## What's new in 0.2.0
 
 `messageCache` and `cache` client options, `client.permissionsFor()`, `client.createCollector()`, `client.monetization`, `computePermissions()`, `PermissionSet.missing()`, collector `idle`/`signal`/async iteration, entitlement and soundboard events, and the previous/deleted message on `messageUpdate`/`messageDelete`/`messageDeleteBulk`.

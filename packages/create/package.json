@@ -1,6 +1,6 @@
 {
   "name": "create-lunibee",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Scaffold a new Lunibee Discord bot project.",
   "type": "module",
   "main": "./dist/index.js",

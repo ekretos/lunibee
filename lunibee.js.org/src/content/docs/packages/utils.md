@@ -46,7 +46,7 @@ Use `isSnowflake()` when validating user-supplied Discord IDs before sending the
 
 Utilities are intentionally independent of the Discord client. You can use them in commands, scripts, workers, tests, or other parts of your application without creating a Lunibee client.
 
-## Prefix-command arguments (next release)
+## Prefix-command arguments (0.2.1)
 
 Read the text after a prefix command as typed values, the way slash-command options are read.
 

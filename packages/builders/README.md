@@ -55,6 +55,13 @@ console.log(embed.toJSON(), buttons.toJSON(), menu.toJSON(), ping.toJSON());
 
 Every builder validates Discord's limits as you set values and serialises with `toJSON()`.
 
+## What's new in 0.2.1
+
+- `ModalBuilder.addTextInputs(...inputs)` wraps each text input in its own row.
+- `componentsV2Message(components, options?)` builds a Components V2 message with the required flag.
+- `EmbedBuilder` setters (`setTitle`, `setDescription`, `setURL`, `setThumbnail`, `setImage`) clear the field with `null`.
+- `TextInputStyle` and `ComponentType` are usable as types; `ModalBuilder.toJSON()` is typed with a required `custom_id` and `title`.
+
 ## What's new in 0.2.0
 
 `toJSON()` validates whole components (required fields, value bounds, action-row rules, button field exclusivity); `ButtonBuilder.setSKUId()` for premium buttons.
