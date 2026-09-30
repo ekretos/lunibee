@@ -1,147 +1,107 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+/**
+ * Publishes every public workspace package, then the root `lunibee` package, to npm.
+ *
+ *   bun run publish:all                 # build, verify, publish
+ *   bun run publish:all -- --dry-run    # everything except the upload
+ *   bun run publish:all -- --otp 123456 # extra flags go to `npm publish`
+ *
+ * Order of work, so a broken tarball never reaches npm:
+ * 1. build every package with a `build` script (and the root with `build:all`);
+ * 2. check that every file package.json points at exists and every bin has a `#!` line
+ *    (npm silently drops a `bin` whose file is missing);
+ * 3. publish dependencies first, skipping versions already on npm, so a failed run can
+ *    simply be rerun.
+ */
 import { spawnSync } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import {
+    entryProblems,
+    preparePackages,
+    publishOrder,
+    workspacePackages,
+    type WorkspacePackage,
+} from "../packages/cli/src/maintainer.ts";
+import { CliError, type IO } from "../packages/cli/src/io.ts";
 
-const PACKAGES_DIR = join(import.meta.dir, "../packages");
-const ROOT_DIR = join(import.meta.dir, "..");
+const ROOT = join(import.meta.dir, "..");
+const npmArgs = process.argv.slice(2);
+const dryRun = npmArgs.includes("--dry-run");
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
-async function publishAll() {
-  const dirs = await readdir(PACKAGES_DIR, { withFileTypes: true });
+const io: IO = {
+    cwd: ROOT,
+    out: (line) => console.log(line),
+    err: (line) => console.error(line),
+    prompt: () => null,
+    interactive: false,
+    color: false,
+    run: async (command, cwd) =>
+        Bun.spawn(command, { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" }).exited,
+};
 
-  const packageVersions = new Map<string, string>();
-  const packageDirs: string[] = [];
-
-  // 1. Gather all versions
-  for (const dir of dirs) {
-    if (!dir.isDirectory()) continue;
-    const pkgJsonPath = join(PACKAGES_DIR, dir.name, "package.json");
-    try {
-      const content = await readFile(pkgJsonPath, "utf-8");
-      const pkg = JSON.parse(content);
-      packageVersions.set(pkg.name, pkg.version);
-      packageDirs.push(dir.name);
-    } catch {}
-  }
-
-  // Add root package version
-  const rootPkgPath = join(ROOT_DIR, "package.json");
-  const rootPkgContent = await readFile(rootPkgPath, "utf-8");
-  const rootPkg = JSON.parse(rootPkgContent);
-  packageVersions.set(rootPkg.name, rootPkg.version);
-
-  // 2. Publish packages in packages/
-  for (const dirName of packageDirs) {
-    const pkgPath = join(PACKAGES_DIR, dirName);
-    const pkgJsonPath = join(pkgPath, "package.json");
-
-    const originalContent = await readFile(pkgJsonPath, "utf-8");
-    const pkg = JSON.parse(originalContent);
-    let modified = false;
-
-    // Replace workspace: and file: with actual versions
-    for (const depType of ["dependencies", "devDependencies", "peerDependencies"]) {
-      if (!pkg[depType]) continue;
-      for (const [depName, depVersion] of Object.entries(pkg[depType] as Record<string, string>)) {
-        if (depVersion.startsWith("workspace:") || depVersion.startsWith("file:")) {
-          const actualVersion = packageVersions.get(depName);
-          if (actualVersion) {
-            pkg[depType][depName] = `^${actualVersion}`;
-            modified = true;
-          }
-        }
-      }
-    }
-
-    try {
-      if (modified) {
-        await writeFile(pkgJsonPath, JSON.stringify(pkg, null, 2) + "\n");
-      }
-
-      console.log(`\n=================================================`);
-      console.log(`🚀 Publishing package: ${pkg.name}`);
-      console.log(`=================================================`);
-
-      const args = ["publish"];
-      // Scoped packages require --access public
-      if (pkg.name.startsWith("@")) {
-        args.push("--access", "public");
-      }
-
-      const result = spawnSync(
-        process.platform === "win32" ? "npm.cmd" : "npm",
-        args,
-        { cwd: pkgPath, stdio: "inherit", shell: true }
-      );
-
-      if (result.error) {
-        console.error("Spawn Error:", result.error);
-      }
-
-      if (result.status !== 0) {
-        console.error(`❌ Failed to publish ${pkg.name}. Status code: ${result.status}`);
-        process.exit(1);
-      } else {
-        console.log(`✅ Successfully published ${pkg.name}!`);
-      }
-    } finally {
-      // Always restore the original package.json (with workspace/file links)
-      if (modified) {
-        await writeFile(pkgJsonPath, originalContent);
-      }
-    }
-  }
-
-  // 3. Publish Root package
-  console.log(`\n=================================================`);
-  console.log(`🚀 Publishing package: ${rootPkg.name} (root)`);
-  console.log(`=================================================`);
-
-  const rootPkgJsonPath = join(ROOT_DIR, "package.json");
-  const rootOriginalContent = await readFile(rootPkgJsonPath, "utf-8");
-  const rootPkgParsed = JSON.parse(rootOriginalContent);
-  let rootModified = false;
-
-  for (const depType of ["dependencies", "devDependencies", "peerDependencies"]) {
-    if (!rootPkgParsed[depType]) continue;
-    for (const [depName, depVersion] of Object.entries(rootPkgParsed[depType] as Record<string, string>)) {
-      if (depVersion.startsWith("workspace:") || depVersion.startsWith("file:")) {
-        const actualVersion = packageVersions.get(depName);
-        if (actualVersion) {
-          rootPkgParsed[depType][depName] = `^${actualVersion}`;
-          rootModified = true;
-        }
-      }
-    }
-  }
-
-  try {
-    if (rootModified) {
-      await writeFile(rootPkgJsonPath, JSON.stringify(rootPkgParsed, null, 2) + "\n");
-    }
-
-    const rootResult = spawnSync(
-      process.platform === "win32" ? "npm.cmd" : "npm",
-      ["publish"],
-      { cwd: ROOT_DIR, stdio: "inherit", shell: true }
-    );
-
-    if (rootResult.error) {
-      console.error("Root Spawn Error:", rootResult.error);
-    }
-
-    if (rootResult.status !== 0) {
-      console.error(`❌ Failed to publish root package. Status code: ${rootResult.status}`);
-      process.exit(1);
-    } else {
-      console.log(`✅ Successfully published root package!`);
-    }
-  } finally {
-    if (rootModified) {
-      await writeFile(rootPkgJsonPath, rootOriginalContent);
-    }
-  }
-
-  console.log(`\n🎉 All packages published successfully!`);
+/** Whether name@version is already on the registry. */
+function published(name: string, version: string): boolean {
+    const result = spawnSync(npm, ["view", `${name}@${version}`, "version"], {
+        cwd: ROOT,
+        encoding: "utf8",
+        shell: process.platform === "win32",
+    });
+    return result.status === 0 && result.stdout.trim() === version;
 }
 
-publishAll().catch(console.error);
+/** Publishes one folder with workspace:/file: ranges replaced by real versions, then restores package.json. */
+async function publishOne(dir: string, versions: Map<string, string>): Promise<void> {
+    const path = join(dir, "package.json");
+    const original = await readFile(path, "utf8");
+    const pkg = JSON.parse(original) as Record<string, unknown> & { name: string; version: string };
+    if (!dryRun && published(pkg.name, pkg.version)) {
+        console.log(`↳ ${pkg.name}@${pkg.version} is already on npm, skipping`);
+        return;
+    }
+    let modified = false;
+    for (const type of ["dependencies", "devDependencies", "peerDependencies"]) {
+        const deps = pkg[type] as Record<string, string> | undefined;
+        for (const [name, range] of Object.entries(deps ?? {}))
+            if ((range.startsWith("workspace:") || range.startsWith("file:")) && versions.has(name)) {
+                deps![name] = `^${versions.get(name)}`;
+                modified = true;
+            }
+    }
+    console.log(`\n🚀 ${pkg.name}@${pkg.version}`);
+    try {
+        if (modified) await writeFile(path, `${JSON.stringify(pkg, null, 2)}\n`);
+        const args = ["publish", ...npmArgs];
+        if (pkg.name.startsWith("@") && !npmArgs.includes("--access")) args.push("--access", "public");
+        const result = spawnSync(npm, args, { cwd: dir, stdio: "inherit", shell: process.platform === "win32" });
+        if (result.status !== 0) throw new CliError(`Publishing ${pkg.name} failed (exit ${result.status}).`);
+    } finally {
+        if (modified) await writeFile(path, original);
+    }
+}
+
+try {
+    const packages = publishOrder((await workspacePackages(ROOT)).filter((p) => !p.manifest.private));
+    const root: WorkspacePackage = {
+        dir: ROOT,
+        manifest: JSON.parse(await readFile(join(ROOT, "package.json"), "utf8")),
+    };
+    const versions = new Map([...packages, root].map((p) => [p.manifest.name, p.manifest.version]));
+    const mixed = new Set(versions.values());
+    if (mixed.size > 1)
+        throw new CliError(`Mixed versions: ${[...versions].map(([n, v]) => `${n}@${v}`).join(", ")}`);
+
+    await preparePackages(io, packages);
+    console.log("• building lunibee (root)");
+    if ((await io.run(["bun", "run", "build:all"], ROOT)) !== 0) throw new CliError("Building the root package failed.");
+    const rootProblems = await entryProblems(ROOT, root.manifest);
+    if (rootProblems.length) throw new CliError(`Refusing to publish:\n  ${rootProblems.join("\n  ")}`);
+
+    for (const { dir } of packages) await publishOne(dir, versions);
+    await publishOne(ROOT, versions);
+    console.log(`\n🎉 ${dryRun ? "Dry run complete" : `Published ${packages.length + 1} packages`}.`);
+} catch (error) {
+    console.error(`❌ ${error instanceof Error ? error.message : String(error)}`);
+    if (error instanceof CliError && error.hint) console.error(`   ${error.hint}`);
+    process.exit(1);
+}

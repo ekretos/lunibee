@@ -1,10 +1,10 @@
 {
   "name": "@lunibee/cli",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Lunibee workspace and developer CLI.",
   "type": "module",
   "bin": {
-    "lunibee": "./dist/index.js"
+    "lunibee": "dist/index.js"
   },
   "exports": {
     ".": "./dist/index.js"

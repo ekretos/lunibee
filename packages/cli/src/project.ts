@@ -9,6 +9,12 @@ export interface PackageManifest {
     devDependencies?: Record<string, string>;
     engines?: Record<string, string>;
     publishConfig?: { access?: string };
+    scripts?: Record<string, string>;
+    bin?: string | Record<string, string>;
+    main?: string;
+    module?: string;
+    types?: string;
+    exports?: unknown;
 }
 
 /** Reads a JSON file; null when it is missing or not valid JSON. */

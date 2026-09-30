@@ -24,6 +24,16 @@ curl -fsSL https://bun.sh/install | bash
 powershell -c "irm bun.sh/install.ps1 | iex"
 ```
 
+## Starting a new project
+
+Scaffold a bot (a `package.json` and a `src/index.ts` that logs in):
+
+```bash
+bun create @lunibee my-bot
+cd my-bot
+bun install
+```
+
 ## Adding Lunibee
 
 Inside your project directory, add `lunibee`:

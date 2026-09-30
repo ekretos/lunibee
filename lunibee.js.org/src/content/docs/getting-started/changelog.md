@@ -3,6 +3,17 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
+## v0.2.3
+
+Packaging fixes for 0.2.2. No API changes.
+
+### 🐛 Fixed
+
+* **`@lunibee/cli` installed without the `lunibee` command.** npm drops a `bin` whose file is missing when it reads `package.json`, which happens before `prepublishOnly` builds it. Packages are now built before `npm publish`.
+* **The project scaffolder shipped without code.** `create-lunibee@0.2.2` contained only its README. It is now built before publishing, ships its type declarations, runs on Node as well as Bun, and is renamed **`@lunibee/create`**: `bun create @lunibee my-bot`. `create-lunibee` is deprecated.
+* **`@lunibee/builders`, `@lunibee/rest` and `@lunibee/managers` did not declare `@lunibee/types`**, so installing one of them on its own could not resolve it.
+* **Publishing refuses broken packages.** `bun run publish:all` and `lunibee publish` build every package, check that every file `package.json` points at exists and that every `bin` has a `#!` line, publish dependencies first, and (`publish:all`) skip versions already on npm so a failed run can be rerun. Extra flags go to `npm publish`: `bun run publish:all -- --otp 123456`.
+
 ## v0.2.2
 
 ### ✨ Added

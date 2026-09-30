@@ -1,4 +1,5 @@
 import { readdir } from "node:fs/promises";
+import { exists } from "./project.js";
 import { join } from "node:path";
 import { CliError, paint, type IO } from "./io.js";
 import { readJSON, type PackageManifest } from "./project.js";
@@ -63,6 +64,78 @@ export function publishOrder(
     };
     for (const pkg of packages) visit(pkg);
     return ordered;
+}
+
+/** Every file a manifest points at (bin, main, module, types, exports), relative to its folder. */
+export function entryFiles(manifest: PackageManifest): string[] {
+    const found = new Set<string>();
+    const add = (value: unknown): void => {
+        if (typeof value === "string") {
+            if (!value.endsWith("package.json"))
+                found.add(value.replace(/^\.\//, ""));
+        } else if (value && typeof value === "object")
+            for (const nested of Object.values(value)) add(nested);
+    };
+    add(manifest.bin);
+    add(manifest.main);
+    add(manifest.module);
+    add(manifest.types);
+    add(manifest.exports);
+    return [...found].sort();
+}
+
+/** Problems that would publish a broken package: missing entry files, bins without a shebang. */
+export async function entryProblems(
+    dir: string,
+    manifest: PackageManifest,
+): Promise<string[]> {
+    const problems: string[] = [];
+    for (const file of entryFiles(manifest))
+        if (!(await exists(join(dir, file))))
+            problems.push(`${manifest.name}: ${file} is missing`);
+    const bins =
+        typeof manifest.bin === "string"
+            ? [manifest.bin]
+            : Object.values(manifest.bin ?? {});
+    for (const bin of bins) {
+        const path = join(dir, bin);
+        if (
+            (await exists(path)) &&
+            !(await Bun.file(path).text()).startsWith("#!")
+        )
+            problems.push(
+                `${manifest.name}: ${bin.replace(/^\.\//, "")} has no #! line, so it cannot run as a command`,
+            );
+    }
+    return problems;
+}
+
+/**
+ * Runs each package's `build` script, then checks its entry files. npm drops a
+ * `bin` whose file is missing when it reads package.json, which happens before
+ * `prepublishOnly`, so building must come first.
+ */
+export async function preparePackages(
+    io: IO,
+    packages: readonly WorkspacePackage[],
+): Promise<void> {
+    for (const { dir, manifest } of packages)
+        if (manifest.scripts?.build) {
+            io.out(`• building ${manifest.name}`);
+            const code = await io.run(["bun", "run", "build"], dir);
+            if (code !== 0)
+                throw new CliError(
+                    `Building ${manifest.name} failed (exit ${code}).`,
+                );
+        }
+    const problems = (
+        await Promise.all(packages.map((p) => entryProblems(p.dir, p.manifest)))
+    ).flat();
+    if (problems.length)
+        throw new CliError(
+            `Refusing to publish broken packages:\n  ${problems.join("\n  ")}`,
+            "Fix the build (or the package.json paths) and rerun.",
+        );
 }
 
 /** Versions of the publishable packages, when they differ. */
@@ -137,6 +210,7 @@ export async function publish(
         );
     if (options.tag !== undefined && !/^[a-z][a-z0-9._-]*$/i.test(options.tag))
         throw new CliError(`Invalid dist-tag: ${options.tag}`);
+    await preparePackages(io, list);
     const version = list[0]!.manifest.version;
     io.out(
         `${options.dryRun ? "Dry run: " : ""}publishing ${list.length} packages at ${version}${options.tag ? ` (tag ${options.tag})` : ""}:`,

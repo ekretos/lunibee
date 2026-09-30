@@ -1,7 +1,13 @@
 ---
 title: Upgrading
-description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.2.2.
+description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.2.3.
 ---
+
+## 0.2.2 → 0.2.3
+
+No code changes. If you installed `@lunibee/cli@0.2.2`, upgrade it to get the `lunibee`
+command. The scaffolder is now `@lunibee/create` (`bun create @lunibee my-bot`) instead
+of `create-lunibee`.
 
 ## 0.2.1 → 0.2.2
 

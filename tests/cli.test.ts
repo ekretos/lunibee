@@ -642,3 +642,89 @@ test("helpers", () => {
     expect(compareVersions("1.1", "1.2.0")).toBeLessThan(0);
     expect(closest("create", ["create", "check"])).toEqual(["create"]);
 });
+
+describe("publish preparation", () => {
+    async function pkg(
+        folder: string,
+        manifest: object,
+        files: Record<string, string> = {},
+    ) {
+        const base = join(dir, "mono/packages", folder);
+        await mkdir(base, { recursive: true });
+        await writeFile(join(base, "package.json"), JSON.stringify(manifest));
+        for (const [path, content] of Object.entries(files)) {
+            await mkdir(join(base, path, ".."), { recursive: true });
+            await writeFile(join(base, path), content);
+        }
+    }
+
+    test("builds first, then checks bin, main, types and nested exports", async () => {
+        await pkg(
+            "cli",
+            {
+                name: "@x/cli",
+                version: "1.0.0",
+                bin: { x: "./dist/index.js" },
+                scripts: { build: "tsc" },
+            },
+            { "dist/index.js": "#!/usr/bin/env bun\n" },
+        );
+        await pkg(
+            "lib",
+            {
+                name: "@x/lib",
+                version: "1.0.0",
+                main: "./dist/index.js",
+                types: "./dist/index.d.ts",
+                exports: {
+                    ".": {
+                        import: "./dist/index.js",
+                        types: "./dist/index.d.ts",
+                    },
+                    "./package.json": "./package.json",
+                },
+            },
+            { "dist/index.js": "", "dist/index.d.ts": "" },
+        );
+        expect(await cli("publish --yes")).toBe(0);
+        expect(runs[0]!.command).toEqual(["bun", "run", "build"]);
+        expect(runs[0]!.cwd).toEndWith("cli");
+        expect(text()).toContain("building @x/cli");
+        expect(runs.filter((r) => r.command[1] === "publish")).toHaveLength(2);
+    });
+
+    test("refuses missing entry files and bins without #!", async () => {
+        await pkg(
+            "a",
+            {
+                name: "@x/a",
+                version: "1.0.0",
+                bin: "dist/cli.js",
+                module: "dist/index.js",
+            },
+            { "dist/cli.js": "console.log(1)" },
+        );
+        await pkg("b", {
+            name: "@x/b",
+            version: "1.0.0",
+            exports: { ".": "./dist/b.js" },
+        });
+        expect(await cli("publish --yes")).toBe(1);
+        expect(errors()).toContain("@x/a: dist/index.js is missing");
+        expect(errors()).toContain("@x/a: dist/cli.js has no #! line");
+        expect(errors()).toContain("@x/b: dist/b.js is missing");
+        expect(runs.some((r) => r.command[1] === "publish")).toBe(false);
+    });
+
+    test("a failing build stops everything", async () => {
+        await pkg("a", {
+            name: "@x/a",
+            version: "1.0.0",
+            scripts: { build: "x" },
+        });
+        exitCodes = [3];
+        expect(await cli("publish --yes")).toBe(1);
+        expect(errors()).toContain("Building @x/a failed (exit 3)");
+        expect(runs).toHaveLength(1);
+    });
+});

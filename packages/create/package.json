@@ -1,13 +1,13 @@
 {
-  "name": "create-lunibee",
-  "version": "0.2.2",
+  "name": "@lunibee/create",
+  "version": "0.2.3",
   "description": "Scaffold a new Lunibee Discord bot project.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "create-lunibee": "./dist/cli.js"
+    "create-lunibee": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -20,7 +20,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/cli.ts --outdir ./dist --target node --format esm"
+    "build": "bun build ./src/index.ts ./src/cli.ts --outdir ./dist --target node --format esm && tsc ./src/index.ts --declaration --emitDeclarationOnly --outDir ./dist --target esnext --module esnext --moduleResolution bundler --skipLibCheck --ignoreConfig",
+    "prepublishOnly": "bun run build"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "license": "MIT"
 }
