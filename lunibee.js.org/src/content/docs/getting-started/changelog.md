@@ -3,7 +3,7 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
-## Unreleased (0.2.2)
+## v0.2.2
 
 ### ✨ Added
 

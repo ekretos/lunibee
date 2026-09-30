@@ -79,6 +79,7 @@ export default defineConfig({
             { label: "@lunibee/voice", link: "/packages/voice" },
             { label: "@lunibee/utils", link: "/packages/utils" },
             { label: "@lunibee/types", link: "/packages/types" },
+            { label: "@lunibee/cli", link: "/packages/cli" },
           ],
         },
         {

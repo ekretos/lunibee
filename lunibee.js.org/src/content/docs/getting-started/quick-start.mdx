@@ -105,6 +105,10 @@ Send `!ping` in a channel the bot can access.
 
 Once the bot is running, these are the most useful next steps:
 
+As the bot grows, scaffold one file per event handler, command and component with the
+[CLI](/packages/cli/): `bunx lunibee create handler messageCreate`, then call
+`registerEvents(client)` from the generated `src/handlers/event.ts`.
+
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
