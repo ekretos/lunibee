@@ -1,0 +1,1176 @@
+{
+ "date": "2026-09-30",
+ "iterations": 10000,
+ "rounds": 3,
+ "statistic": "median",
+ "unit": "ns per call",
+ "runtimes": {
+  "bun13": "bun 1.3.11",
+  "bun14": "bun 1.4.2",
+  "node": "node 22.22.2"
+ },
+ "results": [
+  {
+   "group": "Collection",
+   "name": "Map.set (reference)",
+   "bun13": 166.46,
+   "bun14": 33.65,
+   "node": 83.97
+  },
+  {
+   "group": "Collection",
+   "name": "Map.get (reference)",
+   "bun13": 26.91,
+   "bun14": 21.8,
+   "node": 71.0
+  },
+  {
+   "group": "Collection",
+   "name": "set",
+   "bun13": 64.3,
+   "bun14": 69.82,
+   "node": 96.68
+  },
+  {
+   "group": "Collection",
+   "name": "get",
+   "bun13": 80.75,
+   "bun14": 88.22,
+   "node": 190.38
+  },
+  {
+   "group": "Collection",
+   "name": "has",
+   "bun13": 49.37,
+   "bun14": 58.45,
+   "node": 113.24
+  },
+  {
+   "group": "Collection",
+   "name": "peek",
+   "bun13": 58.79,
+   "bun14": 66.93,
+   "node": 107.16
+  },
+  {
+   "group": "Collection",
+   "name": "delete + set",
+   "bun13": 816.09,
+   "bun14": 204.65,
+   "node": 295.66
+  },
+  {
+   "group": "Collection",
+   "name": "setWithoutTTL",
+   "bun13": 79.98,
+   "bun14": 142.32,
+   "node": 124.04
+  },
+  {
+   "group": "Collection",
+   "name": "set (ttl)",
+   "bun13": 119.6,
+   "bun14": 112.94,
+   "node": 359.71
+  },
+  {
+   "group": "Collection",
+   "name": "get (ttl, sliding)",
+   "bun13": 175.87,
+   "bun14": 138.58,
+   "node": 293.46
+  },
+  {
+   "group": "Collection",
+   "name": "ttlRemaining",
+   "bun13": 161.27,
+   "bun14": 115.43,
+   "node": 237.95
+  },
+  {
+   "group": "Collection",
+   "name": "purge (ttl, nothing due)",
+   "bun13": 371.38,
+   "bun14": 323.83,
+   "node": 507.94
+  },
+  {
+   "group": "Collection",
+   "name": "set (lru, evicting)",
+   "bun13": 108.19,
+   "bun14": 116.42,
+   "node": 360.43
+  },
+  {
+   "group": "Collection",
+   "name": "get (lru, promoting)",
+   "bun13": 107.64,
+   "bun14": 115.65,
+   "node": 230.7
+  },
+  {
+   "group": "Collection",
+   "name": "first",
+   "bun13": 377.31,
+   "bun14": 346.89,
+   "node": 464.43
+  },
+  {
+   "group": "Collection",
+   "name": "firstKey",
+   "bun13": 290.79,
+   "bun14": 247.96,
+   "node": 413.27
+  },
+  {
+   "group": "Collection",
+   "name": "firstEntry",
+   "bun13": 547.45,
+   "bun14": 350.27,
+   "node": 556.41
+  },
+  {
+   "group": "Collection",
+   "name": "last",
+   "bun13": 1898.97,
+   "bun14": 2626.85,
+   "node": 1741.34
+  },
+  {
+   "group": "Collection",
+   "name": "lastKey",
+   "bun13": 2224.07,
+   "bun14": 2932.78,
+   "node": 1756.9
+  },
+  {
+   "group": "Collection",
+   "name": "lastEntry",
+   "bun13": 25307.08,
+   "bun14": 20190.28,
+   "node": 13275.67
+  },
+  {
+   "group": "Collection",
+   "name": "at",
+   "bun13": 11292.81,
+   "bun14": 11195.48,
+   "node": 2271.16
+  },
+  {
+   "group": "Collection",
+   "name": "keyAt",
+   "bun13": 10152.8,
+   "bun14": 10190.09,
+   "node": 2439.16
+  },
+  {
+   "group": "Collection",
+   "name": "random",
+   "bun13": 12145.6,
+   "bun14": 13202.07,
+   "node": 2272.92
+  },
+  {
+   "group": "Collection",
+   "name": "randomKey",
+   "bun13": 10043.59,
+   "bun14": 10035.42,
+   "node": 2515.51
+  },
+  {
+   "group": "Collection",
+   "name": "find (last item)",
+   "bun13": 13263.22,
+   "bun14": 12208.08,
+   "node": 6000.46
+  },
+  {
+   "group": "Collection",
+   "name": "findKey (last item)",
+   "bun13": 13748.78,
+   "bun14": 11575.21,
+   "node": 5970.87
+  },
+  {
+   "group": "Collection",
+   "name": "some (last item)",
+   "bun13": 14468.48,
+   "bun14": 11600.22,
+   "node": 6225.43
+  },
+  {
+   "group": "Collection",
+   "name": "someEntry (last item)",
+   "bun13": 14046.78,
+   "bun14": 13187.22,
+   "node": 6843.25
+  },
+  {
+   "group": "Collection",
+   "name": "every",
+   "bun13": 12094.63,
+   "bun14": 12771.42,
+   "node": 5879.16
+  },
+  {
+   "group": "Collection",
+   "name": "filter",
+   "bun13": 50224.48,
+   "bun14": 37341.25,
+   "node": 18600.58
+  },
+  {
+   "group": "Collection",
+   "name": "partition",
+   "bun13": 80380.74,
+   "bun14": 53081.2,
+   "node": 32444.28
+  },
+  {
+   "group": "Collection",
+   "name": "each",
+   "bun13": 11706.91,
+   "bun14": 11309.78,
+   "node": 5073.03
+  },
+  {
+   "group": "Collection",
+   "name": "tap",
+   "bun13": 34.14,
+   "bun14": 35.69,
+   "node": 70.06
+  },
+  {
+   "group": "Collection",
+   "name": "array",
+   "bun13": 10996.06,
+   "bun14": 11010.68,
+   "node": 2088.5
+  },
+  {
+   "group": "Collection",
+   "name": "keyArray",
+   "bun13": 9878.23,
+   "bun14": 10094.72,
+   "node": 2300.9
+  },
+  {
+   "group": "Collection",
+   "name": "entriesArray",
+   "bun13": 24253.17,
+   "bun14": 22399.39,
+   "node": 23883.53
+  },
+  {
+   "group": "Collection",
+   "name": "toJSON",
+   "bun13": 24631.36,
+   "bun14": 22131.79,
+   "node": 22660.3
+  },
+  {
+   "group": "Collection",
+   "name": "clone",
+   "bun13": 55560.29,
+   "bun14": 42515.96,
+   "node": 27998.39
+  },
+  {
+   "group": "Collection",
+   "name": "sorted",
+   "bun13": 195549.17,
+   "bun14": 76881.55,
+   "node": 72044.91
+  },
+  {
+   "group": "Collection",
+   "name": "union",
+   "bun13": 153310.69,
+   "bun14": 103150.34,
+   "node": 58491.07
+  },
+  {
+   "group": "Collection",
+   "name": "intersection",
+   "bun13": 53047.66,
+   "bun14": 37059.73,
+   "node": 36018.05
+  },
+  {
+   "group": "Collection",
+   "name": "difference",
+   "bun13": 55538.8,
+   "bun14": 41496.33,
+   "node": 32126.56
+  },
+  {
+   "group": "Collection",
+   "name": "hasAll (3 keys)",
+   "bun13": 58.1,
+   "bun14": 54.9,
+   "node": 170.56
+  },
+  {
+   "group": "Collection",
+   "name": "hasAny (3 keys)",
+   "bun13": 97.4,
+   "bun14": 49.16,
+   "node": 155.1
+  },
+  {
+   "group": "Collection",
+   "name": "sweep (removes none)",
+   "bun13": 12753.2,
+   "bun14": 11086.11,
+   "node": 4977.69
+  },
+  {
+   "group": "Builders",
+   "name": "CreateEmbed",
+   "bun13": 7043.54,
+   "bun14": 6339.93,
+   "node": 5819.95
+  },
+  {
+   "group": "Builders",
+   "name": "CreateButton",
+   "bun13": 2367.72,
+   "bun14": 2129.99,
+   "node": 2108.63
+  },
+  {
+   "group": "Builders",
+   "name": "CreateButton (link)",
+   "bun13": 1462.87,
+   "bun14": 832.81,
+   "node": 2047.21
+  },
+  {
+   "group": "Builders",
+   "name": "CreateActionRow (5 buttons)",
+   "bun13": 11677.56,
+   "bun14": 10801.91,
+   "node": 10730.82
+  },
+  {
+   "group": "Builders",
+   "name": "CreateStringSelect (3 options)",
+   "bun13": 5203.84,
+   "bun14": 4524.0,
+   "node": 4634.34
+  },
+  {
+   "group": "Builders",
+   "name": "CreateUserSelectMenu",
+   "bun13": 559.51,
+   "bun14": 423.42,
+   "node": 1519.91
+  },
+  {
+   "group": "Builders",
+   "name": "CreateRoleSelectMenu",
+   "bun13": 547.07,
+   "bun14": 502.01,
+   "node": 1553.35
+  },
+  {
+   "group": "Builders",
+   "name": "CreateMentionableSelectMenu",
+   "bun13": 517.07,
+   "bun14": 337.17,
+   "node": 1353.43
+  },
+  {
+   "group": "Builders",
+   "name": "CreateChannelSelectMenu",
+   "bun13": 2217.07,
+   "bun14": 2099.84,
+   "node": 2677.88
+  },
+  {
+   "group": "Builders",
+   "name": "CreateTextInput",
+   "bun13": 1234.41,
+   "bun14": 1017.05,
+   "node": 2283.25
+  },
+  {
+   "group": "Builders",
+   "name": "CreateModal (2 inputs)",
+   "bun13": 2279.97,
+   "bun14": 1841.54,
+   "node": 3677.47
+  },
+  {
+   "group": "Builders",
+   "name": "CreateTextDisplay",
+   "bun13": 64.8,
+   "bun14": 99.06,
+   "node": 155.52
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSeparator",
+   "bun13": 214.16,
+   "bun14": 130.76,
+   "node": 148.62
+  },
+  {
+   "group": "Builders",
+   "name": "CreateThumbnail",
+   "bun13": 102.99,
+   "bun14": 90.96,
+   "node": 215.15
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSection",
+   "bun13": 398.27,
+   "bun14": 412.12,
+   "node": 350.46
+  },
+  {
+   "group": "Builders",
+   "name": "CreateMediaGallery (2 items)",
+   "bun13": 2756.28,
+   "bun14": 2379.91,
+   "node": 2973.97
+  },
+  {
+   "group": "Builders",
+   "name": "CreateFileComponent",
+   "bun13": 153.24,
+   "bun14": 89.82,
+   "node": 189.91
+  },
+  {
+   "group": "Builders",
+   "name": "CreateContentInventoryEntry",
+   "bun13": 63.69,
+   "bun14": 52.53,
+   "node": 143.37
+  },
+  {
+   "group": "Builders",
+   "name": "CreateContainer (text + separator + row)",
+   "bun13": 3032.04,
+   "bun14": 2967.93,
+   "node": 2893.2
+  },
+  {
+   "group": "Builders",
+   "name": "CreateAttachment (no toJSON; construct + set)",
+   "bun13": 84.84,
+   "bun14": 87.11,
+   "node": 139.73
+  },
+  {
+   "group": "Builders",
+   "name": "CreateStringOption",
+   "bun13": 3535.45,
+   "bun14": 3181.21,
+   "node": 3426.36
+  },
+  {
+   "group": "Builders",
+   "name": "CreateIntegerOption",
+   "bun13": 875.46,
+   "bun14": 755.78,
+   "node": 1910.09
+  },
+  {
+   "group": "Builders",
+   "name": "CreateNumberOption",
+   "bun13": 802.1,
+   "bun14": 719.43,
+   "node": 1755.07
+  },
+  {
+   "group": "Builders",
+   "name": "CreateBooleanOption",
+   "bun13": 527.1,
+   "bun14": 545.36,
+   "node": 1427.65
+  },
+  {
+   "group": "Builders",
+   "name": "CreateUserOption",
+   "bun13": 605.15,
+   "bun14": 542.05,
+   "node": 1491.94
+  },
+  {
+   "group": "Builders",
+   "name": "CreateRoleOption",
+   "bun13": 690.52,
+   "bun14": 549.07,
+   "node": 1403.51
+  },
+  {
+   "group": "Builders",
+   "name": "CreateChannelOption",
+   "bun13": 2108.56,
+   "bun14": 2019.19,
+   "node": 2101.1
+  },
+  {
+   "group": "Builders",
+   "name": "CreateMentionableOption",
+   "bun13": 534.86,
+   "bun14": 482.31,
+   "node": 1301.79
+  },
+  {
+   "group": "Builders",
+   "name": "CreateAttachmentOption",
+   "bun13": 641.47,
+   "bun14": 578.39,
+   "node": 1381.83
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSlashCommand (3 options)",
+   "bun13": 6595.01,
+   "bun14": 6570.2,
+   "node": 8405.63
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSubcommand",
+   "bun13": 2985.13,
+   "bun14": 3257.81,
+   "node": 4008.4
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSubcommandGroup",
+   "bun13": 3281.54,
+   "bun14": 3535.68,
+   "node": 3980.57
+  },
+  {
+   "group": "Builders",
+   "name": "CreateContextMenuCommand",
+   "bun13": 623.7,
+   "bun14": 668.26,
+   "node": 1497.47
+  },
+  {
+   "group": "Builders",
+   "name": "CreateUserCommand",
+   "bun13": 449.79,
+   "bun14": 385.99,
+   "node": 1210.69
+  },
+  {
+   "group": "Builders",
+   "name": "CreateMessageCommand",
+   "bun13": 423.27,
+   "bun14": 380.97,
+   "node": 1295.89
+  },
+  {
+   "group": "Formatters",
+   "name": "userMention",
+   "bun13": 88.04,
+   "bun14": 83.97,
+   "node": 137.42
+  },
+  {
+   "group": "Formatters",
+   "name": "channelMention",
+   "bun13": 69.48,
+   "bun14": 70.06,
+   "node": 110.08
+  },
+  {
+   "group": "Formatters",
+   "name": "roleMention",
+   "bun13": 49.7,
+   "bun14": 58.7,
+   "node": 111.09
+  },
+  {
+   "group": "Formatters",
+   "name": "timestamp",
+   "bun13": 147.91,
+   "bun14": 79.09,
+   "node": 140.35
+  },
+  {
+   "group": "Formatters",
+   "name": "bold",
+   "bun13": 25.66,
+   "bun14": 26.31,
+   "node": 52.1
+  },
+  {
+   "group": "Formatters",
+   "name": "italic",
+   "bun13": 31.08,
+   "bun14": 32.7,
+   "node": 52.71
+  },
+  {
+   "group": "Formatters",
+   "name": "underline",
+   "bun13": 30.97,
+   "bun14": 23.64,
+   "node": 50.5
+  },
+  {
+   "group": "Formatters",
+   "name": "strikethrough",
+   "bun13": 29.16,
+   "bun14": 31.75,
+   "node": 51.89
+  },
+  {
+   "group": "Formatters",
+   "name": "spoiler",
+   "bun13": 25.96,
+   "bun14": 21.58,
+   "node": 51.32
+  },
+  {
+   "group": "Formatters",
+   "name": "masked",
+   "bun13": 37.09,
+   "bun14": 32.88,
+   "node": 55.61
+  },
+  {
+   "group": "Formatters",
+   "name": "link",
+   "bun13": 104.94,
+   "bun14": 40.25,
+   "node": 81.09
+  },
+  {
+   "group": "Formatters",
+   "name": "inlineCode",
+   "bun13": 21.29,
+   "bun14": 22.71,
+   "node": 52.91
+  },
+  {
+   "group": "Formatters",
+   "name": "codeBlock",
+   "bun13": 34.29,
+   "bun14": 29.48,
+   "node": 74.71
+  },
+  {
+   "group": "Formatters",
+   "name": "blockQuote",
+   "bun13": 99.09,
+   "bun14": 142.47,
+   "node": 218.08
+  },
+  {
+   "group": "Formatters",
+   "name": "heading",
+   "bun13": 67.86,
+   "bun14": 50.73,
+   "node": 85.38
+  },
+  {
+   "group": "Formatters",
+   "name": "subtext",
+   "bun13": 59.41,
+   "bun14": 19.86,
+   "node": 48.05
+  },
+  {
+   "group": "Formatters",
+   "name": "orderedList",
+   "bun13": 102.06,
+   "bun14": 144.82,
+   "node": 297.46
+  },
+  {
+   "group": "Formatters",
+   "name": "bulletList",
+   "bun13": 161.16,
+   "bun14": 106.23,
+   "node": 298.7
+  },
+  {
+   "group": "Formatters",
+   "name": "escapeMarkdown",
+   "bun13": 1098.97,
+   "bun14": 530.6,
+   "node": 903.18
+  },
+  {
+   "group": "Formatters",
+   "name": "parseUserMention",
+   "bun13": 141.38,
+   "bun14": 201.4,
+   "node": 234.04
+  },
+  {
+   "group": "Formatters",
+   "name": "parseRoleMention",
+   "bun13": 235.5,
+   "bun14": 226.52,
+   "node": 241.73
+  },
+  {
+   "group": "Formatters",
+   "name": "parseChannelMention",
+   "bun13": 161.67,
+   "bun14": 166.32,
+   "node": 284.24
+  },
+  {
+   "group": "Gateway events",
+   "name": "READY",
+   "bun13": 1001.45,
+   "bun14": 1122.2,
+   "node": 1031.46
+  },
+  {
+   "group": "Gateway events",
+   "name": "RESUMED",
+   "bun13": 384.6,
+   "bun14": 311.34,
+   "node": 229.39
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_CREATE (50 members, 20 roles, 10 channels)",
+   "bun13": 160157.47,
+   "bun14": 111311.2,
+   "node": 174875.09
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_UPDATE",
+   "bun13": 11739.65,
+   "bun14": 2302.45,
+   "node": 2527.68
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_DELETE",
+   "bun13": 3356.96,
+   "bun14": 1374.6,
+   "node": 982.4
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_MEMBER_ADD",
+   "bun13": 5776.37,
+   "bun14": 2391.79,
+   "node": 3099.32
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_MEMBER_UPDATE",
+   "bun13": 4652.71,
+   "bun14": 2544.5,
+   "node": 3439.4
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_MEMBER_REMOVE",
+   "bun13": 1220.9,
+   "bun14": 379.86,
+   "node": 533.06
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_MEMBERS_CHUNK (10 members)",
+   "bun13": 65419.62,
+   "bun14": 24957.83,
+   "node": 34311.5
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_BAN_ADD",
+   "bun13": 538.95,
+   "bun14": 572.14,
+   "node": 547.42
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_BAN_REMOVE",
+   "bun13": 466.54,
+   "bun14": 294.41,
+   "node": 503.73
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_ROLE_CREATE",
+   "bun13": 1948.24,
+   "bun14": 1687.75,
+   "node": 1348.78
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_ROLE_UPDATE",
+   "bun13": 2143.45,
+   "bun14": 1863.89,
+   "node": 1289.83
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_ROLE_DELETE",
+   "bun13": 598.65,
+   "bun14": 320.82,
+   "node": 301.57
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_EMOJIS_UPDATE (10 emojis)",
+   "bun13": 16309.17,
+   "bun14": 8320.94,
+   "node": 5329.88
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_STICKERS_UPDATE (5 stickers)",
+   "bun13": 2814.88,
+   "bun14": 3011.52,
+   "node": 2100.46
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_INTEGRATIONS_UPDATE",
+   "bun13": 295.9,
+   "bun14": 114.81,
+   "node": 78.54
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_CREATE",
+   "bun13": 529.1,
+   "bun14": 334.3,
+   "node": 332.79
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_UPDATE",
+   "bun13": 523.91,
+   "bun14": 264.71,
+   "node": 304.95
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_DELETE",
+   "bun13": 464.36,
+   "bun14": 473.64,
+   "node": 259.07
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_USER_ADD",
+   "bun13": 621.33,
+   "bun14": 410.13,
+   "node": 219.96
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_USER_REMOVE",
+   "bun13": 663.04,
+   "bun14": 337.46,
+   "node": 222.1
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SOUNDBOARD_SOUND_CREATE",
+   "bun13": 527.77,
+   "bun14": 252.42,
+   "node": 295.55
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SOUNDBOARD_SOUND_UPDATE",
+   "bun13": 688.92,
+   "bun14": 270.42,
+   "node": 255.45
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SOUNDBOARD_SOUND_DELETE",
+   "bun13": 611.43,
+   "bun14": 230.1,
+   "node": 305.68
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SOUNDBOARD_SOUNDS_UPDATE (5 sounds)",
+   "bun13": 3186.56,
+   "bun14": 2684.17,
+   "node": 2006.76
+  },
+  {
+   "group": "Gateway events",
+   "name": "CHANNEL_CREATE",
+   "bun13": 1820.43,
+   "bun14": 1286.87,
+   "node": 552.75
+  },
+  {
+   "group": "Gateway events",
+   "name": "CHANNEL_UPDATE",
+   "bun13": 1838.46,
+   "bun14": 981.56,
+   "node": 663.82
+  },
+  {
+   "group": "Gateway events",
+   "name": "CHANNEL_DELETE",
+   "bun13": 595.71,
+   "bun14": 265.48,
+   "node": 356.93
+  },
+  {
+   "group": "Gateway events",
+   "name": "CHANNEL_PINS_UPDATE",
+   "bun13": 100.7,
+   "bun14": 51.57,
+   "node": 97.59
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_CREATE",
+   "bun13": 2403.72,
+   "bun14": 1696.59,
+   "node": 1348.86
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_UPDATE",
+   "bun13": 2093.66,
+   "bun14": 1298.53,
+   "node": 873.07
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_DELETE",
+   "bun13": 785.22,
+   "bun14": 505.7,
+   "node": 417.54
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_LIST_SYNC (5 threads)",
+   "bun13": 10798.27,
+   "bun14": 6589.89,
+   "node": 4358.66
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_MEMBERS_UPDATE",
+   "bun13": 511.0,
+   "bun14": 484.21,
+   "node": 420.44
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_MEMBER_UPDATE",
+   "bun13": 709.38,
+   "bun14": 592.84,
+   "node": 338.42
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_CREATE",
+   "bun13": 6875.09,
+   "bun14": 4867.71,
+   "node": 7476.54
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_UPDATE",
+   "bun13": 3803.68,
+   "bun14": 2411.09,
+   "node": 3839.55
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_DELETE",
+   "bun13": 562.11,
+   "bun14": 493.01,
+   "node": 310.8
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_DELETE_BULK (10 ids)",
+   "bun13": 4652.85,
+   "bun14": 3746.93,
+   "node": 2267.85
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_REACTION_ADD",
+   "bun13": 362.26,
+   "bun14": 356.62,
+   "node": 253.31
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_REACTION_REMOVE",
+   "bun13": 353.94,
+   "bun14": 299.94,
+   "node": 195.48
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_REACTION_REMOVE_ALL",
+   "bun13": 212.25,
+   "bun14": 174.91,
+   "node": 144.68
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_REACTION_REMOVE_EMOJI",
+   "bun13": 282.59,
+   "bun14": 183.41,
+   "node": 237.81
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_POLL_VOTE_ADD",
+   "bun13": 361.11,
+   "bun14": 368.62,
+   "node": 232.05
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_POLL_VOTE_REMOVE",
+   "bun13": 429.73,
+   "bun14": 349.27,
+   "node": 213.81
+  },
+  {
+   "group": "Gateway events",
+   "name": "STAGE_INSTANCE_CREATE",
+   "bun13": 494.45,
+   "bun14": 348.62,
+   "node": 311.11
+  },
+  {
+   "group": "Gateway events",
+   "name": "STAGE_INSTANCE_UPDATE",
+   "bun13": 491.88,
+   "bun14": 411.96,
+   "node": 317.28
+  },
+  {
+   "group": "Gateway events",
+   "name": "STAGE_INSTANCE_DELETE",
+   "bun13": 393.94,
+   "bun14": 372.15,
+   "node": 333.06
+  },
+  {
+   "group": "Gateway events",
+   "name": "INVITE_CREATE",
+   "bun13": 284.7,
+   "bun14": 173.3,
+   "node": 232.65
+  },
+  {
+   "group": "Gateway events",
+   "name": "INVITE_DELETE",
+   "bun13": 144.16,
+   "bun14": 148.95,
+   "node": 192.58
+  },
+  {
+   "group": "Gateway events",
+   "name": "WEBHOOKS_UPDATE",
+   "bun13": 121.53,
+   "bun14": 56.73,
+   "node": 75.34
+  },
+  {
+   "group": "Gateway events",
+   "name": "VOICE_STATE_UPDATE",
+   "bun13": 389.61,
+   "bun14": 334.52,
+   "node": 355.31
+  },
+  {
+   "group": "Gateway events",
+   "name": "VOICE_SERVER_UPDATE",
+   "bun13": 172.97,
+   "bun14": 215.39,
+   "node": 81.34
+  },
+  {
+   "group": "Gateway events",
+   "name": "PRESENCE_UPDATE",
+   "bun13": 487.85,
+   "bun14": 219.55,
+   "node": 217.03
+  },
+  {
+   "group": "Gateway events",
+   "name": "TYPING_START",
+   "bun13": 221.83,
+   "bun14": 194.44,
+   "node": 226.93
+  },
+  {
+   "group": "Gateway events",
+   "name": "AUTO_MODERATION_RULE_CREATE",
+   "bun13": 573.08,
+   "bun14": 523.0,
+   "node": 521.12
+  },
+  {
+   "group": "Gateway events",
+   "name": "AUTO_MODERATION_RULE_UPDATE",
+   "bun13": 530.37,
+   "bun14": 580.26,
+   "node": 307.38
+  },
+  {
+   "group": "Gateway events",
+   "name": "AUTO_MODERATION_RULE_DELETE",
+   "bun13": 537.04,
+   "bun14": 431.24,
+   "node": 378.31
+  },
+  {
+   "group": "Gateway events",
+   "name": "AUTO_MODERATION_ACTION_EXECUTION",
+   "bun13": 416.09,
+   "bun14": 418.7,
+   "node": 293.11
+  },
+  {
+   "group": "Gateway events",
+   "name": "ENTITLEMENT_CREATE",
+   "bun13": 912.28,
+   "bun14": 627.05,
+   "node": 386.1
+  },
+  {
+   "group": "Gateway events",
+   "name": "ENTITLEMENT_UPDATE",
+   "bun13": 784.0,
+   "bun14": 701.33,
+   "node": 350.58
+  },
+  {
+   "group": "Gateway events",
+   "name": "ENTITLEMENT_DELETE",
+   "bun13": 841.69,
+   "bun14": 600.98,
+   "node": 441.04
+  },
+  {
+   "group": "Gateway events",
+   "name": "INTERACTION_CREATE (button)",
+   "bun13": 1316.35,
+   "bun14": 1171.76,
+   "node": 970.98
+  }
+ ]
+}
