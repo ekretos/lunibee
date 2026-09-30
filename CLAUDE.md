@@ -77,5 +77,11 @@ CLI (landed on `dev`): handlers are called as `handler(client, ...args)`,
 `lunibee create handler <event> [name]` works without prompts, and
 `lunibee sync handlers` regenerates the binder.
 
+9. **P1 — zombie reconnect loop (fix first).** `Gateway.#message()` never calls
+   `GatewayHeartbeat.receivedMessage()`, so with the default `zombieTimeout` every
+   healthy connection is closed as a zombie ~45 s after opening and reconnected,
+   forever. Call it for every owned frame; regression tests with a fake clock.
+   Steps in `.roadmap/0.2.0.md`, Step 0.
+
 Not planned: a "cache flow" guide beyond the existing Caching & Structures
 page, and anything Lilybird-specific (rebranding).
