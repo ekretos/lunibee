@@ -596,9 +596,28 @@ export class CreateContextMenuCommand {
         this.data.dm_permission = enabled;
         return this;
     }
-    /** Sets command integration types. */
+    /** Sets command integration types (0 guild install, 1 user install). */
     public setIntegrationTypes(...types: number[]): this {
         this.data.integration_types = [...types];
+        return this;
+    }
+    /** Sets where the command can be used: 0 guilds, 1 the bot's DMs, 2 other DMs. @throws {RangeError} For any other value. */
+    public setContexts(...contexts: number[]): this {
+        if (
+            contexts.some(
+                (context) => context !== 0 && context !== 1 && context !== 2,
+            )
+        )
+            throw new RangeError("Command contexts must be 0, 1 or 2.");
+        this.data.contexts = [...contexts];
+        return this;
+    }
+    /** Sets the name shown per locale, e.g. `{ "es-ES": "Ver perfil" }`; null clears it. */
+    public setNameLocalizations(
+        localizations: Record<string, string> | null,
+    ): this {
+        this.data.name_localizations =
+            localizations === null ? null : { ...localizations };
         return this;
     }
     /** Serializes the command payload for the Discord API. */

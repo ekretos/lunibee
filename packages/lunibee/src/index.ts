@@ -126,6 +126,7 @@ export * from "@lunibee/builders";
 // Explicit re-exports for TypeScript consumer clarity
 export {
     CommandInteraction,
+    ContextMenuCommandInteraction,
     ComponentInteraction,
     ModalSubmitInteraction,
     AutocompleteInteraction,

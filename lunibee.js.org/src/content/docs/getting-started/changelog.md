@@ -5,6 +5,14 @@ description: Lunibee version history and release notes.
 
 ## Unreleased (0.2.2)
 
+### ✨ Added
+
+* **Context-menu commands**: `isContextMenuCommand()`, `isUserContextMenuCommand()`, `isMessageContextMenuCommand()` and `isCommand()` guards; `ContextMenuCommandInteraction` with `targetId`, `targetUser`, `targetMember` (with member actions) and `targetMessage`; `setContexts()` and `setNameLocalizations()` on `CreateUserCommand` / `CreateMessageCommand`. See [Context Menus](/recipes/context-menus/).
+
+### ⚠️ Behaviour changes
+
+* `isChatInputCommand()` is true for slash commands only; context-menu commands no longer match it. Use `isCommand()` for any application command.
+
 ### 🐛 Fixed
 
 * **Healthy Gateway connections were closed as zombies every ~45 s.** Incoming frames never reset the silence clock, so with the default `zombieTimeout` every connection was closed and resumed once the staleness deadline passed, on every shard. Any frame from the current socket now counts as traffic. If you set `zombieTimeout: Infinity` to work around this, remove it.

@@ -5,8 +5,15 @@ description: Code changes needed when upgrading from 0.1.8 to 0.2.0, and from 0.
 
 ## 0.2.1 → 0.2.2
 
-No code changes are required: the old names keep working until 2.0. To move to
-the new names, rename imports and uses:
+**One behaviour change:** `interaction.isChatInputCommand()` is now true for slash
+commands only, not for user and message context-menu commands. If you used it to
+catch every application command, use `isCommand()`; for context menus use
+`isContextMenuCommand()` (see [Context Menus](/recipes/context-menus/)).
+
+**Remove workarounds:** if you set `zombieTimeout: Infinity` because healthy
+connections kept reconnecting, remove it; that bug is fixed.
+
+The old names keep working until 2.0. To move to the new names, rename imports and uses:
 
 | Before | Now |
 |---|---|

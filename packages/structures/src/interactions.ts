@@ -1,6 +1,8 @@
 import { InteractionResponseEnum } from "@lunibee/types";
 import { User, type ResourceContext } from "./base.js";
 import { GuildMember } from "./resources.js";
+// A cycle with index.ts: Message is only used lazily (in a getter), after both modules loaded.
+import { Message } from "./index.js";
 
 /** Discord interaction type constants. */
 export const InteractionEnum = {
@@ -71,6 +73,10 @@ export interface InteractionClient {
 
 /** Discord's ephemeral message flag. */
 const EPHEMERAL = 64;
+/** Application command types (`data.type`): slash, user context menu, message context menu. */
+const COMMAND_CHAT_INPUT = 1;
+const COMMAND_USER = 2;
+const COMMAND_MESSAGE = 3;
 /** Interaction tokens stay valid for 15 minutes. */
 const TOKEN_LIFETIME_MS = 15 * 60_000;
 const DISCORD_EPOCH = 1_420_070_400_000n;
@@ -163,8 +169,39 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         this.type = data.type;
         this.data = data;
     }
-    /** Whether this interaction is an application command. @returns True for application command interactions. */ public isChatInputCommand(): this is CommandInteraction {
+    /** The application command's own type (1 chat input, 2 user, 3 message); 0 when this is not a command. */
+    #commandType(): number {
+        if (this.type !== InteractionEnum.ApplicationCommand) return 0;
+        const type = this.data.data?.type;
+        return typeof type === "number" ? type : COMMAND_CHAT_INPUT;
+    }
+    /** Whether this interaction is any application command: slash or context menu. */
+    public isCommand(): this is CommandInteraction {
         return this.type === InteractionEnum.ApplicationCommand;
+    }
+    /**
+     * Whether this interaction is a slash (chat input) command. Since 0.2.2 this
+     * is false for context-menu commands; use {@link isCommand} for both.
+     */
+    public isChatInputCommand(): this is CommandInteraction {
+        return this.#commandType() === COMMAND_CHAT_INPUT;
+    }
+    /** Whether this interaction is a user or message context-menu command. */
+    public isContextMenuCommand(): this is ContextMenuCommandInteraction {
+        const type = this.#commandType();
+        return type === COMMAND_USER || type === COMMAND_MESSAGE;
+    }
+    /** Whether this interaction is a user context-menu command (right-click a user). */
+    public isUserContextMenuCommand(): this is ContextMenuCommandInteraction {
+        return this.#commandType() === COMMAND_USER;
+    }
+    /** Whether this interaction is a message context-menu command (right-click a message). */
+    public isMessageContextMenuCommand(): this is ContextMenuCommandInteraction {
+        return this.#commandType() === COMMAND_MESSAGE;
+    }
+    /** The client context structures built from this interaction act through. */
+    protected get resourceContext(): ResourceContext | undefined {
+        return this.#client.resourceContext;
     }
     /**
      * Waits for this user to submit a modal, typically one this interaction
@@ -451,6 +488,62 @@ export class CommandInteraction extends Interaction {
     }
 }
 
+// ─── ContextMenuCommandInteraction ───────────────────────────────────────────
+
+/** A user or message context-menu command, with what was right-clicked. */
+export class ContextMenuCommandInteraction extends CommandInteraction {
+    #resolved(): Record<string, Record<string, unknown> | undefined> {
+        return (this.data.data?.resolved ?? {}) as Record<
+            string,
+            Record<string, unknown> | undefined
+        >;
+    }
+    /** ID of the user or message the command was used on. */
+    public get targetId(): string | null {
+        const id = this.data.data?.target_id;
+        return typeof id === "string" ? id : null;
+    }
+    /** The user a user command was used on. */
+    public get targetUser(): User | null {
+        const id = this.targetId;
+        const raw = id ? this.#resolved().users?.[id] : undefined;
+        return raw
+            ? new User(raw as ConstructorParameters<typeof User>[0])
+            : null;
+    }
+    /** The member a user command was used on (in a guild), with member actions when attached to a client. */
+    public get targetMember(): GuildMember | null {
+        const id = this.targetId;
+        const raw = id ? this.#resolved().members?.[id] : undefined;
+        const user = id ? this.#resolved().users?.[id] : undefined;
+        if (!raw || !user || !this.guildId) return null;
+        return new GuildMember(
+            {
+                ...(raw as Omit<
+                    ConstructorParameters<typeof GuildMember>[0],
+                    "guild_id" | "user"
+                >),
+                user: user as ConstructorParameters<
+                    typeof GuildMember
+                >[0]["user"],
+                guild_id: this.guildId,
+            },
+            this.resourceContext,
+        );
+    }
+    /** The message a message command was used on. */
+    public get targetMessage(): Message | null {
+        const id = this.targetId;
+        const raw = id ? this.#resolved().messages?.[id] : undefined;
+        return raw
+            ? new Message(
+                  raw as unknown as ConstructorParameters<typeof Message>[0],
+                  this.resourceContext,
+              )
+            : null;
+    }
+}
+
 // ─── ComponentInteraction ─────────────────────────────────────────────────────
 
 /** Message component interaction. */
@@ -594,8 +687,13 @@ export function createInteraction(
     data: InteractionData,
 ): Interaction {
     switch (data.type) {
-        case InteractionEnum.ApplicationCommand:
-            return new CommandInteraction(client, data);
+        case InteractionEnum.ApplicationCommand: {
+            const commandType = data.data?.type;
+            return commandType === COMMAND_USER ||
+                commandType === COMMAND_MESSAGE
+                ? new ContextMenuCommandInteraction(client, data)
+                : new CommandInteraction(client, data);
+        }
         case InteractionEnum.ApplicationCommandAutocomplete:
             return new AutocompleteInteraction(client, data);
         case InteractionEnum.MessageComponent:
