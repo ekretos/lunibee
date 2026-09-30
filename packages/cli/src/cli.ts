@@ -11,6 +11,7 @@ import {
 } from "./inspect.js";
 import { CliError, didYouMean, paint, type IO } from "./io.js";
 import { publish, status } from "./maintainer.js";
+import { fixHandlers } from "./migrate.js";
 import { findProjectRoot } from "./project.js";
 import { createCommand, createComponent } from "./scaffold.js";
 
@@ -63,6 +64,20 @@ const COMMANDS: Command[] = [
                 dryRun: flag(args, "dry-run"),
             });
         },
+    },
+    {
+        path: ["handler"],
+        usage: "lunibee handler [--fix] [--dry-run] [--json]",
+        summary: "Find handlers not in the current format; --fix updates them",
+        flags: ["fix", "dry-run", "json"],
+        details:
+            "Handlers from before 0.2.2 received only the event arguments. --fix adds a first\n`_client: Client` parameter (and the import), renames event folders whose case is wrong\n(messagecreate/ → messageCreate/), then regenerates src/handlers/event.ts. Handlers whose\nfirst parameter is already the client (named client/bot or typed as a Client) are left\nalone. Without --fix it only reports, exiting 1 when something needs fixing.",
+        run: ({ io, args, root }) =>
+            fixHandlers(io, root, {
+                fix: flag(args, "fix"),
+                dryRun: flag(args, "dry-run"),
+                json: flag(args, "json"),
+            }),
     },
     {
         path: ["sync", "handlers"],
@@ -185,6 +200,8 @@ function isEvent(input: string): boolean {
 }
 
 function find(positionals: readonly string[]): Command | undefined {
+    if (positionals[0] === "handlers")
+        positionals = ["handler", ...positionals.slice(1)];
     return COMMANDS.filter((c) =>
         c.path.every((part, i) => positionals[i] === part),
     ).sort((a, b) => b.path.length - a.path.length)[0];
