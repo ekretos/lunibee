@@ -4,7 +4,8 @@ Lunibee is at **0.2.1**. This file is the plan from here to **1.0.0**: what 1.0
 promises, the releases on the way, and the conditions that make it shippable.
 Day-to-day workflow (P0–P3 audits, the release checklist) lives in
 [AGENT.md](AGENT.md); the next release's task list lives in
-[CLAUDE.md](CLAUDE.md).
+[CLAUDE.md](CLAUDE.md); the step-by-step plan for each minor line lives in
+[.roadmap/](.roadmap/README.md).
 
 ## What 1.0.0 means
 
@@ -112,6 +113,15 @@ gate, docs build, changelog, upgrade notes).
 Voice may be marked `@experimental` at 1.0 if this milestone slips; the rest of
 1.0 does not wait for it.
 
+### 0.5.0 — the framework layer
+
+Optional first-party packages on top of the core, so bots stop hand-rolling
+them: `@lunibee/commands` (one definition for slash, context-menu and prefix,
+guards, diffed sync), `@lunibee/components` (persistent custom-id routing),
+`@lunibee/handlers` (events from files), CLI project templates, plugins,
+metrics hooks and per-cache policies. Detailed in
+[.roadmap/0.5.0.md](.roadmap/0.5.0.md).
+
 ### 0.9.0 — API freeze (release candidate line)
 
 - Mark the surface: every export is public, `@internal` or `@experimental`;
@@ -137,7 +147,7 @@ Ship when every item below is true.
 
 ## 1.0.0 exit criteria
 
-- [ ] 0.2.2, 0.3.0 and 0.9.0 released; voice either shipped (0.4.0) or marked `@experimental`
+- [ ] 0.2.2, 0.3.0, 0.5.0 and 0.9.0 released; voice either shipped (0.4.0) or marked `@experimental`
 - [ ] No open P0 or P1 findings in the audits; P2/P3 findings fixed or tracked
 - [ ] Every public export is marked and covered by the API audit
 - [ ] No `Record<string, unknown>` in public message/interaction option types
