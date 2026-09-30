@@ -2,8 +2,8 @@
 
 Every public `Collection` method, every builder, every formatter and every Gateway
 dispatch the client handles (64 events), run on **Bun 1.3.11**, **Bun 1.4.2** and **Node 22**
-against the same built package. Produced by [`scripts/bench-runtime.mjs`](scripts/bench-runtime.mjs);
-raw medians in [`docs/perf/runtime-2026-09-30.json`](docs/perf/runtime-2026-09-30.json).
+against the same built package. Produced by [`benchmarks/runtime.mjs`](benchmarks/runtime.mjs);
+raw medians in [`benchmarks/results/runtime-2026-09-30.json`](benchmarks/results/runtime-2026-09-30.json).
 
 ## Setup
 
@@ -87,7 +87,7 @@ Geometric mean of the per-call times in each group (a fair average across functi
 | Collection · sorted | 195.55 µs | 76.88 µs | -61% |
 | Gateway events · GUILD_DELETE | 3.36 µs | 1.37 µs | -59% |
 
-### Where Bun 1.4.2 is slower than 1.3.11 (beyond 5%)
+### Where Bun 1.4.2 is slower than 1.3.11 (beyond 5%) — 27 functions
 
 | Function | Bun 1.3.11 | Bun 1.4.2 | Change |
 |---|---|---|---|
@@ -103,10 +103,23 @@ Geometric mean of the per-call times in each group (a fair average across functi
 | Formatters · roleMention | 49.7 ns | 58.7 ns | +18% |
 | Collection · peek | 58.8 ns | 66.9 ns | +14% |
 | Gateway events · READY | 1.00 µs | 1.12 µs | +12% |
+| Gateway events · AUTO_MODERATION_RULE_UPDATE | 530.4 ns | 580.3 ns | +9% |
+| Collection · get | 80.8 ns | 88.2 ns | +9% |
+| Builders · CreateSubcommand | 2.99 µs | 3.26 µs | +9% |
+| Formatters · strikethrough | 29.2 ns | 31.7 ns | +9% |
+| Collection · random | 12.15 µs | 13.20 µs | +9% |
+| Collection · set | 64.3 ns | 69.8 ns | +9% |
+| Builders · CreateSubcommandGroup | 3.28 µs | 3.54 µs | +8% |
+| Collection · set (lru, evicting) | 108.2 ns | 116.4 ns | +8% |
+| Collection · get (lru, promoting) | 107.6 ns | 115.7 ns | +7% |
+| Builders · CreateContextMenuCommand | 623.7 ns | 668.3 ns | +7% |
+| Gateway events · GUILD_STICKERS_UPDATE (5 stickers) | 2.81 µs | 3.01 µs | +7% |
+| Formatters · inlineCode | 21.3 ns | 22.7 ns | +7% |
+| Gateway events · GUILD_BAN_ADD | 538.9 ns | 572.1 ns | +6% |
+| Collection · every | 12.09 µs | 12.77 µs | +6% |
+| Formatters · italic | 31.1 ns | 32.7 ns | +5% |
 
-…and 15 more in the full tables.
-
-### Where Node 22 beats Bun 1.4.2 (beyond 5%)
+### Where Node 22 beats Bun 1.4.2 (beyond 5%) — 65 functions
 
 | Function | Bun 1.4.2 | Node 22 | Node is |
 |---|---|---|---|
@@ -125,8 +138,56 @@ Geometric mean of the per-call times in each group (a fair average across functi
 | Collection · filter | 37.34 µs | 18.60 µs | 2.01× faster |
 | Gateway events · ENTITLEMENT_UPDATE | 701.3 ns | 350.6 ns | 2.00× faster |
 | Collection · findKey (last item) | 11.58 µs | 5.97 µs | 1.94× faster |
-
-…and 50 more in the full tables.
+| Collection · someEntry (last item) | 13.19 µs | 6.84 µs | 1.93× faster |
+| Gateway events · AUTO_MODERATION_RULE_UPDATE | 580.3 ns | 307.4 ns | 1.89× faster |
+| Gateway events · GUILD_SCHEDULED_EVENT_USER_ADD | 410.1 ns | 220.0 ns | 1.86× faster |
+| Collection · some (last item) | 11.60 µs | 6.23 µs | 1.86× faster |
+| Gateway events · GUILD_SCHEDULED_EVENT_DELETE | 473.6 ns | 259.1 ns | 1.83× faster |
+| Collection · union | 103.15 µs | 58.49 µs | 1.76× faster |
+| Gateway events · THREAD_MEMBER_UPDATE | 592.8 ns | 338.4 ns | 1.75× faster |
+| Collection · lastKey | 2.93 µs | 1.76 µs | 1.67× faster |
+| Gateway events · MESSAGE_DELETE_BULK (10 ids) | 3.75 µs | 2.27 µs | 1.65× faster |
+| Collection · partition | 53.08 µs | 32.44 µs | 1.64× faster |
+| Gateway events · MESSAGE_POLL_VOTE_REMOVE | 349.3 ns | 213.8 ns | 1.63× faster |
+| Gateway events · ENTITLEMENT_CREATE | 627.0 ns | 386.1 ns | 1.62× faster |
+| Gateway events · MESSAGE_POLL_VOTE_ADD | 368.6 ns | 232.0 ns | 1.59× faster |
+| Gateway events · MESSAGE_DELETE | 493.0 ns | 310.8 ns | 1.59× faster |
+| Gateway events · GUILD_EMOJIS_UPDATE (10 emojis) | 8.32 µs | 5.33 µs | 1.56× faster |
+| Gateway events · MESSAGE_REACTION_REMOVE | 299.9 ns | 195.5 ns | 1.53× faster |
+| Collection · lastEntry | 20.19 µs | 13.28 µs | 1.52× faster |
+| Gateway events · GUILD_SCHEDULED_EVENT_USER_REMOVE | 337.5 ns | 222.1 ns | 1.52× faster |
+| Collection · clone | 42.52 µs | 28.00 µs | 1.52× faster |
+| Gateway events · THREAD_LIST_SYNC (5 threads) | 6.59 µs | 4.36 µs | 1.51× faster |
+| Collection · last | 2.63 µs | 1.74 µs | 1.51× faster |
+| Gateway events · THREAD_UPDATE | 1.30 µs | 873.1 ns | 1.49× faster |
+| Gateway events · CHANNEL_UPDATE | 981.6 ns | 663.8 ns | 1.48× faster |
+| Gateway events · GUILD_INTEGRATIONS_UPDATE | 114.8 ns | 78.5 ns | 1.46× faster |
+| Gateway events · GUILD_ROLE_UPDATE | 1.86 µs | 1.29 µs | 1.45× faster |
+| Gateway events · GUILD_STICKERS_UPDATE (5 stickers) | 3.01 µs | 2.10 µs | 1.43× faster |
+| Gateway events · AUTO_MODERATION_ACTION_EXECUTION | 418.7 ns | 293.1 ns | 1.43× faster |
+| Gateway events · MESSAGE_REACTION_ADD | 356.6 ns | 253.3 ns | 1.41× faster |
+| Gateway events · GUILD_DELETE | 1.37 µs | 982.4 ns | 1.40× faster |
+| Gateway events · ENTITLEMENT_DELETE | 601.0 ns | 441.0 ns | 1.36× faster |
+| Gateway events · RESUMED | 311.3 ns | 229.4 ns | 1.36× faster |
+| Gateway events · GUILD_SOUNDBOARD_SOUNDS_UPDATE (5 sounds) | 2.68 µs | 2.01 µs | 1.34× faster |
+| Gateway events · STAGE_INSTANCE_UPDATE | 412.0 ns | 317.3 ns | 1.30× faster |
+| Collection · difference | 41.50 µs | 32.13 µs | 1.29× faster |
+| Gateway events · THREAD_CREATE | 1.70 µs | 1.35 µs | 1.26× faster |
+| Gateway events · GUILD_ROLE_CREATE | 1.69 µs | 1.35 µs | 1.25× faster |
+| Gateway events · THREAD_DELETE | 505.7 ns | 417.5 ns | 1.21× faster |
+| Gateway events · MESSAGE_REACTION_REMOVE_ALL | 174.9 ns | 144.7 ns | 1.21× faster |
+| Gateway events · INTERACTION_CREATE (button) | 1.17 µs | 971.0 ns | 1.21× faster |
+| Builders · CreateSection | 412.1 ns | 350.5 ns | 1.18× faster |
+| Gateway events · THREAD_MEMBERS_UPDATE | 484.2 ns | 420.4 ns | 1.15× faster |
+| Collection · setWithoutTTL | 142.3 ns | 124.0 ns | 1.15× faster |
+| Gateway events · AUTO_MODERATION_RULE_DELETE | 431.2 ns | 378.3 ns | 1.14× faster |
+| Gateway events · STAGE_INSTANCE_CREATE | 348.6 ns | 311.1 ns | 1.12× faster |
+| Gateway events · STAGE_INSTANCE_DELETE | 372.1 ns | 333.1 ns | 1.12× faster |
+| Builders · CreateEmbed | 6.34 µs | 5.82 µs | 1.09× faster |
+| Gateway events · READY | 1.12 µs | 1.03 µs | 1.09× faster |
+| Collection · sorted | 76.88 µs | 72.04 µs | 1.07× faster |
+| Gateway events · GUILD_ROLE_DELETE | 320.8 ns | 301.6 ns | 1.06× faster |
+| Gateway events · GUILD_SOUNDBOARD_SOUND_UPDATE | 270.4 ns | 255.5 ns | 1.06× faster |
 
 ### Where Bun 1.4.2 beats Node 22 the most
 
@@ -337,10 +398,10 @@ Geometric mean of the per-call times in each group (a fair average across functi
 
 ```sh
 bun install && bun run build
-bun  scripts/bench-runtime.mjs          # table
-node scripts/bench-runtime.mjs
-bun  scripts/bench-runtime.mjs --json   # machine-readable
-BENCH_ITERATIONS=50000 bun scripts/bench-runtime.mjs
+bun  benchmarks/runtime.mjs          # table
+node benchmarks/runtime.mjs
+bun  benchmarks/runtime.mjs --json   # machine-readable
+BENCH_ITERATIONS=50000 bun benchmarks/runtime.mjs
 ```
 
 Gateway events are fed straight into the client's handlers (no socket): each figure is payload
