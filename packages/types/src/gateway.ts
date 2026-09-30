@@ -197,6 +197,20 @@ export interface ClientOptions {
         roles?: boolean;
         emojis?: boolean;
     };
+    /**
+     * Default `allowed_mentions` for every message the client sends (channel
+     * send/edit, replies, interaction replies, edits and follow-ups), e.g.
+     * `{ parse: [] }` so nothing pings unless a message says so. A message's
+     * own `allowed_mentions` always wins.
+     */
+    allowedMentions?: AllowedMentions;
+}
+/** Discord's `allowed_mentions` object. */
+export interface AllowedMentions {
+    parse?: ("users" | "roles" | "everyone")[];
+    users?: string[];
+    roles?: string[];
+    replied_user?: boolean;
 }
 /** Gateway connection configuration. */
 export interface GatewayOptions {

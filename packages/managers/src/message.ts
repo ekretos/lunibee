@@ -25,9 +25,18 @@ export type MessageCreateOptions = Record<string, unknown> & {
 };
 export type MessageEditOptions = MessageCreateOptions;
 
-/** Splits `files` out of a message payload into a REST upload, encoding string data as UTF-8. */
-export function toRequest(options: MessageCreateOptions): unknown {
+/**
+ * Splits `files` out of a message payload into a REST upload, encoding string
+ * data as UTF-8. `allowedMentions` is the client's default, applied only when
+ * the payload has no `allowed_mentions` of its own.
+ */
+export function toRequest(
+    options: MessageCreateOptions,
+    allowedMentions?: unknown,
+): unknown {
     const { files, ...body } = options;
+    if (allowedMentions !== undefined && body.allowed_mentions === undefined)
+        body.allowed_mentions = allowedMentions;
     if (!files?.length) return body;
     return {
         body,
@@ -50,13 +59,18 @@ export class MessageManager {
     readonly #context: ResourceContext;
     readonly #channelId: string;
 
+    /** The client's default `allowed_mentions`, for payloads without their own. */
+    readonly #allowedMentions?: unknown;
+
     public constructor(
         rest: REST,
         context: ResourceContext,
         channelId: string,
         cache?: MessageCacheOptions,
+        allowedMentions?: unknown,
     ) {
         if (!channelId) throw new TypeError("Channel ID is required.");
+        this.#allowedMentions = allowedMentions;
         this.#rest = rest;
         this.#context = context;
         this.#channelId = channelId;
@@ -72,7 +86,10 @@ export class MessageManager {
     public async send(options: MessageCreateOptions): Promise<Message> {
         const data = await this.#rest.post<
             ConstructorParameters<typeof Message>[0]
-        >(Routes.channelMessages(this.#channelId), toRequest(options));
+        >(
+            Routes.channelMessages(this.#channelId),
+            toRequest(options, this.#allowedMentions),
+        );
         return this.upsert(data);
     }
     public async fetch(messageId: string): Promise<Message> {

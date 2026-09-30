@@ -260,6 +260,21 @@ await client.login();
 |---|---|
 | `messageCache: { maxSize?, ttl? }` | Opt-in bounded per-channel message cache (`maxSize` defaults to 100). Without it messages are not cached. |
 | `cache: { users?, members?, roles?, emojis? }` | Turn off caching of a resource from Gateway events (all `true` by default). |
+| `allowedMentions` *(0.2.2)* | Default `allowed_mentions` for every message the client sends: channel send/edit, `message.reply()`, interaction replies, edits and follow-ups. A message's own `allowed_mentions` wins. Not applied to deferrals or modals. |
+
+#### Mentions safety
+
+Text that comes from users (AFK reasons, tags, echoed input) can contain `@everyone` or role mentions. Set a safe default once and opt in per message:
+
+```ts
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: GatewayIntentBits.Guilds,
+  allowedMentions: { parse: [] },          // nothing pings by default
+});
+
+await channel.send({ content: `<@${user.id}> welcome!`, allowed_mentions: { users: [user.id] } }); // this one does
+```
 
 ### Members
 

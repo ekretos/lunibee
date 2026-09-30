@@ -67,14 +67,22 @@ export class ChannelManager extends Manager<string, Channel> {
     readonly #context: ResourceContext;
     readonly #messageManagers = new Map<string, MessageManager>();
     readonly #messageCache?: MessageCacheOptions;
-    /** @param options.messageCache Enables a bounded per-channel message cache; messages are not cached by default. */
+    readonly #allowedMentions?: unknown;
+    /**
+     * @param options.messageCache Enables a bounded per-channel message cache; messages are not cached by default.
+     * @param options.allowedMentions Default `allowed_mentions` for sends and edits without their own.
+     */
     public constructor(
         rest: REST,
-        options: { messageCache?: MessageCacheOptions } = {},
+        options: {
+            messageCache?: MessageCacheOptions;
+            allowedMentions?: unknown;
+        } = {},
     ) {
         super();
         this.#rest = rest;
         this.#messageCache = options.messageCache;
+        this.#allowedMentions = options.allowedMentions;
         this.#context = {
             sendMessage: (channelId, options) => this.send(channelId, options),
             editMessage: (channelId, messageId, options) =>
@@ -107,6 +115,7 @@ export class ChannelManager extends Manager<string, Channel> {
                 this.#context,
                 channelId,
                 this.#messageCache,
+                this.#allowedMentions,
             );
             this.#messageManagers.set(channelId, manager);
         }
@@ -306,7 +315,7 @@ export class ChannelManager extends Manager<string, Channel> {
         return this.messages(channelId).upsert(
             await this.#rest.patch<ConstructorParameters<typeof Message>[0]>(
                 Routes.message(channelId, messageId),
-                toRequest(options),
+                toRequest(options, this.#allowedMentions),
             ),
         );
     }

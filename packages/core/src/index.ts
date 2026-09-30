@@ -257,6 +257,7 @@ export class Client
         this.guilds = new GuildManager(this.rest);
         this.channels = new ChannelManager(this.rest, {
             messageCache: options.messageCache,
+            allowedMentions: options.allowedMentions,
         });
         this.stageInstances = new StageInstanceManager(this.rest);
         const placeholderAppCommands = new ApplicationCommandManager(
@@ -1055,8 +1056,15 @@ export class Client
         response: import("@lunibee/structures").InteractionResponse,
     ): Promise<unknown> {
         const json = response.toJSON();
+        // Only message responses (4 reply, 7 update) carry mentions; a modal or a deferral does not.
+        const carriesMessage = json.type === 4 || json.type === 7;
         // Files in the reply turn the callback into an upload.
-        const upload = json.data ? toRequest(json.data) : undefined;
+        const upload = json.data
+            ? toRequest(
+                  json.data,
+                  carriesMessage ? this.options.allowedMentions : undefined,
+              )
+            : undefined;
         if (upload && typeof upload === "object" && "files" in upload) {
             const { body, files } = upload as { body: unknown; files: never[] };
             return this.rest.post(Routes.interactionCallback(id, token), {
@@ -1064,7 +1072,10 @@ export class Client
                 files,
             });
         }
-        return this.rest.post(Routes.interactionCallback(id, token), json);
+        return this.rest.post(
+            Routes.interactionCallback(id, token),
+            upload === undefined ? json : { ...json, data: upload },
+        );
     }
     public editInteractionReply(
         token: string,
@@ -1074,7 +1085,7 @@ export class Client
             return Promise.reject(new Error("Client is unauthenticated."));
         return this.rest.patch(
             Routes.interactionOriginalResponse(this.user.id, token),
-            toRequest(data),
+            toRequest(data, this.options.allowedMentions),
         );
     }
     public deleteInteractionReply(token: string): Promise<void> {
@@ -1092,7 +1103,7 @@ export class Client
             return Promise.reject(new Error("Client is unauthenticated."));
         return this.rest.post(
             `/webhooks/${this.user.id}/${token}`,
-            toRequest(data),
+            toRequest(data, this.options.allowedMentions),
         );
     }
     public interactionWebhookMessage(
@@ -1107,7 +1118,11 @@ export class Client
                 ? Routes.interactionOriginalResponse(applicationId, token)
                 : Routes.webhookMessage(applicationId, token, messageId);
         if (method === "GET") return this.rest.get(path);
-        if (method === "PATCH") return this.rest.patch(path, data);
+        if (method === "PATCH")
+            return this.rest.patch(
+                path,
+                data ? toRequest(data, this.options.allowedMentions) : data,
+            );
         return this.rest.delete(path);
     }
 
