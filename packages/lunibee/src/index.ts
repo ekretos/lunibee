@@ -49,6 +49,8 @@ export type {
     APIMessageReference,
     APIMessageReaction,
     APIMessage,
+    APIPoll,
+    APIMessageSnapshot,
     APIChannel,
     APIThreadMetadata,
     APIForumTag,

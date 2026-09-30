@@ -47,6 +47,12 @@ export class Message extends BaseStructure {
     public readonly reference?: import("@lunibee/types").APIMessageReference;
     public readonly components: import("@lunibee/types").APIMessageComponent[];
     public readonly referencedMessage?: Message | null;
+    /** Stickers sent with the message (`sticker_items`). */
+    public readonly stickers: import("@lunibee/types").APIStickerItem[];
+    /** The poll, when the message is one. */
+    public readonly poll: import("@lunibee/types").APIPoll | null;
+    /** For a forwarded message, the snapshot of the original. */
+    public readonly messageSnapshots: import("@lunibee/types").APIMessageSnapshot[];
     /**
      * The author as a guild member, on guild messages from the Gateway. Its
      * `permissions` are computed from the cached roles; `member.kick()` and the
@@ -82,6 +88,15 @@ export class Message extends BaseStructure {
         this.mentionEveryone = data.mention_everyone ?? false;
         this.type = data.type ?? 0;
         this.reference = data.message_reference;
+        this.stickers =
+            data.sticker_items ??
+            (data.stickers ?? []).map(({ id, name, format_type }) => ({
+                id,
+                name,
+                format_type,
+            }));
+        this.poll = data.poll ?? null;
+        this.messageSnapshots = data.message_snapshots ?? [];
         this.referencedMessage = data.referenced_message
             ? new Message(data.referenced_message, context)
             : data.referenced_message === null

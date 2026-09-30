@@ -12,6 +12,7 @@ description: Lunibee version history and release notes.
 * **`withResponse`**: `reply()`, `update()`, `deferReply()` and `deferUpdate()` accept `withResponse: true` and return the created `Message` from the same request.
 * **CDN helpers exported**: `CDN_BASE`, `cdnURL()` and `ImageURLOptions` from `lunibee` and `@lunibee/structures`.
 * **Component payload types exported from `lunibee`.** `APIComponent`, `APIActionRowChild`, `APIStringSelectComponent`, `APIEntitySelectComponent`, `APISelectOption`, `APIContainerComponent`, `APITextDisplayComponent`, `APIModalComponent` and the other builder payload types; the builder shapes of an action row, button and text input are `APIActionRowPayload`, `APIButtonPayload` and `APITextInputPayload`.
+* **Message stickers, polls and forwards**: `message.stickers`, `message.poll` and `message.messageSnapshots`, refreshed on `messageUpdate`. New `APIPoll` and `APIMessageSnapshot` types.
 
 ### ⚠️ Behaviour changes
 

@@ -39,6 +39,9 @@ import { Message } from "lunibee";
 | `attachments` | `APIAttachment[]` | File attachments on this message. |
 | `embeds` | `APIEmbed[]` | Embeds on this message. |
 | `components` | `APIMessageComponent[]` | Interactive components on this message. |
+| `stickers` | `APIStickerItem[]` | Stickers sent with the message (`sticker_items`). |
+| `poll` | `APIPoll \| null` | The poll, when the message is one. Results arrive on `messageUpdate`. |
+| `messageSnapshots` | `APIMessageSnapshot[]` | For a forwarded message, a partial copy of the original (`content`, `embeds`, `attachments`, …). |
 | `mentions` | `User[]` | Users mentioned in this message. |
 | `mentionRoles` | `string[]` | Role IDs mentioned in this message. |
 | `mentionEveryone` | `boolean` | Whether `@everyone` or `@here` was used. |

@@ -335,6 +335,40 @@ export interface APIMessageReaction {
     emoji: APIPartialEmoji;
     burst_colors?: string[];
 }
+/** Raw Discord poll object. */
+export interface APIPoll {
+    question: { text?: string; emoji?: APIPartialEmoji };
+    answers: Array<{
+        answer_id: number;
+        poll_media: { text?: string; emoji?: APIPartialEmoji };
+    }>;
+    expiry: string | null;
+    allow_multiselect: boolean;
+    layout_type: number;
+    results?: {
+        is_finalized: boolean;
+        answer_counts: Array<{ id: number; count: number; me_voted: boolean }>;
+    };
+}
+/** A forwarded message's snapshot of the original. */
+export interface APIMessageSnapshot {
+    message: Partial<
+        Pick<
+            APIMessage,
+            | "type"
+            | "content"
+            | "embeds"
+            | "attachments"
+            | "timestamp"
+            | "edited_timestamp"
+            | "flags"
+            | "mentions"
+            | "mention_roles"
+            | "sticker_items"
+            | "components"
+        >
+    >;
+}
 /** Raw Discord message object. */
 export interface APIMessage {
     id: Snowflake;
@@ -369,7 +403,9 @@ export interface APIMessage {
     position?: number;
     role_subscription_data?: Record<string, unknown>;
     purchase_notification?: Record<string, unknown>;
-    poll?: Record<string, unknown>;
+    poll?: APIPoll;
+    /** Forwarded messages: a partial copy of the original (content, embeds, attachments, …). */
+    message_snapshots?: APIMessageSnapshot[];
     guild_id?: Snowflake;
     /** The author's guild member, on guild messages from the Gateway (without `user`; the author is the user). */
     member?: Omit<APIGuildMember, "user"> & { user?: UserData };
