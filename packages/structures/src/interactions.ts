@@ -518,11 +518,12 @@ export class Interaction<TData extends InteractionData = InteractionData> {
                       components: unknown[];
                   };
               }
+            // No index signature: an interface such as the builder's
+            // `APIModalComponent` (what `toJSON()` returns) must be assignable.
             | {
                   custom_id: string;
                   title: string;
-                  components: unknown[];
-                  [key: string]: unknown;
+                  components: readonly unknown[];
               },
     ): Promise<unknown> {
         const data =

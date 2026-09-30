@@ -19,6 +19,7 @@ description: Lunibee version history and release notes.
 ### 🐛 Fixed
 
 * **Healthy Gateway connections were closed as zombies every ~45 s.** Incoming frames never reset the silence clock, so with the default `zombieTimeout` every connection was closed and resumed once the staleness deadline passed, on every shard. Any frame from the current socket now counts as traffic. If you set `zombieTimeout: Infinity` to work around this, remove it.
+* **`showModal(modal.toJSON())` failed to type-check.** The raw modal type required an index signature that the builder's `APIModalComponent` lacks; a builder and its `toJSON()` output are now accepted alike, without a cast.
 
 ### ✏️ New names
 
