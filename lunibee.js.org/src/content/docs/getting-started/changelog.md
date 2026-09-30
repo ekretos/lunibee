@@ -13,6 +13,7 @@ description: Lunibee version history and release notes.
 * **CDN helpers exported**: `CDN_BASE`, `cdnURL()` and `ImageURLOptions` from `lunibee` and `@lunibee/structures`.
 * **Component payload types exported from `lunibee`.** `APIComponent`, `APIActionRowChild`, `APIStringSelectComponent`, `APIEntitySelectComponent`, `APISelectOption`, `APIContainerComponent`, `APITextDisplayComponent`, `APIModalComponent` and the other builder payload types; the builder shapes of an action row, button and text input are `APIActionRowPayload`, `APIButtonPayload` and `APITextInputPayload`.
 * **Message stickers, polls and forwards**: `message.stickers`, `message.poll` and `message.messageSnapshots`, refreshed on `messageUpdate`. New `APIPoll` and `APIMessageSnapshot` types.
+* **Previous state on update and delete events**: `guildUpdate`, `guildMemberUpdate`, `guildRoleUpdate`, `channelUpdate` and `threadUpdate` pass a copy of the cached structure before the update; `guildRoleDelete`, `channelDelete` and `threadDelete` pass the removed one; `guildEmojisUpdate` and `guildStickersUpdate` pass the previous list. Trailing arguments only, so existing handlers keep working. If you captured previous state from `raw`, you can drop that.
 
 ### ⚠️ Behaviour changes
 

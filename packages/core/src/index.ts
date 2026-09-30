@@ -46,6 +46,8 @@ import {
     Guild,
     GuildMember,
     Role,
+    Emoji,
+    type Channel,
     createChannel,
     Message,
     createInteraction,
@@ -519,8 +521,11 @@ export class Client
             );
         });
         this.#gateway.on("GUILD_UPDATE", (data) => {
-            this.guilds.patch(data as APIGuild);
-            this.emit(ClientEvent.GuildUpdate, data as APIGuild);
+            const payload = data as APIGuild;
+            const cached = this.guilds.get(payload.id);
+            const previous = cached ? this.#snapshot(cached) : null;
+            this.guilds.patch(payload);
+            this.emit(ClientEvent.GuildUpdate, payload, previous);
         });
         this.#gateway.on("GUILD_DELETE", (data) => {
             const payload = data as { id: string; unavailable?: boolean };
@@ -541,8 +546,21 @@ export class Client
         });
         this.#gateway.on("GUILD_MEMBER_UPDATE", (data) => {
             const member = data as GuildMemberEvent;
+            const cached = this.#cache.members
+                ? this.guilds.members(member.guild_id).get(member.user.id)
+                : undefined;
+            // A fresh instance keeps the client context (a private field).
+            const previous = cached
+                ? this.#snapshot(
+                      cached,
+                      new GuildMember(
+                          { user: member.user, guild_id: member.guild_id },
+                          this.#resourceContext,
+                      ),
+                  )
+                : null;
             this.#upsertMember(member.guild_id, member);
-            this.emit(ClientEvent.GuildMemberUpdate, member);
+            this.emit(ClientEvent.GuildMemberUpdate, member, previous);
         });
         this.#gateway.on("GUILD_MEMBER_REMOVE", (data) => {
             const member = data as GuildMemberEvent;
@@ -582,33 +600,46 @@ export class Client
         });
         this.#gateway.on("GUILD_ROLE_UPDATE", (data) => {
             const event = data as APIGuildRoleEvent;
+            const cached = this.#cache.roles
+                ? this.guilds.roles(event.guild_id).get(event.role.id)
+                : undefined;
+            const previous = cached ? this.#snapshot(cached) : null;
             this.#upsertRole(event.guild_id, event.role);
-            this.emit(ClientEvent.GuildRoleUpdate, event);
+            this.emit(ClientEvent.GuildRoleUpdate, event, previous);
         });
         this.#gateway.on("GUILD_ROLE_DELETE", (data) => {
             const event = data as APIGuildRoleDeleteEvent;
-            this.guilds.roles(event.guild_id).delete(event.role_id);
-            this.emit(ClientEvent.GuildRoleDelete, event);
+            const roles = this.guilds.roles(event.guild_id);
+            const removed = roles.get(event.role_id) ?? null;
+            roles.delete(event.role_id);
+            this.emit(ClientEvent.GuildRoleDelete, event, removed);
         });
 
         // ── Guild Emojis & Stickers ──────────────────────────────────────────────
         this.#gateway.on("GUILD_EMOJIS_UPDATE", (data) => {
             const event = data as APIGuildEmojisUpdateEvent;
+            let previous: Emoji[] | null = null;
             // The event carries the guild's full emoji list.
             if (this.#cache.emojis) {
                 const emojis = this.guilds.emojis(event.guild_id);
+                previous = [...emojis.cache.values()].map((emoji) =>
+                    this.#snapshot(emoji),
+                );
                 const current = new Set(event.emojis.map((emoji) => emoji.id));
                 for (const id of [...emojis.cache.keys()])
                     if (!current.has(id)) emojis.delete(id);
                 for (const emoji of event.emojis) emojis.upsert(emoji);
             }
-            this.emit(ClientEvent.GuildEmojisUpdate, event);
+            this.emit(ClientEvent.GuildEmojisUpdate, event, previous);
         });
         this.#gateway.on("GUILD_STICKERS_UPDATE", (data) => {
             const event = data as APIGuildStickersUpdateEvent;
-            // The event carries the guild's full sticker list.
-            this.guilds.stickers(event.guild_id).sync(event.stickers);
-            this.emit(ClientEvent.GuildStickersUpdate, event);
+            // The event carries the guild's full sticker list. `sync` replaces
+            // the raw objects, so the previous list needs no copying.
+            const stickers = this.guilds.stickers(event.guild_id);
+            const previous = [...stickers.cache.values()];
+            stickers.sync(event.stickers);
+            this.emit(ClientEvent.GuildStickersUpdate, event, previous);
         });
 
         // ── Soundboard ───────────────────────────────────────────────────────────
@@ -728,13 +759,15 @@ export class Client
             this.emit(ClientEvent.ChannelCreate, channel);
         });
         this.#gateway.on("CHANNEL_UPDATE", (data) => {
+            const previous = this.#previousChannel(data as APIChannel);
             const channel = this.channels.upsert(data as APIChannel);
-            this.emit(ClientEvent.ChannelUpdate, channel);
+            this.emit(ClientEvent.ChannelUpdate, channel, previous);
         });
         this.#gateway.on("CHANNEL_DELETE", (data) => {
             const payload = data as APIChannel;
+            const removed = this.channels.get(payload.id) ?? null;
             this.channels.delete(payload.id);
-            this.emit(ClientEvent.ChannelDelete, payload);
+            this.emit(ClientEvent.ChannelDelete, payload, removed);
         });
         this.#gateway.on("CHANNEL_PINS_UPDATE", (data) =>
             this.emit(
@@ -749,13 +782,15 @@ export class Client
             this.emit(ClientEvent.ThreadCreate, channel);
         });
         this.#gateway.on("THREAD_UPDATE", (data) => {
+            const previous = this.#previousChannel(data as APIThreadEvent);
             const channel = this.channels.upsert(data as APIThreadEvent);
-            this.emit(ClientEvent.ThreadUpdate, channel);
+            this.emit(ClientEvent.ThreadUpdate, channel, previous);
         });
         this.#gateway.on("THREAD_DELETE", (data) => {
             const payload = data as APIThreadEvent;
+            const removed = this.channels.get(payload.id) ?? null;
             this.channels.delete(payload.id);
-            this.emit(ClientEvent.ThreadDelete, payload);
+            this.emit(ClientEvent.ThreadDelete, payload, removed);
         });
         this.#gateway.on("THREAD_LIST_SYNC", (data) => {
             const sync = data as APIThreadListSync;
@@ -894,6 +929,33 @@ export class Client
     #upsertRole(guildId: string, data: APIRole): Role {
         if (!this.#cache.roles) return new Role(data);
         return this.#merge(this.guilds.roles(guildId), data.id, new Role(data));
+    }
+
+    /**
+     * Copies a cached structure's fields before an in-place merge changes them.
+     * Pass `blank` (a fresh instance of the same class) when the class has
+     * private fields, so the copy keeps them.
+     */
+    #snapshot<T extends object>(
+        cached: T,
+        blank: T = Object.create(Object.getPrototypeOf(cached)) as T,
+    ): T {
+        return Object.assign(blank, cached);
+    }
+
+    /** A copy of the cached channel an update is about to change, or null. */
+    #previousChannel(data: APIChannel): Channel | null {
+        const cached = this.channels.get(data.id);
+        if (!cached) return null;
+        // Channel keeps its client context in a private field; build the copy
+        // through the same factory so it keeps the subclass and the context.
+        return this.#snapshot(
+            cached,
+            createChannel(
+                { id: cached.id, type: cached.type, guild_id: cached.guildId },
+                this.#resourceContext,
+            ),
+        );
     }
 
     /** Merges `next` into the cached instance so references stay valid.

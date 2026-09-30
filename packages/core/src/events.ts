@@ -1,4 +1,8 @@
-import type { APIEntitlement, APISoundboardSound } from "@lunibee/types";
+import type {
+    APIEntitlement,
+    APISoundboardSound,
+    APISticker,
+} from "@lunibee/types";
 import type {
     APIAutoModerationActionExecution,
     APIAutoModerationRule,
@@ -33,7 +37,15 @@ import type {
     APIWebhooksUpdate,
     ClientUser,
 } from "@lunibee/types";
-import type { Channel, Interaction, Message } from "@lunibee/structures";
+import type {
+    Channel,
+    Emoji,
+    Guild,
+    GuildMember,
+    Interaction,
+    Message,
+    Role,
+} from "@lunibee/structures";
 /** Names of events emitted by a Lunibee client. */
 export enum ClientEvent {
     // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -170,13 +182,15 @@ export type ClientEvents = {
     messagePollVoteRemove: [data: APIMessagePollVoteEvent];
     // ── Guilds ────────────────────────────────────────────────────────────────
     guildCreate: [data: APIGuild];
-    guildUpdate: [data: APIGuild];
+    /** `previous` is a copy of the cached guild before the update, or null when it was not cached. */
+    guildUpdate: [data: APIGuild, previous: Guild | null];
     guildDelete: [data: { id: string; unavailable?: boolean }];
     guildAvailable: [data: APIGuild & { unavailable?: boolean }];
     guildUnavailable: [data: { id: string; unavailable?: boolean }];
     // ── Guild Members ──────────────────────────────────────────────────────────
     guildMemberAdd: [member: APIGuildMember];
-    guildMemberUpdate: [member: APIGuildMember];
+    /** `previous` is a copy of the cached member before the update, or null when it was not cached. */
+    guildMemberUpdate: [member: APIGuildMember, previous: GuildMember | null];
     guildMemberRemove: [member: APIGuildMember];
     guildMembersChunk: [data: APIGuildMembersChunk];
     // ── Guild Bans ────────────────────────────────────────────────────────────
@@ -184,11 +198,21 @@ export type ClientEvents = {
     guildBanRemove: [data: APIGuildBanEvent];
     // ── Guild Roles ───────────────────────────────────────────────────────────
     guildRoleCreate: [data: APIGuildRoleEvent];
-    guildRoleUpdate: [data: APIGuildRoleEvent];
-    guildRoleDelete: [data: APIGuildRoleDeleteEvent];
+    /** `previous` is a copy of the cached role before the update, or null when it was not cached. */
+    guildRoleUpdate: [data: APIGuildRoleEvent, previous: Role | null];
+    /** `removed` is the role that was cached, or null. */
+    guildRoleDelete: [data: APIGuildRoleDeleteEvent, removed: Role | null];
     // ── Guild Emojis & Stickers ───────────────────────────────────────────────
-    guildEmojisUpdate: [data: APIGuildEmojisUpdateEvent];
-    guildStickersUpdate: [data: APIGuildStickersUpdateEvent];
+    /** `previous` is the cached emoji list before the update, or null without the emoji cache. */
+    guildEmojisUpdate: [
+        data: APIGuildEmojisUpdateEvent,
+        previous: Emoji[] | null,
+    ];
+    /** `previous` is the cached sticker list before the update (empty when none were cached). */
+    guildStickersUpdate: [
+        data: APIGuildStickersUpdateEvent,
+        previous: APISticker[],
+    ];
     // ── Monetization ──────────────────────────────────────────────────────────
     entitlementCreate: [entitlement: APIEntitlement];
     entitlementUpdate: [entitlement: APIEntitlement];
@@ -215,13 +239,17 @@ export type ClientEvents = {
     autoModerationActionExecution: [data: APIAutoModerationActionExecution];
     // ── Channels ──────────────────────────────────────────────────────────────
     channelCreate: [channel: Channel];
-    channelUpdate: [channel: Channel];
-    channelDelete: [data: APIChannel];
+    /** `previous` is a copy of the cached channel before the update, or null when it was not cached. */
+    channelUpdate: [channel: Channel, previous: Channel | null];
+    /** `removed` is the channel that was cached, or null. */
+    channelDelete: [data: APIChannel, removed: Channel | null];
     channelPinsUpdate: [data: APIChannelPinsUpdate];
     // ── Threads ───────────────────────────────────────────────────────────────
     threadCreate: [channel: Channel];
-    threadUpdate: [channel: Channel];
-    threadDelete: [data: APIThreadEvent];
+    /** `previous` is a copy of the cached thread before the update, or null when it was not cached. */
+    threadUpdate: [channel: Channel, previous: Channel | null];
+    /** `removed` is the thread that was cached, or null. */
+    threadDelete: [data: APIThreadEvent, removed: Channel | null];
     threadListSync: [data: APIThreadListSync];
     threadMembersUpdate: [data: APIThreadMembersUpdate];
     threadMemberUpdate: [data: APIThreadMember];
