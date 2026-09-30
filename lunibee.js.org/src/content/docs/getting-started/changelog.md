@@ -11,6 +11,7 @@ description: Lunibee version history and release notes.
 * **Default `allowed_mentions`**: `new Client({ allowedMentions: { parse: [] } })` applies to every message the client sends (channel send/edit, replies, interaction replies, edits, follow-ups); a message's own `allowed_mentions` wins. See [Client options](/reference/client/).
 * **`withResponse`**: `reply()`, `update()`, `deferReply()` and `deferUpdate()` accept `withResponse: true` and return the created `Message` from the same request.
 * **CDN helpers exported**: `CDN_BASE`, `cdnURL()` and `ImageURLOptions` from `lunibee` and `@lunibee/structures`.
+* **Component payload types exported from `lunibee`.** `APIComponent`, `APIActionRowChild`, `APIStringSelectComponent`, `APIEntitySelectComponent`, `APISelectOption`, `APIContainerComponent`, `APITextDisplayComponent`, `APIModalComponent` and the other builder payload types; the builder shapes of an action row, button and text input are `APIActionRowPayload`, `APIButtonPayload` and `APITextInputPayload`.
 
 ### ⚠️ Behaviour changes
 

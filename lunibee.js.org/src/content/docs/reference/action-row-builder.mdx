@@ -182,3 +182,30 @@ await interaction.showModal(modal);
 ```
 </TabItem>
 </Tabs>
+
+## Payload types
+
+The shapes `toJSON()` returns are exported from `lunibee`, so helpers that build or accept raw
+component payloads need no `ReturnType<...>` tricks:
+
+```ts
+import type {
+  APIComponent,
+  APIActionRowChild,
+  APIActionRowPayload,
+  APIButtonPayload,
+  APITextInputPayload,
+  APIStringSelectComponent,
+  APIEntitySelectComponent,
+  APISelectOption,
+  APIContainerComponent,
+  APITextDisplayComponent,
+  APIModalComponent,
+} from "lunibee";
+
+const rows: APIActionRowPayload[] = [new CreateActionRow().addComponents(button).toJSON()];
+```
+
+`APIActionRowComponent`, `APIButtonComponent` and `APITextInputComponent` keep naming the shapes
+Discord **sends** (for example on `message.components`); the builder output for those three is
+exported as `APIActionRowPayload`, `APIButtonPayload` and `APITextInputPayload`.

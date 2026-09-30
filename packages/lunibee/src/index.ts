@@ -155,6 +155,15 @@ export {
     CreateAttachment,
 } from "@lunibee/builders";
 
+// Builder payload types whose names are taken by the received-shape types above.
+// The rest (`APIComponent`, `APIActionRowChild`, `APIContainerComponent`, …) come
+// through `export *`.
+export type {
+    APIActionRowComponent as APIActionRowPayload,
+    APIButtonComponent as APIButtonPayload,
+    APITextInputComponent as APITextInputPayload,
+} from "@lunibee/builders";
+
 export { Gateway } from "@lunibee/ws";
 export type { GatewayOptions } from "@lunibee/ws";
 export { Collection, Cache } from "@lunibee/collection";
