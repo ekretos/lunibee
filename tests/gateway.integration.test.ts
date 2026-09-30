@@ -196,6 +196,129 @@ describe("Gateway integration lifecycle", () => {
         gateway.close();
     });
 
+    const dispatch = (s: number) => ({
+        op: GatewayOpcodes.Dispatch,
+        t: "TYPING_START",
+        s,
+        d: {},
+    });
+    const keepTalking = async (
+        socket: FakeWebSocket,
+        forMs: number,
+        everyMs = 5,
+    ) => {
+        for (let elapsed = 0, s = 1; elapsed < forMs; elapsed += everyMs, s++) {
+            socket.receive(dispatch(s));
+            await Bun.sleep(everyMs);
+        }
+    };
+
+    test("inbound traffic keeps a healthy connection alive past the zombie timeout", async () => {
+        const gateway = new Gateway({
+            token: "token",
+            intents: 1,
+            reconnect: false,
+            heartbeatAckTimeout: 10,
+            zombieTimeout: 30,
+        });
+        const zombies: unknown[] = [];
+        gateway.on("zombie", (data) => zombies.push(data));
+        gateway.on("error", () => undefined);
+        const promise = gateway.connect();
+        const socket = FakeWebSocket.instances[0]!;
+        socket.open();
+        await promise;
+
+        // Five times the zombie timeout of steady traffic: never a zombie.
+        await keepTalking(socket, 150);
+        expect(zombies.length).toBe(0);
+        expect(socket.closeCode).toBeUndefined();
+
+        // Then silence past the deadline: exactly one zombie, one resumable close.
+        await Bun.sleep(60);
+        expect(zombies.length).toBe(1);
+        expect(socket.closeCode).toBe(4900);
+        gateway.close();
+    });
+
+    test("dispatches without heartbeat ACKs still trip the ACK timeout", async () => {
+        const gateway = new Gateway({
+            token: "token",
+            intents: 1,
+            reconnect: false,
+            heartbeatAckTimeout: 10,
+            zombieTimeout: 1_000,
+        });
+        gateway.on("error", () => undefined);
+        const promise = gateway.connect();
+        const socket = FakeWebSocket.instances[0]!;
+        socket.open();
+        await promise;
+        socket.receive({
+            op: GatewayOpcodes.Hello,
+            d: { heartbeat_interval: 20 },
+        });
+        // Traffic keeps the silence clock fresh, but no ACK ever answers a beat.
+        await keepTalking(socket, 80);
+        expect(socket.closeCode).toBe(4900);
+        gateway.close();
+    });
+
+    test("frames from a superseded socket do not keep the current one alive", async () => {
+        const gateway = new Gateway({
+            token: "token",
+            intents: 1,
+            heartbeatAckTimeout: 10,
+            zombieTimeout: 30,
+            reconnectBaseDelay: 1,
+            reconnectMaxDelay: 1,
+        });
+        const zombies: unknown[] = [];
+        gateway.on("zombie", (data) => zombies.push(data));
+        gateway.on("error", () => undefined);
+        const promise = gateway.connect();
+        const first = FakeWebSocket.instances[0]!;
+        first.open();
+        await promise;
+        first.close(1000, "network failure");
+        await Bun.sleep(10);
+        const second = FakeWebSocket.instances[1]!;
+        second.open();
+
+        // Only the old socket talks; the new one is silent and must still be caught.
+        await keepTalking(first, 80);
+        expect(zombies.length).toBeGreaterThanOrEqual(1);
+        expect(second.closeCode).toBe(4900);
+        gateway.close();
+    });
+
+    test("after a reconnect the new socket's traffic keeps it alive", async () => {
+        const gateway = new Gateway({
+            token: "token",
+            intents: 1,
+            heartbeatAckTimeout: 10,
+            zombieTimeout: 30,
+            reconnectBaseDelay: 1,
+            reconnectMaxDelay: 1,
+        });
+        const zombies: unknown[] = [];
+        gateway.on("zombie", (data) => zombies.push(data));
+        gateway.on("error", () => undefined);
+        const promise = gateway.connect();
+        const first = FakeWebSocket.instances[0]!;
+        first.open();
+        await promise;
+        first.close(1000, "network failure");
+        await Bun.sleep(10);
+        const second = FakeWebSocket.instances[1]!;
+        second.open();
+
+        await keepTalking(second, 120);
+        expect(zombies.length).toBe(0);
+        expect(second.closeCode).toBeUndefined();
+        gateway.close();
+    });
+
     test("closes connection when heartbeat acknowledgement times out", async () => {
         const gateway = new Gateway({
             token: "token",

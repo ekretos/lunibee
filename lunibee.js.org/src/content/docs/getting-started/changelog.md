@@ -5,6 +5,10 @@ description: Lunibee version history and release notes.
 
 ## Unreleased (0.2.2)
 
+### 🐛 Fixed
+
+* **Healthy Gateway connections were closed as zombies every ~45 s.** Incoming frames never reset the silence clock, so with the default `zombieTimeout` every connection was closed and resumed once the staleness deadline passed, on every shard. Any frame from the current socket now counts as traffic. If you set `zombieTimeout: Infinity` to work around this, remove it.
+
 ### ✏️ New names
 
 Builders are now `CreateX`, `…Style` constants are `…Type`, and `…Type` constants are `…Enum`; every `…Enum` and `…Type` also works as a type. **The old names still work** as deprecated aliases (your editor shows them struck through) and are removed in 2.0. See [Upgrading](/getting-started/upgrading/).

@@ -435,6 +435,10 @@ export class Gateway {
         // The transport already drops frames from a replaced socket; this
         // second check keeps the session authoritative about who may mutate it.
         if (!this.#session.owns(token)) return;
+        // Any frame from the current socket proves it is alive. Without this the
+        // silence clock only moved on open, so every healthy connection was
+        // declared a zombie once the staleness deadline passed.
+        this.#heartbeat.receivedMessage();
         const { sequence, action } = classifyFrame(raw);
         // Record before acting: a RESUME must never be built from a sequence
         // the connection has not actually observed. The session ignores a
