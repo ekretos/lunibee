@@ -18,8 +18,15 @@ import type { ResourceContext } from "./base.js";
  * ChatInputCommand and ContextMenuCommand. Any other type is a system message. */
 const NON_SYSTEM_MESSAGE_TYPES = new Set([0, 19, 20, 23]);
 
-export { BaseStructure, Channel, Guild, User } from "./base.js";
-export type { ResourceContext } from "./base.js";
+export {
+    BaseStructure,
+    Channel,
+    Guild,
+    User,
+    CDN_BASE,
+    cdnURL,
+} from "./base.js";
+export type { ResourceContext, ImageURLOptions } from "./base.js";
 
 export class Message extends BaseStructure {
     public content: string;

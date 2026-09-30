@@ -239,3 +239,18 @@ and removed with the guild:
 
 `guilds.patch(data)` merges an update into the cached guild; fields the
 payload omits keep their cached values.
+
+## CDN helpers (0.2.2)
+
+`iconURL()`, `avatarURL()` and the other image accessors build Discord CDN URLs.
+The same helper is exported for assets that have no accessor, such as a guild's
+old icon hash kept from an update event:
+
+```ts
+import { CDN_BASE, cdnURL, type ImageURLOptions } from "lunibee";
+
+const options: ImageURLOptions = { size: 1024 };
+cdnURL(`/icons/${guild.id}`, oldIconHash, options); // animated `a_` hashes become .gif
+cdnURL(`/banners/${guild.id}`, bannerHash, { extension: "webp", forceStatic: true });
+CDN_BASE; // "https://cdn.discordapp.com"
+```

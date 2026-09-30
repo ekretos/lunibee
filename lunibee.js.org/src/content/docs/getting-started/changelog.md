@@ -9,6 +9,7 @@ description: Lunibee version history and release notes.
 
 * **Context-menu commands**: `isContextMenuCommand()`, `isUserContextMenuCommand()`, `isMessageContextMenuCommand()` and `isCommand()` guards; `ContextMenuCommandInteraction` with `targetId`, `targetUser`, `targetMember` (with member actions) and `targetMessage`; `setContexts()` and `setNameLocalizations()` on `CreateUserCommand` / `CreateMessageCommand`. See [Context Menus](/recipes/context-menus/).
 * **Default `allowed_mentions`**: `new Client({ allowedMentions: { parse: [] } })` applies to every message the client sends (channel send/edit, replies, interaction replies, edits, follow-ups); a message's own `allowed_mentions` wins. See [Client options](/reference/client/).
+* **CDN helpers exported**: `CDN_BASE`, `cdnURL()` and `ImageURLOptions` from `lunibee` and `@lunibee/structures`.
 
 ### ⚠️ Behaviour changes
 
