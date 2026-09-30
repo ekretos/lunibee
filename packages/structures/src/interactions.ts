@@ -39,6 +39,7 @@ export interface InteractionReplyOptions {
     /** Message components. */ components?: unknown[];
     /** Message embeds. */ embeds?: unknown[];
     /** Discord message flags. */ flags?: number;
+    /** On `reply()` / `update()`: return the created message (one request, no `fetchReply()`). */ withResponse?: boolean;
     [key: string]: unknown;
 }
 /** Transport required by an interaction structure. */
@@ -81,6 +82,17 @@ const COMMAND_MESSAGE = 3;
 const TOKEN_LIFETIME_MS = 15 * 60_000;
 const DISCORD_EPOCH = 1_420_070_400_000n;
 
+/** Takes the local-only `withResponse` key off reply options. */
+function splitWithResponse(options: InteractionReplyOptions | string): {
+    withResponse: boolean;
+    rest: InteractionReplyOptions | string;
+} {
+    if (typeof options === "string")
+        return { withResponse: false, rest: options };
+    const { withResponse, ...rest } = options;
+    return { withResponse: withResponse === true, rest };
+}
+
 /** Turns `{ ephemeral: true }` into Discord's flag and drops the local-only key. */
 function toMessageData(
     options: InteractionReplyOptions | string,
@@ -102,6 +114,8 @@ import { CommandOptions, type APIInteractionDataOption } from "./options.js";
 export class InteractionResponse {
     readonly type: number;
     readonly data?: InteractionReplyOptions;
+    /** Ask Discord to return the created message (`?with_response=true`); not part of the body. */
+    public withResponse = false;
     /** Creates a response payload. @param type Discord callback type. @param data Optional callback data. @throws {TypeError} If type is not finite. */
     public constructor(type: number, data?: InteractionReplyOptions) {
         if (!Number.isFinite(type))
@@ -381,23 +395,74 @@ export class Interaction<TData extends InteractionData = InteractionData> {
             response,
         );
     }
-    /** Sends the initial interaction response. @param options Response message options. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */ public async reply(
+    /**
+     * Sends a response and, when `withResponse` is set, turns the callback
+     * resource Discord returns into the created message.
+     */
+    protected async acknowledgeWith(
+        response: InteractionResponse,
+        state: "replied" | "deferred",
+        withResponse: boolean,
+    ): Promise<unknown> {
+        response.withResponse = withResponse;
+        const result = await this.acknowledge(response, state);
+        if (!withResponse) return result;
+        const message = (result as { resource?: { message?: unknown } } | null)
+            ?.resource?.message;
+        return message
+            ? new Message(
+                  message as ConstructorParameters<typeof Message>[0],
+                  this.#client.resourceContext,
+              )
+            : null;
+    }
+    /**
+     * Sends the initial interaction response. With `withResponse: true` it
+     * returns the created {@link Message} in the same request (no `fetchReply()`).
+     * @throws {Error} When already acknowledged or REST fails.
+     */
+    public async reply(
+        options: InteractionReplyOptions & { withResponse: true },
+    ): Promise<Message | null>;
+    public async reply(
+        options: InteractionReplyOptions | string,
+    ): Promise<unknown>;
+    public async reply(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
-        return this.acknowledge(
-            InteractionResponse.message(toMessageData(options)),
+        const { withResponse, rest } = splitWithResponse(options);
+        return this.acknowledgeWith(
+            InteractionResponse.message(toMessageData(rest)),
             "replied",
+            withResponse,
         );
     }
-    /** Defers the initial interaction response. @param options `true` or `{ ephemeral: true }` makes the eventual response private. @returns Promise fulfilled after acknowledgement. @throws {Error} When already acknowledged or REST fails. */ public async deferReply(
-        options: boolean | { ephemeral?: boolean } = false,
-    ): Promise<void> {
+    /**
+     * Defers the initial interaction response. `true` or `{ ephemeral: true }`
+     * makes the eventual response private; `withResponse: true` returns the
+     * placeholder message. @throws {Error} When already acknowledged or REST fails.
+     */
+    public async deferReply(options: {
+        ephemeral?: boolean;
+        withResponse: true;
+    }): Promise<Message | null>;
+    public async deferReply(
+        options?: boolean | { ephemeral?: boolean; withResponse?: boolean },
+    ): Promise<void>;
+    public async deferReply(
+        options:
+            boolean | { ephemeral?: boolean; withResponse?: boolean } = false,
+    ): Promise<Message | null | void> {
         const ephemeral =
             typeof options === "boolean" ? options : options.ephemeral === true;
-        await this.acknowledge(
+        const withResponse =
+            typeof options === "object" && options.withResponse === true;
+        const result = await this.acknowledgeWith(
             InteractionResponse.defer(ephemeral),
             "deferred",
+            withResponse,
         );
+        if (withResponse) return result as Message | null;
     }
     /** Edits the original response. @param options Replacement message options. @returns Discord response. @throws {Error} When not acknowledged or REST fails. */ public editReply(
         options: InteractionReplyOptions,
@@ -420,15 +485,27 @@ export class Interaction<TData extends InteractionData = InteractionData> {
             toMessageData(options),
         );
     }
-    /** Updates the message for a component interaction. */ public async update(
+    /**
+     * Updates the message a component is on. With `withResponse: true` it
+     * returns the updated {@link Message}.
+     */
+    public async update(
+        options: InteractionReplyOptions & { withResponse: true },
+    ): Promise<Message | null>;
+    public async update(
+        options: InteractionReplyOptions | string,
+    ): Promise<unknown>;
+    public async update(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
-        return this.acknowledge(
+        const { withResponse, rest } = splitWithResponse(options);
+        return this.acknowledgeWith(
             new InteractionResponse(
                 InteractionResponseEnum.MessageUpdate,
-                toMessageData(options),
+                toMessageData(rest),
             ),
             "replied",
+            withResponse,
         );
     }
     /** Opens a modal dialog in the user's client. @param modal Modal builder output or raw modal callback data. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */
@@ -565,25 +642,24 @@ export class ComponentInteraction extends Interaction {
         return (this.data as any)?.data?.values ?? [];
     }
     /** Defers updating the message to which the component was attached. */
-    public async deferUpdate(): Promise<void> {
-        await this.acknowledge(
+    public async deferUpdate(options: {
+        withResponse: true;
+    }): Promise<Message | null>;
+    public async deferUpdate(options?: {
+        withResponse?: boolean;
+    }): Promise<void>;
+    public async deferUpdate(
+        options: { withResponse?: boolean } = {},
+    ): Promise<Message | null | void> {
+        const withResponse = options.withResponse === true;
+        const result = await this.acknowledgeWith(
             new InteractionResponse(
                 InteractionResponseEnum.DeferredMessageUpdate,
             ),
             "deferred",
+            withResponse,
         );
-    }
-    /** Updates the message to which the component was attached. */
-    public override async update(
-        options: InteractionReplyOptions | string,
-    ): Promise<unknown> {
-        return this.acknowledge(
-            new InteractionResponse(
-                InteractionResponseEnum.MessageUpdate,
-                toMessageData(options),
-            ),
-            "replied",
-        );
+        if (withResponse) return result as Message | null;
     }
 }
 

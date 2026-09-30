@@ -473,3 +473,20 @@ await interaction.showModal(
 const submitted = await interaction.awaitModalSubmit({ time: 5 * 60_000, customId: "report" });
 await submitted.reply({ content: "Thanks!", ephemeral: true });
 ```
+
+## The created message in one request (0.2.2)
+
+`reply()`, `update()`, `deferReply()` and `deferUpdate()` accept `withResponse: true`.
+Discord then returns the message with the acknowledgement, so there is no second
+request to `fetchReply()`:
+
+```ts
+const message = await interaction.reply({ content: "Pick one", components: [row], withResponse: true });
+const collector = message?.createComponentCollector({ time: 60_000 });
+
+const placeholder = await interaction.deferReply({ ephemeral: true, withResponse: true }); // the "thinking…" message
+const updated = await componentInteraction.update({ content: "Saved", withResponse: true });
+```
+
+The result is a `Message`, or `null` if Discord sent no message. Without
+`withResponse` the methods behave exactly as before. `fetchReply()` still works.

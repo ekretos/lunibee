@@ -1056,6 +1056,10 @@ export class Client
         response: import("@lunibee/structures").InteractionResponse,
     ): Promise<unknown> {
         const json = response.toJSON();
+        // `?with_response=true` makes Discord return the created message.
+        const callback = response.withResponse
+            ? `${Routes.interactionCallback(id, token)}?with_response=true`
+            : Routes.interactionCallback(id, token);
         // Only message responses (4 reply, 7 update) carry mentions; a modal or a deferral does not.
         const carriesMessage = json.type === 4 || json.type === 7;
         // Files in the reply turn the callback into an upload.
@@ -1067,13 +1071,13 @@ export class Client
             : undefined;
         if (upload && typeof upload === "object" && "files" in upload) {
             const { body, files } = upload as { body: unknown; files: never[] };
-            return this.rest.post(Routes.interactionCallback(id, token), {
+            return this.rest.post(callback, {
                 body: { ...json, data: body },
                 files,
             });
         }
         return this.rest.post(
-            Routes.interactionCallback(id, token),
+            callback,
             upload === undefined ? json : { ...json, data: upload },
         );
     }
