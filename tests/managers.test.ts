@@ -147,7 +147,7 @@ describe("Managers Coverage", () => {
                 name: "SuperMod",
             });
             expect(editedRole.name).toBe("SuperMod");
-            await roleMgr.deleteRole("123456789012345682");
+            await roleMgr.remove("123456789012345682");
 
             const memberMgr = new GuildMemberManager(
                 "123456789012345678",
@@ -245,7 +245,7 @@ describe("Managers Coverage", () => {
         expect(lastUrl).toBe("/guilds/111111111111111111");
         expect(lastOpts.name).toBe("Edited Guild");
 
-        await guildMgr.deleteGuild("111111111111111111");
+        await guildMgr.remove("111111111111111111");
         expect(lastUrl).toBe("/guilds/111111111111111111");
 
         await guildMgr.fetchPreview("111111111111111111");
@@ -409,7 +409,7 @@ describe("Managers Coverage", () => {
             "/guilds/555555555555555555/emojis/123456789012345678",
         );
 
-        await emojiMgr.deleteEmoji("123456789012345678");
+        await emojiMgr.remove("123456789012345678");
         expect(lastUrl).toBe(
             "/guilds/555555555555555555/emojis/123456789012345678",
         );

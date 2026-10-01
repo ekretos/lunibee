@@ -38,7 +38,6 @@ export interface TransportOptions {
 }
 
 /** WebSocket states. Compared numerically so a stub needs no static constants. */
-const CONNECTING = 0;
 const OPEN = 1;
 
 /**

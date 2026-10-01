@@ -5,9 +5,26 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 
 ## 0.2.2 → 0.2.3
 
-No code changes. If you installed `@lunibee/cli@0.2.2`, upgrade it to get the `lunibee`
-command. The scaffolder is now `@lunibee/create` (`bun create @lunibee my-bot`) instead
-of `create-lunibee`.
+Nothing breaks: deprecated APIs keep working until 0.3.0 and your editor strikes them
+through. To be ready for 0.3.0:
+
+| Deprecated | Use |
+|---|---|
+| `roles.deleteRole(id)`, `emojis.deleteEmoji(id)`, `channels.deleteChannel(id)`, `guilds.deleteGuild(id)` | `remove(id, reason?)` |
+| `channel.sendMessage(p)`, `channels.sendMessage(id, p)` | `send()` |
+| `channels.bulkDelete(id, ids)` | `channels.bulkDeleteMessages(id, ids, reason?)` |
+| `members.edit(id, options, reason)` (and the same for scheduled events, stage instances, permission overwrites) | `members.edit(id, { ...options, reason })` |
+| `setDMPermission(false)` | `setContexts(0)` |
+| `Routes.channelPins` / `Routes.channelPin` | `Routes.channelMessagesPins` / `Routes.channelMessagesPin` |
+| `fetchInvite(code, { withExpiration })` | drop `withExpiration` |
+| The pre-0.2.2 names (`ButtonBuilder`, `ChannelType`…) | the table below |
+
+Two changes you may notice: pinning needs the **Pin Messages** permission, and an error
+thrown by a listener that nothing handles is now printed as a `LunibeeWarning`.
+
+If you installed `@lunibee/cli@0.2.2`, upgrade it to get the `lunibee` command. The
+scaffolder is now `@lunibee/create` (`bun create @lunibee my-bot`) instead of
+`create-lunibee`.
 
 ## 0.2.1 → 0.2.2
 

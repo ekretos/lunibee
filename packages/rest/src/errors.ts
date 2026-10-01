@@ -47,6 +47,12 @@ export function redactPath(path: string): string {
     );
 }
 
+/** What to check when Discord refuses an action the bot attempted. */
+const HINTS: Readonly<Record<number, string>> = {
+    50001: "The bot cannot see this resource: check that it is in the guild and has View Channel there.",
+    50013: "The bot lacks a permission for this action, or the target role or member is at or above the bot's highest role.",
+};
+
 /** Error thrown when Discord rejects a REST request. */
 export class RESTError extends Error {
     /** Failure category. */ public readonly kind: RESTErrorKind;
@@ -55,6 +61,7 @@ export class RESTError extends Error {
     /** Raw Discord validation/error payload. */ public readonly errors?: unknown;
     /** HTTP method used for the failed request. */ public readonly method?: string;
     /** API path used for the failed request. */ public readonly path?: string;
+    /** What to check next, for errors with a common cause (missing access or permissions). */ public readonly hint?: string;
     /** Creates a REST error with request context. @param message Error message. @param status HTTP status. @param code Discord error code. @param errors Raw error payload. @param options Request context and cause. */
     public constructor(
         message: string,
@@ -76,6 +83,7 @@ export class RESTError extends Error {
         this.status = status;
         this.kind = options.kind ?? kindFromStatus(status);
         this.code = code;
+        this.hint = code === undefined ? undefined : HINTS[code];
         this.errors = errors;
         this.method = options.method;
         this.path =

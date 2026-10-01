@@ -11,7 +11,7 @@ Lunibee provides structured `RESTError` types with Discord API details.
 ```ts
 import { RESTError } from "lunibee";
 try {
-  await client.channels.sendMessage("invalid-id", { content: "Hello!" });
+  await client.channels.send("invalid-id", { content: "Hello!" });
 } catch (error) {
   if (error instanceof RESTError) {
     console.error(`HTTP Status: ${error.status}`);

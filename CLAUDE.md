@@ -19,9 +19,14 @@ future sessions should pick up.
   examples use the new names only. `PermissionFlagsBits`, `GatewayIntentBits`, `Routes`,
   `MessageFlags` and the Gateway code sets keep their names.
 
-## Next release: 0.2.2 (planned)
+## Next release: 0.2.3
 
-Small, general, non-breaking. Each item needs code, a test that keeps
+Deprecation pass and the API-consistency fixes in [FIX.md](FIX.md). Nothing is
+removed; deprecated APIs go in 0.3.0 (`.roadmap/0.3.0.md`, Step 0).
+
+## 0.2.2 (shipped)
+
+All items below shipped in 0.2.2; kept as a record. Small, general, non-breaking. Each item needs code, a test that keeps
 per-file coverage at the CI threshold, and a docs update (reference page +
 changelog), following the release checklist in AGENT.md. Found by comparing
 Lunibee with the closed issues of Lilybird, another Bun-first library.

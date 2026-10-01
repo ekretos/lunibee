@@ -1,4 +1,4 @@
-import { Manager } from "./base.js";
+import { Manager, splitReason } from "./base.js";
 import { Routes, type REST } from "@lunibee/rest";
 import type {
     APIChannel,
@@ -95,7 +95,10 @@ export class GuildBanManager extends Manager<string, APIBan> {
 export type GuildScheduledEventOptions = Partial<
     Omit<APIGuildScheduledEvent, "id" | "guild_id" | "creator" | "user_count">
 > &
-    Record<string, unknown>;
+    Record<string, unknown> & {
+        /** Audit-log reason. */
+        reason?: string;
+    };
 
 /** Manages a guild's scheduled events, cached by event ID. Discord.js-familiar. */
 export class GuildScheduledEventManager extends Manager<
@@ -147,11 +150,12 @@ export class GuildScheduledEventManager extends Manager<
         options: GuildScheduledEventOptions,
         reason?: string,
     ): Promise<APIGuildScheduledEvent> {
+        const [payload, optionsReason] = splitReason(options);
         return this.#store(
             await this.#rest.post(
                 Routes.guildScheduledEvents(this.guildId),
-                options,
-                { reason },
+                payload,
+                { reason: optionsReason ?? reason },
             ),
         );
     }
@@ -162,19 +166,21 @@ export class GuildScheduledEventManager extends Manager<
         options: GuildScheduledEventOptions,
         reason?: string,
     ): Promise<APIGuildScheduledEvent> {
+        const [payload, optionsReason] = splitReason(options);
         return this.#store(
             await this.#rest.patch(
                 Routes.guildScheduledEvent(this.guildId, eventId),
-                options,
-                { reason },
+                payload,
+                { reason: optionsReason ?? reason },
             ),
         );
     }
 
-    /** Deletes an event. */
-    public async remove(eventId: string): Promise<void> {
+    /** Deletes an event. @param reason Audit-log reason. */
+    public async remove(eventId: string, reason?: string): Promise<void> {
         await this.#rest.delete(
             Routes.guildScheduledEvent(this.guildId, eventId),
+            { reason },
         );
         this.delete(eventId);
     }
@@ -206,6 +212,8 @@ export class GuildScheduledEventManager extends Manager<
 
 /** Options for creating a stage instance. */
 export interface StageInstanceCreateOptions {
+    /** Audit-log reason. */
+    reason?: string;
     topic: string;
     privacyLevel?: number;
     sendStartNotification?: boolean;
@@ -242,7 +250,7 @@ export class StageInstanceManager extends Manager<string, APIStageInstance> {
                     send_start_notification: options.sendStartNotification,
                     guild_scheduled_event_id: options.guildScheduledEventId,
                 },
-                { reason },
+                { reason: options.reason ?? reason },
             ),
         );
     }
@@ -257,14 +265,14 @@ export class StageInstanceManager extends Manager<string, APIStageInstance> {
     /** Edits a stage instance's topic or privacy level. */
     public async edit(
         channelId: string,
-        options: { topic?: string; privacyLevel?: number },
+        options: { topic?: string; privacyLevel?: number; reason?: string },
         reason?: string,
     ): Promise<APIStageInstance> {
         return this.#store(
             await this.#rest.patch(
                 Routes.stageInstanceByChannel(channelId),
                 { topic: options.topic, privacy_level: options.privacyLevel },
-                { reason },
+                { reason: options.reason ?? reason },
             ),
         );
     }
@@ -283,6 +291,8 @@ export type PermissionOverwriteTargetType = 0 | 1;
 
 /** Permission values accepted by {@link PermissionOverwriteManager.edit}. */
 export interface PermissionOverwriteOptions {
+    /** Audit-log reason. */
+    reason?: string;
     /** Target type: 0 = role, 1 = member. */
     type: PermissionOverwriteTargetType;
     /** Allowed permission bits. */
@@ -364,7 +374,7 @@ export class PermissionOverwriteManager {
                 allow: BigInt(options.allow ?? 0).toString(),
                 deny: BigInt(options.deny ?? 0).toString(),
             },
-            { reason },
+            { reason: options.reason ?? reason },
         );
     }
 

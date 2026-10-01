@@ -1,9 +1,11 @@
-import { Manager } from "./base.js";
+import { Manager, splitReason } from "./base.js";
 import { Emoji } from "@lunibee/structures";
 import { Routes, type REST } from "@lunibee/rest";
 
 /** Strict payload for creating a custom guild emoji. */
 export interface EmojiCreateOptions {
+    /** Audit-log reason. */
+    reason?: string;
     /** Emoji name (1-32 chars, alphanumeric + underscores). */
     name: string;
     /** Base64-encoded 128x128 image data URI. */
@@ -14,6 +16,8 @@ export interface EmojiCreateOptions {
 
 /** Strict payload for editing a custom guild emoji. */
 export interface EmojiEditOptions {
+    /** Audit-log reason. */
+    reason?: string;
     /** New emoji name. */
     name?: string;
     /** Role IDs allowed to use the emoji. */
@@ -55,10 +59,12 @@ export class EmojiManager extends Manager<string, Emoji> {
 
     /** Creates a new custom emoji. */
     public async create(options: EmojiCreateOptions): Promise<Emoji> {
+        const [payload, reason] = splitReason(options);
         return this.upsert(
             await this.#rest.post<ConstructorParameters<typeof Emoji>[0]>(
                 Routes.guildEmoji(this.#guildId),
-                options,
+                payload,
+                { reason },
             ),
         );
     }
@@ -68,18 +74,27 @@ export class EmojiManager extends Manager<string, Emoji> {
         emojiId: string,
         options: EmojiEditOptions,
     ): Promise<Emoji> {
+        const [payload, reason] = splitReason(options);
         return this.upsert(
             await this.#rest.patch<ConstructorParameters<typeof Emoji>[0]>(
                 Routes.guildEmoji(this.#guildId, emojiId),
-                options,
+                payload,
+                { reason },
             ),
         );
     }
 
-    /** Deletes a custom emoji. */
-    public async deleteEmoji(emojiId: string): Promise<void> {
-        await this.#rest.delete(Routes.guildEmoji(this.#guildId, emojiId));
+    /** Deletes a custom emoji. @param reason Audit-log reason. */
+    public async remove(emojiId: string, reason?: string): Promise<void> {
+        await this.#rest.delete(Routes.guildEmoji(this.#guildId, emojiId), {
+            reason,
+        });
         this.delete(emojiId);
+    }
+
+    /** @deprecated Use {@link EmojiManager.remove}, which also takes an audit-log reason. Removed in 0.3.0. */
+    public deleteEmoji(emojiId: string): Promise<void> {
+        return this.remove(emojiId);
     }
 
     /** Upserts an emoji into the manager cache. Custom emojis are keyed by their

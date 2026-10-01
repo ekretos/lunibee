@@ -28,7 +28,11 @@ export interface ResourceContext {
         messageId: string,
         options: Record<string, unknown> & { content?: string },
     ): Promise<import("./index.js").Message>;
-    deleteMessage(channelId: string, messageId: string): Promise<void>;
+    deleteMessage(
+        channelId: string,
+        messageId: string,
+        reason?: string,
+    ): Promise<void>;
     crosspostMessage(
         channelId: string,
         messageId: string,
@@ -37,7 +41,7 @@ export interface ResourceContext {
         channelId: string,
         options: Record<string, unknown>,
     ): Promise<import("./base.js").Channel>;
-    deleteChannel?(channelId: string): Promise<void>;
+    deleteChannel?(channelId: string, reason?: string): Promise<void>;
     addReaction?(
         channelId: string,
         messageId: string,
@@ -55,8 +59,16 @@ export interface ResourceContext {
         userId: string,
     ): Promise<void>;
     removeAllReactions?(channelId: string, messageId: string): Promise<void>;
-    pinMessage?(channelId: string, messageId: string): Promise<void>;
-    unpinMessage?(channelId: string, messageId: string): Promise<void>;
+    pinMessage?(
+        channelId: string,
+        messageId: string,
+        reason?: string,
+    ): Promise<void>;
+    unpinMessage?(
+        channelId: string,
+        messageId: string,
+        reason?: string,
+    ): Promise<void>;
     /**
      * A member's permissions from cached state: guild-level, or channel-level
      * (with overwrites) when a channel ID is given. Null when the guild (or
@@ -238,7 +250,7 @@ export class Channel extends BaseStructure {
     }
 
     /** Sends a message to this channel. @param options Message payload. @returns The created message. @throws {Error} If the channel is not attached to a client. */
-    public sendMessage(
+    public send(
         options: Record<string, unknown> & { content?: string },
     ): Promise<import("./index.js").Message> {
         if (!this.#context)
@@ -246,11 +258,11 @@ export class Channel extends BaseStructure {
         return this.#context.sendMessage(this.id, options);
     }
 
-    /** Sends a message using Lunibee's concise channel API. @param options Message payload. @returns The created message. @throws {Error} If the channel is not attached to a client. */
-    public send(
+    /** @deprecated Use {@link Channel.send}. Removed in 0.3.0. */
+    public sendMessage(
         options: Record<string, unknown> & { content?: string },
     ): Promise<import("./index.js").Message> {
-        return this.sendMessage(options);
+        return this.send(options);
     }
 
     /** Edits this channel. @param options Channel fields to change. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
@@ -298,11 +310,11 @@ export class Channel extends BaseStructure {
         return this.edit({ parent_id: parentId });
     }
 
-    /** Deletes this channel. @returns A promise fulfilled when Discord confirms deletion. @throws {Error} If the channel is not attached to a client. */
-    public delete(): Promise<void> {
+    /** Deletes this channel. @param reason Audit-log reason. @returns A promise fulfilled when Discord confirms deletion. @throws {Error} If the channel is not attached to a client. */
+    public delete(reason?: string): Promise<void> {
         if (!this.#context?.deleteChannel)
             throw new Error("This channel is not attached to a client.");
-        return this.#context.deleteChannel(this.id);
+        return this.#context.deleteChannel(this.id, reason);
     }
 
     /** Updates this channel using the same resource operation as edit. @param options Channel fields to change. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
@@ -370,6 +382,20 @@ export class Guild extends BaseStructure {
     public explicitContentFilter: number;
     /** Default notification level for new members. */
     public defaultMessageNotifications: number;
+    /** AFK voice channel, or null. */ public afkChannelId: string | null;
+    /** Seconds before a silent member is moved to the AFK channel. */ public afkTimeout?: number;
+    /** Whether the server widget is on. */ public widgetEnabled: boolean;
+    /** Channel the widget invites to, or null. */ public widgetChannelId:
+        string | null;
+    /** Application that created the guild, if a bot did. */ public applicationId:
+        string | null;
+    /** Channel for Discord's community updates, or null. */ public publicUpdatesChannelId:
+        string | null;
+    /** Channel for safety alerts, or null. */ public safetyAlertsChannelId:
+        string | null;
+    /** Maximum presences (null for the default limit). */ public maxPresences:
+        number | null;
+    /** Maximum users in a video channel. */ public maxVideoChannelUsers?: number;
 
     public constructor(data: import("@lunibee/types").APIGuild) {
         super(data.id);
@@ -391,22 +417,23 @@ export class Guild extends BaseStructure {
         this.vanityUrlCode = data.vanity_url_code ?? null;
         this.nsfwLevel = data.nsfw_level ?? 0;
         this.discoverySplash = data.discovery_splash ?? null;
-        // NOTE (flagged to Arjun): these fields are read via a Record cast because
-        // APIGuild in @lunibee/types does not yet declare rules_channel_id,
-        // system_channel_id/flags, max_members, mfa_level, explicit_content_filter or
-        // default_message_notifications. Runtime `??` fallbacks guard missing values.
-        // Once APIGuild gains these fields (types-owner change), drop the cast.
-        const d = data as unknown as Record<string, unknown>;
-        this.rulesChannelId = (d.rules_channel_id as string | null) ?? null;
-        this.systemChannelId = (d.system_channel_id as string | null) ?? null;
-        this.systemChannelFlags =
-            (d.system_channel_flags as number | undefined) ?? 0;
-        this.maxMembers = (d.max_members as number | undefined) ?? 0;
-        this.mfaLevel = (d.mfa_level as number | undefined) ?? 0;
-        this.explicitContentFilter =
-            (d.explicit_content_filter as number | undefined) ?? 0;
+        this.rulesChannelId = data.rules_channel_id ?? null;
+        this.systemChannelId = data.system_channel_id ?? null;
+        this.systemChannelFlags = data.system_channel_flags ?? 0;
+        this.maxMembers = data.max_members ?? 0;
+        this.mfaLevel = data.mfa_level ?? 0;
+        this.explicitContentFilter = data.explicit_content_filter ?? 0;
         this.defaultMessageNotifications =
-            (d.default_message_notifications as number | undefined) ?? 0;
+            data.default_message_notifications ?? 0;
+        this.afkChannelId = data.afk_channel_id ?? null;
+        this.afkTimeout = data.afk_timeout;
+        this.widgetEnabled = data.widget_enabled ?? false;
+        this.widgetChannelId = data.widget_channel_id ?? null;
+        this.applicationId = data.application_id ?? null;
+        this.publicUpdatesChannelId = data.public_updates_channel_id ?? null;
+        this.safetyAlertsChannelId = data.safety_alerts_channel_id ?? null;
+        this.maxPresences = data.max_presences ?? null;
+        this.maxVideoChannelUsers = data.max_video_channel_users;
     }
 
     /** Returns the guild icon URL, or null if no icon is set. */

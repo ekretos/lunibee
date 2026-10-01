@@ -1,5 +1,13 @@
 import { Collection } from "@lunibee/collection";
 
+/** Splits the audit-log `reason` off an options object, so it becomes a header, not a body field. */
+export function splitReason<T extends { reason?: string }>(
+    options: T,
+): [Omit<T, "reason">, string | undefined] {
+    const { reason, ...payload } = options;
+    return [payload, reason];
+}
+
 /** Generic cache manager. @typeParam K Cache key type. @typeParam V Cached value type. */
 export class Manager<K, V> {
     /** Authoritative resource state. Entries never expire: see {@link Manager.set}. */ public readonly cache =

@@ -1,15 +1,13 @@
-import { Manager, ResourceManager } from "./base.js";
+import { Manager, ResourceManager, splitReason } from "./base.js";
 export { Manager, ResourceManager } from "./base.js";
 /** Discord.js-familiar alias for {@link ResourceManager}. */
 export { ResourceManager as CachedManager } from "./base.js";
-import { Collection } from "@lunibee/collection";
 import { REST, Routes } from "@lunibee/rest";
 import {
     Channel,
     createChannel,
     Message,
     User,
-    Guild,
     type ResourceContext,
 } from "@lunibee/structures";
 import {
@@ -53,12 +51,17 @@ export interface ReactionFetchOptions {
 }
 
 export interface ChannelCreateOptions extends Record<string, unknown> {
+    /** Audit-log reason. */
+    reason?: string;
     name: string;
     type: number;
     guild_id?: string;
     parent_id?: string | null;
 }
-export type ChannelEditOptions = Record<string, unknown>;
+export type ChannelEditOptions = Record<string, unknown> & {
+    /** Audit-log reason. */
+    reason?: string;
+};
 
 import { PermissionOverwriteManager } from "./guild-resources.js";
 
@@ -87,12 +90,13 @@ export class ChannelManager extends Manager<string, Channel> {
             sendMessage: (channelId, options) => this.send(channelId, options),
             editMessage: (channelId, messageId, options) =>
                 this.editMessage(channelId, messageId, options),
-            deleteMessage: (channelId, messageId) =>
-                this.deleteMessage(channelId, messageId),
+            deleteMessage: (channelId, messageId, reason) =>
+                this.deleteMessage(channelId, messageId, reason),
             crosspostMessage: (channelId, messageId) =>
                 this.crosspostMessage(channelId, messageId),
             editChannel: (channelId, options) => this.edit(channelId, options),
-            deleteChannel: (channelId) => this.deleteChannel(channelId),
+            deleteChannel: (channelId, reason) =>
+                this.remove(channelId, reason),
             addReaction: (channelId, messageId, emoji) =>
                 this.addReaction(channelId, messageId, emoji),
             removeOwnReaction: (channelId, messageId, emoji) =>
@@ -101,10 +105,10 @@ export class ChannelManager extends Manager<string, Channel> {
                 this.removeReaction(channelId, messageId, emoji, userId),
             removeAllReactions: (channelId, messageId) =>
                 this.removeAllReactions(channelId, messageId),
-            pinMessage: (channelId, messageId) =>
-                this.pinMessage(channelId, messageId),
-            unpinMessage: (channelId, messageId) =>
-                this.unpinMessage(channelId, messageId),
+            pinMessage: (channelId, messageId, reason) =>
+                this.pinMessage(channelId, messageId, reason),
+            unpinMessage: (channelId, messageId, reason) =>
+                this.unpinMessage(channelId, messageId, reason),
         };
     }
     public messages(channelId: string): MessageManager {
@@ -228,10 +232,12 @@ export class ChannelManager extends Manager<string, Channel> {
         guildId: string,
         options: ChannelCreateOptions,
     ): Promise<Channel> {
+        const [payload, reason] = splitReason(options);
         return this.upsert(
             await this.#rest.post<ConstructorParameters<typeof Channel>[0]>(
                 Routes.guildChannels(guildId),
-                options,
+                payload,
+                { reason },
             ),
         );
     }
@@ -239,22 +245,29 @@ export class ChannelManager extends Manager<string, Channel> {
         channelId: string,
         options: ChannelEditOptions,
     ): Promise<Channel> {
+        const [payload, reason] = splitReason(options);
         return this.upsert(
             await this.#rest.patch<ConstructorParameters<typeof Channel>[0]>(
                 Routes.channel(channelId),
-                options,
+                payload,
+                { reason },
             ),
         );
     }
 
-    public async deleteChannel(channelId: string): Promise<void> {
-        await this.#rest.delete(Routes.channel(channelId));
+    /** Deletes a channel (or closes a DM). @param reason Audit-log reason. */
+    public async remove(channelId: string, reason?: string): Promise<void> {
+        await this.#rest.delete(Routes.channel(channelId), { reason });
         this.delete(channelId);
+    }
+    /** @deprecated Use {@link ChannelManager.remove}, which also takes an audit-log reason. Removed in 0.3.0. */
+    public deleteChannel(channelId: string): Promise<void> {
+        return this.remove(channelId);
     }
     /** Evicts a channel, dropping its per-channel message manager with it.
      * Overrides {@link Manager.delete} so cache eviction driven by a Gateway
      * `CHANNEL_DELETE`/`THREAD_DELETE` — which calls `delete` rather than
-     * {@link deleteChannel} — releases the message manager and its cached
+     * {@link remove} — releases the message manager and its cached
      * messages too, instead of retaining them for the client's lifetime. */
     public override delete(channelId: string): boolean {
         this.#messageManagers.delete(channelId);
@@ -266,6 +279,7 @@ export class ChannelManager extends Manager<string, Channel> {
     ): Promise<Message> {
         return this.messages(channelId).send(options);
     }
+    /** @deprecated Use {@link ChannelManager.send}. Removed in 0.3.0. */
     public sendMessage(
         channelId: string,
         options: MessageCreateOptions,
@@ -319,11 +333,15 @@ export class ChannelManager extends Manager<string, Channel> {
             ),
         );
     }
+    /** Deletes a message. @param reason Audit-log reason (shown when deleting someone else's message). */
     public async deleteMessage(
         channelId: string,
         messageId: string,
+        reason?: string,
     ): Promise<void> {
-        await this.#rest.delete(Routes.message(channelId, messageId));
+        await this.#rest.delete(Routes.message(channelId, messageId), {
+            reason,
+        });
         this.messages(channelId).delete(messageId);
     }
     public deleteCachedMessage(channelId: string, messageId: string): boolean {
@@ -346,22 +364,26 @@ export class ChannelManager extends Manager<string, Channel> {
     public async bulkDeleteMessages(
         channelId: string,
         messageIds: Iterable<string>,
+        reason?: string,
     ): Promise<void> {
         const ids = [...new Set(messageIds)];
         if (ids.length < 1 || ids.length > 100)
             throw new RangeError(
                 "bulkDelete requires between 1 and 100 message IDs.",
             );
-        if (ids.length === 1) return this.deleteMessage(channelId, ids[0]!);
+        if (ids.length === 1)
+            return this.deleteMessage(channelId, ids[0]!, reason);
         const cutoff = Date.now() - BULK_DELETE_MAX_AGE_MS;
         const tooOld = ids.filter((id) => snowflakeTime(id) < cutoff);
         if (tooOld.length)
             throw new RangeError(
                 `bulkDelete cannot delete messages older than 14 days: ${tooOld.join(", ")}`,
             );
-        await this.#rest.post(Routes.channelBulkDelete(channelId), {
-            messages: ids,
-        });
+        await this.#rest.post(
+            Routes.channelBulkDelete(channelId),
+            { messages: ids },
+            { reason },
+        );
         for (const id of ids) this.messages(channelId).delete(id);
     }
     /**
@@ -452,19 +474,38 @@ export class ChannelManager extends Manager<string, Channel> {
             this.messages(channelId).upsert(item.message),
         );
     }
+    /** Pins a message. @param reason Audit-log reason. */
     public async pinMessage(
         channelId: string,
         messageId: string,
+        reason?: string,
     ): Promise<void> {
-        await this.#rest.put(Routes.channelMessagesPin(channelId, messageId));
+        await this.#rest.put(
+            Routes.channelMessagesPin(channelId, messageId),
+            undefined,
+            { reason },
+        );
     }
+    /** Unpins a message. @param reason Audit-log reason. */
     public async unpinMessage(
         channelId: string,
         messageId: string,
+        reason?: string,
     ): Promise<void> {
         await this.#rest.delete(
             Routes.channelMessagesPin(channelId, messageId),
+            { reason },
         );
+    }
+    /** Creates a webhook in a channel. @param options Name, optional avatar data URI, and audit-log `reason`. */
+    public async createWebhook(
+        channelId: string,
+        options: { name: string; avatar?: string | null; reason?: string },
+    ): Promise<import("@lunibee/types").APIWebhook> {
+        const [payload, reason] = splitReason(options);
+        return this.#rest.post(Routes.channelWebhooks(channelId), payload, {
+            reason,
+        });
     }
     public createThreadFromMessage(
         channelId: string,
@@ -500,21 +541,11 @@ export class ChannelManager extends Manager<string, Channel> {
             hasMore: messages.length === limit,
         };
     }
-    /**
-     * Bulk-deletes 2–100 messages from a channel.
-     * Only messages younger than 14 days are accepted by Discord.
-     * @param channelId Channel to delete from.
-     * @param messageIds Array of message IDs to delete.
-     * @throws {RangeError} If fewer than 2 or more than 100 IDs are provided.
-     */
-    public async bulkDelete(
-        channelId: string,
-        messageIds: string[],
-    ): Promise<void> {
-        // Validation lives in bulkDeleteMessages so the public entry point is guarded too.
+    /** @deprecated Use {@link ChannelManager.bulkDeleteMessages}, which also takes an audit-log reason. Removed in 0.3.0. */
+    public bulkDelete(channelId: string, messageIds: string[]): Promise<void> {
         return this.bulkDeleteMessages(channelId, messageIds);
     }
-    public clear(): void {
+    public override clear(): void {
         this.#messageManagers.clear();
         super.clear();
     }

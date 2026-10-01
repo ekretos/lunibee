@@ -85,16 +85,14 @@ The manager also provides `fetch()`, `edit()`, `delete()`, `fetchGuild()`, `setG
 ## `GuildMemberManager`
 
 ```ts
-const guild = client.guilds.get(guildId);
-if (!guild) throw new Error("Guild not cached");
-const members = guild.members;
+const members = client.guilds.members(guildId);
 
 await members.kick(userId, "Rule violation");
 await members.ban(userId, {
   reason: "Severe spamming",
   deleteMessageSeconds: 86400,
 });
-await members.unban(userId);
+await members.unban(userId, "Appeal accepted");
 await members.timeout(userId, 600_000, "10-minute mute");
 
 await members.addRole(userId, roleId);
@@ -106,12 +104,13 @@ await members.removeRole(userId, roleId);
 Provides methods for fetching, creating, editing, and deleting emojis in a guild.
 
 ```ts
-const emojis = guild.emojis;
+const emojis = client.guilds.emojis(guildId);
 
 // Create a new emoji
 await emojis.create({
   name: "lunibee",
   image: "data:image/png;base64,...",
+  reason: "Server mascot",
 });
 
 // Edit an emoji
@@ -119,9 +118,54 @@ await emojis.edit(emojiId, {
   name: "new_name",
 });
 
-// Delete an emoji
-await emojis.delete(emojiId);
+// Delete an emoji on Discord
+await emojis.remove(emojiId, "No longer used");
 ```
+
+`emojis.delete(emojiId)` only drops the emoji from the cache; use `remove()` to delete it on Discord.
+
+## Audit-log reasons
+
+Every manager follows one rule, so the reason is always in the same place:
+
+- If the method takes an options object, the reason goes in it: `roles.create({ name, reason })`, `channels.edit(id, { name, reason })`, `members.ban(userId, { reason })`.
+- Otherwise it is the last argument: `roles.remove(roleId, reason)`, `members.kick(userId, reason)`, `members.unban(userId, reason)`.
+
+Lunibee sends it as the `X-Audit-Log-Reason` header, never in the request body. To delete something on Discord, managers use `remove()`; `delete()` only drops an entry from the cache.
+
+| Deprecated (removed in 0.3.0) | Use |
+|---|---|
+| `roles.deleteRole(id)` | `roles.remove(id, reason?)` |
+| `emojis.deleteEmoji(id)` | `emojis.remove(id, reason?)` |
+| `channels.deleteChannel(id)` | `channels.remove(id, reason?)` |
+| `guilds.deleteGuild(id)` | `guilds.remove(id)` |
+| `channels.sendMessage(id, payload)`, `channel.sendMessage(payload)` | `channels.send(id, payload)`, `channel.send(payload)` |
+| `members.edit(id, options, reason)` | `members.edit(id, { ...options, reason })` |
+
+## From `Routes` to methods
+
+`guilds` and `channels` are `client.guilds` and `client.channels`. Prefer a method over `client.rest` with `Routes`: it updates the cache, returns a structure, and takes the audit-log reason in the usual place.
+
+| Instead of | Use |
+|---|---|
+| `rest.patch(Routes.guildMember(g, u), body)` | `guilds.members(g).edit(u, { ...body, reason })` |
+| `rest.put` / `rest.delete(Routes.guildMemberRole(g, u, r))` | `guilds.members(g).addRole(u, r, reason)` / `members.removeRole(u, r, reason)` |
+| `rest.put` / `rest.get` / `rest.delete(Routes.guildBan(g, u))` | `members.ban(u, { reason })`, `guilds.bans(g).fetch(u)`, `members.unban(u, reason)` |
+| `rest.delete(Routes.guildMember(g, u))` | `members.kick(u, reason)` |
+| `rest.post(Routes.guildRoles(g), body)` | `guilds.roles(g).create({ ...body, reason })` |
+| `rest.patch(Routes.guildRoles(g), positions)` | `guilds.roles(g).setPositions(positions, reason)` |
+| `rest.patch` / `rest.delete(Routes.guildRole(g, r))` | `roles.edit(r, { ...body, reason })` / `roles.remove(r, reason)` |
+| `rest.patch(Routes.guild(g), body)` | `guilds.edit(g, { ...body, reason })` |
+| `rest.get` / `rest.patch` / `rest.delete(Routes.channel(c))` | `channels.fetch(c)`, `channels.edit(c, { ...body, reason })`, `channels.remove(c, reason)` |
+| `rest.post(Routes.channelMessages(c), body)` | `channels.send(c, body)` |
+| `rest.delete(Routes.message(c, m))` | `channels.deleteMessage(c, m, reason)` |
+| `rest.put` / `rest.delete(Routes.channelMessagesPin(c, m))` | `channels.pinMessage(c, m, reason)` / `channels.unpinMessage(c, m, reason)` |
+| `rest.put` / `rest.delete(Routes.messageReactions(c, m, e))` | `channels.addReaction(c, m, e)` / `channels.removeAllReactions(c, m)` |
+| `rest.post(Routes.messageThread(c, m), body)` | `channels.createThreadFromMessage(c, m, body)` |
+| `rest.put(Routes.channelPermission(c, id), body)` | `channels.permissionOverwrites(c).edit(id, { ...body, reason })` |
+| `rest.post(Routes.channelWebhooks(c), body)` | `channels.createWebhook(c, { ...body, reason })` |
+| `rest.post(Routes.guildEmoji(g), body)` | `guilds.emojis(g).create({ ...body, reason })` |
+| `rest.delete(Routes.guildSticker(g, s))` | `guilds.stickers(g).remove(s, reason)` |
 
 ## Guild resource managers
 

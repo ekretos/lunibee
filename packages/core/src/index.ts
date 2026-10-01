@@ -30,7 +30,6 @@ export {
     type GatewayIntentResolvable,
 } from "@lunibee/types";
 
-import { Collection } from "@lunibee/collection";
 import {
     ApplicationCommandManager,
     ChannelManager,
@@ -43,7 +42,6 @@ import {
 import { REST, Routes } from "@lunibee/rest";
 import {
     User,
-    Guild,
     GuildMember,
     Role,
     Emoji,
@@ -168,20 +166,51 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
         }
         return true;
     }
+    /** Sends a listener's error to the `error` listeners. When there are none, or
+     * an `error` listener itself fails, it becomes a process warning instead of
+     * disappearing (never a new `error` event, so it cannot loop). */
     #handleError(event: keyof Events, error: unknown): void {
-        if (event === ClientEvent.Error) return;
         const normalized =
             error instanceof Error
                 ? error
                 : new Error(String(error), { cause: error });
-        for (const listener of [
-            ...(this.#listeners.get(ClientEvent.Error as keyof Events) ?? []),
-        ]) {
+        const listeners =
+            event === ClientEvent.Error
+                ? []
+                : [
+                      ...(this.#listeners.get(
+                          ClientEvent.Error as keyof Events,
+                      ) ?? []),
+                  ];
+        if (listeners.length === 0) return warnListenerError(event, normalized);
+        for (const listener of listeners) {
             try {
-                void listener(normalized);
-            } catch {}
+                const result = listener(normalized);
+                if (
+                    result &&
+                    typeof (result as PromiseLike<unknown>).then === "function"
+                )
+                    void Promise.resolve(result).catch((failure) =>
+                        warnListenerError(ClientEvent.Error, failure),
+                    );
+            } catch (failure) {
+                warnListenerError(ClientEvent.Error, failure);
+            }
         }
     }
+}
+
+/** Reports an error no listener handled as a process warning (stderr by default). */
+function warnListenerError(event: PropertyKey, error: unknown): void {
+    const failure = error instanceof Error ? error : new Error(String(error));
+    process.emitWarning(
+        `A "${String(event)}" listener threw and no error listener handled it: ${failure.message}`,
+        {
+            type: "LunibeeWarning",
+            code: "LUNIBEE_UNHANDLED_LISTENER_ERROR",
+            detail: failure.stack,
+        },
+    );
 }
 
 /** Main Lunibee Discord client. */
@@ -272,14 +301,14 @@ export class Client
                 this.channels.send(channelId, options),
             editMessage: (channelId, messageId, options) =>
                 this.channels.editMessage(channelId, messageId, options),
-            deleteMessage: (channelId, messageId) =>
-                this.channels.deleteMessage(channelId, messageId),
+            deleteMessage: (channelId, messageId, reason) =>
+                this.channels.deleteMessage(channelId, messageId, reason),
             crosspostMessage: (channelId, messageId) =>
                 this.channels.crosspostMessage(channelId, messageId),
             editChannel: (channelId, options) =>
                 this.channels.edit(channelId, options),
-            deleteChannel: (channelId) =>
-                this.channels.deleteChannel(channelId),
+            deleteChannel: (channelId, reason) =>
+                this.channels.remove(channelId, reason),
             addReaction: (channelId, messageId, emoji) =>
                 this.channels.addReaction(channelId, messageId, emoji),
             removeOwnReaction: (channelId, messageId, emoji) =>
@@ -293,10 +322,10 @@ export class Client
                 ),
             removeAllReactions: (channelId, messageId) =>
                 this.channels.removeAllReactions(channelId, messageId),
-            pinMessage: (channelId, messageId) =>
-                this.channels.pinMessage(channelId, messageId),
-            unpinMessage: (channelId, messageId) =>
-                this.channels.unpinMessage(channelId, messageId),
+            pinMessage: (channelId, messageId, reason) =>
+                this.channels.pinMessage(channelId, messageId, reason),
+            unpinMessage: (channelId, messageId, reason) =>
+                this.channels.unpinMessage(channelId, messageId, reason),
             collectInteractions: (options) =>
                 this.createCollector(ClientEvent.InteractionCreate, options),
             memberPermissions: (guildId, memberId, roleIds, channelId) =>

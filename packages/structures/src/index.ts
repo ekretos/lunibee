@@ -153,11 +153,11 @@ export class Message extends BaseStructure {
         return this.edit(options);
     }
 
-    /** Deletes this message. @returns A promise fulfilled when Discord confirms deletion. @throws {Error} If the message is not attached to a client. */
-    public delete(): Promise<void> {
+    /** Deletes this message. @param reason Audit-log reason (shown when deleting someone else's message). @returns A promise fulfilled when Discord confirms deletion. @throws {Error} If the message is not attached to a client. */
+    public delete(reason?: string): Promise<void> {
         if (!this.#context)
             throw new Error("This message is not attached to a client.");
-        return this.#context.deleteMessage(this.channelId, this.id);
+        return this.#context.deleteMessage(this.channelId, this.id, reason);
     }
 
     /** Replies to this message. @param options Message content or payload. @returns The created reply message. @throws {Error} If the message is not attached to a client. */
@@ -261,18 +261,18 @@ export class Message extends BaseStructure {
         return this.#context.removeAllReactions(this.channelId, this.id);
     }
 
-    /** Pins this message. @returns A promise fulfilled when the message is pinned. @throws {Error} If pin operations are unavailable. */
-    public pin(): Promise<void> {
+    /** Pins this message. @param reason Audit-log reason. @returns A promise fulfilled when the message is pinned. @throws {Error} If pin operations are unavailable. */
+    public pin(reason?: string): Promise<void> {
         if (!this.#context?.pinMessage)
             throw new Error("This message is not attached to a client.");
-        return this.#context.pinMessage(this.channelId, this.id);
+        return this.#context.pinMessage(this.channelId, this.id, reason);
     }
 
-    /** Unpins this message. @returns A promise fulfilled when the message is unpinned. @throws {Error} If pin operations are unavailable. */
-    public unpin(): Promise<void> {
+    /** Unpins this message. @param reason Audit-log reason. @returns A promise fulfilled when the message is unpinned. @throws {Error} If pin operations are unavailable. */
+    public unpin(reason?: string): Promise<void> {
         if (!this.#context?.unpinMessage)
             throw new Error("This message is not attached to a client.");
-        return this.#context.unpinMessage(this.channelId, this.id);
+        return this.#context.unpinMessage(this.channelId, this.id, reason);
     }
 
     // ─── Flag-based getters ───────────────────────────────────────────────────────

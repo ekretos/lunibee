@@ -628,19 +628,22 @@ export class ContextMenuCommandInteraction extends CommandInteraction {
 export class ComponentInteraction extends Interaction {
     /** Gets component custom ID. */
     public get customId(): string {
-        return (this.data as any)?.data?.custom_id ?? "";
+        const id = this.data.data?.custom_id;
+        return typeof id === "string" ? id : "";
     }
     /** ID of the message the component is on. */
     public get messageId(): string | undefined {
-        return (this.data as any)?.message?.id;
+        return (this.data.message as { id?: string } | undefined)?.id;
     }
     /** Gets component type. */
     public get componentType(): number {
-        return (this.data as any)?.data?.component_type ?? 0;
+        const type = this.data.data?.component_type;
+        return typeof type === "number" ? type : 0;
     }
     /** Gets selected values for select menu component interactions. */
     public get values(): string[] {
-        return (this.data as any)?.data?.values ?? [];
+        const values = this.data.data?.values;
+        return Array.isArray(values) ? (values as string[]) : [];
     }
     /** Defers updating the message to which the component was attached. */
     public async deferUpdate(options: {
@@ -670,12 +673,16 @@ export class ComponentInteraction extends Interaction {
 export class ModalSubmitInteraction extends Interaction {
     /** Gets the submitted modal custom ID. */
     public get customId(): string {
-        return (this.data as any)?.data?.custom_id ?? "";
+        const id = this.data.data?.custom_id;
+        return typeof id === "string" ? id : "";
     }
 
     /** Retrieves the text value for a specific text input custom ID. @param customId The custom_id of the text input component. @returns The submitted text, or undefined if not found. */
     public getInputValue(customId: string): string | undefined {
-        const rows = (this.data as any)?.data?.components ?? [];
+        const rows =
+            (this.data.data?.components as
+                | { components?: { custom_id?: string; value?: string }[] }[]
+                | undefined) ?? [];
         for (const row of rows) {
             for (const comp of row.components ?? []) {
                 if (comp.custom_id === customId) return comp.value;
@@ -711,14 +718,17 @@ export class AutocompleteInteraction extends Interaction {
 
     /** Gets the target command name. */
     public get commandName(): string {
-        return (this.data as any)?.data?.name ?? "";
+        const name = this.data.data?.name;
+        return typeof name === "string" ? name : "";
     }
 
     /** Gets the currently focused autocomplete option. */
     public get focusedOption():
         { name: string; value: unknown; type: number } | undefined {
-        const options = (this.data as any)?.data?.options ?? [];
-        return findFocused(options);
+        const options = this.data.data?.options;
+        return findFocused(
+            Array.isArray(options) ? (options as FocusableOption[]) : [],
+        );
     }
 
     /** Responds to Discord with autocomplete choices. @param choices Array of name/value pairs to show. @throws {TypeError} If choices is not an array. */
@@ -735,9 +745,18 @@ export class AutocompleteInteraction extends Interaction {
     }
 }
 
+/** An option as Discord sends it in autocomplete data. */
+interface FocusableOption {
+    name: string;
+    value?: unknown;
+    type: number;
+    focused?: boolean;
+    options?: FocusableOption[];
+}
+
 /** Recursively finds the focused option in a nested options tree. */
 function findFocused(
-    options: any[],
+    options: FocusableOption[],
 ): { name: string; value: unknown; type: number } | undefined {
     for (const opt of options) {
         if (opt.focused)

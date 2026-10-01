@@ -13,6 +13,8 @@ Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existi
 * **`setDMPermission()`** on slash and context-menu command builders: Discord deprecated `dm_permission`. Use `setContexts()`, which slash commands now have too: `setDMPermission(false)` → `setContexts(0)`.
 * **`Routes.channelPins` / `Routes.channelPin`**: Discord deprecated `/channels/{id}/pins`. Use `Routes.channelMessagesPins` (returns `{ items, has_more }`) and `Routes.channelMessagesPin`.
 * **`fetchInvite({ withExpiration })`**: no effect; Discord always returns `expires_at` and deprecated the `with_expiration` parameter, so it is no longer sent.
+* **Manager names that hid the cache/Discord split**: `roles.deleteRole()`, `emojis.deleteEmoji()`, `channels.deleteChannel()` and `guilds.deleteGuild()` become `remove()`; `delete()` keeps meaning "drop from the cache". `channel.sendMessage()` / `channels.sendMessage()` become `send()`, and `channels.bulkDelete()` becomes `bulkDeleteMessages()`.
+* **A reason passed after an options object** (`members.edit(id, options, reason)`, scheduled events, stage instances, permission overwrites): put it in the options, `{ ...options, reason }`.
 
 ### ✨ Added
 
@@ -20,13 +22,23 @@ Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existi
 * `Routes.channelMessagesPins` and `Routes.channelMessagesPin`.
 * `CreateCommandOption` is exported, so code using the deprecated `CommandOptionBuilder` has a name to move to.
 * `contexts` on the `APIApplicationCommand` and `ApplicationCommandData` types.
+* **One rule for audit-log reasons.** If a method takes an options object the reason goes in it, otherwise it is the last argument; it is always sent as the `X-Audit-Log-Reason` header. New: `remove(id, reason)` on the role, emoji, channel and guild managers, and a reason on `unban()`, emoji and channel create/edit, `guilds.edit()`, auto-moderation rules, scheduled-event delete, `deleteMessage()`, `bulkDeleteMessages()`, `pinMessage()` / `unpinMessage()`, and on `message.delete()`, `message.pin()`, `message.unpin()` and `channel.delete()`. See [Managers](/packages/managers/#audit-log-reasons).
+* `roles.setPositions(positions, reason)` and `channels.createWebhook(channelId, { name, reason })`, for the two routes bots still called by hand.
+* `Guild` carries `afkChannelId`, `afkTimeout`, `widgetEnabled`, `widgetChannelId`, `applicationId`, `publicUpdatesChannelId`, `safetyAlertsChannelId`, `maxPresences` and `maxVideoChannelUsers`.
+* `RESTErrorCode`: names for the Discord error codes bots handle, e.g. `error.code === RESTErrorCode.UnknownMessage`. `RESTError.hint` says what to check for Missing Access (50001) and Missing Permissions (50013).
+* `MessagePayload` and `Buildable<T>` types: type your own message payloads (builders or raw objects); every send and reply method accepts them.
 
 ### 🔧 Changed
 
-* `pinMessage()`, `unpinMessage()` and `fetchPinnedMessages()` use Discord's current pin endpoints. `fetchPinnedMessages()` still returns the newest pinned messages (up to 50) as `Message[]`.
+* **An error thrown by a listener is no longer silent.** With no `error` listener, or when an `error` listener itself throws or rejects, it is reported as a process warning (`LunibeeWarning`, on stderr by default) instead of disappearing.
+* `pinMessage()`, `unpinMessage()` and `fetchPinnedMessages()` use Discord's current pin endpoints. Discord requires the **Pin Messages** permission for pinning and unpinning. `fetchPinnedMessages()` still returns the newest pinned messages (up to 50) as `Message[]`.
 
 ### 🐛 Fixed
 
+* **`roles.create()` and `roles.edit()` dropped the audit-log reason.** It was taken out of the options and never sent.
+* **Lunibee's source failed to compile in strict projects.** Projects using `noUnusedLocals`, `noImplicitOverride` or `noUncheckedIndexedAccess` got errors from inside Lunibee; CI now checks with these flags.
+* **Malformed interaction data leaked wrong types**: a non-string `custom_id` came back as a number from `customId`. Interaction fields are now read with type checks (no `any` left in `@lunibee/structures`).
+* **Docs:** the Managers page used `emojis.delete()` (which only clears the cache) to delete an emoji, and `guild.members` / `guild.emojis`, which do not exist.
 * **`@lunibee/cli` installed without the `lunibee` command.** npm drops a `bin` whose file is missing when it reads `package.json`, which happens before `prepublishOnly` builds it. Packages are now built before `npm publish`.
 * **The project scaffolder shipped without code.** `create-lunibee@0.2.2` contained only its README. It is now built before publishing, ships its type declarations, runs on Node as well as Bun, and is renamed **`@lunibee/create`**: `bun create @lunibee my-bot`. `create-lunibee` is deprecated.
 * **`@lunibee/builders`, `@lunibee/rest` and `@lunibee/managers` did not declare `@lunibee/types`**, so installing one of them on its own could not resolve it.

@@ -2,13 +2,9 @@
 import packageJson from "../package.json" with { type: "json" };
 const LIBRARY_VERSION = packageJson.version;
 const LIBRARY_URL = "https://github.com/Ekretos/lunibee";
-const USER_AGENT = `DiscordBot (${LIBRARY_URL}, ${packageJson.version})`;
+const USER_AGENT = `DiscordBot (${LIBRARY_URL}, ${LIBRARY_VERSION})`;
 
-import {
-    MemoryRateLimitStore,
-    type RateLimitStore,
-    type BucketState,
-} from "./store.js";
+import { MemoryRateLimitStore, type RateLimitStore } from "./store.js";
 import { RESTError, abortError, redactPath, sleep } from "./errors.js";
 import {
     createRouteKey,
@@ -21,8 +17,6 @@ import { RateLimiter } from "./limiter.js";
 import { HttpTransport, TransportError } from "./transport.js";
 import { ResponseDecoder } from "./decoder.js";
 
-/** Internal state shared by requests mapped to one Discord rate-limit bucket. */
-type Bucket = { remaining: number; resetAt: number };
 /** A file attachment sent as part of a multipart REST request. */
 export interface RESTFileAttachment {
     name: string;
@@ -617,6 +611,7 @@ export {
     redactPath,
     type RESTErrorKind,
 } from "./errors.js";
+export { RESTErrorCode } from "./error-codes.js";
 export {
     createRouteKey,
     normalizeRoutePath,

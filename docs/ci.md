@@ -12,7 +12,7 @@ packages depend on each other via `workspace:*`):
 
 | Job | Steps |
 |---|---|
-| Bun typecheck | dependency graph (`check:deps`), `format:check`, public API audit (`audit:api`), per-package `tsc`, root `tsc` |
+| Bun typecheck | dependency graph (`check:deps`), `format:check`, public API audit (`audit:api`), per-package `tsc`, root `tsc`, strict `tsc` (`tsconfig.strict.json`: the flags strict consumers use) |
 | Bun test | `ci:test`: `bun test --coverage` (per-file threshold in `bunfig.toml`) and the `packages/testing` compat suite |
 | Benchmarks | `bun run bench`; output goes to the job summary; never fails the build |
 

@@ -33,6 +33,15 @@ const OptionType = {
 export class CommandOptions {
     readonly #options: APIInteractionDataOption[];
     readonly #resolved: Record<string, unknown>;
+    /** `resolved[kind][id]` from Discord's interaction data, if present. */
+    #lookup(kind: string, id: string): Record<string, unknown> | undefined {
+        const group = this.#resolved?.[kind];
+        if (typeof group !== "object" || group === null) return undefined;
+        const entry = (group as Record<string, unknown>)[id];
+        return typeof entry === "object" && entry !== null
+            ? (entry as Record<string, unknown>)
+            : undefined;
+    }
 
     /** @internal */
     public constructor(
@@ -191,7 +200,7 @@ export class CommandOptions {
             return null;
         }
         const userId = String(opt.value);
-        const resolved = (this.#resolved as any)?.users?.[userId] ?? null;
+        const resolved = this.#lookup("users", userId) ?? null;
         if (!resolved && required)
             throw new TypeError(
                 `Resolved user for option "${name}" is missing.`,
@@ -218,7 +227,7 @@ export class CommandOptions {
             return null;
         }
         const channelId = String(opt.value);
-        const resolved = (this.#resolved as any)?.channels?.[channelId] ?? null;
+        const resolved = this.#lookup("channels", channelId) ?? null;
         if (!resolved && required)
             throw new TypeError(
                 `Resolved channel for option "${name}" is missing.`,
@@ -245,7 +254,7 @@ export class CommandOptions {
             return null;
         }
         const roleId = String(opt.value);
-        const resolved = (this.#resolved as any)?.roles?.[roleId] ?? null;
+        const resolved = this.#lookup("roles", roleId) ?? null;
         if (!resolved && required)
             throw new TypeError(
                 `Resolved role for option "${name}" is missing.`,
@@ -276,9 +285,7 @@ export class CommandOptions {
         }
         const id = String(opt.value);
         const resolved =
-            (this.#resolved as any)?.users?.[id] ??
-            (this.#resolved as any)?.roles?.[id] ??
-            null;
+            this.#lookup("users", id) ?? this.#lookup("roles", id) ?? null;
         if (!resolved && required)
             throw new TypeError(
                 `Resolved mentionable for option "${name}" is missing.`,
@@ -291,8 +298,8 @@ export class CommandOptions {
         const opt = this.#get(name);
         if (!opt || opt.type !== OptionType.Mentionable) return null;
         const id = String(opt.value);
-        if ((this.#resolved as any)?.users?.[id]) return "user";
-        if ((this.#resolved as any)?.roles?.[id]) return "role";
+        if (this.#lookup("users", id)) return "user";
+        if (this.#lookup("roles", id)) return "role";
         return null;
     }
 
@@ -315,8 +322,7 @@ export class CommandOptions {
             return null;
         }
         const attachmentId = String(opt.value);
-        const resolved =
-            (this.#resolved as any)?.attachments?.[attachmentId] ?? null;
+        const resolved = this.#lookup("attachments", attachmentId) ?? null;
         if (!resolved && required)
             throw new TypeError(
                 `Resolved attachment for option "${name}" is missing.`,

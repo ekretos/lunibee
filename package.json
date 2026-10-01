@@ -92,7 +92,7 @@
     "format:check": "prettier --check \"packages/*/src/**/*.ts\" \"tests/**/*.ts\"",
     "check:deps": "bun scripts/check-dependency-graph.ts",
     "audit:api": "bun scripts/api-audit.ts",
-    "typecheck": "bunx tsc --noEmit --project tsconfig.json",
+    "typecheck": "bunx tsc --noEmit --project tsconfig.json && bunx tsc --noEmit --project tsconfig.strict.json",
     "ci:install": "bun install --frozen-lockfile",
     "ci:deps": "bun run check:deps",
     "ci:typecheck": "bun run typecheck",

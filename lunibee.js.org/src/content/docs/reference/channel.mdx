@@ -39,7 +39,7 @@ import { Channel } from "lunibee";
 
 ## Methods
 
-### `send(options)` / `sendMessage(options)`
+### `send(options)`
 
 Sends a message to this channel.
 
@@ -67,6 +67,9 @@ await channel.send({
 ```
 </TabItem>
 </Tabs>
+
+
+`sendMessage(options)` is a deprecated alias of `send()`, removed in 0.3.0.
 
 ### `edit(options)`
 
@@ -140,14 +143,14 @@ await channel.editParent(null);
 </TabItem>
 </Tabs>
 
-### `delete()`
+### `delete(reason?)`
 
-Deletes this channel.
+Deletes this channel. `reason` is shown in the audit log.
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-await channel.delete();
+await channel.delete("Archived");
 ```
 </TabItem>
 <TabItem label="JavaScript">

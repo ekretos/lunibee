@@ -591,9 +591,10 @@ export class VoiceReceiver {
 
         // Compute the RTP payload offset: 12-byte fixed header + CSRC list, plus
         // the extension header when the X bit is set.
-        const csrcCount = packet[0] & 0x0f;
+        const first = view.getUint8(0);
+        const csrcCount = first & 0x0f;
         let offset = 12 + csrcCount * 4;
-        const hasExtension = (packet[0] & 0x10) !== 0;
+        const hasExtension = (first & 0x10) !== 0;
         if (hasExtension) {
             if (packet.length < offset + 4) return;
             const extWords = view.getUint16(offset + 2, false);

@@ -274,6 +274,27 @@ export interface APIActionRowComponent {
 export type APIMessageComponent =
     APIActionRowComponent | { type: Exclude<number, 1>; [key: string]: any };
 
+// ─── Message payloads ────────────────────────────────────────────────────────
+
+/** A Discord payload, or a builder that serialises to one (its `toJSON()` runs when the request is sent). */
+export type Buildable<T> = T | { toJSON(): T };
+
+/**
+ * A message Lunibee sends: channel send and edit, message reply and edit,
+ * interaction replies, follow-ups and updates. Embeds and components may be
+ * builders or raw objects. Other Discord fields pass through unchanged.
+ */
+export interface MessagePayload {
+    content?: string;
+    embeds?: Buildable<APIEmbed>[];
+    components?: Buildable<APIMessageComponent>[];
+    allowed_mentions?: import("./gateway.js").AllowedMentions;
+    /** Discord message flags, e.g. `MessageFlags.SuppressEmbeds`. */
+    flags?: number;
+    tts?: boolean;
+    [key: string]: unknown;
+}
+
 // ─── Attachments ─────────────────────────────────────────────────────────────
 
 /** Raw Discord attachment object. */

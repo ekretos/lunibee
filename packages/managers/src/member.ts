@@ -1,8 +1,10 @@
 import { REST, Routes } from "@lunibee/rest";
 import { GuildMember, type ResourceContext } from "@lunibee/structures";
-import { ResourceManager } from "./base.js";
+import { ResourceManager, splitReason } from "./base.js";
 
 export interface MemberEditOptions {
+    /** Audit-log reason. */
+    reason?: string;
     nick?: string | null;
     roles?: string[];
     mute?: boolean;
@@ -64,20 +66,25 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
         this.delete(userId);
     }
 
-    /** Unbans a user from the guild. */
-    public async unban(userId: string): Promise<void> {
-        await this.#rest.delete(Routes.guildBan(this.guildId, userId));
+    /** Unbans a user from the guild. @param reason Audit-log reason. */
+    public async unban(userId: string, reason?: string): Promise<void> {
+        await this.#rest.delete(Routes.guildBan(this.guildId, userId), {
+            reason,
+        });
     }
 
-    /** Edits a guild member (nickname, roles, timeout, mute, deaf). @param reason Audit-log reason. */
+    /** Edits a guild member (nickname, roles, timeout, mute, deaf). Put the audit-log reason in `options.reason`. @param reason Deprecated: use `options.reason`. Removed in 0.3.0. */
     public async edit(
         userId: string,
         options: MemberEditOptions,
         reason?: string,
     ): Promise<GuildMember> {
+        const [payload, optionsReason] = splitReason(options);
         const data = await this.#rest.patch<
             import("@lunibee/types").APIGuildMember
-        >(Routes.guildMember(this.guildId, userId), options, { reason });
+        >(Routes.guildMember(this.guildId, userId), payload, {
+            reason: optionsReason ?? reason,
+        });
         const member = new GuildMember(
             { ...data, guild_id: this.guildId },
             this.#context(),

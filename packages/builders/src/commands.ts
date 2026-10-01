@@ -284,7 +284,7 @@ export class CreateIntegerOption extends CreateCommandOption {
         this.data.max_value = value;
         return this;
     }
-    public setAutocomplete(enabled = true): this {
+    public override setAutocomplete(enabled = true): this {
         if (
             enabled &&
             Array.isArray(this.data.choices) &&
@@ -340,7 +340,7 @@ export class CreateNumberOption extends CreateCommandOption {
         this.data.max_value = value;
         return this;
     }
-    public setAutocomplete(enabled = true): this {
+    public override setAutocomplete(enabled = true): this {
         if (
             enabled &&
             Array.isArray(this.data.choices) &&

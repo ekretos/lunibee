@@ -437,14 +437,16 @@ describe("ChannelManager paging", () => {
                 offset
             ).toString();
         const [a, b] = [recent(1n), recent(2n)];
-        await expect(messages.bulkDelete("1", [])).rejects.toThrow(RangeError);
-        await expect(messages.bulkDelete("1", [a, "2"])).rejects.toThrow(
-            "older than 14 days",
+        await expect(messages.bulkDeleteMessages("1", [])).rejects.toThrow(
+            RangeError,
         );
-        await messages.bulkDelete("1", [a]);
-        await messages.bulkDelete("1", [a, b, a]);
+        await expect(
+            messages.bulkDeleteMessages("1", [a, "2"]),
+        ).rejects.toThrow("older than 14 days");
+        await messages.bulkDeleteMessages("1", [a]);
+        await messages.bulkDeleteMessages("1", [a, b, a]);
         expect(calls).toEqual([
-            ["delete", `/channels/1/messages/${a}`, undefined],
+            ["delete", `/channels/1/messages/${a}`, { reason: undefined }],
             ["post", "/channels/1/messages/bulk-delete", { messages: [a, b] }],
         ]);
     });

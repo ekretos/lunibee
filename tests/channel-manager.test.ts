@@ -25,7 +25,7 @@ test("ChannelManager.sendMessage posts a message and returns Message", async () 
     };
 
     const channels = new ChannelManager(rest as never);
-    const result = await channels.sendMessage(message.channel_id, {
+    const result = await channels.send(message.channel_id, {
         content: "hello",
     });
 
@@ -47,7 +47,7 @@ test("ChannelManager.sendMessage propagates REST errors", async () => {
     const channels = new ChannelManager(rest as never);
 
     await expect(
-        channels.sendMessage("123456789012345680", { content: "hello" }),
+        channels.send("123456789012345680", { content: "hello" }),
     ).rejects.toBe(error);
 });
 
@@ -56,6 +56,6 @@ test("ChannelManager.sendMessage validates channel IDs through Routes", async ()
     const channels = new ChannelManager(rest as never);
 
     expect(
-        channels.sendMessage("not-a-snowflake", { content: "hello" }),
+        channels.send("not-a-snowflake", { content: "hello" }),
     ).rejects.toThrow(TypeError);
 });

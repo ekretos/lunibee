@@ -146,12 +146,12 @@ export class ClusterManager {
             () => [] as number[],
         );
         for (let i = 0; i < count; i++) {
-            chunks[i % clusterCount].push(i);
+            chunks[i % clusterCount]?.push(i);
         }
 
-        for (let i = 0; i < clusterCount; i++) {
-            if (chunks[i].length === 0) continue;
-            this.#launch(i, chunks[i], count);
+        for (const [i, chunk] of chunks.entries()) {
+            if (chunk.length === 0) continue;
+            this.#launch(i, chunk, count);
             // Stagger cluster creation
             await sleep(500);
         }

@@ -6,7 +6,7 @@ Scope: consistency, typing, errors and docs only. **No new concepts.**
 
 Format and severity follow AGENT.md. Each item ships with a regression test,
 a reference-page update and a changelog entry. Renames keep the old name as a
-`@deprecated` alias (bottom of the defining file) until 2.0.
+`@deprecated` alias (bottom of the defining file) until 0.3.0.
 
 ## Evidence (ZedBot `src/`)
 
@@ -20,7 +20,7 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 ## Guardrails (do not "brain rot" the API)
 
 - One way to do each thing. A new name replaces an old one; it never adds a third.
-- Every deprecated alias has a removal version (2.0).
+- Every deprecated alias has a removal version (0.3.0).
 - No custom-ID router, command framework, implicit fetching or global state in core.
 - A change ships only if it removes real lines or casts from ZedBot.
 
@@ -41,7 +41,9 @@ a reference-page update and a changelog entry. Renames keep the old name as a
   `verb(id, payload?, { reason }?)`, so `reason` is always the last options object.
   Old names → `@deprecated` aliases; the positional `reason` on `MemberManager.edit` still works.
 - **Regression test:** Each manager: verb exists, alias forwards, `X-Audit-Log-Reason` header sent.
-- **Status:** Open
+- **Status:** Verified (0.2.3). Rule shipped as: options object → `options.reason`, otherwise the
+  last argument. The REST delete verb is `remove()`, because `delete()` already means "drop from
+  the cache" on every manager. Tests: `tests/audit-reasons.test.ts`, `tests/deprecated.test.ts`.
 
 ## F2 — Builders accepted everywhere, with types
 
@@ -56,7 +58,10 @@ a reference-page update and a changelog entry. Renames keep the old name as a
   message reply/edit, interaction reply/edit/follow-up/update and webhooks.
 - **Regression test:** Type tests (`tsc` fixture) accept a builder and a raw object, and
   reject an unknown key. A runtime test that a builder serialises to the same body.
-- **Status:** Open
+- **Status:** Partly fixed (0.2.3), rest deferred to 0.3.0. `MessagePayload` and `Buildable<T>`
+  ship as types users can adopt (`tests/message-payload.test.ts`). Typing the send/reply
+  signatures with them broke ZedBot in 16 places (`embeds: unknown[]` payloads), so it moves to
+  0.3.0 Step 1, where breaking type changes are allowed.
 
 ## F3 — Methods for the routes people call directly
 
@@ -70,7 +75,9 @@ a reference-page update and a changelog entry. Renames keep the old name as a
   where Discord allows it, and returns a structure. Fill gaps only for these routes.
   Add a "`Routes.x` → method" table to the docs.
 - **Regression test:** One test per method: route, method, body, reason header, returned type.
-- **Status:** Open
+- **Status:** Verified (0.2.3). Every route listed already had a method except role positions and
+  channel webhooks (`roles.setPositions()`, `channels.createWebhook()` added); reasons added to
+  message delete, bulk delete, pin and unpin. Docs table on the Managers page.
 
 ## F4 — Type guards that narrow
 
@@ -83,7 +90,9 @@ a reference-page update and a changelog entry. Renames keep the old name as a
   No runtime change.
 - **Regression test:** Type tests: after the guard `values` is `string[]`; before it, accessing it fails.
   Zero `as any` left in `structures`.
-- **Status:** Open
+- **Status:** Verified (0.2.3). Correction: the guards already narrowed (`this is ComponentInteraction`,
+  whose `values` is `string[]`); ZedBot's casts there were unnecessary. The 17 `as any` reads are
+  replaced by checked reads. Tests: `tests/interaction-data.test.ts` (also asserts no `any`).
 
 ## F5 — Structures carry every field the API type has
 
@@ -93,7 +102,8 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 - **Impact:** ZedBot casts in `backupHandler.ts:135` and `antinuke/discord.ts`.
 - **Fix:** Map each `APIX` field or list it as deliberately excluded.
 - **Regression test:** Per structure: every `APIX` key is either mapped or in an exclusion list.
-- **Status:** Open
+- **Status:** Verified for `Guild` (0.2.3), `tests/guild-fields.test.ts`. Other structures were not
+  audited field by field; track separately if a consumer needs a missing field.
 
 ## F6 — Name the specific Discord error codes
 
@@ -105,7 +115,9 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 - **Fix:** Export Discord's JSON error codes as a `const` object `RESTErrorCode` (CLAUDE.md naming).
   Add a 50013 hint (missing permission or role hierarchy) to the message. No token or body in it.
 - **Regression test:** Code names round-trip; the message has no secrets; hint present for 50013.
-- **Status:** Open
+- **Status:** Verified (0.2.3). `RESTErrorCode` is a curated set of 35 codes, values checked against
+  Discord's official docs (discord/discord-api-docs); other codes stay numeric on `code`.
+  `RESTError.hint` for 50001/50013; `message` unchanged. Tests: `tests/rest-error-codes.test.ts`.
 
 ## F7 — Error listeners are not silently swallowed
 
@@ -114,14 +126,33 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 - **Problem:** An error thrown by an `error` listener disappears.
 - **Fix:** Report it with `process.emitWarning` (no loop back into `error`).
 - **Regression test:** A throwing error listener produces one warning and no recursion.
-- **Status:** Open
+- **Status:** Verified (0.2.3). Same failure mode also fixed for listener errors with no `error`
+  listener and for rejecting async `error` listeners. Tests: `tests/listener-errors.test.ts`.
 
 ## F8 — Keep the release files truthful
 
 - **Severity:** P3
 - **Location:** `AGENT.md` (target "v0.2.1"), `CLAUDE.md` ("next: 0.2.2"); packages are 0.2.3
 - **Fix:** Update both targets; mark the 0.2.2 items in CLAUDE.md that have shipped as done.
-- **Status:** Open
+- **Status:** Verified (0.2.3). AGENT.md target v0.2.3; CLAUDE.md marks 0.2.2 shipped.
+
+## F9 — Lunibee's source fails to compile in strict consumer projects
+
+- **Severity:** P2
+- **Location:** `builders/commands.ts`, `core/index.ts`, `managers/{guild,index}.ts`, `rest/index.ts`, `sharding/cluster.ts`, `voice/index.ts`, `ws/transport.ts`
+- **Problem:** Packages ship `.ts` source, so a consumer with `noUnusedLocals`, `noImplicitOverride`
+  or `noUncheckedIndexedAccess` type-checks Lunibee too: 20 errors inside Lunibee in ZedBot.
+- **Fix:** Fixed the 20 sites; `tsconfig.strict.json` runs those flags on package source in `typecheck`.
+- **Status:** Verified (0.2.3). ZedBot against local Lunibee: 53 → 33 errors, all 33 its own.
+
+## F10 — `roles.create()` / `roles.edit()` drop the audit-log reason
+
+- **Severity:** P2
+- **Location:** `packages/managers/src/role.ts`
+- **Problem:** `const { reason, ...payload } = options` and then `reason` was never sent.
+- **Impact:** Audit log shows no reason; ZedBot called the route directly to get one.
+- **Fix:** Pass `{ reason }` to the request. (`noUnusedLocals` would have caught it; see F9.)
+- **Status:** Verified (0.2.3), `tests/audit-reasons.test.ts`.
 
 ---
 
@@ -134,3 +165,6 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 
 Done when ZedBot can drop its `.toJSON()` calls, the Lunibee-related casts and the direct
 `Routes` calls listed above without adding new ones.
+
+**State after 0.2.3:** F1, F3–F10 verified. F2 is partly done; its remaining, breaking half is
+0.3.0 Step 1. The `.toJSON()` calls in ZedBot are already unnecessary at runtime.

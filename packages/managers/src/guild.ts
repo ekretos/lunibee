@@ -1,4 +1,4 @@
-import { Manager, ResourceManager } from "./base.js";
+import { Manager, ResourceManager, splitReason } from "./base.js";
 import { EmojiManager } from "./emoji.js";
 import { GuildSoundboardManager, GuildStickerManager } from "./advanced.js";
 import { GuildMemberManager } from "./member.js";
@@ -10,8 +10,6 @@ import {
 import {
     Guild,
     AutoModerationRule,
-    GuildWelcomeScreen,
-    GuildOnboarding,
     type ResourceContext,
 } from "@lunibee/structures";
 import { type REST, Routes } from "@lunibee/rest";
@@ -23,8 +21,6 @@ import {
     type APIAutoModerationRule,
     type APIInviteCreate,
     type APIVoiceState,
-    type APIGuildWelcomeScreen,
-    type APIGuildOnboarding,
 } from "@lunibee/types";
 
 type GuildData = ConstructorParameters<typeof Guild>[0];
@@ -40,7 +36,10 @@ function withQuery(path: string, params: URLSearchParams): string {
 export interface GuildCreateOptions extends Record<string, unknown> {
     name: string;
 }
-export interface GuildEditOptions extends Record<string, unknown> {}
+export interface GuildEditOptions extends Record<string, unknown> {
+    /** Audit-log reason. */
+    reason?: string;
+}
 
 export class GuildManager extends ResourceManager<string, Guild> {
     readonly #rest: REST;
@@ -217,16 +216,22 @@ export class GuildManager extends ResourceManager<string, Guild> {
 
     /** Modifies a guild's settings. */
     public async edit(id: string, options: GuildEditOptions): Promise<Guild> {
+        const [payload, reason] = splitReason(options);
         const data = await this.#rest.patch<GuildData>(
             Routes.guild(id),
-            options,
+            payload,
+            { reason },
         );
         return this.upsert(new Guild(data));
     }
 
-    /** Deletes a guild permanently. User must be the owner. */
-    public async deleteGuild(id: string): Promise<void> {
+    /** Deletes a guild permanently. The bot must own it. */
+    public async remove(id: string): Promise<void> {
         await this.#rest.delete(Routes.guild(id));
+    }
+    /** @deprecated Use {@link GuildManager.remove}. Removed in 0.3.0. */
+    public deleteGuild(id: string): Promise<void> {
+        return this.remove(id);
     }
 
     /** Fetches a guild's preview (even if the bot is not in the guild). */
@@ -331,11 +336,13 @@ export class GuildManager extends ResourceManager<string, Guild> {
     /** Creates a new auto moderation rule. */
     public async createAutoModerationRule(
         guildId: string,
-        options: Record<string, unknown>,
+        options: Record<string, unknown> & { reason?: string },
     ): Promise<AutoModerationRule> {
+        const [payload, reason] = splitReason(options);
         const rule = await this.#rest.post<APIAutoModerationRule>(
             Routes.guildAutoModerationRules(guildId),
-            options,
+            payload,
+            { reason },
         );
         return new AutoModerationRule(rule);
     }
@@ -344,22 +351,26 @@ export class GuildManager extends ResourceManager<string, Guild> {
     public async editAutoModerationRule(
         guildId: string,
         ruleId: string,
-        options: Record<string, unknown>,
+        options: Record<string, unknown> & { reason?: string },
     ): Promise<AutoModerationRule> {
+        const [payload, reason] = splitReason(options);
         const rule = await this.#rest.patch<APIAutoModerationRule>(
             Routes.guildAutoModerationRule(guildId, ruleId),
-            options,
+            payload,
+            { reason },
         );
         return new AutoModerationRule(rule);
     }
 
-    /** Deletes an auto moderation rule. */
+    /** Deletes an auto moderation rule. @param reason Audit-log reason. */
     public async deleteAutoModerationRule(
         guildId: string,
         ruleId: string,
+        reason?: string,
     ): Promise<void> {
         await this.#rest.delete(
             Routes.guildAutoModerationRule(guildId, ruleId),
+            { reason },
         );
     }
 }

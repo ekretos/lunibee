@@ -44,9 +44,7 @@ test("message resource methods delegate through ChannelManager", async () => {
 
     expect(created.channelId).toBe(channelId);
     expect(created.channel.id).toBe(channelId);
-    expect(
-        await created.channel.sendMessage({ content: "again" }),
-    ).toBeDefined();
+    expect(await created.channel.send({ content: "again" })).toBeDefined();
     expect(await created.reply("reply")).toBeDefined();
     expect(await created.edit({ content: "edited" })).toBeDefined();
     expect(await created.update({ content: "updated" })).toBeDefined();
@@ -76,7 +74,7 @@ test("detached structures fail clearly instead of bypassing REST", async () => {
     const detachedChannel = new Channel({ id: channelId, type: 0 });
     const detachedMessage = new Message(message);
 
-    expect(() => detachedChannel.sendMessage({ content: "hello" })).toThrow(
+    expect(() => detachedChannel.send({ content: "hello" })).toThrow(
         "not attached to a client",
     );
     expect(() => detachedMessage.reply("hello")).toThrow(
