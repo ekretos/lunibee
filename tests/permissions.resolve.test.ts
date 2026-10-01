@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
     Client,
     Permission,
-    PermissionOverwriteType,
+    PermissionOverwriteEnum,
     PermissionSet,
     computePermissions,
 } from "../packages/core/src/index.ts";
@@ -56,25 +56,25 @@ describe("computePermissions", () => {
             overwrites: [
                 {
                     id: GUILD,
-                    type: PermissionOverwriteType.Role,
+                    type: PermissionOverwriteEnum.Role,
                     allow: 0n,
                     deny: Permission.sendMessages | Permission.viewChannel,
                 },
                 {
                     id: "2",
-                    type: PermissionOverwriteType.Role,
+                    type: PermissionOverwriteEnum.Role,
                     allow: Permission.sendMessages,
                     deny: Permission.addReactions,
                 },
                 {
                     id: "99",
-                    type: PermissionOverwriteType.Role,
+                    type: PermissionOverwriteEnum.Role,
                     allow: Permission.kickMembers,
                     deny: 0n,
                 },
                 {
                     id: "10",
-                    type: PermissionOverwriteType.Member,
+                    type: PermissionOverwriteEnum.Member,
                     allow: Permission.viewChannel,
                     deny: 0n,
                 },

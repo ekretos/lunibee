@@ -27,7 +27,7 @@ After 0.5.x comes the 0.9.0 API freeze and 1.0.0 (see ROADMAP.md).
 ## Conventions every step follows
 
 - Naming (from 0.2.2): builders `CreateX`, constant sets `…Enum`, style sets
-  `…Type`; old names stay as `@deprecated` aliases until 2.0.
+  `…Type`; old names stay as `@deprecated` aliases until 0.3.0.
 - Layering is enforced by `bun run check:deps`:
   types(0) < structures(1) < managers(2) < core(3) < lunibee(4).
 - No breaking change to the public API in a minor unless the file says so and

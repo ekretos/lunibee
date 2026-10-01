@@ -782,7 +782,7 @@ export function createInteraction(
     }
 }
 
-/** @deprecated Use {@link InteractionEnum}. Removed in 2.0. */
+/** @deprecated Use {@link InteractionEnum}. Removed in 0.3.0. */
 export const InteractionType = InteractionEnum;
-/** @deprecated Use {@link InteractionEnum}. Removed in 2.0. */
+/** @deprecated Use {@link InteractionEnum}. Removed in 0.3.0. */
 export type InteractionType = InteractionEnum;

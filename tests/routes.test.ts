@@ -33,8 +33,12 @@ describe("REST Routes Full Coverage", () => {
         expect(Routes.messageReactionsAll(A, B)).toBe(
             `/channels/${A}/messages/${B}/reactions`,
         );
-        expect(Routes.channelPins(A)).toBe(`/channels/${A}/pins`);
-        expect(Routes.channelPin(A, B)).toBe(`/channels/${A}/pins/${B}`);
+        expect(Routes.channelMessagesPins(A)).toBe(
+            `/channels/${A}/messages/pins`,
+        );
+        expect(Routes.channelMessagesPin(A, B)).toBe(
+            `/channels/${A}/messages/pins/${B}`,
+        );
         expect(Routes.messageThread(A, B)).toBe(
             `/channels/${A}/messages/${B}/threads`,
         );

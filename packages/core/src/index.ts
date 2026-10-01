@@ -1225,13 +1225,13 @@ export class Client
         code: string,
         options?: {
             withCounts?: boolean;
+            /** @deprecated No effect: Discord always returns `expires_at` and deprecated `with_expiration`. Removed in 0.3.0. */
             withExpiration?: boolean;
             guildScheduledEventId?: string;
         },
     ): Promise<Record<string, unknown>> {
         const query = new URLSearchParams();
         if (options?.withCounts) query.set("with_counts", "true");
-        if (options?.withExpiration) query.set("with_expiration", "true");
         if (options?.guildScheduledEventId)
             query.set(
                 "guild_scheduled_event_id",

@@ -261,6 +261,16 @@ describe("REST-004: routes sharing one bucket hash", () => {
         expect(sharedBucketOverlaps).toEqual([]);
     });
 
+    test("pin routes get their own bucket, not a message's", () => {
+        const pins = createRouteKey("GET", "/channels/1/messages/pins");
+        const pin = createRouteKey("PUT", "/channels/1/messages/pins/2");
+        const message = createRouteKey("GET", "/channels/1/messages/2");
+        expect(pins.route).toBe("GET:/channels/:id/messages/pins");
+        expect(pin.route).toBe("PUT:/channels/:id/messages/pins/:id");
+        expect(message.route).toBe("GET:/channels/:id/messages/:id");
+        expect(pins.major).toBe("1");
+    });
+
     test("different major parameters still run independently", async () => {
         const store = new MemoryRateLimitStore();
         store.setBucketHash("GET:/channels/:id/messages", "shared");

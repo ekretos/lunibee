@@ -6,13 +6,13 @@ import {
     ResourceManager,
     ShardingManager,
     ShardManager,
-    StringSelectMenuBuilder,
-    StringSelectBuilder,
-    UserSelectMenuBuilder,
-    RoleSelectMenuBuilder,
-    MentionableSelectMenuBuilder,
-    ChannelSelectMenuBuilder,
-    ContextMenuCommandBuilder,
+    CreateStringSelectMenu,
+    CreateStringSelect,
+    CreateUserSelectMenu,
+    CreateRoleSelectMenu,
+    CreateMentionableSelectMenu,
+    CreateChannelSelectMenu,
+    CreateContextMenuCommand,
     createInteraction,
     VoiceConnectionStatus,
     VoiceConnectionState,
@@ -33,29 +33,29 @@ describe("discord.js-familiar aliases", () => {
         expect(Events.MessageCreate).toBe(ClientEvent.MessageCreate);
         expect(CachedManager).toBe(ResourceManager);
         expect(ShardingManager).toBe(ShardManager);
-        expect(StringSelectMenuBuilder).toBe(StringSelectBuilder);
+        expect(CreateStringSelectMenu).toBe(CreateStringSelect);
         expect(VoiceConnectionStatus).toBe(VoiceConnectionState);
     });
 
     test("entity select menu builders fix their component type", () => {
         const types = [
-            new UserSelectMenuBuilder(),
-            new RoleSelectMenuBuilder(),
-            new MentionableSelectMenuBuilder(),
-            new ChannelSelectMenuBuilder(),
+            new CreateUserSelectMenu(),
+            new CreateRoleSelectMenu(),
+            new CreateMentionableSelectMenu(),
+            new CreateChannelSelectMenu(),
         ].map((b) => (b.setCustomId("id").toJSON() as { type: number }).type);
         expect(types).toEqual([5, 6, 7, 8]);
     });
 
-    test("ContextMenuCommandBuilder supports setType", () => {
-        const json = new ContextMenuCommandBuilder()
+    test("CreateContextMenuCommand supports setType", () => {
+        const json = new CreateContextMenuCommand()
             .setName("Quote")
             .setType(3)
             .toJSON();
         expect(json).toEqual({ type: 3, name: "Quote" });
-        expect(new ContextMenuCommandBuilder().toJSON().type).toBe(2);
+        expect(new CreateContextMenuCommand().toJSON().type).toBe(2);
         expect(() =>
-            new ContextMenuCommandBuilder().setType(1 as never),
+            new CreateContextMenuCommand().setType(1 as never),
         ).toThrow(RangeError);
     });
 });

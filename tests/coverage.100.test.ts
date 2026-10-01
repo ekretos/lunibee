@@ -1,23 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import { readFile, writeFile, unlink } from "node:fs/promises";
 import {
-    AttachmentBuilder,
-    SlashCommandBuilder,
-    StringOptionBuilder,
-    IntegerOptionBuilder,
-    NumberOptionBuilder,
-    BooleanOptionBuilder,
-    SubcommandBuilder,
-    SubcommandGroupBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    StringSelectBuilder,
-    EntitySelectBuilder,
-    ComponentType,
-    ModalBuilder,
-    TextInputBuilder,
-    EmbedBuilder,
+    CreateAttachment,
+    CreateSlashCommand,
+    CreateStringOption,
+    CreateIntegerOption,
+    CreateNumberOption,
+    CreateBooleanOption,
+    CreateSubcommand,
+    CreateSubcommandGroup,
+    CreateActionRow,
+    CreateButton,
+    ButtonType,
+    CreateStringSelect,
+    CreateEntitySelect,
+    ComponentEnum,
+    CreateModal,
+    CreateTextInput,
+    CreateEmbed,
 } from "../packages/builders/src/index.ts";
 import { Cache, Collection } from "../packages/collection/src/index.ts";
 import { Client } from "../packages/core/src/index.ts";
@@ -44,7 +44,7 @@ import {
 import {
     Interaction,
     InteractionResponse,
-    InteractionResponseType,
+    InteractionResponseEnum,
     CommandInteraction,
     ComponentInteraction,
     ModalSubmitInteraction,
@@ -119,8 +119,8 @@ class MockWebSocket {
 }
 
 describe("100% Comprehensive Codebase Coverage", () => {
-    test("AttachmentBuilder setFile and file conversions", async () => {
-        const att = new AttachmentBuilder("initial.txt", "file.txt");
+    test("CreateAttachment setFile and file conversions", async () => {
+        const att = new CreateAttachment("initial.txt", "file.txt");
         expect(att.name).toBe("file.txt");
 
         att.setFile("newfile.txt");
@@ -138,8 +138,8 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(new TextDecoder().decode(buf2)).toBe("buffer data");
     });
 
-    test("SlashCommandBuilder options, validations and subcommands", () => {
-        const cmd = new SlashCommandBuilder()
+    test("CreateSlashCommand options, validations and subcommands", () => {
+        const cmd = new CreateSlashCommand()
             .setName("testcmd")
             .setDescription("test desc")
             .setNsfw(true)
@@ -153,7 +153,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         cmd.setNSFW(false);
         expect(cmd.toJSON().nsfw).toBe(false);
 
-        const numOpt = new NumberOptionBuilder()
+        const numOpt = new CreateNumberOption()
             .setName("num")
             .setDescription("num desc")
             .addChoices(
@@ -163,35 +163,35 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(numOpt.toJSON().choices).toBeDefined();
         expect(() => numOpt.addChoices()).toThrow();
         expect(() =>
-            new NumberOptionBuilder()
+            new CreateNumberOption()
                 .setAutocomplete(true)
                 .addChoices({ name: "A", value: 1 }),
         ).toThrow();
         expect(() =>
-            new NumberOptionBuilder()
+            new CreateNumberOption()
                 .addChoices({ name: "A", value: 1 })
                 .setAutocomplete(true),
         ).toThrow();
         expect(() =>
-            new NumberOptionBuilder().setMinValue(10).setMaxValue(5),
+            new CreateNumberOption().setMinValue(10).setMaxValue(5),
         ).toThrow();
-        expect(() => new NumberOptionBuilder().setMinValue(NaN)).toThrow();
+        expect(() => new CreateNumberOption().setMinValue(NaN)).toThrow();
         expect(() =>
-            new IntegerOptionBuilder().setMinValue(10).setMaxValue(5),
+            new CreateIntegerOption().setMinValue(10).setMaxValue(5),
         ).toThrow();
-        expect(() => new IntegerOptionBuilder().setMinValue(1.5)).toThrow();
-        expect(() => new IntegerOptionBuilder().setMinValue(NaN)).toThrow();
+        expect(() => new CreateIntegerOption().setMinValue(1.5)).toThrow();
+        expect(() => new CreateIntegerOption().setMinValue(NaN)).toThrow();
         expect(() =>
-            new StringOptionBuilder().setMinLength(10).setMaxLength(5),
-        ).toThrow();
-        expect(() =>
-            new SlashCommandBuilder().setName("").setDescription("d"),
+            new CreateStringOption().setMinLength(10).setMaxLength(5),
         ).toThrow();
         expect(() =>
-            new SlashCommandBuilder().setName("UPPERCASE").setDescription("d"),
+            new CreateSlashCommand().setName("").setDescription("d"),
+        ).toThrow();
+        expect(() =>
+            new CreateSlashCommand().setName("UPPERCASE").setDescription("d"),
         ).toThrow();
         expect(() => {
-            const opt = new NumberOptionBuilder();
+            const opt = new CreateNumberOption();
             const choices = Array.from({ length: 26 }, (_, i) => ({
                 name: `c${i}`,
                 value: i,
@@ -199,12 +199,12 @@ describe("100% Comprehensive Codebase Coverage", () => {
             opt.addChoices(...choices);
         }).toThrow();
 
-        const strOpt = new StringOptionBuilder()
+        const strOpt = new CreateStringOption()
             .setName("str")
             .setDescription("desc");
         expect(() => strOpt.addChoices()).toThrow();
 
-        const subGroup = new SubcommandGroupBuilder()
+        const subGroup = new CreateSubcommandGroup()
             .setName("group")
             .setDescription("group desc");
         subGroup.addSubcommand((s) =>
@@ -222,7 +222,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             }),
         ).toThrow();
         expect(() => {
-            const g = new SubcommandGroupBuilder()
+            const g = new CreateSubcommandGroup()
                 .setName("grp")
                 .setDescription("d");
             for (let i = 0; i < 25; i++)
@@ -232,7 +232,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             g.addSubcommand((s) => s.setName("sub26").setDescription("d"));
         }).toThrow();
 
-        const slash = new SlashCommandBuilder()
+        const slash = new CreateSlashCommand()
             .setName("main")
             .setDescription("main desc");
         slash.addStringOption((o) =>
@@ -252,9 +252,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             ),
         ).toThrow();
         expect(() => {
-            const s = new SlashCommandBuilder()
-                .setName("m")
-                .setDescription("d");
+            const s = new CreateSlashCommand().setName("m").setDescription("d");
             for (let i = 0; i < 25; i++)
                 s.addBooleanOption((o) =>
                     o.setName(`opt${i}`).setDescription("d"),
@@ -264,18 +262,18 @@ describe("100% Comprehensive Codebase Coverage", () => {
     });
 
     test("Component Builders & Validations", () => {
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
+        const row = new CreateActionRow().addComponents(
+            new CreateButton()
                 .setCustomId("btn")
                 .setLabel("Click")
-                .setStyle(ButtonStyle.Primary),
+                .setStyle(ButtonType.Primary),
         );
         expect(row.toJSON().components.length).toBe(1);
         row.clearComponents();
         expect(() => row.toJSON()).toThrow(RangeError);
         expect(() => row.addComponents()).toThrow();
 
-        const strSelect = new StringSelectBuilder()
+        const strSelect = new CreateStringSelect()
             .setCustomId("sel")
             .setPlaceholder("pick")
             .setRequired(true)
@@ -292,7 +290,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(selJson.required).toBe(true);
         expect(selJson.disabled).toBe(true);
 
-        const entSelect = new EntitySelectBuilder(ComponentType.RoleSelect)
+        const entSelect = new CreateEntitySelect(ComponentEnum.RoleSelect)
             .setCustomId("rolesel")
             .setPlaceholder("roles")
             .setRequired(true)
@@ -303,7 +301,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(entJson.required).toBe(true);
         expect(entJson.disabled).toBe(true);
 
-        const txtInput = new TextInputBuilder()
+        const txtInput = new CreateTextInput()
             .setCustomId("input")
             .setLabel("label");
         txtInput.setMinLength(10).setMaxLength(100);
@@ -317,8 +315,8 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(() => strSelect.setCustomId("")).toThrow();
     });
 
-    test("EmbedBuilder clear methods and validations", () => {
-        const embed = new EmbedBuilder()
+    test("CreateEmbed clear methods and validations", () => {
+        const embed = new CreateEmbed()
             .setTitle("Title")
             .setDescription("Desc")
             .addFields({ name: "F1", value: "V1" });

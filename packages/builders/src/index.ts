@@ -27,6 +27,7 @@ export {
 } from "./components.js";
 export {
     CreateSlashCommand,
+    CreateCommandOption,
     CreateStringOption,
     CreateIntegerOption,
     CreateNumberOption,
@@ -45,7 +46,7 @@ export {
 } from "./commands.js";
 export { CreateAttachment, type AttachmentData } from "./attachment.js";
 
-// Deprecated names (0.2.2), removed in 2.0.
+// Deprecated names (0.2.2), removed in 0.3.0.
 export { AttachmentBuilder } from "./attachment.js";
 export { EmbedBuilder } from "./embed.js";
 export {

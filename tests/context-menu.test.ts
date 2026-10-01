@@ -12,6 +12,7 @@ import {
     CreateContextMenuCommand,
     CreateMessageCommand,
     CreateUserCommand,
+    CreateSlashCommand,
 } from "../packages/builders/src/index.ts";
 
 const client: InteractionClient = {
@@ -196,6 +197,17 @@ describe("context-menu builders", () => {
 
     test("invalid contexts are refused", () => {
         expect(() => new CreateUserCommand().setContexts(3)).toThrow(
+            RangeError,
+        );
+    });
+    test("slash commands set contexts like context-menu commands", () => {
+        const json = new CreateSlashCommand()
+            .setName("ping")
+            .setDescription("Ping")
+            .setContexts(0, 1, 2)
+            .toJSON();
+        expect(json.contexts).toEqual([0, 1, 2]);
+        expect(() => new CreateSlashCommand().setContexts(3)).toThrow(
             RangeError,
         );
     });

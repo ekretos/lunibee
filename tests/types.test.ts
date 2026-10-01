@@ -3,10 +3,10 @@ import {
     GatewayIntentBits,
     IntentBits,
     resolveGatewayIntents,
-    ChannelType,
+    ChannelEnum,
     MessageFlags,
-    ApplicationCommandOptionType,
-    ApplicationCommandType,
+    ApplicationCommandOptionEnum,
+    ApplicationCommandEnum,
 } from "../packages/types/src/index.ts";
 
 describe("Types & Intent Resolvers", () => {
@@ -28,12 +28,12 @@ describe("Types & Intent Resolvers", () => {
         expect(resolveGatewayIntents("unknown_intent_string" as any)).toBe(0);
     });
 
-    test("ChannelType enum constants", () => {
-        expect(ChannelType.GuildText).toBe(0);
-        expect(ChannelType.DM).toBe(1);
-        expect(ChannelType.GuildVoice).toBe(2);
-        expect(ChannelType.PublicThread).toBe(11);
-        expect(ChannelType.PrivateThread).toBe(12);
+    test("ChannelEnum enum constants", () => {
+        expect(ChannelEnum.GuildText).toBe(0);
+        expect(ChannelEnum.DM).toBe(1);
+        expect(ChannelEnum.GuildVoice).toBe(2);
+        expect(ChannelEnum.PublicThread).toBe(11);
+        expect(ChannelEnum.PrivateThread).toBe(12);
     });
 
     test("MessageFlags enum constants", () => {
@@ -43,9 +43,9 @@ describe("Types & Intent Resolvers", () => {
     });
 
     test("ApplicationCommand types and options", () => {
-        expect(ApplicationCommandType.ChatInput).toBe(1);
-        expect(ApplicationCommandOptionType.String).toBe(3);
-        expect(ApplicationCommandOptionType.Integer).toBe(4);
-        expect(ApplicationCommandOptionType.Boolean).toBe(5);
+        expect(ApplicationCommandEnum.ChatInput).toBe(1);
+        expect(ApplicationCommandOptionEnum.String).toBe(3);
+        expect(ApplicationCommandOptionEnum.Integer).toBe(4);
+        expect(ApplicationCommandOptionEnum.Boolean).toBe(5);
     });
 });

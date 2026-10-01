@@ -3,9 +3,9 @@ export enum PermissionOverwriteEnum {
     Role = 0,
     Member = 1,
 }
-/** @deprecated Use {@link PermissionOverwriteEnum}. Removed in 2.0. */
+/** @deprecated Use {@link PermissionOverwriteEnum}. Removed in 0.3.0. */
 export const PermissionOverwriteType = PermissionOverwriteEnum;
-/** @deprecated Use {@link PermissionOverwriteEnum}. Removed in 2.0. */
+/** @deprecated Use {@link PermissionOverwriteEnum}. Removed in 0.3.0. */
 export type PermissionOverwriteType = PermissionOverwriteEnum;
 
 /** Lunibee idiomatic camelCase permission bitflags. */

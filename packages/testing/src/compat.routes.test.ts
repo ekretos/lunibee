@@ -53,8 +53,12 @@ describe("Channel & message routes", () => {
         expect(Routes.channelBulkDelete(CH)).toBe(
             `/channels/${CH}/messages/bulk-delete`,
         );
-        expect(Routes.channelPins(CH)).toBe(`/channels/${CH}/pins`);
-        expect(Routes.channelPin(CH, MSG)).toBe(`/channels/${CH}/pins/${MSG}`);
+        expect(Routes.channelMessagesPins(CH)).toBe(
+            `/channels/${CH}/messages/pins`,
+        );
+        expect(Routes.channelMessagesPin(CH, MSG)).toBe(
+            `/channels/${CH}/messages/pins/${MSG}`,
+        );
     });
 });
 

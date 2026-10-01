@@ -1,22 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import {
-    EmbedBuilder,
-    AttachmentBuilder,
-    SlashCommandBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    StringSelectBuilder,
-    EntitySelectBuilder,
-    ComponentType,
-    ModalBuilder,
-    TextInputBuilder,
-    TextInputStyle,
-    ActionRowBuilder,
+    CreateEmbed,
+    CreateAttachment,
+    CreateSlashCommand,
+    CreateButton,
+    ButtonType,
+    CreateStringSelect,
+    CreateEntitySelect,
+    ComponentEnum,
+    CreateModal,
+    CreateTextInput,
+    TextInputType,
+    CreateActionRow,
 } from "../packages/builders/src/index.ts";
 
 describe("Builders Full Coverage", () => {
-    test("EmbedBuilder covers all setters and toJSON", () => {
-        const embed = new EmbedBuilder()
+    test("CreateEmbed covers all setters and toJSON", () => {
+        const embed = new CreateEmbed()
             .setTitle("Test Embed")
             .setDescription("Description text")
             .setURL("https://example.com/")
@@ -55,13 +55,13 @@ describe("Builders Full Coverage", () => {
         embed.setFields([{ name: "Sole Field", value: "Val" }]);
         expect(embed.data.fields?.length).toBe(1);
 
-        const nowEmbed = new EmbedBuilder().setTimestamp();
+        const nowEmbed = new CreateEmbed().setTimestamp();
         expect(nowEmbed.data.timestamp).toBeDefined();
     });
 
-    test("AttachmentBuilder covers name, description, buffers and conversions", async () => {
+    test("CreateAttachment covers name, description, buffers and conversions", async () => {
         const uint8 = new Uint8Array([1, 2, 3]);
-        const att = new AttachmentBuilder(uint8, {
+        const att = new CreateAttachment(uint8, {
             name: "test.bin",
             description: "Binary test",
         });
@@ -75,25 +75,25 @@ describe("Builders Full Coverage", () => {
         const buf = await att.toBuffer();
         expect(buf).toEqual(uint8);
 
-        const stringAtt = new AttachmentBuilder(uint8, "string-named.bin");
+        const stringAtt = new CreateAttachment(uint8, "string-named.bin");
         expect(stringAtt.name).toBe("string-named.bin");
 
-        const arrayBufAtt = new AttachmentBuilder(uint8.buffer);
+        const arrayBufAtt = new CreateAttachment(uint8.buffer);
         expect(await arrayBufAtt.toBuffer()).toEqual(uint8);
 
-        const blobAtt = new AttachmentBuilder(new Blob(["hello"]));
+        const blobAtt = new CreateAttachment(new Blob(["hello"]));
         const blobBuf = await blobAtt.toBuffer();
         expect(new TextDecoder().decode(blobBuf)).toBe("hello");
 
-        const invalidAtt = new AttachmentBuilder(123 as any);
+        const invalidAtt = new CreateAttachment(123 as any);
         await expect(invalidAtt.toBuffer()).rejects.toThrow(TypeError);
     });
 
-    test("SlashCommandBuilder covers all option types, subcommands and groups", () => {
-        const cmd = new SlashCommandBuilder()
+    test("CreateSlashCommand covers all option types, subcommands and groups", () => {
+        const cmd = new CreateSlashCommand()
             .setName("moderation")
             .setDescription("Moderation command suite")
-            .setDMPermission(false)
+            .setContexts(0)
             .setDefaultMemberPermissions("8")
             .setNSFW(true)
             .addStringOption((opt) =>
@@ -170,30 +170,31 @@ describe("Builders Full Coverage", () => {
         const json = cmd.toJSON();
         expect(json.name).toBe("moderation");
         expect(json.description).toBe("Moderation command suite");
-        expect(json.dm_permission).toBe(false);
+        expect(json.contexts).toEqual([0]);
+        expect(json.dm_permission).toBeUndefined();
         expect(json.default_member_permissions).toBe("8");
         expect(json.nsfw).toBe(true);
         expect((json.options as any[]).length).toBe(11);
     });
 
     test("Component Builders cover buttons, selects, modals and text inputs", () => {
-        const btn = new ButtonBuilder()
+        const btn = new CreateButton()
             .setCustomId("btn_confirm")
             .setLabel("Confirm")
-            .setStyle(ButtonStyle.Success)
+            .setStyle(ButtonType.Success)
             .setEmoji("✅")
             .setDisabled(false);
 
         expect(btn.toJSON().custom_id).toBe("btn_confirm");
-        expect(btn.toJSON().style).toBe(ButtonStyle.Success);
+        expect(btn.toJSON().style).toBe(ButtonType.Success);
 
-        const linkBtn = new ButtonBuilder()
+        const linkBtn = new CreateButton()
             .setLabel("Docs")
-            .setStyle(ButtonStyle.Link)
+            .setStyle(ButtonType.Link)
             .setURL("https://lunibee.js.org/");
         expect(linkBtn.toJSON().url).toBe("https://lunibee.js.org/");
 
-        const strSelect = new StringSelectBuilder()
+        const strSelect = new CreateStringSelect()
             .setCustomId("select_roles")
             .setPlaceholder("Choose a role")
             .setMinValues(1)
@@ -210,26 +211,26 @@ describe("Builders Full Coverage", () => {
             );
         expect(strSelect.toJSON().options?.length).toBe(2);
 
-        const userSelect = new EntitySelectBuilder(ComponentType.UserSelect)
+        const userSelect = new CreateEntitySelect(ComponentEnum.UserSelect)
             .setCustomId("select_users")
             .setPlaceholder("Pick users")
             .setDefaultValues({ id: "123", type: "user" });
-        expect(userSelect.toJSON().type).toBe(ComponentType.UserSelect);
+        expect(userSelect.toJSON().type).toBe(ComponentEnum.UserSelect);
 
-        const textInput = new TextInputBuilder()
+        const textInput = new CreateTextInput()
             .setCustomId("input_feedback")
             .setLabel("Your Feedback")
-            .setStyle(TextInputStyle.Paragraph)
+            .setStyle(TextInputType.Paragraph)
             .setPlaceholder("Type here...")
             .setValue("Initial text")
             .setMinLength(10)
             .setMaxLength(500)
             .setRequired(true);
 
-        const modal = new ModalBuilder()
+        const modal = new CreateModal()
             .setCustomId("modal_feedback")
             .setTitle("Feedback Form")
-            .addComponents(new ActionRowBuilder().addComponents(textInput));
+            .addComponents(new CreateActionRow().addComponents(textInput));
 
         const modalJson = modal.toJSON();
         expect(modalJson.custom_id).toBe("modal_feedback");

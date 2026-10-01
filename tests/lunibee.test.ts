@@ -7,8 +7,8 @@ describe("Lunibee Main Package", () => {
         expect(lunibee.REST).toBeDefined();
         expect(lunibee.Gateway).toBeDefined();
         expect(lunibee.GatewayState).toBeDefined();
-        expect(lunibee.EmbedBuilder).toBeDefined();
-        expect(lunibee.SlashCommandBuilder).toBeDefined();
+        expect(lunibee.CreateEmbed).toBeDefined();
+        expect(lunibee.CreateSlashCommand).toBeDefined();
         expect(lunibee.PermissionsBitField).toBeDefined();
         expect(lunibee.userMention).toBeDefined();
         expect(lunibee.channelMention).toBeDefined();

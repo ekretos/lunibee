@@ -8,21 +8,21 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
-    EmbedBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    ComponentType,
-    ActionRowBuilder,
-    StringSelectBuilder,
-    EntitySelectBuilder,
-    ModalBuilder,
-    TextInputBuilder,
-    TextInputStyle,
-    ContainerBuilder,
-    SectionBuilder,
-    TextDisplayBuilder,
-    ThumbnailBuilder,
-    MediaGalleryBuilder,
+    CreateEmbed,
+    CreateButton,
+    ButtonType,
+    ComponentEnum,
+    CreateActionRow,
+    CreateStringSelect,
+    CreateEntitySelect,
+    CreateModal,
+    CreateTextInput,
+    TextInputType,
+    CreateContainer,
+    CreateSection,
+    CreateTextDisplay,
+    CreateThumbnail,
+    CreateMediaGallery,
 } from "../packages/builders/src/index.ts";
 import type {
     APIButtonComponent,
@@ -38,8 +38,8 @@ import {
 } from "../packages/structures/src/index.ts";
 
 describe("Builders — payload contracts", () => {
-    test("EmbedBuilder.toJSON returns a snake_case Discord payload and is cloned", () => {
-        const builder = new EmbedBuilder()
+    test("CreateEmbed.toJSON returns a snake_case Discord payload and is cloned", () => {
+        const builder = new CreateEmbed()
             .setTitle("Title")
             .setColor(0x5865f2)
             .addFields({ name: "a", value: "b", inline: true });
@@ -54,65 +54,65 @@ describe("Builders — payload contracts", () => {
         expect(builder.toJSON().fields).toHaveLength(1);
     });
 
-    test("ButtonBuilder enforces link/custom_id mutual exclusion", () => {
-        const custom = new ButtonBuilder()
-            .setStyle(ButtonStyle.Primary)
+    test("CreateButton enforces link/custom_id mutual exclusion", () => {
+        const custom = new CreateButton()
+            .setStyle(ButtonType.Primary)
             .setCustomId("click")
             .setLabel("Click");
         const json: APIButtonComponent = custom.toJSON();
         expect(json).toEqual({
-            type: ComponentType.Button,
-            style: ButtonStyle.Primary,
+            type: ComponentEnum.Button,
+            style: ButtonType.Primary,
             custom_id: "click",
             label: "Click",
         });
 
         // setURL flips to a link button and drops custom_id.
-        const link = new ButtonBuilder()
+        const link = new CreateButton()
             .setCustomId("x")
             .setURL("https://a.b/")
             .setLabel("Go");
         expect(link.toJSON()).toEqual({
-            type: ComponentType.Button,
-            style: ButtonStyle.Link,
+            type: ComponentEnum.Button,
+            style: ButtonType.Link,
             label: "Go",
             url: "https://a.b/",
         });
         // A link button rejects custom ids.
         expect(() =>
-            new ButtonBuilder().setStyle(ButtonStyle.Link).setCustomId("no"),
+            new CreateButton().setStyle(ButtonType.Link).setCustomId("no"),
         ).toThrow(TypeError);
     });
 
-    test("ActionRowBuilder nests child toJSON output and caps at 5", () => {
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId("a").setLabel("A"),
-            new ButtonBuilder().setCustomId("b").setLabel("B"),
+    test("CreateActionRow nests child toJSON output and caps at 5", () => {
+        const row = new CreateActionRow<CreateButton>().addComponents(
+            new CreateButton().setCustomId("a").setLabel("A"),
+            new CreateButton().setCustomId("b").setLabel("B"),
         );
         const json = row.toJSON();
-        expect(json.type).toBe(ComponentType.ActionRow);
+        expect(json.type).toBe(ComponentEnum.ActionRow);
         expect(json.components).toHaveLength(2);
-        expect(json.components[0]!.type).toBe(ComponentType.Button);
+        expect(json.components[0]!.type).toBe(ComponentEnum.Button);
         expect(() =>
-            new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new CreateActionRow<CreateButton>().addComponents(
                 ...Array.from({ length: 6 }, (_, i) =>
-                    new ButtonBuilder().setCustomId(`c${i}`).setLabel("x"),
+                    new CreateButton().setCustomId(`c${i}`).setLabel("x"),
                 ),
             ),
         ).toThrow(RangeError);
     });
 
-    test("StringSelectBuilder clones options and enforces the 25 cap", () => {
-        const select = new StringSelectBuilder()
+    test("CreateStringSelect clones options and enforces the 25 cap", () => {
+        const select = new CreateStringSelect()
             .setCustomId("menu")
             .addOptions({ label: "One", value: "1" });
         expect(select.toJSON()).toEqual({
-            type: ComponentType.StringSelect,
+            type: ComponentEnum.StringSelect,
             custom_id: "menu",
             options: [{ label: "One", value: "1" }],
         });
         expect(() =>
-            new StringSelectBuilder().addOptions(
+            new CreateStringSelect().addOptions(
                 ...Array.from({ length: 26 }, (_, i) => ({
                     label: `l${i}`,
                     value: `${i}`,
@@ -121,27 +121,27 @@ describe("Builders — payload contracts", () => {
         ).toThrow(RangeError);
     });
 
-    test("EntitySelectBuilder carries typed default_values", () => {
-        const select = new EntitySelectBuilder(ComponentType.UserSelect)
+    test("CreateEntitySelect carries typed default_values", () => {
+        const select = new CreateEntitySelect(ComponentEnum.UserSelect)
             .setCustomId("users")
             .setDefaultValues({ id: "1", type: "user" });
         const json: APIEntitySelectComponent = select.toJSON();
         expect(json.default_values).toEqual([{ id: "1", type: "user" }]);
         expect(
-            () => new EntitySelectBuilder(ComponentType.Button as never),
+            () => new CreateEntitySelect(ComponentEnum.Button as never),
         ).toThrow();
     });
 
     test("Modal + TextInput serialize to Discord's nested shape", () => {
-        const modal = new ModalBuilder()
+        const modal = new CreateModal()
             .setCustomId("m")
             .setTitle("Feedback")
             .addComponents(
-                new ActionRowBuilder<TextInputBuilder>().addComponents(
-                    new TextInputBuilder()
+                new CreateActionRow<CreateTextInput>().addComponents(
+                    new CreateTextInput()
                         .setCustomId("field")
                         .setLabel("Field")
-                        .setStyle(TextInputStyle.Paragraph),
+                        .setStyle(TextInputType.Paragraph),
                 ),
             );
         expect(modal.toJSON()).toEqual({
@@ -150,11 +150,11 @@ describe("Builders — payload contracts", () => {
             title: "Feedback",
             components: [
                 {
-                    type: ComponentType.ActionRow,
+                    type: ComponentEnum.ActionRow,
                     components: [
                         {
-                            type: ComponentType.TextInput,
-                            style: TextInputStyle.Paragraph,
+                            type: ComponentEnum.TextInput,
+                            style: TextInputType.Paragraph,
                             custom_id: "field",
                             label: "Field",
                         },
@@ -167,16 +167,16 @@ describe("Builders — payload contracts", () => {
 
 describe("Builders — Components V2", () => {
     test("Container omits unset accent_color and supports spoiler", () => {
-        const plain: APIContainerComponent = new ContainerBuilder()
-            .addComponents(new TextDisplayBuilder().setContent("hi"))
+        const plain: APIContainerComponent = new CreateContainer()
+            .addComponents(new CreateTextDisplay().setContent("hi"))
             .toJSON();
         expect("accent_color" in plain).toBe(false);
         expect("spoiler" in plain).toBe(false);
 
-        const styled = new ContainerBuilder()
+        const styled = new CreateContainer()
             .setAccentColor(0x00ff00)
             .setSpoiler()
-            .addComponents(new TextDisplayBuilder().setContent("hi"))
+            .addComponents(new CreateTextDisplay().setContent("hi"))
             .toJSON();
         expect(styled.accent_color).toBe(0x00ff00);
         expect(styled.spoiler).toBe(true);
@@ -184,18 +184,18 @@ describe("Builders — Components V2", () => {
 
     test("Thumbnail supports description + spoiler and stays minimal by default", () => {
         expect(
-            new ThumbnailBuilder().setUrl("https://a.b/t.png").toJSON(),
+            new CreateThumbnail().setUrl("https://a.b/t.png").toJSON(),
         ).toEqual({
-            type: ComponentType.Thumbnail,
+            type: ComponentEnum.Thumbnail,
             url: "https://a.b/t.png",
         });
-        const full: APIThumbnailComponent = new ThumbnailBuilder()
+        const full: APIThumbnailComponent = new CreateThumbnail()
             .setUrl("https://a.b/t.png")
             .setDescription("alt text")
             .setSpoiler()
             .toJSON();
         expect(full).toEqual({
-            type: ComponentType.Thumbnail,
+            type: ComponentEnum.Thumbnail,
             url: "https://a.b/t.png",
             description: "alt text",
             spoiler: true,
@@ -203,17 +203,17 @@ describe("Builders — Components V2", () => {
     });
 
     test("Section only emits keys that are set", () => {
-        const section = new SectionBuilder()
-            .addComponents(new TextDisplayBuilder().setContent("body"))
+        const section = new CreateSection()
+            .addComponents(new CreateTextDisplay().setContent("body"))
             .toJSON();
-        expect(section.type).toBe(ComponentType.Section);
+        expect(section.type).toBe(ComponentEnum.Section);
         expect(section.components).toHaveLength(1);
         expect(section.accessory).toBeUndefined();
     });
 
     test("MediaGallery caps at 10 items", () => {
         expect(() =>
-            new MediaGalleryBuilder().addItems(
+            new CreateMediaGallery().addItems(
                 ...Array.from({ length: 11 }, () => ({
                     url: "https://a.b/i.png",
                 })),

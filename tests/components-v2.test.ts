@@ -1,59 +1,59 @@
 import { expect, test } from "bun:test";
 import {
-    ContainerBuilder,
-    SectionBuilder,
-    TextDisplayBuilder,
-    MediaGalleryBuilder,
-    FileComponentBuilder,
-    SeparatorBuilder,
-    ThumbnailBuilder,
-    ContentInventoryEntryBuilder,
-    ComponentType,
+    CreateContainer,
+    CreateSection,
+    CreateTextDisplay,
+    CreateMediaGallery,
+    CreateFileComponent,
+    CreateSeparator,
+    CreateThumbnail,
+    CreateContentInventoryEntry,
+    ComponentEnum,
 } from "../packages/builders/src/components.js";
 
 test("Components V2 Builders > all builders serialize correctly and validate", () => {
-    const container = new ContainerBuilder()
+    const container = new CreateContainer()
         .setAccentColor(0xff0000)
         .addComponents(
-            new SectionBuilder()
+            new CreateSection()
                 .addComponents(
-                    new TextDisplayBuilder().setContent("Hello world"),
+                    new CreateTextDisplay().setContent("Hello world"),
                 )
                 .setAccessory(
-                    new FileComponentBuilder().setUrl("attachment://test.png"),
+                    new CreateFileComponent().setUrl("attachment://test.png"),
                 ),
-            new SeparatorBuilder().setSpacing(2),
-            new MediaGalleryBuilder().addItems({
+            new CreateSeparator().setSpacing(2),
+            new CreateMediaGallery().addItems({
                 url: "https://example.com/image.png",
                 description: "test",
             }),
-            new ThumbnailBuilder().setUrl("https://example.com/thumb.png"),
-            new ContentInventoryEntryBuilder().setId("123456"),
+            new CreateThumbnail().setUrl("https://example.com/thumb.png"),
+            new CreateContentInventoryEntry().setId("123456"),
         );
 
     expect(container.toJSON()).toEqual({
-        type: ComponentType.Container,
+        type: ComponentEnum.Container,
         accent_color: 0xff0000,
         components: [
             {
-                type: ComponentType.Section,
+                type: ComponentEnum.Section,
                 components: [
                     {
-                        type: ComponentType.TextDisplay,
+                        type: ComponentEnum.TextDisplay,
                         content: "Hello world",
                     },
                 ],
                 accessory: {
-                    type: ComponentType.File,
+                    type: ComponentEnum.File,
                     file: { url: "attachment://test.png" },
                 },
             },
             {
-                type: ComponentType.Separator,
+                type: ComponentEnum.Separator,
                 spacing: 2,
             },
             {
-                type: ComponentType.MediaGallery,
+                type: ComponentEnum.MediaGallery,
                 items: [
                     {
                         media: {
@@ -64,26 +64,26 @@ test("Components V2 Builders > all builders serialize correctly and validate", (
                 ],
             },
             {
-                type: ComponentType.Thumbnail,
+                type: ComponentEnum.Thumbnail,
                 url: "https://example.com/thumb.png",
             },
             {
-                type: ComponentType.ContentInventoryEntry,
+                type: ComponentEnum.ContentInventoryEntry,
                 id: "123456",
             },
         ],
     });
 
     // Validation throws
-    expect(() => new ContainerBuilder().addComponents()).toThrow();
-    expect(() => new ContainerBuilder().setAccentColor(-1)).toThrow();
-    expect(() => new SectionBuilder().addComponents()).toThrow();
-    expect(() => new TextDisplayBuilder().setContent("")).toThrow();
-    const gallery = new MediaGalleryBuilder();
+    expect(() => new CreateContainer().addComponents()).toThrow();
+    expect(() => new CreateContainer().setAccentColor(-1)).toThrow();
+    expect(() => new CreateSection().addComponents()).toThrow();
+    expect(() => new CreateTextDisplay().setContent("")).toThrow();
+    const gallery = new CreateMediaGallery();
     expect(() =>
         gallery.addItems(...new Array(11).fill({ url: "test" })),
     ).toThrow();
-    expect(() => new FileComponentBuilder().setUrl("")).toThrow();
-    expect(() => new ThumbnailBuilder().setUrl("")).toThrow();
-    expect(() => new ContentInventoryEntryBuilder().setId("")).toThrow();
+    expect(() => new CreateFileComponent().setUrl("")).toThrow();
+    expect(() => new CreateThumbnail().setUrl("")).toThrow();
+    expect(() => new CreateContentInventoryEntry().setId("")).toThrow();
 });

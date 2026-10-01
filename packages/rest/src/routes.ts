@@ -63,10 +63,16 @@ export const Routes = {
     /** Removes all reactions from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Reaction collection route. */ messageReactionsAll:
         (channelId: string, messageId: string) =>
             `${Routes.message(channelId, messageId)}/reactions`,
-    /** Returns pinned messages. @param channelId Channel identifier. @returns Pins route. */ channelPins:
+    /** Returns pinned messages, newest first, in pages of up to 50 (`before`, `limit`). @param channelId Channel identifier. @returns Pins route. */ channelMessagesPins:
+        (channelId: string) =>
+            `/channels/${snowflake(channelId, "Channel ID")}/messages/pins`,
+    /** Pins (PUT) or unpins (DELETE) a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Pin route. */ channelMessagesPin:
+        (channelId: string, messageId: string) =>
+            `/channels/${snowflake(channelId, "Channel ID")}/messages/pins/${snowflake(messageId, "Message ID")}`,
+    /** @deprecated Discord deprecated this endpoint. Use {@link Routes.channelMessagesPins}, which returns `{ items, has_more }`. Removed in 0.3.0. */ channelPins:
         (channelId: string) =>
             `/channels/${snowflake(channelId, "Channel ID")}/pins`,
-    /** Pins a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Pin route. */ channelPin:
+    /** @deprecated Discord deprecated this endpoint. Use {@link Routes.channelMessagesPin}. Removed in 0.3.0. */ channelPin:
         (channelId: string, messageId: string) =>
             `/channels/${snowflake(channelId, "Channel ID")}/pins/${snowflake(messageId, "Message ID")}`,
     /** Creates a thread from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Message-thread route. */ messageThread:

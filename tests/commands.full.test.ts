@@ -1,22 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import {
-    SlashCommandBuilder,
-    StringOptionBuilder,
-    IntegerOptionBuilder,
-    NumberOptionBuilder,
-    BooleanOptionBuilder,
-    UserOptionBuilder,
-    ChannelOptionBuilder,
-    RoleOptionBuilder,
-    MentionableOptionBuilder,
-    AttachmentOptionBuilder,
-    SubcommandBuilder,
-    SubcommandGroupBuilder,
+    CreateSlashCommand,
+    CreateStringOption,
+    CreateIntegerOption,
+    CreateNumberOption,
+    CreateBooleanOption,
+    CreateUserOption,
+    CreateChannelOption,
+    CreateRoleOption,
+    CreateMentionableOption,
+    CreateAttachmentOption,
+    CreateSubcommand,
+    CreateSubcommandGroup,
 } from "../packages/builders/src/index.ts";
 
 describe("Commands Options & Subcommands Full Coverage", () => {
     test("covers all option builder setters and validations", () => {
-        const strOpt = new StringOptionBuilder()
+        const strOpt = new CreateStringOption()
             .setName("str")
             .setDescription("string desc")
             .setRequired(false)
@@ -26,7 +26,7 @@ describe("Commands Options & Subcommands Full Coverage", () => {
         expect(strOpt.toJSON().name).toBe("str");
         expect(() => strOpt.setMinLength(100).setMaxLength(10)).toThrow();
 
-        const intOpt = new IntegerOptionBuilder()
+        const intOpt = new CreateIntegerOption()
             .setName("int")
             .setDescription("integer desc")
             .setMinValue(0)
@@ -35,7 +35,7 @@ describe("Commands Options & Subcommands Full Coverage", () => {
         expect(intOpt.toJSON().name).toBe("int");
         expect(() => intOpt.setMinValue(100).setMaxValue(10)).toThrow();
 
-        const numOpt = new NumberOptionBuilder()
+        const numOpt = new CreateNumberOption()
             .setName("num")
             .setDescription("number desc")
             .setMinValue(0.5)
@@ -43,38 +43,38 @@ describe("Commands Options & Subcommands Full Coverage", () => {
             .setAutocomplete(true);
         expect(numOpt.toJSON().name).toBe("num");
 
-        const boolOpt = new BooleanOptionBuilder()
+        const boolOpt = new CreateBooleanOption()
             .setName("bool")
             .setDescription("boolean desc");
         expect(boolOpt.toJSON().name).toBe("bool");
 
-        const userOpt = new UserOptionBuilder()
+        const userOpt = new CreateUserOption()
             .setName("usr")
             .setDescription("user desc");
         expect(userOpt.toJSON().name).toBe("usr");
 
-        const chanOpt = new ChannelOptionBuilder()
+        const chanOpt = new CreateChannelOption()
             .setName("chn")
             .setDescription("channel desc")
             .addChannelTypes(0, 2);
         expect(chanOpt.toJSON().name).toBe("chn");
 
-        const roleOpt = new RoleOptionBuilder()
+        const roleOpt = new CreateRoleOption()
             .setName("rol")
             .setDescription("role desc");
         expect(roleOpt.toJSON().name).toBe("rol");
 
-        const mentOpt = new MentionableOptionBuilder()
+        const mentOpt = new CreateMentionableOption()
             .setName("mnt")
             .setDescription("mentionable desc");
         expect(mentOpt.toJSON().name).toBe("mnt");
 
-        const attOpt = new AttachmentOptionBuilder()
+        const attOpt = new CreateAttachmentOption()
             .setName("att")
             .setDescription("attachment desc");
         expect(attOpt.toJSON().name).toBe("att");
 
-        const sub = new SubcommandBuilder()
+        const sub = new CreateSubcommand()
             .setName("sub")
             .setDescription("subcommand desc")
             .addStringOption((o) => o.setName("s").setDescription("s"))
@@ -88,7 +88,7 @@ describe("Commands Options & Subcommands Full Coverage", () => {
             .addAttachmentOption((o) => o.setName("a").setDescription("a"));
         expect(sub.toJSON().name).toBe("sub");
 
-        const group = new SubcommandGroupBuilder()
+        const group = new CreateSubcommandGroup()
             .setName("grp")
             .setDescription("group desc")
             .addSubcommand((s) => s.setName("sub1").setDescription("sub1"));

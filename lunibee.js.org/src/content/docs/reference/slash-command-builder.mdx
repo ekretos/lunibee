@@ -77,22 +77,26 @@ command.setDefaultMemberPermissions(Permission.banMembers);
 </TabItem>
 </Tabs>
 
-### `setDMPermission(allowed)`
+### `setContexts(...contexts)`
 
-Whether the command can be used in DMs.
+Where the command can be used: `0` guilds, `1` the bot's DMs, `2` other DMs. Any other value throws a `RangeError`.
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-command.setDMPermission(false);
+command.setContexts(0); // guilds only
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-command.setDMPermission(false);
+command.setContexts(0); // guilds only
 ```
 </TabItem>
 </Tabs>
+
+### `setDMPermission(allowed)` (deprecated)
+
+Discord deprecated `dm_permission`. Use `setContexts()` instead: `setDMPermission(false)` becomes `setContexts(0)`, and, for a guild-installed bot, `setDMPermission(true)` becomes `setContexts(0, 1)`. Still works in 0.2.x; removed in 0.3.0.
 
 ## Option Builders
 

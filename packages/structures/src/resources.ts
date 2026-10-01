@@ -631,7 +631,7 @@ export class GuildOnboarding extends BaseStructure {
     }
 }
 
-/** @deprecated Use {@link WebhookEnum}. Removed in 2.0. */
+/** @deprecated Use {@link WebhookEnum}. Removed in 0.3.0. */
 export const WebhookType = WebhookEnum;
-/** @deprecated Use {@link WebhookEnum}. Removed in 2.0. */
+/** @deprecated Use {@link WebhookEnum}. Removed in 0.3.0. */
 export type WebhookType = WebhookEnum;

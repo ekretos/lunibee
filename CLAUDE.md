@@ -15,8 +15,8 @@ future sessions should pick up.
   breaks under Bun's per-file transpiler). `PermissionOverwriteEnum` is the
   one existing TS `enum` among them and stays one.
 - Pre-0.2.2 names stay as `@deprecated` aliases, defined at the bottom of the
-  file that defines the new name, until 2.0. New code, docs and examples use
-  the new names only. `PermissionFlagsBits`, `GatewayIntentBits`, `Routes`,
+  file that defines the new name, and are removed in 0.3.0. New code, docs and
+  examples use the new names only. `PermissionFlagsBits`, `GatewayIntentBits`, `Routes`,
   `MessageFlags` and the Gateway code sets keep their names.
 
 ## Next release: 0.2.2 (planned)

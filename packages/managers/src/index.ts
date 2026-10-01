@@ -443,23 +443,28 @@ export class ChannelManager extends Manager<string, Channel> {
             Routes.messageReactionsAll(channelId, messageId),
         );
     }
+    /** Fetches the newest pinned messages (one page, up to 50, like the endpoint it replaces). */
     public async fetchPinnedMessages(channelId: string): Promise<Message[]> {
-        const data = await this.#rest.get<
-            ConstructorParameters<typeof Message>[0][]
-        >(Routes.channelPins(channelId));
-        return data.map((item) => this.messages(channelId).upsert(item));
+        const data = await this.#rest.get<{
+            items: { message: ConstructorParameters<typeof Message>[0] }[];
+        }>(Routes.channelMessagesPins(channelId));
+        return data.items.map((item) =>
+            this.messages(channelId).upsert(item.message),
+        );
     }
     public async pinMessage(
         channelId: string,
         messageId: string,
     ): Promise<void> {
-        await this.#rest.put(Routes.channelPin(channelId, messageId));
+        await this.#rest.put(Routes.channelMessagesPin(channelId, messageId));
     }
     public async unpinMessage(
         channelId: string,
         messageId: string,
     ): Promise<void> {
-        await this.#rest.delete(Routes.channelPin(channelId, messageId));
+        await this.#rest.delete(
+            Routes.channelMessagesPin(channelId, messageId),
+        );
     }
     public createThreadFromMessage(
         channelId: string,

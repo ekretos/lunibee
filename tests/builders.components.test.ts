@@ -1,25 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import {
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    EntitySelectBuilder,
-    ModalBuilder,
-    StringSelectBuilder,
-    TextInputBuilder,
-    TextInputStyle,
-    ComponentType,
+    CreateActionRow,
+    CreateButton,
+    ButtonType,
+    CreateEntitySelect,
+    CreateModal,
+    CreateStringSelect,
+    CreateTextInput,
+    TextInputType,
+    ComponentEnum,
 } from "../packages/builders/src/index.ts";
 
 describe("component builders", () => {
     test("serializes entity selects with Discord component types", () => {
-        const select = new EntitySelectBuilder(ComponentType.UserSelect)
+        const select = new CreateEntitySelect(ComponentEnum.UserSelect)
             .setCustomId("users")
             .setMinValues(1)
             .setMaxValues(3)
             .setPlaceholder("Choose users");
         expect(select.toJSON()).toEqual({
-            type: ComponentType.UserSelect,
+            type: ComponentEnum.UserSelect,
             custom_id: "users",
             min_values: 1,
             max_values: 3,
@@ -28,24 +28,22 @@ describe("component builders", () => {
     });
 
     test("rejects invalid select identifiers", () => {
-        expect(() => new StringSelectBuilder().setCustomId(" ")).toThrow(
+        expect(() => new CreateStringSelect().setCustomId(" ")).toThrow(
             RangeError,
         );
         expect(() =>
-            new StringSelectBuilder().addOptions({ label: "", value: "x" }),
+            new CreateStringSelect().addOptions({ label: "", value: "x" }),
         ).toThrow(RangeError);
     });
 
     test("builds a modal containing a text input action row", () => {
-        const input = new TextInputBuilder()
+        const input = new CreateTextInput()
             .setCustomId("reason")
-            .setStyle(TextInputStyle.Paragraph)
+            .setStyle(TextInputType.Paragraph)
             .setLabel("Reason")
             .setRequired();
-        const row = new ActionRowBuilder<TextInputBuilder>().addComponents(
-            input,
-        );
-        const modal = new ModalBuilder()
+        const row = new CreateActionRow<CreateTextInput>().addComponents(input);
+        const modal = new CreateModal()
             .setCustomId("moderation")
             .setTitle("Moderation")
             .addComponents(row);
@@ -55,11 +53,11 @@ describe("component builders", () => {
             title: "Moderation",
             components: [
                 {
-                    type: ComponentType.ActionRow,
+                    type: ComponentEnum.ActionRow,
                     components: [
                         {
-                            type: ComponentType.TextInput,
-                            style: TextInputStyle.Paragraph,
+                            type: ComponentEnum.TextInput,
+                            style: TextInputType.Paragraph,
                             custom_id: "reason",
                             label: "Reason",
                             required: true,
@@ -71,14 +69,14 @@ describe("component builders", () => {
     });
 
     test("link buttons cannot retain an interaction custom id", () => {
-        const button = new ButtonBuilder()
+        const button = new CreateButton()
             .setCustomId("action")
-            .setStyle(ButtonStyle.Primary)
+            .setStyle(ButtonType.Primary)
             .setURL("https://example.com")
             .setLabel("Open");
         expect(button.toJSON()).toEqual({
-            type: ComponentType.Button,
-            style: ButtonStyle.Link,
+            type: ComponentEnum.Button,
+            style: ButtonType.Link,
             label: "Open",
             url: "https://example.com/",
         });

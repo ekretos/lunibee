@@ -946,7 +946,10 @@ export interface APIApplicationCommand {
     description: string;
     options?: APIApplicationCommandOption[];
     default_member_permissions?: string | null;
+    /** @deprecated Discord deprecated this field. Use `contexts`. Removed in 0.3.0. */
     dm_permission?: boolean;
+    /** Where the command can be used: 0 guilds, 1 the bot's DMs, 2 other DMs. */
+    contexts?: number[];
     nsfw?: boolean;
     version: Snowflake;
 }
@@ -958,7 +961,10 @@ export interface ApplicationCommandData {
     type?: number;
     options?: APIApplicationCommandOption[];
     default_member_permissions?: string | null;
+    /** @deprecated Discord deprecated this field. Use `contexts`. Removed in 0.3.0. */
     dm_permission?: boolean;
+    /** Where the command can be used: 0 guilds, 1 the bot's DMs, 2 other DMs. */
+    contexts?: number[];
     nsfw?: boolean;
 }
 
@@ -1023,42 +1029,42 @@ export interface APISubscription {
 }
 
 // ─── Deprecated names (0.2.2) ────────────────────────────────────────────────
-// Kept so existing bots keep working; removed in 2.0. `…Style` became `…Type`
+// Kept so existing bots keep working; removed in 0.3.0. `…Style` became `…Type`
 // and `…Type` became `…Enum`.
 
-/** @deprecated Use {@link ButtonType}. Removed in 2.0. */
+/** @deprecated Use {@link ButtonType}. Removed in 0.3.0. */
 export const ButtonStyle = ButtonType;
-/** @deprecated Use {@link ButtonType}. Removed in 2.0. */
+/** @deprecated Use {@link ButtonType}. Removed in 0.3.0. */
 export type ButtonStyle = ButtonType;
-/** @deprecated Use {@link TextInputType}. Removed in 2.0. */
+/** @deprecated Use {@link TextInputType}. Removed in 0.3.0. */
 export const TextInputStyle = TextInputType;
-/** @deprecated Use {@link TextInputType}. Removed in 2.0. */
+/** @deprecated Use {@link TextInputType}. Removed in 0.3.0. */
 export type TextInputStyle = TextInputType;
-/** @deprecated Use {@link ChannelEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ChannelEnum}. Removed in 0.3.0. */
 export const ChannelType = ChannelEnum;
-/** @deprecated Use {@link ChannelEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ChannelEnum}. Removed in 0.3.0. */
 export type ChannelType = ChannelEnum;
-/** @deprecated Use {@link ComponentEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ComponentEnum}. Removed in 0.3.0. */
 export const ComponentType = ComponentEnum;
-/** @deprecated Use {@link ComponentEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ComponentEnum}. Removed in 0.3.0. */
 export type ComponentType = ComponentEnum;
-/** @deprecated Use {@link InteractionResponseEnum}. Removed in 2.0. */
+/** @deprecated Use {@link InteractionResponseEnum}. Removed in 0.3.0. */
 export const InteractionResponseType = InteractionResponseEnum;
-/** @deprecated Use {@link InteractionResponseEnum}. Removed in 2.0. */
+/** @deprecated Use {@link InteractionResponseEnum}. Removed in 0.3.0. */
 export type InteractionResponseType = InteractionResponseEnum;
-/** @deprecated Use {@link ApplicationCommandEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ApplicationCommandEnum}. Removed in 0.3.0. */
 export const ApplicationCommandType = ApplicationCommandEnum;
-/** @deprecated Use {@link ApplicationCommandEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ApplicationCommandEnum}. Removed in 0.3.0. */
 export type ApplicationCommandType = ApplicationCommandEnum;
-/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 0.3.0. */
 export const ApplicationCommandOptionType = ApplicationCommandOptionEnum;
-/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 0.3.0. */
 export type ApplicationCommandOptionType = ApplicationCommandOptionEnum;
-/** @deprecated Use {@link StickerEnum}. Removed in 2.0. */
+/** @deprecated Use {@link StickerEnum}. Removed in 0.3.0. */
 export const StickerType = StickerEnum;
-/** @deprecated Use {@link StickerEnum}. Removed in 2.0. */
+/** @deprecated Use {@link StickerEnum}. Removed in 0.3.0. */
 export type StickerType = StickerEnum;
-/** @deprecated Use {@link StickerFormatEnum}. Removed in 2.0. */
+/** @deprecated Use {@link StickerFormatEnum}. Removed in 0.3.0. */
 export const StickerFormatType = StickerFormatEnum;
-/** @deprecated Use {@link StickerFormatEnum}. Removed in 2.0. */
+/** @deprecated Use {@link StickerFormatEnum}. Removed in 0.3.0. */
 export type StickerFormatType = StickerFormatEnum;

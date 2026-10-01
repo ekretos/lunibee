@@ -21,12 +21,12 @@ import {
     toRequest,
 } from "../packages/managers/src/index.js";
 import {
-    ContainerBuilder,
-    EmbedBuilder,
-    ModalBuilder,
-    TextDisplayBuilder,
-    TextInputBuilder,
-    TextInputStyle,
+    CreateContainer,
+    CreateEmbed,
+    CreateModal,
+    CreateTextDisplay,
+    CreateTextInput,
+    TextInputType,
     componentsV2Message,
 } from "../packages/builders/src/index.js";
 
@@ -552,18 +552,18 @@ describe("messages", () => {
 
 describe("builders", () => {
     test("modals take text inputs directly", () => {
-        const modal = new ModalBuilder()
+        const modal = new CreateModal()
             .setCustomId("m")
             .setTitle("Title")
             .addTextInputs(
-                new TextInputBuilder()
+                new CreateTextInput()
                     .setCustomId("a")
                     .setLabel("A")
-                    .setStyle(TextInputStyle.Short),
-                new TextInputBuilder()
+                    .setStyle(TextInputType.Short),
+                new CreateTextInput()
                     .setCustomId("b")
                     .setLabel("B")
-                    .setStyle(TextInputStyle.Paragraph),
+                    .setStyle(TextInputType.Paragraph),
             )
             .toJSON();
         expect(modal.custom_id).toBe("m");
@@ -572,8 +572,8 @@ describe("builders", () => {
     });
 
     test("componentsV2Message sets the flag and keeps other fields", () => {
-        const container = new ContainerBuilder().addComponents(
-            new TextDisplayBuilder().setContent("hi"),
+        const container = new CreateContainer().addComponents(
+            new CreateTextDisplay().setContent("hi"),
         );
         expect(
             componentsV2Message(container, {
@@ -592,7 +592,7 @@ describe("builders", () => {
     });
 
     test("embed setters clear with null", () => {
-        const embed = new EmbedBuilder()
+        const embed = new CreateEmbed()
             .setTitle("t")
             .setDescription("d")
             .setURL("https://example.com")

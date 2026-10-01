@@ -43,7 +43,7 @@ bunx lunibee handler --fix    # add the client parameter, fix folder case, resyn
 `create command` now also generates `data` and `execute()`; existing command
 files keep working. See the [CLI page](/packages/cli/).
 
-The old names keep working until 2.0. To move to the new names, rename imports and uses:
+The old names keep working in 0.2.x and are **removed in 0.3.0**. To move to the new names, rename imports and uses:
 
 | Before | Now |
 |---|---|

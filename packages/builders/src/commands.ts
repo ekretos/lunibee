@@ -16,6 +16,16 @@ export const ApplicationCommandOptionEnum = {
 export type ApplicationCommandOptionEnum =
     (typeof ApplicationCommandOptionEnum)[keyof typeof ApplicationCommandOptionEnum];
 
+/** Throws unless every context is 0 (guilds), 1 (the bot's DMs) or 2 (other DMs). */
+function validateContexts(contexts: number[]): void {
+    if (
+        contexts.some(
+            (context) => context !== 0 && context !== 1 && context !== 2,
+        )
+    )
+        throw new RangeError("Command contexts must be 0, 1 or 2.");
+}
+
 /** Builds Discord application command payloads. */
 export class CreateSlashCommand {
     readonly #data: Record<string, unknown> = { type: 1 };
@@ -31,9 +41,14 @@ export class CreateSlashCommand {
         this.#data.description = description;
         return this;
     }
-    /** Sets whether the command is available in direct messages. */ public setDMPermission(
-        enabled: boolean,
-    ): this {
+    /** Sets where the command can be used: 0 guilds, 1 the bot's DMs, 2 other DMs. @throws {RangeError} For any other value. */
+    public setContexts(...contexts: number[]): this {
+        validateContexts(contexts);
+        this.#data.contexts = [...contexts];
+        return this;
+    }
+    /** @deprecated Discord deprecated `dm_permission`. Use {@link CreateSlashCommand.setContexts}: `setContexts(0)` for guilds only, `setContexts(0, 1)` to allow the bot's DMs. Removed in 0.3.0. */
+    public setDMPermission(enabled: boolean): this {
         this.#data.dm_permission = enabled;
         return this;
     }
@@ -591,7 +606,7 @@ export class CreateContextMenuCommand {
             permissions === null ? null : BigInt(permissions).toString();
         return this;
     }
-    /** Sets whether the command is available in direct messages. */
+    /** @deprecated Discord deprecated `dm_permission`. Use {@link CreateContextMenuCommand.setContexts}: `setContexts(0)` for guilds only, `setContexts(0, 1)` to allow the bot's DMs. Removed in 0.3.0. */
     public setDMPermission(enabled: boolean): this {
         this.data.dm_permission = enabled;
         return this;
@@ -603,12 +618,7 @@ export class CreateContextMenuCommand {
     }
     /** Sets where the command can be used: 0 guilds, 1 the bot's DMs, 2 other DMs. @throws {RangeError} For any other value. */
     public setContexts(...contexts: number[]): this {
-        if (
-            contexts.some(
-                (context) => context !== 0 && context !== 1 && context !== 2,
-            )
-        )
-            throw new RangeError("Command contexts must be 0, 1 or 2.");
+        validateContexts(contexts);
         this.data.contexts = [...contexts];
         return this;
     }
@@ -646,91 +656,91 @@ export class CreateMessageCommand extends CreateContextMenuCommand {
     }
 }
 
-// ─── Deprecated names (0.2.2), removed in 2.0 ────────────────────────────────
+// ─── Deprecated names (0.2.2), removed in 0.3.0 ────────────────────────────────
 // Builders are now `CreateX` (`ButtonBuilder` → `CreateButton`); `…Style` became
 // `…Type` and `…Type` became `…Enum`.
 
-/** @deprecated Use {@link CreateAttachmentOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateAttachmentOption}. Removed in 0.3.0. */
 export const AttachmentOptionBuilder = CreateAttachmentOption;
-/** @deprecated Use {@link CreateAttachmentOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateAttachmentOption}. Removed in 0.3.0. */
 export type AttachmentOptionBuilder = CreateAttachmentOption;
 
-/** @deprecated Use {@link CreateBooleanOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateBooleanOption}. Removed in 0.3.0. */
 export const BooleanOptionBuilder = CreateBooleanOption;
-/** @deprecated Use {@link CreateBooleanOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateBooleanOption}. Removed in 0.3.0. */
 export type BooleanOptionBuilder = CreateBooleanOption;
 
-/** @deprecated Use {@link CreateChannelOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateChannelOption}. Removed in 0.3.0. */
 export const ChannelOptionBuilder = CreateChannelOption;
-/** @deprecated Use {@link CreateChannelOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateChannelOption}. Removed in 0.3.0. */
 export type ChannelOptionBuilder = CreateChannelOption;
 
-/** @deprecated Use {@link CreateCommandOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateCommandOption}. Removed in 0.3.0. */
 export const CommandOptionBuilder = CreateCommandOption;
-/** @deprecated Use {@link CreateCommandOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateCommandOption}. Removed in 0.3.0. */
 export type CommandOptionBuilder = CreateCommandOption;
 
-/** @deprecated Use {@link CreateContextMenuCommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateContextMenuCommand}. Removed in 0.3.0. */
 export const ContextMenuCommandBuilder = CreateContextMenuCommand;
-/** @deprecated Use {@link CreateContextMenuCommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateContextMenuCommand}. Removed in 0.3.0. */
 export type ContextMenuCommandBuilder = CreateContextMenuCommand;
 
-/** @deprecated Use {@link CreateIntegerOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateIntegerOption}. Removed in 0.3.0. */
 export const IntegerOptionBuilder = CreateIntegerOption;
-/** @deprecated Use {@link CreateIntegerOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateIntegerOption}. Removed in 0.3.0. */
 export type IntegerOptionBuilder = CreateIntegerOption;
 
-/** @deprecated Use {@link CreateMentionableOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateMentionableOption}. Removed in 0.3.0. */
 export const MentionableOptionBuilder = CreateMentionableOption;
-/** @deprecated Use {@link CreateMentionableOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateMentionableOption}. Removed in 0.3.0. */
 export type MentionableOptionBuilder = CreateMentionableOption;
 
-/** @deprecated Use {@link CreateMessageCommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateMessageCommand}. Removed in 0.3.0. */
 export const MessageCommandBuilder = CreateMessageCommand;
-/** @deprecated Use {@link CreateMessageCommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateMessageCommand}. Removed in 0.3.0. */
 export type MessageCommandBuilder = CreateMessageCommand;
 
-/** @deprecated Use {@link CreateNumberOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateNumberOption}. Removed in 0.3.0. */
 export const NumberOptionBuilder = CreateNumberOption;
-/** @deprecated Use {@link CreateNumberOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateNumberOption}. Removed in 0.3.0. */
 export type NumberOptionBuilder = CreateNumberOption;
 
-/** @deprecated Use {@link CreateRoleOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateRoleOption}. Removed in 0.3.0. */
 export const RoleOptionBuilder = CreateRoleOption;
-/** @deprecated Use {@link CreateRoleOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateRoleOption}. Removed in 0.3.0. */
 export type RoleOptionBuilder = CreateRoleOption;
 
-/** @deprecated Use {@link CreateSlashCommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateSlashCommand}. Removed in 0.3.0. */
 export const SlashCommandBuilder = CreateSlashCommand;
-/** @deprecated Use {@link CreateSlashCommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateSlashCommand}. Removed in 0.3.0. */
 export type SlashCommandBuilder = CreateSlashCommand;
 
-/** @deprecated Use {@link CreateStringOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateStringOption}. Removed in 0.3.0. */
 export const StringOptionBuilder = CreateStringOption;
-/** @deprecated Use {@link CreateStringOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateStringOption}. Removed in 0.3.0. */
 export type StringOptionBuilder = CreateStringOption;
 
-/** @deprecated Use {@link CreateSubcommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateSubcommand}. Removed in 0.3.0. */
 export const SubcommandBuilder = CreateSubcommand;
-/** @deprecated Use {@link CreateSubcommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateSubcommand}. Removed in 0.3.0. */
 export type SubcommandBuilder = CreateSubcommand;
 
-/** @deprecated Use {@link CreateSubcommandGroup}. Removed in 2.0. */
+/** @deprecated Use {@link CreateSubcommandGroup}. Removed in 0.3.0. */
 export const SubcommandGroupBuilder = CreateSubcommandGroup;
-/** @deprecated Use {@link CreateSubcommandGroup}. Removed in 2.0. */
+/** @deprecated Use {@link CreateSubcommandGroup}. Removed in 0.3.0. */
 export type SubcommandGroupBuilder = CreateSubcommandGroup;
 
-/** @deprecated Use {@link CreateUserCommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateUserCommand}. Removed in 0.3.0. */
 export const UserCommandBuilder = CreateUserCommand;
-/** @deprecated Use {@link CreateUserCommand}. Removed in 2.0. */
+/** @deprecated Use {@link CreateUserCommand}. Removed in 0.3.0. */
 export type UserCommandBuilder = CreateUserCommand;
 
-/** @deprecated Use {@link CreateUserOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateUserOption}. Removed in 0.3.0. */
 export const UserOptionBuilder = CreateUserOption;
-/** @deprecated Use {@link CreateUserOption}. Removed in 2.0. */
+/** @deprecated Use {@link CreateUserOption}. Removed in 0.3.0. */
 export type UserOptionBuilder = CreateUserOption;
 
-/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 0.3.0. */
 export const ApplicationCommandOptionType = ApplicationCommandOptionEnum;
-/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 2.0. */
+/** @deprecated Use {@link ApplicationCommandOptionEnum}. Removed in 0.3.0. */
 export type ApplicationCommandOptionType = ApplicationCommandOptionEnum;

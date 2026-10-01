@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Client, Permission } from "../packages/core/src/index.ts";
-import { ButtonBuilder, ButtonStyle } from "../packages/builders/src/index.ts";
+import { CreateButton, ButtonType } from "../packages/builders/src/index.ts";
 import { redactPath } from "../packages/rest/src/index.ts";
 import type { Message } from "../packages/structures/src/index.ts";
 
@@ -65,10 +65,10 @@ describe("Gateway messages and messageCache", () => {
 
 describe("button field exclusivity", () => {
     test("premium buttons drop and reject label, emoji, custom ID and URL", () => {
-        const premium = new ButtonBuilder().setLabel("Buy").setSKUId("123");
+        const premium = new CreateButton().setLabel("Buy").setSKUId("123");
         expect(premium.toJSON()).toEqual({
             type: 2,
-            style: ButtonStyle.Premium,
+            style: ButtonType.Premium,
             sku_id: "123",
         });
         premium.setLabel("Buy");
@@ -76,15 +76,15 @@ describe("button field exclusivity", () => {
     });
 
     test("changing style clears fields the new style cannot carry", () => {
-        const button = new ButtonBuilder()
+        const button = new CreateButton()
             .setURL("https://example.com")
             .setLabel("Go")
-            .setStyle(ButtonStyle.Primary)
+            .setStyle(ButtonType.Primary)
             .setCustomId("go");
         expect(button.toJSON().url).toBeUndefined();
-        const fromPremium = new ButtonBuilder()
+        const fromPremium = new CreateButton()
             .setSKUId("1")
-            .setStyle(ButtonStyle.Link)
+            .setStyle(ButtonType.Link)
             .setURL("https://example.com")
             .setLabel("x");
         expect(fromPremium.toJSON().sku_id).toBeUndefined();

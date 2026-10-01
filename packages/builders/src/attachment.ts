@@ -69,11 +69,11 @@ export class CreateAttachment {
     }
 }
 
-// ─── Deprecated names (0.2.2), removed in 2.0 ────────────────────────────────
+// ─── Deprecated names (0.2.2), removed in 0.3.0 ────────────────────────────────
 // Builders are now `CreateX` (`ButtonBuilder` → `CreateButton`); `…Style` became
 // `…Type` and `…Type` became `…Enum`.
 
-/** @deprecated Use {@link CreateAttachment}. Removed in 2.0. */
+/** @deprecated Use {@link CreateAttachment}. Removed in 0.3.0. */
 export const AttachmentBuilder = CreateAttachment;
-/** @deprecated Use {@link CreateAttachment}. Removed in 2.0. */
+/** @deprecated Use {@link CreateAttachment}. Removed in 0.3.0. */
 export type AttachmentBuilder = CreateAttachment;

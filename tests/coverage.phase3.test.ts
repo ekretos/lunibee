@@ -114,7 +114,7 @@ import {
     Role,
     Invite,
     Webhook,
-    WebhookType,
+    WebhookEnum,
     Emoji,
     AutoModerationRule,
     GuildWelcomeScreen,
@@ -252,10 +252,10 @@ describe("resource structures", () => {
 
     test("Webhook", () => {
         const hook = new Webhook({ id: "9", token: "t", avatar: "h" });
-        expect(hook.type).toBe(WebhookType.Incoming);
+        expect(hook.type).toBe(WebhookEnum.Incoming);
         expect(`${hook}`).toBe("https://discord.com/api/webhooks/9/t");
         expect(hook.avatarURL()).toContain("/avatars/9/h.png");
-        const noToken = new Webhook({ id: "8", type: WebhookType.Application });
+        const noToken = new Webhook({ id: "8", type: WebhookEnum.Application });
         expect(noToken.url).toBeNull();
         expect(`${noToken}`).toBe("8");
         expect(noToken.avatarURL()).toBeNull();
@@ -481,8 +481,8 @@ describe("ChannelManager paging", () => {
 
 import { Routes } from "../packages/rest/src/index.ts";
 import {
-    UserCommandBuilder,
-    MessageCommandBuilder,
+    CreateUserCommand,
+    CreateMessageCommand,
 } from "../packages/builders/src/index.ts";
 
 describe("Routes (misc)", () => {
@@ -508,20 +508,20 @@ describe("Routes (misc)", () => {
 
 describe("context menu command builders", () => {
     test("serialise all fields", () => {
-        const user = new UserCommandBuilder()
+        const user = new CreateUserCommand()
             .setName("View Profile")
             .setDefaultMemberPermissions(8n)
-            .setDMPermission(false)
+            .setContexts(0)
             .setIntegrationTypes(0, 1)
             .toJSON();
         expect(user).toEqual({
             type: 2,
             name: "View Profile",
             default_member_permissions: "8",
-            dm_permission: false,
+            contexts: [0],
             integration_types: [0, 1],
         });
-        const message = new MessageCommandBuilder()
+        const message = new CreateMessageCommand()
             .setName("Quote")
             .setDefaultMemberPermissions(null)
             .toJSON();
@@ -530,8 +530,8 @@ describe("context menu command builders", () => {
             name: "Quote",
             default_member_permissions: null,
         });
-        expect(() => new UserCommandBuilder().setName(" ")).toThrow(RangeError);
-        expect(() => new UserCommandBuilder().setName("x".repeat(33))).toThrow(
+        expect(() => new CreateUserCommand().setName(" ")).toThrow(RangeError);
+        expect(() => new CreateUserCommand().setName("x".repeat(33))).toThrow(
             RangeError,
         );
     });
@@ -561,7 +561,6 @@ describe("Client utilities", () => {
         await client.fetchInvite("abc");
         await client.fetchInvite("../x", {
             withCounts: true,
-            withExpiration: true,
             guildScheduledEventId: "3",
         });
         await client.fetchSticker("4");
@@ -573,7 +572,7 @@ describe("Client utilities", () => {
             "/guilds/2/preview",
             "/voice/regions",
             "/invites/abc",
-            "/invites/..%2Fx?with_counts=true&with_expiration=true&guild_scheduled_event_id=3",
+            "/invites/..%2Fx?with_counts=true&guild_scheduled_event_id=3",
             "/stickers/4",
             "/sticker-packs",
             "/guilds/templates/a%2Fb",

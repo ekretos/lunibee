@@ -26,7 +26,7 @@ Day-to-day workflow (P0–P3 audits, the release checklist) lives in
 
 1.0 keeps today's names (`Client`, `Guild`, `GuildManager`, `Collection`…),
 with the 0.2.2 naming convention: builders `CreateX`, constant sets `…Enum`
-(`…Type` for styles). The pre-0.2.2 names are removed in 2.0, not in 1.x.
+(`…Type` for styles). The pre-0.2.2 names are removed in 0.3.0.
 The renames in [docs/lunibee-2-architecture.md](docs/lunibee-2-architecture.md)
 (`GuildResource`, `GuildService`, `Store`, `Fleet`…) are **2.0 work**: its own
 staging rule forbids breaking the public API before its Stage 4. The internal
@@ -75,7 +75,7 @@ gate, docs build, changelog, upgrade notes).
   `CreateButton`), `…Style` constants are `…Type` (`ButtonStyle` →
   `ButtonType`), `…Type` constants are `…Enum` (`ChannelType` →
   `ChannelEnum`), plus the new `ActivityEnum`. Old names stay as deprecated
-  aliases until 2.0. New code, docs and examples use the new names.
+  aliases until 0.3.0. New code, docs and examples use the new names.
 - The seven items in [CLAUDE.md](CLAUDE.md): context-menu commands, default
   `allowed_mentions`, CDN exports, `reply({ withResponse })`, `showModal()`
   accepting `toJSON()` output, exported component payload types, and message

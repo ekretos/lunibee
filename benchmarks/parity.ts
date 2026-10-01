@@ -1,5 +1,5 @@
 import { Collection } from "../packages/collection/src/index.ts";
-import { EmbedBuilder, SlashCommandBuilder } from "../packages/builders/src/index.ts";
+import { CreateEmbed, CreateSlashCommand } from "../packages/builders/src/index.ts";
 
 const iterations = Number(process.env.BENCH_ITERATIONS ?? 10_000);
 if (!Number.isInteger(iterations) || iterations <= 0) throw new RangeError("BENCH_ITERATIONS must be a positive integer");
@@ -21,7 +21,7 @@ bench("collection.find", () => collection.find(item => item.value === 999));
 bench("collection.filter", () => collection.filter(item => item.value % 2 === 0));
 bench("collection.clone", () => collection.clone());
 
-bench("embed.serialize", () => new EmbedBuilder().setTitle("benchmark").setDescription("payload").toJSON());
-bench("slash-command.serialize", () => new SlashCommandBuilder().setName("benchmark").setDescription("payload").toJSON());
+bench("embed.serialize", () => new CreateEmbed().setTitle("benchmark").setDescription("payload").toJSON());
+bench("slash-command.serialize", () => new CreateSlashCommand().setName("benchmark").setDescription("payload").toJSON());
 
 console.log(`Lunibee parity benchmarks complete (iterations=${iterations}).`);

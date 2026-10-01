@@ -22,6 +22,11 @@ function manager() {
     const rest = {
         get: async <T>(path: string): Promise<T> => {
             calls.push({ method: "GET", path });
+            if (path.endsWith("/messages/pins"))
+                return {
+                    items: [{ pinned_at: "2025-06-01T00:00:00.000Z", message }],
+                    has_more: false,
+                } as T;
             if (path.includes("/reactions/"))
                 return [{ id: userId, username: "user" }] as T;
             if (path.includes("?")) return [message] as T; // query params usually mean fetchMany
@@ -127,7 +132,9 @@ test("supports reaction endpoints", async () => {
 
 test("supports pins and message threads", async () => {
     const { channels, calls } = manager();
-    await channels.fetchPinnedMessages(channelId);
+    const pinned = await channels.fetchPinnedMessages(channelId);
+    expect(pinned.map((m) => m.id)).toEqual([messageId]);
+    expect(pinned[0]?.content).toBe("hello");
     await channels.pinMessage(channelId, messageId);
     await channels.unpinMessage(channelId, messageId);
     const result = await channels.createThreadFromMessage(
@@ -138,9 +145,16 @@ test("supports pins and message threads", async () => {
         },
     );
     expect(result.id).toBe(thread.id);
-    expect(calls[0]?.path).toBe(`/channels/${channelId}/pins`);
-    expect(calls[1]?.path).toBe(`/channels/${channelId}/pins/${messageId}`);
-    expect(calls[2]?.path).toBe(`/channels/${channelId}/pins/${messageId}`);
+    // Discord's current pin endpoints, not the deprecated /channels/:id/pins.
+    expect(calls[0]?.path).toBe(`/channels/${channelId}/messages/pins`);
+    expect(calls[1]).toMatchObject({
+        method: "PUT",
+        path: `/channels/${channelId}/messages/pins/${messageId}`,
+    });
+    expect(calls[2]).toMatchObject({
+        method: "DELETE",
+        path: `/channels/${channelId}/messages/pins/${messageId}`,
+    });
     expect(calls[3]?.path).toBe(
         `/channels/${channelId}/messages/${messageId}/threads`,
     );

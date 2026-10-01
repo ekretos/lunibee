@@ -5,7 +5,25 @@ description: Lunibee version history and release notes.
 
 ## v0.2.3
 
-Packaging fixes for 0.2.2. No API changes.
+Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existing code keeps working; deprecated APIs are struck through in your editor and **removed in 0.3.0**.
+
+### ⚠️ Deprecated (removed in 0.3.0)
+
+* **The pre-0.2.2 names** (`ButtonBuilder`, `ButtonStyle`, `ChannelType`…, all 49 of them) are now removed in **0.3.0** instead of 2.0. See [Upgrading](/getting-started/upgrading/) for the table of new names.
+* **`setDMPermission()`** on slash and context-menu command builders: Discord deprecated `dm_permission`. Use `setContexts()`, which slash commands now have too: `setDMPermission(false)` → `setContexts(0)`.
+* **`Routes.channelPins` / `Routes.channelPin`**: Discord deprecated `/channels/{id}/pins`. Use `Routes.channelMessagesPins` (returns `{ items, has_more }`) and `Routes.channelMessagesPin`.
+* **`fetchInvite({ withExpiration })`**: no effect; Discord always returns `expires_at` and deprecated the `with_expiration` parameter, so it is no longer sent.
+
+### ✨ Added
+
+* `setContexts()` on `CreateSlashCommand`, the replacement for `setDMPermission()`.
+* `Routes.channelMessagesPins` and `Routes.channelMessagesPin`.
+* `CreateCommandOption` is exported, so code using the deprecated `CommandOptionBuilder` has a name to move to.
+* `contexts` on the `APIApplicationCommand` and `ApplicationCommandData` types.
+
+### 🔧 Changed
+
+* `pinMessage()`, `unpinMessage()` and `fetchPinnedMessages()` use Discord's current pin endpoints. `fetchPinnedMessages()` still returns the newest pinned messages (up to 50) as `Message[]`.
 
 ### 🐛 Fixed
 

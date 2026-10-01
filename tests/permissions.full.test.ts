@@ -5,7 +5,7 @@ import {
     Permission,
     Permissions,
     PermissionFlagsBits,
-    PermissionOverwriteType,
+    PermissionOverwriteEnum,
 } from "../packages/core/src/permissions.ts";
 
 describe("Permissions Full Coverage", () => {
@@ -96,8 +96,8 @@ describe("Permissions Full Coverage", () => {
             PermissionFlagsBits.Administrator,
         );
         expect(PermissionsBitField.All.administrator).toBe(1n << 3n);
-        expect(PermissionOverwriteType.Role).toBe(0);
-        expect(PermissionOverwriteType.Member).toBe(1);
+        expect(PermissionOverwriteEnum.Role).toBe(0);
+        expect(PermissionOverwriteEnum.Member).toBe(1);
 
         expect(() => new PermissionSet(-1n)).toThrow();
         expect(() => new PermissionSet("invalid" as any)).toThrow();
