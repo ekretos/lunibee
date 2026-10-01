@@ -11,6 +11,7 @@ import {
 } from "./inspect.js";
 import { CliError, didYouMean, paint, type IO } from "./io.js";
 import { publish, status } from "./maintainer.js";
+import { migrateDeprecations } from "./deprecations.js";
 import { fixHandlers } from "./migrate.js";
 import { findProjectRoot } from "./project.js";
 import { createCommand, createComponent } from "./scaffold.js";
@@ -74,6 +75,21 @@ const COMMANDS: Command[] = [
             "Handlers from before 0.2.2 received only the event arguments. --fix adds a first\n`_client: Client` parameter (and the import), renames event folders whose case is wrong\n(messagecreate/ → messageCreate/), then regenerates src/handlers/event.ts. Handlers whose\nfirst parameter is already the client (named client/bot or typed as a Client) are left\nalone. Without --fix it only reports, exiting 1 when something needs fixing.",
         run: ({ io, args, root }) =>
             fixHandlers(io, root, {
+                fix: flag(args, "fix"),
+                dryRun: flag(args, "dry-run"),
+                json: flag(args, "json"),
+            }),
+    },
+    {
+        path: ["migrate"],
+        usage: "lunibee migrate [--fix] [--dry-run] [--json]",
+        summary:
+            "Find APIs removed in 0.3.0; --fix renames the old Lunibee names",
+        flags: ["fix", "dry-run", "json"],
+        details:
+            "Checks every file under src/. --fix renames the pre-0.2.2 names (ButtonBuilder →\nCreateButton, ChannelType → ChannelEnum…) only where the file imports them from lunibee\nor @lunibee/*, so discord.js names are never touched, and Routes.channelPin →\nRoutes.channelMessagesPin. Calls that cannot be proven to be Lunibee's (deleteRole,\nsendMessage, bulkDelete, setDMPermission, Routes.channelPins, withExpiration…) are\nlisted with their replacement to change by hand. Exits 1 while anything is left.",
+        run: ({ io, args, root }) =>
+            migrateDeprecations(io, root, {
                 fix: flag(args, "fix"),
                 dryRun: flag(args, "dry-run"),
                 json: flag(args, "json"),

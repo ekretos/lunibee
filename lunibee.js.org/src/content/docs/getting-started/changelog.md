@@ -26,6 +26,7 @@ Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existi
 * `roles.setPositions(positions, reason)` and `channels.createWebhook(channelId, { name, reason })`, for the two routes bots still called by hand.
 * `Guild` carries `afkChannelId`, `afkTimeout`, `widgetEnabled`, `widgetChannelId`, `applicationId`, `publicUpdatesChannelId`, `safetyAlertsChannelId`, `maxPresences` and `maxVideoChannelUsers`.
 * `RESTErrorCode`: names for the Discord error codes bots handle, e.g. `error.code === RESTErrorCode.UnknownMessage`. `RESTError.hint` says what to check for Missing Access (50001) and Missing Permissions (50013).
+* **`lunibee migrate`** (CLI): lists the APIs removed in 0.3.0 in your `src/`; `--fix` renames the old Lunibee names (only where they are imported from Lunibee) and lists the calls to change by hand. See [CLI](/packages/cli/).
 * `MessagePayload` and `Buildable<T>` types: type your own message payloads (builders or raw objects); every send and reply method accepts them.
 
 ### 🔧 Changed

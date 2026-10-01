@@ -6,7 +6,8 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 ## 0.2.2 → 0.2.3
 
 Nothing breaks: deprecated APIs keep working until 0.3.0 and your editor strikes them
-through. To be ready for 0.3.0:
+through. `bunx lunibee migrate` lists them in your project and `--fix` renames the old
+names for you. To be ready for 0.3.0:
 
 | Deprecated | Use |
 |---|---|
