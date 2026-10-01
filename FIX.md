@@ -15,7 +15,7 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 | `client.rest.*(Routes.…)` | 109 | Manager/structure methods missing `reason`, inconsistent, or not discoverable |
 | `.toJSON()` on builders | 162 | Payload fields typed `unknown[]`, so no autocomplete or checking |
 | `as unknown as` / raw reads | 45 | Interaction payload read through `any`; `Guild` misses fields |
-| `error.status === 404` checks | many | Discord error codes have no names |
+| `error.status === 404` checks | several | `RESTError.kind` exists but is not discovered; specific codes have no names |
 
 ## Guardrails (do not "brain rot" the API)
 
@@ -30,7 +30,8 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 
 - **Severity:** P2
 - **Location:** `packages/managers/src/{role,emoji,index,guild,member}.ts`, `packages/structures/src/base.ts` (`Channel`)
-- **Problem:** The same action has different names and argument shapes:
+- **Problem:** The same action has different names and argument shapes.
+  `GuildMember.kick(reason)`, `.ban({ reason })`, `.timeout(ms, reason)`;
   `RoleManager.deleteRole`, `EmojiManager.deleteEmoji`, `ChannelManager.deleteChannel`,
   `GuildManager.deleteGuild`, `BaseManager.delete`; `Channel.send` and `Channel.sendMessage`.
   `RoleManager.edit(id, { reason, … })` but `MemberManager.edit(id, options, reason)`.
@@ -94,17 +95,16 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 - **Regression test:** Per structure: every `APIX` key is either mapped or in an exclusion list.
 - **Status:** Open
 
-## F6 — Errors a human can act on
+## F6 — Name the specific Discord error codes
 
-- **Severity:** P2
+- **Severity:** P3
 - **Location:** `packages/rest/src/errors.ts`
-- **Problem:** `RESTError.code` is a bare number; callers compare `status === 404`. Messages do not
-  say what to do.
-- **Impact:** Fragile checks (404 covers Unknown Message, Unknown Channel, …).
-- **Fix:** Export Discord's JSON error codes as a `const` object, `RESTErrorCode`, using the naming
-  rules in CLAUDE.md. Message format: `<method> <route> → <status> <Discord message> (<code name>)`
-  plus a hint for 403/50013 (missing permission or role hierarchy). No token or body in the message.
-- **Regression test:** Code names round-trip; the message has no secrets; hints present for 50013.
+- **Today:** `RESTError` already has `kind` (`"notFound"`, `"permission"`, `"rateLimited"`, …),
+  `status`, the numeric `code`, `method` and `path`. ZedBot ignores `kind` and checks `status === 404`.
+- **Problem:** `kind` cannot tell Unknown Message from Unknown Channel; `code` is a bare number.
+- **Fix:** Export Discord's JSON error codes as a `const` object `RESTErrorCode` (CLAUDE.md naming).
+  Add a 50013 hint (missing permission or role hierarchy) to the message. No token or body in it.
+- **Regression test:** Code names round-trip; the message has no secrets; hint present for 50013.
 - **Status:** Open
 
 ## F7 — Error listeners are not silently swallowed
@@ -116,17 +116,7 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 - **Regression test:** A throwing error listener produces one warning and no recursion.
 - **Status:** Open
 
-## F8 — Docs for people coming from discord.js
-
-- **Severity:** P3
-- **Location:** docs site
-- **Problem:** No side-by-side guide; ZedBot was ported by trial and error.
-- **Fix:** One "From discord.js" page: client, replies and `ephemeral`, embeds and components,
-  collectors, permissions, moderation (ban/kick/timeout with reason), errors.
-  Every snippet uses the post-F1/F2 API and compiles in CI.
-- **Status:** Open
-
-## F9 — Keep the release files truthful
+## F8 — Keep the release files truthful
 
 - **Severity:** P3
 - **Location:** `AGENT.md` (target "v0.2.1"), `CLAUDE.md` ("next: 0.2.2"); packages are 0.2.3
@@ -140,7 +130,7 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 1. F1 + F2: biggest effect, mechanical, non-breaking with aliases.
 2. F4, then F6.
 3. F3, F5.
-4. F7, F8, F9.
+4. F7, F8.
 
 Done when ZedBot can drop its `.toJSON()` calls, the Lunibee-related casts and the direct
 `Routes` calls listed above without adding new ones.
