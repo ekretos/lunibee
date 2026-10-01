@@ -8,7 +8,7 @@ The goal is to keep changes systematic and prevent known issues from being forgo
 
 ## Release Target
 
-Current release target: **v0.2.3**
+Current release target: **v0.2.4**
 
 When working on a release:
 

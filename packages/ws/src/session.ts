@@ -190,8 +190,35 @@ export class GatewaySession {
         return resume ? { type: "resume", ...resume } : { type: "identify" };
     }
 
-    /** Host the next connection should dial: the resume host, else `fallback`. */
+    /**
+     * Host the next connection should dial: the resume host, else `fallback`.
+     * The resume host comes from READY, so it is used only when it is a `wss:`
+     * URL on discord.gg (or a subdomain), or on the fallback's own host; any
+     * other host would receive the bot token in the RESUME frame.
+     */
     public connectURL(fallback: string): string {
-        return this.resumeInfo()?.resumeURL ?? fallback;
+        const resume = this.resumeInfo()?.resumeURL;
+        return resume !== undefined && isTrustedGatewayURL(resume, fallback)
+            ? resume
+            : fallback;
+    }
+}
+
+/** Whether `url` is a `wss:` URL on discord.gg (or a subdomain) or on `fallback`'s host. */
+export function isTrustedGatewayURL(url: string, fallback: string): boolean {
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return false;
+    }
+    if (parsed.protocol !== "wss:" || parsed.username || parsed.password)
+        return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === "discord.gg" || host.endsWith(".discord.gg")) return true;
+    try {
+        return host === new URL(fallback).hostname.toLowerCase();
+    } catch {
+        return false;
     }
 }

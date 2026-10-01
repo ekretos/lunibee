@@ -165,7 +165,7 @@ describe("Gateway integration lifecycle", () => {
             s: 42,
             d: {
                 session_id: "session",
-                resume_gateway_url: "wss://resume.test",
+                resume_gateway_url: "wss://gateway-us-east1-b.discord.gg",
             },
         });
         socket.receive({ op: GatewayOpcodes.InvalidSession, d: false });
@@ -577,7 +577,7 @@ describe("Gateway integration lifecycle", () => {
             s: 42,
             d: {
                 session_id: "test-session",
-                resume_gateway_url: "wss://resume.test",
+                resume_gateway_url: "wss://gateway-us-east1-b.discord.gg",
             },
         });
 
@@ -585,7 +585,7 @@ describe("Gateway integration lifecycle", () => {
         await Bun.sleep(10);
 
         const socket2 = FakeWebSocket.instances[1]!;
-        expect(socket2.url).toBe("wss://resume.test");
+        expect(socket2.url).toBe("wss://gateway-us-east1-b.discord.gg");
         socket2.open();
 
         socket2.receive({

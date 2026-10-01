@@ -267,7 +267,7 @@ async function connectReady(gateway: Gateway): Promise<FakeWebSocket> {
             s: 5,
             d: {
                 session_id: "session-1",
-                resume_gateway_url: "wss://resume.test",
+                resume_gateway_url: "wss://gateway-us-east1-b.discord.gg",
             },
         }),
     });
@@ -314,7 +314,9 @@ describe("Gateway reconnect wiring", () => {
         const socket = await connectReady(gateway);
         socket.close(1006);
         await wait(40);
-        expect(FakeWebSocket.instances[1]!.url).toBe("wss://resume.test");
+        expect(FakeWebSocket.instances[1]!.url).toBe(
+            "wss://gateway-us-east1-b.discord.gg",
+        );
         gateway.close();
     });
 
@@ -335,7 +337,7 @@ describe("Gateway reconnect wiring", () => {
         await wait(40);
 
         const second = FakeWebSocket.instances[1]!;
-        expect(second.url).not.toBe("wss://resume.test");
+        expect(second.url).not.toBe("wss://gateway-us-east1-b.discord.gg");
         second.open();
         second.receive({
             op: GatewayOpcodes.Hello,

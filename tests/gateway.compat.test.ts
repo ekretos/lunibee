@@ -90,7 +90,10 @@ async function connectReady(options: Record<string, unknown> = {}) {
         op: GatewayOpcodes.Dispatch,
         t: "READY",
         s: 5,
-        d: { session_id: "sess", resume_gateway_url: "wss://resume.test" },
+        d: {
+            session_id: "sess",
+            resume_gateway_url: "wss://gateway-us-east1-b.discord.gg",
+        },
     });
     return { gateway, socket };
 }
@@ -134,7 +137,7 @@ describe("Gateway resume / reconnect behaviour", () => {
         const next = FakeWebSocket.instances.at(-1)!;
         expect(next).not.toBe(socket);
         // Reconnect targets the resume URL, then RESUMEs the same session.
-        expect(next.url).toBe("wss://resume.test");
+        expect(next.url).toBe("wss://gateway-us-east1-b.discord.gg");
         next.open();
         next.receive({
             op: GatewayOpcodes.Hello,

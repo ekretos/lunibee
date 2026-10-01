@@ -3,7 +3,32 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
-## v0.2.3
+## v0.2.4
+
+Security release. Fixes the findings of the 0.2.3 security review; the status of each one is in [`docs/audits/security-0.2.3.md`](https://github.com/ekretos/lunibee/blob/0.2.4/docs/audits/security-0.2.3.md). **Upgrade recommended.**
+
+### 🔒 Security
+
+* **REST paths can no longer be rewritten into another route.** `.`/`..` segments, percent-encoded dots and backslashes are refused before the request, so a string passed as an id cannot send the bot token to a different endpoint. `leaveGuild()`, `fetchWebhook()`, `fetchGuildPreview()`, `fetchSticker()`, `followUpInteraction()` and `removeReaction()` validate ids, and tokens are always URL-encoded.
+* **Webhook and interaction tokens stay out of rate-limit keys** (including Redis), errors and hooks; redaction now ignores the path's case.
+* **The Gateway only resumes on Discord's hosts.** A `resume_gateway_url` that is not `wss:` on `discord.gg` (or the gateway you connected to) is ignored and the default gateway is used, so the RESUME frame never carries the token elsewhere.
+* **A caller's `authorization` header can no longer be merged with the bot token.** Library headers replace any spelling of the same header.
+* **Gateway frames are capped** at 64 MiB inflated, so a compressed frame cannot exhaust memory.
+* **Webhook URLs must be Discord's** (`WebhookClient({ url })` no longer accepts look-alike hosts or embedded URLs); `thread_id` is encoded; CDN asset hashes are encoded.
+* **Listener warnings never print the bot token**; it is replaced with `[token]`.
+
+### ⚠️ Behaviour changes
+
+* **Timed-out members** keep only View Channel and Read Message History in `member.permissions`, `member.permissionsIn()`, `client.permissionsFor()` and `computePermissions({ timedOutUntil })`, as Discord applies it. Owners and administrators are exempt.
+* **IDENTIFY properties** default to `os: process.platform`, `browser` and `device: "Lunibee"` instead of Discord's Android client, so the bot no longer shows the mobile status icon. Set `properties` in the client options to change them.
+* **`link()` and `codeBlock()`** escape their input: brackets in a link label, parentheses and spaces in its URL, and ``` inside a code block.
+* `fetchWebhook()`, `fetchGuildPreview()`, `fetchSticker()` and `followUpInteraction()` reject a malformed id (a rejected promise with a `TypeError`), and `REST` rejects paths with dot segments.
+
+### ✨ Added
+
+* **`CreateAttachment(path, { root })`**: confines a file path to a folder (symlinks resolved). Use it, or pass bytes, whenever the path comes from a user.
+* `Routes.currentUserGuild`, `Routes.sticker`, `Routes.messageReactionUser`.
+
 
 Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existing code keeps working; deprecated APIs are struck through in your editor and **removed in 0.3.0**.
 

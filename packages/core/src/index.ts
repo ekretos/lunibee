@@ -104,6 +104,8 @@ type GuildMemberEvent = APIGuildMember & { guild_id: string };
 /** Minimal typed event emitter used by the client. */
 class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
     readonly #listeners = new Map<keyof Events, Set<Listener<any>>>();
+    /** Removes secrets from text this emitter prints; the client removes its token. */
+    protected readonly redactSecrets = (text: string): string => text;
     public on<K extends keyof Events>(
         event: K,
         listener: Listener<Events[K]>,
@@ -182,7 +184,8 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
                           ClientEvent.Error as keyof Events,
                       ) ?? []),
                   ];
-        if (listeners.length === 0) return warnListenerError(event, normalized);
+        if (listeners.length === 0)
+            return warnListenerError(event, normalized, this.redactSecrets);
         for (const listener of listeners) {
             try {
                 const result = listener(normalized);
@@ -191,24 +194,39 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
                     typeof (result as PromiseLike<unknown>).then === "function"
                 )
                     void Promise.resolve(result).catch((failure) =>
-                        warnListenerError(ClientEvent.Error, failure),
+                        warnListenerError(
+                            ClientEvent.Error,
+                            failure,
+                            this.redactSecrets,
+                        ),
                     );
             } catch (failure) {
-                warnListenerError(ClientEvent.Error, failure);
+                warnListenerError(
+                    ClientEvent.Error,
+                    failure,
+                    this.redactSecrets,
+                );
             }
         }
     }
 }
 
-/** Reports an error no listener handled as a process warning (stderr by default). */
-function warnListenerError(event: PropertyKey, error: unknown): void {
+/** Reports an error no listener handled as a process warning (stderr by default), with secrets removed. */
+function warnListenerError(
+    event: PropertyKey,
+    error: unknown,
+    redact: (text: string) => string = (text) => text,
+): void {
     const failure = error instanceof Error ? error : new Error(String(error));
     process.emitWarning(
-        `A "${String(event)}" listener threw and no error listener handled it: ${failure.message}`,
+        redact(
+            `A "${String(event)}" listener threw and no error listener handled it: ${failure.message}`,
+        ),
         {
             type: "LunibeeWarning",
             code: "LUNIBEE_UNHANDLED_LISTENER_ERROR",
-            detail: failure.stack,
+            detail:
+                failure.stack === undefined ? undefined : redact(failure.stack),
         },
     );
 }
@@ -240,6 +258,13 @@ export class Client
      * The bot token this client is authenticated with, or `null` once the
      * client has been destroyed. Mirrors `Client#token` in Discord.js.
      */
+    /** Replaces the bot token in text Lunibee prints (listener warnings). */
+    protected override readonly redactSecrets = (text: string): string => {
+        const token = this.options.token;
+        return token && token.length >= 8
+            ? text.split(token).join("[token]")
+            : text;
+    };
     public get token(): string | null {
         return this.state === "destroyed" ? null : (this.options.token ?? null);
     }
@@ -328,8 +353,20 @@ export class Client
                 this.channels.unpinMessage(channelId, messageId, reason),
             collectInteractions: (options) =>
                 this.createCollector(ClientEvent.InteractionCreate, options),
-            memberPermissions: (guildId, memberId, roleIds, channelId) =>
-                this.#memberPermissions(guildId, memberId, roleIds, channelId),
+            memberPermissions: (
+                guildId,
+                memberId,
+                roleIds,
+                channelId,
+                timedOutUntil,
+            ) =>
+                this.#memberPermissions(
+                    guildId,
+                    memberId,
+                    roleIds,
+                    channelId,
+                    timedOutUntil,
+                ),
             kickMember: (guildId, userId, reason) =>
                 this.guilds.members(guildId).kick(userId, reason),
             banMember: (guildId, userId, options) =>
@@ -1054,6 +1091,7 @@ export class Client
         memberId: string,
         roleIds: readonly string[],
         channelId?: string,
+        timedOutUntil?: Date | null,
     ): PermissionSet | null {
         const guild = this.guilds.get(guildId);
         if (!guild) return null;
@@ -1073,6 +1111,7 @@ export class Client
             memberRoleIds: [...roleIds],
             roles: this.guilds.roles(guildId).values(),
             overwrites: channel?.permissionOverwrites,
+            timedOutUntil,
         });
     }
 
@@ -1106,6 +1145,7 @@ export class Client
             memberRoleIds: member.roleIds,
             roles: this.guilds.roles(guildId).values(),
             overwrites: channel?.permissionOverwrites,
+            timedOutUntil: member.timedOutUntil,
         });
     }
 
@@ -1116,6 +1156,10 @@ export class Client
         );
     }
 
+    /**
+     * Connects to the Gateway. Resolves with the token used, like discord.js;
+     * do not log the return value.
+     */
     public async login(token?: string): Promise<string> {
         if (this.state === "destroyed")
             throw new Error("Cannot login a destroyed client.");
@@ -1190,14 +1234,14 @@ export class Client
             Routes.interactionOriginalResponse(this.user.id, token),
         );
     }
-    public followUpInteraction(
+    public async followUpInteraction(
         token: string,
         data: Record<string, unknown>,
     ): Promise<unknown> {
         if (!this.user)
             return Promise.reject(new Error("Client is unauthenticated."));
         return this.rest.post(
-            `/webhooks/${this.user.id}/${token}`,
+            Routes.webhook(this.user.id, token),
             toRequest(data, this.options.allowedMentions),
         );
     }
@@ -1224,20 +1268,20 @@ export class Client
     // ── Client Utilities ─────────────────────────────────────────────────────
 
     /** Fetches a webhook from Discord. */
-    public fetchWebhook(
+    public async fetchWebhook(
         id: string,
         token?: string,
     ): Promise<Record<string, unknown>> {
-        return this.rest.get(
-            token ? `/webhooks/${id}/${token}` : `/webhooks/${id}`,
-        ) as Promise<Record<string, unknown>>;
+        return this.rest.get(Routes.webhook(id, token)) as Promise<
+            Record<string, unknown>
+        >;
     }
 
     /** Fetches a guild preview from Discord. */
-    public fetchGuildPreview(
+    public async fetchGuildPreview(
         guildId: string,
     ): Promise<Record<string, unknown>> {
-        return this.rest.get(`/guilds/${guildId}/preview`) as Promise<
+        return this.rest.get(Routes.guildPreview(guildId)) as Promise<
             Record<string, unknown>
         >;
     }
@@ -1273,8 +1317,8 @@ export class Client
     }
 
     /** Fetches a sticker from Discord. */
-    public fetchSticker(id: string): Promise<Record<string, unknown>> {
-        return this.rest.get(`/stickers/${id}`) as Promise<
+    public async fetchSticker(id: string): Promise<Record<string, unknown>> {
+        return this.rest.get(Routes.sticker(id)) as Promise<
             Record<string, unknown>
         >;
     }

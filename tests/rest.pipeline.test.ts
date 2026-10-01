@@ -27,7 +27,13 @@ describe("RouteKey", () => {
     });
 
     test("scopes webhooks by id and token, and unscoped routes by @none", () => {
-        expect(createRouteKey("POST", "/webhooks/12/abc").major).toBe("12:abc");
+        const a = createRouteKey("POST", "/webhooks/12/abc");
+        const b = createRouteKey("POST", "/webhooks/12/xyz");
+        // Scoped by id and token, but the token itself never enters the key.
+        expect(a.major).toMatch(/^12:[0-9a-f]{16}$/);
+        expect(a.major).not.toContain("abc");
+        expect(a.major).not.toBe(b.major);
+        expect(a.route).toBe("POST:/webhooks/:id/:token");
         expect(createRouteKey("GET", "/users/@me").major).toBe("@none");
     });
 

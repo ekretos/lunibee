@@ -89,6 +89,8 @@ export class GuildMember {
                 this.guildId,
                 this.user.id,
                 this.roleIds,
+                undefined,
+                this.timedOutUntil,
             ) ?? 0n,
         );
     }
@@ -100,6 +102,7 @@ export class GuildMember {
             this.user.id,
             this.roleIds,
             channelId,
+            this.timedOutUntil,
         );
         return computed ? new PermissionsBitField(computed) : null;
     }

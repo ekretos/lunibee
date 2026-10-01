@@ -7,6 +7,15 @@ export const Routes = {
     /** Returns a guild. @param guildId Guild identifier. @returns Guild route. */ guild: (
         guildId: string,
     ) => `/guilds/${snowflake(guildId, "Guild ID")}`,
+    /** Leaves a guild as the current user (DELETE). @param guildId Guild identifier. @returns Current-user guild route. */ currentUserGuild:
+        (guildId: string) =>
+            `/users/@me/guilds/${snowflake(guildId, "Guild ID")}`,
+    /** Returns a sticker. @param stickerId Sticker identifier. @returns Sticker route. */ sticker:
+        (stickerId: string) =>
+            `/stickers/${snowflake(stickerId, "Sticker ID")}`,
+    /** Removes one user's reaction (DELETE). @param channelId Channel identifier. @param messageId Message identifier. @param emoji Emoji name or ID. @param userId User identifier. @returns Reaction-user route. */ messageReactionUser:
+        (channelId: string, messageId: string, emoji: string, userId: string) =>
+            `${Routes.messageReactions(channelId, messageId, emoji)}/${snowflake(userId, "User ID")}`,
     /** Returns a guild preview. @param guildId Guild identifier. */ guildPreview:
         (guildId: string) =>
             `/guilds/${snowflake(guildId, "Guild ID")}/preview`,

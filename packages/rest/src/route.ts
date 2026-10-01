@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { redactPath } from "./errors.js";
+
 /** Query-string value accepted by a request. */
 export type RESTQuery =
     | URLSearchParams
@@ -23,7 +26,8 @@ export interface RouteKey {
 export function normalizeRoutePath(path: string): string {
     const queryIndex = path.indexOf("?");
     const routePath = queryIndex === -1 ? path : path.slice(0, queryIndex);
-    return routePath.replace(/\/\d+(?=\/|$)/g, "/:id");
+    // Tokens never enter a route key: keys are stored (Redis keeps them for days).
+    return redactPath(routePath).replace(/\/\d+(?=\/|$)/g, "/:id");
 }
 
 /**
@@ -33,14 +37,20 @@ export function normalizeRoutePath(path: string): string {
  * their token. Any other id in a path shares its limit with sibling resources.
  */
 export function majorParameter(path: string): string {
-    const match = /^\/(channels|guilds|webhooks)\/(\d+)(?:\/([^/?]+))?/.exec(
+    const match = /^\/(channels|guilds|webhooks)\/(\d+)(?:\/([^/?]+))?/i.exec(
         path,
     );
     if (!match) return "@none";
-    // A webhook's limit is keyed by both its id and its token.
-    if (match[1] === "webhooks" && match[3] !== undefined)
-        return `${match[2]}:${match[3]}`;
+    // A webhook's limit is keyed by its id and its token. The token is hashed
+    // so the key (stored, possibly shared through Redis) never holds it.
+    if (match[1]!.toLowerCase() === "webhooks" && match[3] !== undefined)
+        return `${match[2]}:${tokenDigest(match[3])}`;
     return match[2]!;
+}
+
+/** A short, stable digest of a token, identical in every process. */
+function tokenDigest(token: string): string {
+    return createHash("sha256").update(token).digest("hex").slice(0, 16);
 }
 
 /** Combines a bucket hash (or route) with a major parameter into a bucket key. */

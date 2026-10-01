@@ -33,8 +33,9 @@ export class WebhookClient {
         restOptions?: { timeout?: number; retries?: number },
     ) {
         if (options.url) {
+            // Anchored: the URL must be Discord's own webhook URL, not merely contain one.
             const match = options.url.match(
-                /discord(?:app)?.com\/api\/webhooks\/(\d+)\/([A-Za-z0-9_-]+)/,
+                /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api(?:\/v\d+)?\/webhooks\/(\d{1,20})\/([A-Za-z0-9_-]+)\/?(?:[?#].*)?$/,
             );
             if (!match) throw new Error("Invalid Discord webhook URL format.");
             this.id = match[1]!;
@@ -57,9 +58,9 @@ export class WebhookClient {
         const payload =
             typeof options === "string" ? { content: options } : options;
         const { thread_id, ...body } = payload;
-        const query = thread_id
-            ? `?thread_id=${thread_id}&wait=true`
-            : `?wait=true`;
+        const params = new URLSearchParams({ wait: "true" });
+        if (thread_id) params.set("thread_id", String(thread_id));
+        const query = `?${params}`;
         const formattedEmbeds: APIEmbed[] | undefined = body.embeds?.map((e) =>
             "toJSON" in e ? e.toJSON() : e,
         );

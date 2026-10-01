@@ -77,7 +77,10 @@ export function inlineCode(text: string): string {
  * @param language Optional language identifier for syntax highlighting.
  */
 export function codeBlock(text: string, language = ""): string {
-    return `\`\`\`${language}\n${text}\n\`\`\``;
+    // A zero-width space between backticks keeps the text from closing the block.
+    const safe = text.replace(/```/g, "`\u200b``");
+    const lang = language.replace(/[^\w+#.-]/g, "");
+    return `\`\`\`${lang}\n${safe}\n\`\`\``;
 }
 
 /** Creates a Discord masked hyperlink: [label](url).
@@ -86,8 +89,16 @@ export function codeBlock(text: string, language = ""): string {
  * @param title Optional hover title.
  */
 export function link(label: string, url: string, title?: string): string {
-    const titlePart = title ? ` "${title}"` : "";
-    return `[${label}](${url}${titlePart})`;
+    // Brackets in the label and parentheses, quotes or spaces in the URL would
+    // otherwise end the link early and let the rest render as a second link.
+    const text = label.replace(/[[\]\\]/g, "\\$&").replace(/\n/g, " ");
+    const target = url.replace(
+        /[()\s"]/g,
+        (c) =>
+            `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+    );
+    const titlePart = title ? ` "${title.replace(/["\n]/g, "")}"` : "";
+    return `[${text}](${target}${titlePart})`;
 }
 
 /** Wraps each line of text in a Discord block quote (> prefix). */

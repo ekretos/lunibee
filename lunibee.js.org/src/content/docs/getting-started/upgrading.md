@@ -3,7 +3,15 @@ title: Upgrading
 description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.2.3.
 ---
 
-## 0.2.2 → 0.2.3
+## 0.2.3 → 0.2.4
+
+A security release; upgrade. No code changes are required, but check these:
+
+* **Mobile status icon:** the bot now identifies as Lunibee instead of Discord's Android app, so the phone icon disappears. The `properties` client option still sets these values.
+* **Timeouts:** permission checks on a timed-out member now return only View Channel and Read Message History, as Discord enforces.
+* **File paths from users:** use `new CreateAttachment(path, { root: "./uploads" })` (or pass bytes) so a path cannot read files outside that folder.
+* **Mentions:** if your bot echoes user text, set `allowedMentions: { parse: [] }` on the client.
+
 
 Nothing breaks: deprecated APIs keep working until 0.3.0 and your editor strikes them
 through. `bunx lunibee migrate` lists them in your project and `--fix` renames the old

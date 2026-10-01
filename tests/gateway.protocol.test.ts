@@ -214,9 +214,12 @@ describe("outbound payload construction", () => {
         expect(data.token).toBe("token");
         expect(typeof data.intents).toBe("number");
         expect(data.shard).toEqual([2, 4]);
-        expect(data.properties.os).toBe("Android");
+        // Lunibee identifies as itself on the real OS, not as Discord's Android app.
+        expect(data.properties.os).toBe(process.platform);
+        expect(data.properties.browser).toBe("Lunibee");
+        expect(data.properties.device).toBe("Lunibee");
         // Both spellings, so the payload works against either expectation.
-        expect(data.properties.$os).toBe("Android");
+        expect(data.properties.$os).toBe(process.platform);
         expect(data.presence).toEqual({
             since: null,
             activities: [],
@@ -252,7 +255,7 @@ describe("outbound payload construction", () => {
         const payload = resumePayload("token", {
             sessionId: "abc",
             sequence: 0,
-            resumeURL: "wss://resume.test",
+            resumeURL: "wss://gateway-us-east1-b.discord.gg",
         });
         expect(payload.op).toBe(GatewayOpcodes.Resume);
         // Sequence 0 must survive into the payload.

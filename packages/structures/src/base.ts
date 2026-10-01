@@ -79,6 +79,7 @@ export interface ResourceContext {
         memberId: string,
         roleIds: readonly string[],
         channelId?: string,
+        timedOutUntil?: Date | null,
     ): import("@lunibee/core").PermissionSet | null;
     kickMember?(
         guildId: string,
@@ -156,7 +157,8 @@ export function cdnURL(
     const isAnimated = hash.startsWith("a_") && !options.forceStatic;
     const ext = options.extension ?? (isAnimated ? "gif" : "png");
     const size = options.size ? `?size=${options.size}` : "";
-    return `${CDN_BASE}${path}/${hash}.${ext}${size}`;
+    // Encoded, so a hash holding `/`, `?` or `#` cannot change the CDN path.
+    return `${CDN_BASE}${path}/${encodeURIComponent(hash)}.${ext}${size}`;
 }
 
 // ─── User ─────────────────────────────────────────────────────────────────────

@@ -183,9 +183,9 @@ export interface IdentifyOptions {
 /** Builds an IDENTIFY payload. */
 export function identifyPayload(options: IdentifyOptions): GatewayPayload {
     const props = options.properties ?? {};
-    const os = props.os ?? "Android";
-    const browser = props.browser ?? "Discord Android";
-    const device = props.device ?? "Discord Android";
+    const os = props.os ?? process.platform;
+    const browser = props.browser ?? "Lunibee";
+    const device = props.device ?? "Lunibee";
     return {
         op: GatewayOpcodes.Identify,
         d: {

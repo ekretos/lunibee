@@ -667,6 +667,8 @@ export interface PermissionContext {
     roles: readonly PermissionRole[];
     /** Channel overwrites; omit for guild-level permissions. */
     overwrites?: readonly PermissionOverwrite[];
+    /** When the member's timeout ends; while it is in the future the member keeps only View Channel and Read Message History. */
+    timedOutUntil?: Date | number | null;
 }
 
 const bits = (value: PermissionResolvable): bigint =>
@@ -676,7 +678,8 @@ const bits = (value: PermissionResolvable): bigint =>
  * Resolves a member's effective permissions the way Discord does: base
  * permissions from `@everyone` and the member's roles (owner and
  * administrator get everything), then the channel's `@everyone` overwrite,
- * the combined role overwrites, and finally the member overwrite.
+ * the combined role overwrites, and finally the member overwrite. A member
+ * whose timeout has not ended keeps only View Channel and Read Message History.
  */
 export function computePermissions(context: PermissionContext): PermissionSet {
     if (context.ownerId !== undefined && context.ownerId === context.memberId)
@@ -709,5 +712,13 @@ export function computePermissions(context: PermissionContext): PermissionSet {
             o.id === context.memberId,
     );
     if (member) base = (base & ~bits(member.deny)) | bits(member.allow);
+    // Discord: timed-out members lose every permission except View Channel and
+    // Read Message History. Owners and administrators returned above.
+    const until =
+        context.timedOutUntil instanceof Date
+            ? context.timedOutUntil.getTime()
+            : (context.timedOutUntil ?? 0);
+    if (until > Date.now())
+        base &= Permission.viewChannel | Permission.readMessageHistory;
     return new PermissionSet(base);
 }

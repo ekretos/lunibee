@@ -39,9 +39,15 @@ new CreateAttachment(data: Uint8Array | ArrayBuffer | Buffer, options?: Attachme
 
 | Parameter | Type | Description |
 |---|---|---|
-| `data` | `Uint8Array \| ArrayBuffer \| Buffer` | Raw file data. |
+| `data` | `Uint8Array \| ArrayBuffer \| Buffer \| Blob \| string` | Raw file data, or a file path read when the message is sent. |
 | `options.name` | `string` | Filename including extension (e.g. `"image.png"`). |
 | `options.description` | `string` | Alt text description for the file. |
+| `options.root` | `string` | For a path: the folder it must stay inside (symlinks resolved). Set it whenever the path comes from a user, e.g. a command option; otherwise any readable file could be uploaded. |
+
+```ts
+// A path chosen by a user can only reach files under ./uploads.
+new CreateAttachment(userPath, { root: "./uploads" });
+```
 
 ## Methods
 

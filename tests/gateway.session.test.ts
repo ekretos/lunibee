@@ -15,7 +15,7 @@ import {
  */
 function ready(
     sessionId = "session-1",
-    resumeURL = "wss://resume.test",
+    resumeURL = "wss://gateway-us-east1-b.discord.gg",
 ): unknown {
     return { session_id: sessionId, resume_gateway_url: resumeURL };
 }
@@ -29,12 +29,12 @@ describe("GatewaySession state", () => {
 
         expect(session.sessionId).toBe("session-1");
         expect(session.sequence).toBe(1);
-        expect(session.resumeURL).toBe("wss://resume.test");
+        expect(session.resumeURL).toBe("wss://gateway-us-east1-b.discord.gg");
         expect(session.canResume).toBe(true);
         expect(session.resumeInfo()).toEqual({
             sessionId: "session-1",
             sequence: 1,
-            resumeURL: "wss://resume.test",
+            resumeURL: "wss://gateway-us-east1-b.discord.gg",
         });
     });
 
@@ -52,14 +52,17 @@ describe("GatewaySession state", () => {
         const session = new GatewaySession();
         const token = session.beginConnection();
         session.recordSequence(4, token);
-        session.activate(ready("s", "wss://resume.test"), token);
+        session.activate(
+            ready("s", "wss://gateway-us-east1-b.discord.gg"),
+            token,
+        );
         // Reconnecting takes a new generation; the session must survive it.
         session.beginConnection();
         expect(session.handshake()).toEqual({
             type: "resume",
             sessionId: "s",
             sequence: 4,
-            resumeURL: "wss://resume.test",
+            resumeURL: "wss://gateway-us-east1-b.discord.gg",
         });
     });
 
@@ -105,7 +108,7 @@ describe("GatewaySession state", () => {
             type: "resume",
             sessionId: "session-1",
             sequence: 0,
-            resumeURL: "wss://resume.test",
+            resumeURL: "wss://gateway-us-east1-b.discord.gg",
         });
     });
 
@@ -113,7 +116,10 @@ describe("GatewaySession state", () => {
         const session = new GatewaySession();
         const first = session.beginConnection();
         session.recordSequence(5, first);
-        session.activate(ready("kept", "wss://resume.test"), first);
+        session.activate(
+            ready("kept", "wss://gateway-us-east1-b.discord.gg"),
+            first,
+        );
 
         const second = session.beginConnection();
         expect(session.sessionId).toBe("kept");
@@ -129,7 +135,10 @@ describe("GatewaySession state", () => {
         const session = new GatewaySession();
         const stale = session.beginConnection();
         session.recordSequence(5, stale);
-        session.activate(ready("live", "wss://resume.test"), stale);
+        session.activate(
+            ready("live", "wss://gateway-us-east1-b.discord.gg"),
+            stale,
+        );
 
         session.beginConnection(); // a new transport takes ownership
 
@@ -142,7 +151,7 @@ describe("GatewaySession state", () => {
 
         expect(session.sequence).toBe(5);
         expect(session.sessionId).toBe("live");
-        expect(session.resumeURL).toBe("wss://resume.test");
+        expect(session.resumeURL).toBe("wss://gateway-us-east1-b.discord.gg");
     });
 
     test("malformed READY is rejected without corrupting the session", () => {
@@ -249,7 +258,7 @@ describe("Gateway session wiring", () => {
         await new Promise((resolve) => setTimeout(resolve, 40));
 
         const second = FakeWebSocket.instances[1]!;
-        expect(second.url).toBe("wss://resume.test");
+        expect(second.url).toBe("wss://gateway-us-east1-b.discord.gg");
         second.open();
         second.receive({
             op: GatewayOpcodes.Hello,
@@ -286,7 +295,7 @@ describe("Gateway session wiring", () => {
         await new Promise((resolve) => setTimeout(resolve, 40));
 
         const second = FakeWebSocket.instances[1]!;
-        expect(second.url).toBe("wss://resume.test");
+        expect(second.url).toBe("wss://gateway-us-east1-b.discord.gg");
         second.open();
         second.receive({
             op: GatewayOpcodes.Hello,
@@ -314,7 +323,7 @@ describe("Gateway session wiring", () => {
         await new Promise((resolve) => setTimeout(resolve, 40));
 
         const second = FakeWebSocket.instances[1]!;
-        expect(second.url).not.toBe("wss://resume.test");
+        expect(second.url).not.toBe("wss://gateway-us-east1-b.discord.gg");
         second.open();
         second.receive({
             op: GatewayOpcodes.Hello,
@@ -343,7 +352,7 @@ describe("Gateway session wiring", () => {
         await new Promise((resolve) => setTimeout(resolve, 40));
 
         const second = FakeWebSocket.instances[1]!;
-        expect(second.url).not.toBe("wss://resume.test");
+        expect(second.url).not.toBe("wss://gateway-us-east1-b.discord.gg");
         second.open();
         second.receive({
             op: GatewayOpcodes.Hello,
@@ -416,7 +425,7 @@ describe("Gateway session wiring", () => {
         await new Promise((resolve) => setTimeout(resolve, 40));
 
         const second = FakeWebSocket.instances[1]!;
-        expect(second.url).toBe("wss://resume.test");
+        expect(second.url).toBe("wss://gateway-us-east1-b.discord.gg");
         second.open();
         second.receive({
             op: GatewayOpcodes.Hello,

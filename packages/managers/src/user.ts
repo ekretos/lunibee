@@ -35,7 +35,7 @@ export class UserManager extends ResourceManager<string, User> {
 
     /** Leaves a guild. */
     public async leaveGuild(guildId: string): Promise<void> {
-        await this.#rest.delete(`/users/@me/guilds/${guildId}`);
+        await this.#rest.delete(Routes.currentUserGuild(guildId));
     }
 
     /** Creates a DM channel with a user. */

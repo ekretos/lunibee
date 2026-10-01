@@ -17,6 +17,31 @@ import { RateLimiter } from "./limiter.js";
 import { HttpTransport, TransportError } from "./transport.js";
 import { ResponseDecoder } from "./decoder.js";
 
+/**
+ * Refuses a path that URL normalization would rewrite into another route:
+ * `.` / `..` segments (also percent-encoded) and backslashes. Without this,
+ * an id like `../../channels/1` sends the bot token to a route the caller
+ * never asked for. The path is left out of the message: it may hold a token.
+ */
+function assertSafePath(path: string): void {
+    const end = path.search(/[?#]/);
+    const pathname = end === -1 ? path : path.slice(0, end);
+    if (pathname.includes("\\"))
+        throw new TypeError("REST paths must not contain backslashes.");
+    for (const segment of pathname.split("/")) {
+        let decoded: string;
+        try {
+            decoded = decodeURIComponent(segment);
+        } catch {
+            throw new TypeError("REST path has malformed percent-encoding.");
+        }
+        if (decoded === "." || decoded === "..")
+            throw new TypeError(
+                "REST paths must not contain '.' or '..' segments.",
+            );
+    }
+}
+
 /** A file attachment sent as part of a multipart REST request. */
 export interface RESTFileAttachment {
     name: string;
@@ -265,6 +290,7 @@ export class REST {
             throw new TypeError("REST method is required.");
         if (!path.startsWith("/"))
             throw new TypeError("REST paths must start with '/'.");
+        assertSafePath(path);
         const route = createRouteKey(method, path);
         // Upgrade to multipart when file attachments are supplied via options.
         const files = options.files;
@@ -439,12 +465,20 @@ export class REST {
         const isFormData =
             typeof FormData !== "undefined" && body instanceof FormData;
         const headers: Record<string, string> = { ...options.headers };
+        // Header names are case-insensitive: drop the caller's spelling first,
+        // or `authorization` and `Authorization` are joined into one value.
+        const set = (name: string, value: string): void => {
+            for (const key of Object.keys(headers))
+                if (key.toLowerCase() === name.toLowerCase())
+                    delete headers[key];
+            headers[name] = value;
+        };
         if (options.auth !== false && this.#token)
-            headers["Authorization"] = `Bot ${this.#token}`;
-        headers["User-Agent"] = USER_AGENT;
+            set("Authorization", `Bot ${this.#token}`);
+        set("User-Agent", USER_AGENT);
         if (options.reason !== undefined)
-            headers["X-Audit-Log-Reason"] = encodeURIComponent(options.reason);
-        if (!isFormData) headers["Content-Type"] = "application/json";
+            set("X-Audit-Log-Reason", encodeURIComponent(options.reason));
+        if (!isFormData) set("Content-Type", "application/json");
         return headers;
     }
     /** Encodes a body as multipart (passed through) or JSON. */

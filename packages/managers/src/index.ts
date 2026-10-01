@@ -454,7 +454,7 @@ export class ChannelManager extends Manager<string, Channel> {
         userId: string,
     ): Promise<void> {
         await this.#rest.delete(
-            `${Routes.messageReactions(channelId, messageId, emoji)}/${userId}`,
+            Routes.messageReactionUser(channelId, messageId, emoji, userId),
         );
     }
     public async removeAllReactions(

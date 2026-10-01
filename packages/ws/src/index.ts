@@ -182,10 +182,11 @@ export class Gateway {
             reconnectMaxDelay: 30000,
             heartbeatAckTimeout: 10000,
             zombieTimeout: 30000,
+            // Lunibee identifies as itself, not as an official Discord client.
             properties: {
-                os: "Android",
-                browser: "Discord Android",
-                device: "Discord Android",
+                os: process.platform,
+                browser: "Lunibee",
+                device: "Lunibee",
             },
             presence: {
                 status: "online",

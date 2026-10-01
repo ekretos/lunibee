@@ -19,7 +19,13 @@ future sessions should pick up.
   examples use the new names only. `PermissionFlagsBits`, `GatewayIntentBits`, `Routes`,
   `MessageFlags` and the Gateway code sets keep their names.
 
-## Next release: 0.2.3
+## Next release: 0.2.4 (security)
+
+Fixes for the 0.2.3 security review (H1-H3, M1-M5, L1-L3, L5, L7); status of
+every finding in `docs/audits/security-0.2.3.md`. Non-breaking except the
+behaviour changes listed in the changelog.
+
+## 0.2.3 (shipped)
 
 Deprecation pass and the API-consistency fixes in [FIX.md](FIX.md). Nothing is
 removed; deprecated APIs go in 0.3.0 (`.roadmap/0.3.0.md`, Step 0).

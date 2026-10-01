@@ -64,8 +64,11 @@ export class PlainTextDecoder implements GatewayDecoder {
  */
 export class ZlibStreamDecoder implements GatewayDecoder {
     readonly #create: () => Inflate;
+    readonly #maxFrameBytes: number;
     #inflate?: Inflate;
     #chunks: Uint8Array[] = [];
+    /** Bytes inflated for the frame being assembled. */
+    #size = 0;
     #failure?: Error;
     /**
      * Rejector for the operation currently awaiting the inflater.
@@ -77,9 +80,17 @@ export class ZlibStreamDecoder implements GatewayDecoder {
      */
     #pendingReject?: (error: Error) => void;
 
-    /** @param create Inflater factory; injected in tests. */
-    public constructor(create: () => Inflate = () => createInflate()) {
+    /**
+     * @param create Inflater factory; injected in tests.
+     * @param maxFrameBytes Largest inflated frame accepted (default 64 MiB);
+     * past it the stream fails instead of growing until memory runs out.
+     */
+    public constructor(
+        create: () => Inflate = () => createInflate(),
+        maxFrameBytes = 64 * 1024 * 1024,
+    ) {
         this.#create = create;
+        this.#maxFrameBytes = maxFrameBytes;
     }
 
     /**
@@ -118,6 +129,7 @@ export class ZlibStreamDecoder implements GatewayDecoder {
 
         const parts = this.#chunks;
         this.#chunks = [];
+        this.#size = 0;
         if (parts.length === 0) return [];
         const total = parts.reduce((size, part) => size + part.length, 0);
         const merged = new Uint8Array(total);
@@ -133,6 +145,7 @@ export class ZlibStreamDecoder implements GatewayDecoder {
         const inflate = this.#inflate;
         this.#inflate = undefined;
         this.#chunks = [];
+        this.#size = 0;
         this.#failure = undefined;
         this.#pendingReject = undefined;
         if (!inflate) return;
@@ -164,7 +177,23 @@ export class ZlibStreamDecoder implements GatewayDecoder {
 
     #open(): Inflate {
         const inflate = this.#create();
-        inflate.on("data", (chunk: Uint8Array) => this.#chunks.push(chunk));
+        inflate.on("data", (chunk: Uint8Array) => {
+            if (this.#failure) return;
+            this.#size += chunk.length;
+            if (this.#size > this.#maxFrameBytes) {
+                // Same path as a corrupt stream: the waiter rejects and the
+                // connection is reset, so nothing keeps accumulating.
+                this.#chunks = [];
+                inflate.emit(
+                    "error",
+                    new Error(
+                        `Gateway frame inflated past ${this.#maxFrameBytes} bytes.`,
+                    ),
+                );
+                return;
+            }
+            this.#chunks.push(chunk);
+        });
         inflate.on("error", (error: Error) => {
             this.#failure = error;
             // Settle whatever is waiting: zlib will not call its callback.

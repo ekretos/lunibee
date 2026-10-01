@@ -42,8 +42,8 @@ export function redactPath(path: string): string {
         path
             // The ID segment is matched loosely: a malformed ID must not stop the
             // token that follows it from being redacted.
-            .replace(/^(\/webhooks\/[^/?]+\/)[^/?]+/, "$1:token")
-            .replace(/^(\/interactions\/[^/?]+\/)[^/?]+/, "$1:token")
+            .replace(/^(\/webhooks\/[^/?]+\/)[^/?]+/i, "$1:token")
+            .replace(/^(\/interactions\/[^/?]+\/)[^/?]+/i, "$1:token")
     );
 }
 
