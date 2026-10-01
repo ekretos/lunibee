@@ -1,6 +1,12 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import starlightTypeDoc, { typeDocSidebarGroup } from "starlight-typedoc";
+import { readFileSync } from "node:fs";
+
+// Source links in the generated API point at the release tag (e.g. 0.2.3), not a commit.
+const { version } = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+);
 
 const site = process.env.ASTRO_SITE || "https://lunibee.js.org";
 const base = process.env.ASTRO_BASE || undefined;
@@ -33,7 +39,11 @@ export default defineConfig({
           tsconfig: "../tsconfig.json",
           output: "api",
           sidebar: { label: "Generated API", collapsed: true },
-          typeDoc: { excludePrivate: true, excludeInternal: true },
+          typeDoc: {
+            excludePrivate: true,
+            excludeInternal: true,
+            gitRevision: version,
+          },
         }),
       ],
       sidebar: [
