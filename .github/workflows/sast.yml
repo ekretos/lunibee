@@ -137,8 +137,10 @@ jobs:
 
       - name: Fail on OSV findings
         if: steps.osv.outputs.code != '0'
+        env:
+          OSV_EXIT: ${{ steps.osv.outputs.code }}
         run: |
-          echo "::error::OSV-Scanner reported vulnerable dependencies (exit ${{ steps.osv.outputs.code }})"
+          echo "::error::OSV-Scanner reported vulnerable dependencies (exit $OSV_EXIT)"
           exit 1
 
   workflows:
@@ -188,8 +190,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Require all layers to pass
+        env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+          if [[ "$FAILED" == "true" ]]; then
             echo "::error::One or more security layers failed"
             exit 1
           fi
