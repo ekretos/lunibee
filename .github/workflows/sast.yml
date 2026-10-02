@@ -1,4 +1,9 @@
-name: SAST
+name: Security
+
+# Layered automated security review for the dev branch only:
+# CodeQL (SAST) + Semgrep (SAST rules) + Gitleaks (secrets) + OSV-Scanner and
+# bun audit (dependencies) + zizmor (workflow hardening) + Dependency Review (PR
+# gate). SARIF results land in the Security tab and as PR annotations.
 
 on:
   push:
@@ -11,34 +16,180 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  actions: read
 
 concurrency:
-  group: sast-${{ github.ref }}
+  group: security-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   codeql:
-    name: CodeQL SAST
+    name: CodeQL
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
     strategy:
       fail-fast: false
       matrix:
-        language: [javascript-typescript]
-
+        language: [javascript-typescript, actions]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          queries: security-extended
+          queries: security-extended,security-and-quality
 
-      - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Scan
+        run: >-
+          semgrep scan
+          --config p/default
+          --config p/typescript
+          --config p/javascript
+          --config p/nodejs
+          --config p/secrets
+          --config p/github-actions
+          --exclude dist --exclude node_modules --exclude docs
+          --sarif --output semgrep.sarif
+          --error --severity ERROR
+
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  secrets:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan history
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            git /repo --redact --no-banner \
+            --report-format sarif --report-path /repo/gitleaks.sarif
+
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+  dependencies:
+    name: OSV-Scanner + bun audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: OSV-Scanner
+        id: osv
+        run: |
+          set +e
+          docker run --rm -v "$PWD:/src" ghcr.io/google/osv-scanner:latest \
+            scan source -r --format sarif --output-file /src/osv.sarif /src
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: osv.sarif
+          category: osv-scanner
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: bun audit
+        run: bun audit --audit-level=high
+
+      - name: Fail on OSV findings
+        if: steps.osv.outputs.code != '0'
+        run: |
+          echo "::error::OSV-Scanner reported vulnerable dependencies (exit ${{ steps.osv.outputs.code }})"
+          exit 1
+
+  workflows:
+    name: zizmor (Actions hardening)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Scan workflows
+        run: uvx zizmor --format sarif .github/workflows > zizmor.sarif
+
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor
+
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-3.0-only, AGPL-3.0-only
+          comment-summary-in-pr: on-failure
+
+  gate:
+    name: Security gate
+    if: always()
+    needs: [codeql, semgrep, secrets, dependencies, workflows, dependency-review]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all layers to pass
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "::error::One or more security layers failed"
+            exit 1
+          fi
