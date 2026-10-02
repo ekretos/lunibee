@@ -219,17 +219,44 @@ export async function fixHandlers(
     options: FixOptions = {},
 ): Promise<number> {
     const dir = eventsDir(root);
-    const write = options.fix && !options.dryRun;
+    const write = Boolean(options.fix && !options.dryRun);
     const report: HandlerReport = {
         migrated: [],
         renamed: [],
         manual: [],
         ok: 0,
     };
-
-    // Folders that differ from an event only by case (messagecreate/) are renamed.
     const before = await discover(dir);
-    for (const folder of before.unknownFolders) {
+    await renameEventFolders(dir, before.unknownFolders, report, write);
+
+    // Folder on disk → event name, including folders about to be renamed.
+    const folders = new Map<string, string>(
+        [...new Set(before.handlers.map((h) => h.event))].map((e) => [e, e]),
+    );
+    for (const line of report.renamed) {
+        const [from, to] = line.split(" → ").map((p) => p.slice(7, -1));
+        folders.set(write ? to! : from!, to!);
+    }
+    for (const [folder, event] of [...folders].sort())
+        await migrateFolder(join(dir, folder), event, report, write);
+
+    const pending = report.migrated.length + report.renamed.length;
+    if (options.json) io.out(JSON.stringify(report));
+    else printReport(io, report, Boolean(options.fix), write);
+    if (write) {
+        await syncHandlers(options.json ? { ...io, out: () => {} } : io, root);
+    }
+    return report.manual.length || (!write && pending) ? 1 : 0;
+}
+
+/** Renames folders that differ from an event only by case (messagecreate/). */
+async function renameEventFolders(
+    dir: string,
+    unknownFolders: string[],
+    report: HandlerReport,
+    write: boolean,
+): Promise<void> {
+    for (const folder of unknownFolders) {
         const event = EVENTS.find(
             (e) => e.toLowerCase() === folder.toLowerCase(),
         );
@@ -252,72 +279,68 @@ export async function fixHandlers(
             await rename(temp, join(dir, event));
         }
     }
+}
 
-    // Folder on disk → event name, including folders about to be renamed.
-    const folders = new Map<string, string>(
-        [...new Set(before.handlers.map((h) => h.event))].map((e) => [e, e]),
-    );
-    for (const line of report.renamed) {
-        const [from, to] = line.split(" → ").map((p) => p.slice(7, -1));
-        folders.set(write ? to! : from!, to!);
-    }
-    for (const [folder, event] of [...folders].sort()) {
-        const seen = new Set<string>();
-        const files = (
-            await readdir(join(dir, folder), { withFileTypes: true })
+/** Migrates the handler files of one event folder; a `.ts` file wins over its `.js` twin. */
+async function migrateFolder(
+    path: string,
+    event: string,
+    report: HandlerReport,
+    write: boolean,
+): Promise<void> {
+    const seen = new Set<string>();
+    const files = (await readdir(path, { withFileTypes: true }))
+        .filter(
+            (f) =>
+                f.isFile() &&
+                /\.[jt]s$/.test(f.name) &&
+                !/\.(d|test|spec)\.[jt]s$/.test(f.name),
         )
-            .filter(
-                (f) =>
-                    f.isFile() &&
-                    /\.[jt]s$/.test(f.name) &&
-                    !/\.(d|test|spec)\.[jt]s$/.test(f.name),
-            )
-            .map((f) => f.name)
-            .sort(
-                (a, b) =>
-                    Number(a.endsWith(".js")) - Number(b.endsWith(".js")) ||
-                    a.localeCompare(b),
-            );
-        for (const file of files) {
-            const base = file.slice(0, -3);
-            if (seen.has(base)) continue;
-            seen.add(base);
-            const path = join(dir, folder, file);
-            const result = migrateHandler(
-                await Bun.file(path).text(),
-                file.endsWith(".ts"),
-            );
-            const label = `events/${event}/${file}`;
-            if (result.state === "ok") report.ok++;
-            else if (result.state === "manual")
-                report.manual.push(`${label}: ${result.reason}`);
-            else {
-                report.migrated.push(label);
-                if (write) await writeFile(path, result.source);
-            }
+        .map((f) => f.name)
+        .sort(
+            (a, b) =>
+                Number(a.endsWith(".js")) - Number(b.endsWith(".js")) ||
+                a.localeCompare(b),
+        );
+    for (const file of files) {
+        const base = file.slice(0, -3);
+        if (seen.has(base)) continue;
+        seen.add(base);
+        const filePath = join(path, file);
+        const result = migrateHandler(
+            await Bun.file(filePath).text(),
+            file.endsWith(".ts"),
+        );
+        const label = `events/${event}/${file}`;
+        if (result.state === "ok") report.ok++;
+        else if (result.state === "manual")
+            report.manual.push(`${label}: ${result.reason}`);
+        else {
+            report.migrated.push(label);
+            if (write) await writeFile(filePath, result.source);
         }
     }
+}
 
+function printReport(
+    io: IO,
+    report: HandlerReport,
+    fix: boolean,
+    write: boolean,
+): void {
     const pending = report.migrated.length + report.renamed.length;
-    if (options.json) io.out(JSON.stringify(report));
-    else {
-        const verb = write ? "" : options.fix ? "would " : "needs ";
-        for (const line of report.renamed)
-            io.out(`${paint(io, "green", "✓")} ${verb}rename ${line}`);
-        for (const line of report.migrated)
-            io.out(
-                `${paint(io, "green", "✓")} ${write ? "updated" : `${verb}update`} ${line} (client first)`,
-            );
-        for (const line of report.manual)
-            io.out(`${paint(io, "yellow", "⚠")} ${line}`);
+    const verb = write ? "" : fix ? "would " : "needs ";
+    for (const line of report.renamed)
+        io.out(`${paint(io, "green", "✓")} ${verb}rename ${line}`);
+    for (const line of report.migrated)
         io.out(
-            `\n${report.ok} up to date, ${pending} ${write ? "fixed" : "to fix"}, ${report.manual.length} to check by hand`,
+            `${paint(io, "green", "✓")} ${write ? "updated" : `${verb}update`} ${line} (client first)`,
         );
-        if (!options.fix && pending)
-            io.out(paint(io, "dim", "Run `lunibee handler --fix` to apply."));
-    }
-    if (write) {
-        await syncHandlers(options.json ? { ...io, out: () => {} } : io, root);
-    }
-    return report.manual.length || (!write && pending) ? 1 : 0;
+    for (const line of report.manual)
+        io.out(`${paint(io, "yellow", "⚠")} ${line}`);
+    io.out(
+        `\n${report.ok} up to date, ${pending} ${write ? "fixed" : "to fix"}, ${report.manual.length} to check by hand`,
+    );
+    if (!fix && pending)
+        io.out(paint(io, "dim", "Run `lunibee handler --fix` to apply."));
 }

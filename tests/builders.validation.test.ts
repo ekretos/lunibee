@@ -8,6 +8,10 @@ import {
     CreateModal,
     CreateStringSelect,
     CreateTextInput,
+    CreateIntegerOption,
+    CreateNumberOption,
+    CreateStringOption,
+    CreateUserSelectMenu,
 } from "../packages/builders/src/index.ts";
 
 describe("component validation on toJSON", () => {
@@ -84,5 +88,52 @@ describe("component validation on toJSON", () => {
                 .setMaxLength(5)
                 .toJSON(),
         ).toThrow("min_length");
+    });
+});
+
+describe("shared option rules", () => {
+    test("integer and number choices validate names like string choices", () => {
+        expect(() =>
+            new CreateIntegerOption().addChoices({ name: "", value: 1 }),
+        ).toThrow(RangeError);
+        expect(() =>
+            new CreateNumberOption().addChoices({
+                name: "x".repeat(101),
+                value: 1.5,
+            }),
+        ).toThrow(RangeError);
+    });
+
+    test("a rejected string choice leaves the option unchanged", () => {
+        const option = new CreateStringOption()
+            .setName("pick")
+            .setDescription("d")
+            .addChoices({ name: "a", value: "a" });
+        expect(() => option.addChoices({ name: "b", value: "" })).toThrow(
+            RangeError,
+        );
+        expect(option.toJSON().choices).toEqual([{ name: "a", value: "a" }]);
+    });
+
+    test("select menus share their setters", () => {
+        const string = new CreateStringSelect()
+            .setCustomId("s")
+            .setPlaceholder("p")
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions({ label: "a", value: "a" });
+        const user = new CreateUserSelectMenu()
+            .setCustomId("u")
+            .setPlaceholder("p")
+            .setDisabled();
+        expect(string.toJSON()).toMatchObject({
+            custom_id: "s",
+            placeholder: "p",
+        });
+        expect(user.toJSON()).toMatchObject({
+            type: 5,
+            custom_id: "u",
+            disabled: true,
+        });
     });
 });

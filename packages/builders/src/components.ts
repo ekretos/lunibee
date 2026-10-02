@@ -1,30 +1,9 @@
-import { ButtonType } from "@lunibee/types";
-export { ButtonType };
+import { ButtonType, ComponentEnum } from "@lunibee/types";
+export { ButtonType, ComponentEnum };
 
-/** Component type constants exposed by Lunibee. */
-export const ComponentEnum = {
-    ActionRow: 1,
-    Button: 2,
-    StringSelect: 3,
-    TextInput: 4,
-    UserSelect: 5,
-    RoleSelect: 6,
-    MentionableSelect: 7,
-    ChannelSelect: 8,
-    Section: 9,
-    TextDisplay: 10,
-    Thumbnail: 11,
-    MediaGallery: 12,
-    File: 13,
-    Separator: 14,
-    ContentInventoryEntry: 16,
-    Container: 17,
-} as const;
 export const TextInputType = { Short: 1, Paragraph: 2 } as const;
 /** One {@link TextInputType} value, usable as a type. */
 export type TextInputType = (typeof TextInputType)[keyof typeof TextInputType];
-/** One {@link ComponentEnum} value, usable as a type. */
-export type ComponentEnum = (typeof ComponentEnum)[keyof typeof ComponentEnum];
 export interface APIComponentEmoji {
     id?: string | null;
     name?: string | null;
@@ -195,37 +174,51 @@ export class CreateActionRow<
         return { type: ComponentEnum.ActionRow, components };
     }
 }
-export class CreateStringSelect {
-    readonly #data: APIStringSelectComponent = {
-        type: ComponentEnum.StringSelect,
-    };
+/** Setters shared by string and entity select menus. */
+export class CreateSelectMenu {
+    readonly #select: APIStringSelectComponent | APIEntitySelectComponent;
+    protected constructor(
+        data: APIStringSelectComponent | APIEntitySelectComponent,
+    ) {
+        this.#select = data;
+    }
     public setCustomId(value: string): this {
         validateText(value, 100, "Component custom ID");
-        this.#data.custom_id = value;
+        this.#select.custom_id = value;
         return this;
     }
     public setPlaceholder(value: string): this {
         validateText(value, 150, "Component placeholder");
-        this.#data.placeholder = value;
+        this.#select.placeholder = value;
         return this;
     }
     public setMinValues(value: number): this {
         validateCount(value, "min_values", 0);
-        this.#data.min_values = value;
+        this.#select.min_values = value;
         return this;
     }
     public setMaxValues(value: number): this {
         validateCount(value, "max_values", 1);
-        this.#data.max_values = value;
+        this.#select.max_values = value;
         return this;
     }
     public setRequired(value = true): this {
-        this.#data.required = value;
+        this.#select.required = value;
         return this;
     }
     public setDisabled(value = true): this {
-        this.#data.disabled = value;
+        this.#select.disabled = value;
         return this;
+    }
+}
+export class CreateStringSelect extends CreateSelectMenu {
+    readonly #data: APIStringSelectComponent;
+    public constructor() {
+        const data: APIStringSelectComponent = {
+            type: ComponentEnum.StringSelect,
+        };
+        super(data);
+        this.#data = data;
     }
     public addOptions(...options: APISelectOption[]): this {
         if (!options.length)
@@ -356,7 +349,7 @@ export class CreateButton {
         return structuredClone(data);
     }
 }
-export class CreateEntitySelect {
+export class CreateEntitySelect extends CreateSelectMenu {
     readonly #data: APIEntitySelectComponent;
     public constructor(
         type:
@@ -372,35 +365,9 @@ export class CreateEntitySelect {
             type !== ComponentEnum.ChannelSelect
         )
             throw new TypeError("Invalid select component type.");
-        this.#data = { type };
-    }
-    public setCustomId(value: string): this {
-        validateText(value, 100, "Component custom ID");
-        this.#data.custom_id = value;
-        return this;
-    }
-    public setPlaceholder(value: string): this {
-        validateText(value, 150, "Component placeholder");
-        this.#data.placeholder = value;
-        return this;
-    }
-    public setMinValues(value: number): this {
-        validateCount(value, "min_values", 0);
-        this.#data.min_values = value;
-        return this;
-    }
-    public setMaxValues(value: number): this {
-        validateCount(value, "max_values", 1);
-        this.#data.max_values = value;
-        return this;
-    }
-    public setRequired(value = true): this {
-        this.#data.required = value;
-        return this;
-    }
-    public setDisabled(value = true): this {
-        this.#data.disabled = value;
-        return this;
+        const data: APIEntitySelectComponent = { type };
+        super(data);
+        this.#data = data;
     }
     public setDefaultValues(...values: APISelectDefaultValue[]): this {
         this.#data.default_values = values.map((value) => ({ ...value }));

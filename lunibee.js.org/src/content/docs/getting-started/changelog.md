@@ -33,6 +33,7 @@ Security release. Fixes the findings of the 0.2.3 security review; the status of
 ### 🐛 Fixed
 
 * **`WebhookClient.send({ files })` uploads the files.** They were serialized into the JSON body and never reached Discord; they are now sent as multipart form data. Component builders in `components` are serialized with `toJSON()` like embeds.
+* **Integer and number option choices** are checked like string choices: a name must be 1-100 characters. A string choice with an invalid value no longer leaves earlier choices from the same call behind.
 
 ### 🔧 Changed
 

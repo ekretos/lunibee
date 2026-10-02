@@ -146,33 +146,11 @@ export class CreateSlashCommand {
     }
     /** Adds a validated top-level command option. */
     protected addOption(option: CreateCommandOption): this {
-        const options = (this.#data.options as unknown[] | undefined) ?? [];
-        if (options.length >= 25)
-            throw new RangeError(
-                "An application command cannot contain more than 25 options.",
-            );
-        const payload = option.toJSON();
-        if (
-            options.some(
-                (existing) =>
-                    (existing as Record<string, unknown>).name === payload.name,
-            )
-        )
-            throw new RangeError(
-                `Duplicate option name: ${String(payload.name)}.`,
-            );
-        if (
-            payload.required === true &&
-            options.some(
-                (existing) =>
-                    (existing as Record<string, unknown>).required !== true,
-            )
-        )
-            throw new RangeError(
-                "Required application command options must be placed before optional options.",
-            );
-        options.push(payload);
-        this.#data.options = options;
+        this.#data.options = appendOption(
+            this.#data.options,
+            option.toJSON(),
+            "application command",
+        );
         return this;
     }
 }
@@ -222,23 +200,9 @@ export class CreateStringOption extends CreateCommandOption {
     public addChoices(
         ...choices: Array<{ name: string; value: string }>
     ): this {
-        const current = (this.data.choices as unknown[] | undefined) ?? [];
-        if (!choices.length)
-            throw new TypeError("At least one choice is required.");
-        if (this.data.autocomplete === true)
-            throw new RangeError("Autocomplete options cannot define choices.");
-        if (current.length + choices.length > 25)
-            throw new RangeError(
-                "An option cannot contain more than 25 choices.",
-            );
-        for (const choice of choices) {
-            validateText(choice.name, "Choice name", 100);
+        for (const choice of choices)
             validateText(choice.value, "Choice value", 100);
-        }
-        this.data.choices = [
-            ...current,
-            ...choices.map((choice) => ({ ...choice })),
-        ];
+        appendChoices(this.data, choices);
         return this;
     }
     /** Sets the minimum string length. */
@@ -259,38 +223,42 @@ export class CreateStringOption extends CreateCommandOption {
         return this;
     }
 }
-/** Builds an integer command option. */
-export class CreateIntegerOption extends CreateCommandOption {
-    public constructor() {
-        super(ApplicationCommandOptionEnum.Integer);
+/** Shared bounds, choices and autocomplete rules of integer and number options. */
+export class CreateNumericOption extends CreateCommandOption {
+    readonly #integer: boolean;
+    /** Creates a numeric option; `integer` rejects fractional bounds. */
+    public constructor(type: number, integer: boolean) {
+        super(type);
+        this.#integer = integer;
     }
+    /** Sets the minimum value. */
     public setMinValue(value: number): this {
         validateNumberRange(
             value,
-            -9_007_199_254_740_991,
-            9_007_199_254_740_991,
+            -MAX_SAFE,
+            MAX_SAFE,
             "min_value",
-            true,
+            this.#integer,
         );
         this.data.min_value = value;
         return this;
     }
+    /** Sets the maximum value; it cannot be below the minimum. */
     public setMaxValue(value: number): this {
         validateNumberRange(
             value,
-            -9_007_199_254_740_991,
-            9_007_199_254_740_991,
+            -MAX_SAFE,
+            MAX_SAFE,
             "max_value",
-            true,
+            this.#integer,
         );
-        if (
-            (this.data.min_value as number | undefined) !== undefined &&
-            (this.data.min_value as number) > value
-        )
+        const min = this.data.min_value as number | undefined;
+        if (min !== undefined && min > value)
             throw new RangeError("min_value cannot exceed max_value.");
         this.data.max_value = value;
         return this;
     }
+    /** Enables autocomplete; options with choices cannot use it. */
     public override setAutocomplete(enabled = true): this {
         if (
             enabled &&
@@ -301,74 +269,22 @@ export class CreateIntegerOption extends CreateCommandOption {
         this.data.autocomplete = enabled;
         return this;
     }
+    /** Adds fixed choices. */
     public addChoices(...choices: { name: string; value: number }[]): this {
-        const current = (this.data.choices as unknown[] | undefined) ?? [];
-        if (!choices.length)
-            throw new TypeError("At least one choice is required.");
-        if (this.data.autocomplete === true)
-            throw new RangeError("Autocomplete options cannot define choices.");
-        if (current.length + choices.length > 25)
-            throw new RangeError(
-                "An option cannot contain more than 25 choices.",
-            );
-        this.data.choices = [...current, ...choices];
+        appendChoices(this.data, choices);
         return this;
     }
 }
-/** Builds a number command option. */
-export class CreateNumberOption extends CreateCommandOption {
+/** Builds an integer command option. */
+export class CreateIntegerOption extends CreateNumericOption {
     public constructor() {
-        super(ApplicationCommandOptionEnum.Number);
+        super(ApplicationCommandOptionEnum.Integer, true);
     }
-    public setMinValue(value: number): this {
-        validateNumberRange(
-            value,
-            -9_007_199_254_740_991,
-            9_007_199_254_740_991,
-            "min_value",
-            false,
-        );
-        this.data.min_value = value;
-        return this;
-    }
-    public setMaxValue(value: number): this {
-        validateNumberRange(
-            value,
-            -9_007_199_254_740_991,
-            9_007_199_254_740_991,
-            "max_value",
-            false,
-        );
-        if (
-            (this.data.min_value as number | undefined) !== undefined &&
-            (this.data.min_value as number) > value
-        )
-            throw new RangeError("min_value cannot exceed max_value.");
-        this.data.max_value = value;
-        return this;
-    }
-    public override setAutocomplete(enabled = true): this {
-        if (
-            enabled &&
-            Array.isArray(this.data.choices) &&
-            this.data.choices.length
-        )
-            throw new RangeError("Autocomplete options cannot define choices.");
-        this.data.autocomplete = enabled;
-        return this;
-    }
-    public addChoices(...choices: { name: string; value: number }[]): this {
-        const current = (this.data.choices as unknown[] | undefined) ?? [];
-        if (!choices.length)
-            throw new TypeError("At least one choice is required.");
-        if (this.data.autocomplete === true)
-            throw new RangeError("Autocomplete options cannot define choices.");
-        if (current.length + choices.length > 25)
-            throw new RangeError(
-                "An option cannot contain more than 25 choices.",
-            );
-        this.data.choices = [...current, ...choices];
-        return this;
+}
+/** Builds a number command option. */
+export class CreateNumberOption extends CreateNumericOption {
+    public constructor() {
+        super(ApplicationCommandOptionEnum.Number, false);
     }
 }
 /** Builds a boolean command option. */
@@ -483,43 +399,22 @@ export class CreateSubcommand extends CreateCommandOption {
         return this.addChildOption(configure(new CreateAttachmentOption()));
     }
     protected addChildOption(option: CreateCommandOption): this {
-        const options = (this.data.options as unknown[] | undefined) ?? [];
-        if (options.length >= 25)
-            throw new RangeError(
-                "A subcommand cannot contain more than 25 options.",
-            );
-        const payload = option.toJSON();
+        const options =
+            (this.data.options as OptionPayload[] | undefined) ?? [];
         if (
             options.some(
                 (existing) =>
-                    (existing as Record<string, unknown>).name === payload.name,
-            )
-        )
-            throw new RangeError(
-                `Duplicate option name: ${String(payload.name)}.`,
-            );
-        if (
-            payload.required === true &&
-            options.some(
-                (existing) =>
-                    (existing as Record<string, unknown>).required !== true,
-            )
-        )
-            throw new RangeError(
-                "Required subcommand options must be placed before optional options.",
-            );
-        if (
-            options.some(
-                (existing) =>
-                    (existing as Record<string, unknown>).type ===
-                    ApplicationCommandOptionEnum.Subcommand,
+                    existing.type === ApplicationCommandOptionEnum.Subcommand,
             )
         )
             throw new RangeError(
                 "Subcommands cannot contain nested subcommands.",
             );
-        options.push(payload);
-        this.data.options = options;
+        this.data.options = appendOption(
+            options,
+            option.toJSON(),
+            "subcommand",
+        );
         return this;
     }
 }
@@ -557,6 +452,53 @@ export class CreateSubcommandGroup extends CreateCommandOption {
         return this;
     }
 }
+const MAX_SAFE = Number.MAX_SAFE_INTEGER;
+
+/** A serialized option as stored on its parent. */
+type OptionPayload = Record<string, unknown>;
+
+/**
+ * Returns `options` with `payload` appended, enforcing Discord's limit of 25,
+ * unique names, and required options before optional ones.
+ */
+function appendOption(
+    options: unknown,
+    payload: OptionPayload,
+    parent: "application command" | "subcommand",
+): OptionPayload[] {
+    const list = (options as OptionPayload[] | undefined) ?? [];
+    if (list.length >= 25)
+        throw new RangeError(
+            `${parent === "subcommand" ? "A subcommand" : "An application command"} cannot contain more than 25 options.`,
+        );
+    if (list.some((existing) => existing.name === payload.name))
+        throw new RangeError(`Duplicate option name: ${String(payload.name)}.`);
+    if (
+        payload.required === true &&
+        list.some((existing) => existing.required !== true)
+    )
+        throw new RangeError(
+            `Required ${parent} options must be placed before optional options.`,
+        );
+    return [...list, payload];
+}
+
+/** Appends choices to an option, enforcing the shared choice rules. */
+function appendChoices(
+    data: OptionPayload,
+    choices: { name: string; value: string | number }[],
+): void {
+    const current = (data.choices as unknown[] | undefined) ?? [];
+    if (!choices.length)
+        throw new TypeError("At least one choice is required.");
+    if (data.autocomplete === true)
+        throw new RangeError("Autocomplete options cannot define choices.");
+    if (current.length + choices.length > 25)
+        throw new RangeError("An option cannot contain more than 25 choices.");
+    for (const choice of choices) validateText(choice.name, "Choice name", 100);
+    data.choices = [...current, ...choices.map((choice) => ({ ...choice }))];
+}
+
 function validateName(value: string, field: string): void {
     if (!/^[\p{L}\p{N}_-]{1,32}$/u.test(value) || value !== value.toLowerCase())
         throw new RangeError(

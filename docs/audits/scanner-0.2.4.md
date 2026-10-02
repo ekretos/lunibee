@@ -37,9 +37,9 @@ comments was a P0/P1. Working through them turned up one real bug (F1).
 | Category | Count | Status |
 | --- | --- | --- |
 | Explicit `any` | 139 | **Fixed, except one**: `APIMessageComponent` in `packages/types/src/index.ts` (see Open). Listener maps are mapped types; mocks are typed; invalid-input tests use `@ts-expect-error`. |
-| Duplicated code | 60 | **Partly fixed.** The fake WebSocket copied into 8 test files is now `tests/helpers/fake-websocket.ts`; `fetch` stubs share `tests/helpers/fetch.ts`; a dead `MockWebSocket` was removed. The rest is open (see below). |
+| Duplicated code | 60 | **Fixed where real.** Fake WebSocket and `fetch` stubs shared in `tests/helpers/`; numeric options share `CreateNumericOption`; select menus share `CreateSelectMenu`; option and choice checks share `appendOption` / `appendChoices`; `ComponentEnum` is re-exported from `@lunibee/types`; `PermissionFlagsBits` is the `Permissions` object; role payloads share `rolePayload`. Not fixed: `ApplicationCommandOptionEnum` (builders use `Subcommand`, types use `SubCommand`, so they are not the same table) and test files that repeat a table on purpose. |
 | Sequential `await` in loops | 25 | **Accepted.** Each one is ordered on purpose: publishing in dependency order, file writes that create folders, migrations that rename before rewriting, shard spawn pacing. `Promise.all` would change behaviour. |
-| Complex / long functions | 21 | **Open (P3).** Biggest: the `Client` constructor (event wiring), `importEdit` / `scanSource` / `maskCode` in the CLI. Refactor only with tests around them, not in a security release. |
+| Complex / long functions | 21 | **Fixed where real.** The `Client` constructor (656 lines) is split into a resource-context factory and seven event-wiring methods; `fixHandlers` is split into rename, migrate and report steps (the scanner attributed its length to `importEdit`, which is 30 lines). The rest are parsers or Discord's own algorithms just over the threshold. |
 | Leftover `console.log` | 26 | **Accepted.** All are CLI, script, benchmark or example output. |
 | Empty `catch` | 2 | **Fixed** in `scripts/bump.ts` and `scripts/check-dependency-graph.ts`. |
 | Unused imports | 3 files | **Fixed.** |
@@ -59,10 +59,5 @@ comments was a P0/P1. Working through them turned up one real bug (F1).
   generic constraints. The ones to replace are option bags typed
   `Record<string, unknown>` (builders, `MessageCreateOptions`, interaction data);
   each needs the Discord payload type it stands for.
-- **Duplicated constant tables** (P3): `ComponentEnum`, the command option types
-  and the permission flags exist in both `@lunibee/types` and the package that
-  uses them. They are deliberately kept identical; merging them is part of the
-  same move as the component types.
-- **Builder duplication** (P3): `setMinValue` / `setMaxValue`, `addChoices` and
-  `setCustomId` / `setPlaceholder` are repeated between the integer/number
-  options and the select menus. A shared base would remove it.
+- **`ApplicationCommandOptionEnum`** exists in builders (`Subcommand`) and types
+  (`SubCommand`). Merging needs one spelling plus a deprecated alias.

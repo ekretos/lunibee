@@ -317,7 +317,25 @@ export class Client
             "0",
         );
         this.application = { commands: placeholderAppCommands };
-        this.#resourceContext = {
+        this.#resourceContext = this.#createResourceContext();
+        this.guilds.attachContext(this.#resourceContext);
+        this.#gateway = new Gateway({
+            token: options.token,
+            intents: options.intents,
+            ...options.gateway,
+        });
+
+        this.#wireLifecycle();
+        this.#wireMessages();
+        this.#wireGuilds();
+        this.#wireGuildFeatures();
+        this.#wireChannels();
+        this.#wireMisc();
+    }
+
+    /** Callbacks structures use to act through this client (send, edit, kick...). */
+    #createResourceContext(): ResourceContext {
+        return {
             sendMessage: (channelId, options) =>
                 this.channels.send(channelId, options),
             editMessage: (channelId, messageId, options) =>
@@ -403,13 +421,10 @@ export class Client
                     .update(targetId, bits, options);
             },
         };
-        this.guilds.attachContext(this.#resourceContext);
-        this.#gateway = new Gateway({
-            token: options.token,
-            intents: options.intents,
-            ...options.gateway,
-        });
+    }
 
+    /** Session lifecycle: ready, resume, open and close. */
+    #wireLifecycle(): void {
         // ── Lifecycle ────────────────────────────────────────────────────────────
         this.#gateway.on("READY", (data) => {
             const ready = data as APIReadyEvent;
@@ -440,7 +455,10 @@ export class Client
                 data as { code: number; action: string },
             );
         });
+    }
 
+    /** Messages, reactions and polls. */
+    #wireMessages(): void {
         // ── Messages ─────────────────────────────────────────────────────────────
         this.#gateway.on("MESSAGE_CREATE", (data) => {
             const payload = data as import("@lunibee/types").APIMessage;
@@ -539,7 +557,10 @@ export class Client
                 data as APIMessagePollVoteEvent,
             ),
         );
+    }
 
+    /** Guilds, members, bans and roles. */
+    #wireGuilds(): void {
         // ── Guilds ───────────────────────────────────────────────────────────────
         this.#gateway.on("GUILD_CREATE", (data) => {
             const payload = data as APIGuild & {
@@ -676,7 +697,10 @@ export class Client
             roles.delete(event.role_id);
             this.emit(ClientEvent.GuildRoleDelete, event, removed);
         });
+    }
 
+    /** Guild emojis, stickers, soundboard, monetization, integrations, scheduled events and AutoMod. */
+    #wireGuildFeatures(): void {
         // ── Guild Emojis & Stickers ──────────────────────────────────────────────
         this.#gateway.on("GUILD_EMOJIS_UPDATE", (data) => {
             const event = data as APIGuildEmojisUpdateEvent;
@@ -814,7 +838,10 @@ export class Client
                 data as APIAutoModerationActionExecution,
             ),
         );
+    }
 
+    /** Channels, threads, stage instances, invites and webhooks. */
+    #wireChannels(): void {
         // ── Channels ─────────────────────────────────────────────────────────────
         this.#gateway.on("CHANNEL_CREATE", (data) => {
             const channel = this.channels.upsert(data as APIChannel);
@@ -908,7 +935,10 @@ export class Client
         this.#gateway.on("WEBHOOKS_UPDATE", (data) =>
             this.emit(ClientEvent.WebhooksUpdate, data as APIWebhooksUpdate),
         );
+    }
 
+    /** Voice, presence, typing, interactions, raw frames and errors. */
+    #wireMisc(): void {
         // ── Voice ────────────────────────────────────────────────────────────────
         this.#gateway.on("VOICE_STATE_UPDATE", (data) => {
             const state = data as APIVoiceState;

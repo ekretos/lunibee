@@ -56,18 +56,10 @@ export class RoleManager extends ResourceManager<string, Role> {
         const { reason, ...payload } = options;
         const data = await this.#rest.post<APIRole>(
             Routes.guildRoles(this.guildId),
-            {
-                ...payload,
-                permissions:
-                    payload.permissions !== undefined
-                        ? String(payload.permissions)
-                        : undefined,
-            },
+            rolePayload(payload),
             { reason },
         );
-        const role = new Role(data);
-        this.set(role.id, role);
-        return role;
+        return this.#store(data);
     }
 
     /** Edits an existing role. */
@@ -75,15 +67,13 @@ export class RoleManager extends ResourceManager<string, Role> {
         const { reason, ...payload } = options;
         const data = await this.#rest.patch<APIRole>(
             Routes.guildRole(this.guildId, roleId),
-            {
-                ...payload,
-                permissions:
-                    payload.permissions !== undefined
-                        ? String(payload.permissions)
-                        : undefined,
-            },
+            rolePayload(payload),
             { reason },
         );
+        return this.#store(data);
+    }
+
+    #store(data: APIRole): Role {
         const role = new Role(data);
         this.set(role.id, role);
         return role;
@@ -123,4 +113,14 @@ export class RoleManager extends ResourceManager<string, Role> {
     public deleteRole(roleId: string): Promise<void> {
         return this.remove(roleId);
     }
+}
+
+/** Role options as Discord expects them: `permissions` as a decimal string. */
+function rolePayload(options: Omit<RoleEditOptions, "reason">) {
+    const { permissions, ...rest } = options;
+    return {
+        ...rest,
+        permissions:
+            permissions !== undefined ? String(permissions) : undefined,
+    };
 }
