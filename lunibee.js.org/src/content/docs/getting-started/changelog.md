@@ -16,6 +16,7 @@ Security release. Fixes the findings of the 0.2.3 security review; the status of
 * **Gateway frames are capped** at 64 MiB inflated, so a compressed frame cannot exhaust memory.
 * **Webhook URLs must be Discord's** (`WebhookClient({ url })` no longer accepts look-alike hosts or embedded URLs); `thread_id` is encoded; CDN asset hashes are encoded.
 * **Listener warnings never print the bot token**; it is replaced with `[token]`.
+* **`lunibee migrate` / `lunibee fix` escape every RegExp metacharacter** in names they search for (CodeQL `js/incomplete-sanitization`); `publish:all` no longer runs `npm` through a shell.
 
 ### ⚠️ Behaviour changes
 

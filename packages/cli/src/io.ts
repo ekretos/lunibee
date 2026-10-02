@@ -84,3 +84,8 @@ export function didYouMean(
         ? `Did you mean ${matches.map((m) => `\`${m}\``).join(", ")}?`
         : undefined;
 }
+
+/** Escapes every RegExp metacharacter so `text` matches literally. */
+export function escapeRegExp(text: string): string {
+    return text.replace(/[\\^$.*+?()[\]{}|/-]/g, "\\$&");
+}

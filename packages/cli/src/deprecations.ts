@@ -1,6 +1,6 @@
 import { readdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { paint, type IO } from "./io.js";
+import { escapeRegExp, paint, type IO } from "./io.js";
 
 /** Pre-0.2.2 names, removed in 0.3.0, and the names that replace them. */
 export const RENAMED: Readonly<Record<string, string>> = {
@@ -292,7 +292,7 @@ export function scanSource(source: string): FileResult {
     }
     for (const ns of namespaces) {
         const pattern = new RegExp(
-            `(?<![\\w$.])${ns.replace(/\$/g, "\\$")}\\.(${Object.keys(RENAMED).join("|")})(?![\\w$])`,
+            `(?<![\\w$.])${escapeRegExp(ns)}\\.(${Object.keys(RENAMED).join("|")})(?![\\w$])`,
             "g",
         );
         for (const use of masked.matchAll(pattern)) {

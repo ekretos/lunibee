@@ -1,7 +1,7 @@
 import { readdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { discover, EVENTS, eventsDir, syncHandlers } from "./handlers.js";
-import { paint, type IO } from "./io.js";
+import { escapeRegExp, paint, type IO } from "./io.js";
 
 export type Migration =
     | { state: "ok" }
@@ -99,7 +99,7 @@ function findTarget(text: string): Target {
         /export\s*\{[^}]*?\b([\w$]+)\s+as\s+default\b/.exec(text)?.[1];
     if (!named || ["class", "async", "function"].includes(named))
         return { kind: "manual", reason: "no default-exported function found" };
-    const escaped = named.replace(/\$/g, "\\$");
+    const escaped = escapeRegExp(named);
     const declared =
         new RegExp(
             `function\\s*\\*?\\s*${escaped}\\s*(?:<[^>]*>)?\\s*\\(`,

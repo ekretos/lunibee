@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../packages/cli/src/cli.ts";
 import { maskCode, scanSource } from "../packages/cli/src/deprecations.ts";
-import type { IO } from "../packages/cli/src/io.ts";
+import { escapeRegExp, type IO } from "../packages/cli/src/io.ts";
+
+test("escapeRegExp matches metacharacters literally", () => {
+    const text = "a.b*c+$d(e)[f]{g}|h\\i^j?k/l-m";
+    expect(new RegExp(`^${escapeRegExp(text)}$`).test(text)).toBe(true);
+    expect(new RegExp(escapeRegExp("a.b")).test("axb")).toBe(false);
+});
 
 describe("scanSource", () => {
     test("renames old names imported from lunibee, with their uses", () => {
