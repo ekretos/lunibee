@@ -1,0 +1,389 @@
+---
+title: Components V2 Builders
+description: Discord Components V2 layout builders — Container, Section,
+  TextDisplay, MediaGallery, Separator, Thumbnail, and FileComponent.
+slug: 0.2.1/reference/components-v2
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Lunibee includes builders for Discord's **Components V2** layout system, which provides richer message layouts with sections, galleries, separators, and more.
+
+> \[!IMPORTANT]
+> Components V2 requires the `IS_COMPONENTS_V2` message flag. Messages using V2 components cannot also contain embeds or regular content.
+
+## Import
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import {
+      CreateContainer,
+      CreateSection,
+      CreateTextDisplay,
+      CreateMediaGallery,
+      CreateFileComponent,
+      CreateSeparator,
+      CreateThumbnail,
+    } from "lunibee";
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import {
+      CreateContainer,
+      CreateSection,
+      CreateTextDisplay,
+      CreateMediaGallery,
+      CreateFileComponent,
+      CreateSeparator,
+      CreateThumbnail,
+    } from "lunibee";
+    ```
+  </TabItem>
+</Tabs>
+
+***
+
+## `CreateContainer`
+
+The top-level V2 component that wraps other components. Set `IS_COMPONENTS_V2` flag when sending.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const container = new CreateContainer()
+      .addComponents(
+        new CreateSection()
+          .addComponents(new CreateTextDisplay().setContent("**Welcome!** 🐝"))
+          .setAccessory(new CreateThumbnail().setUrl("https://example.com/bee.png")),
+        new CreateSeparator(),
+        new CreateTextDisplay().setContent("Explore the channels below."),
+      );
+
+    await channel.send({
+      components: [container],
+      flags: 1 << 15, // IS_COMPONENTS_V2
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const container = new CreateContainer()
+      .addComponents(
+        new CreateSection()
+          .addComponents(new CreateTextDisplay().setContent("**Welcome!** 🐝"))
+          .setAccessory(new CreateThumbnail().setUrl("https://example.com/bee.png")),
+        new CreateSeparator(),
+        new CreateTextDisplay().setContent("Explore the channels below."),
+      );
+
+    await channel.send({
+      components: [container],
+      flags: 1 << 15, // IS_COMPONENTS_V2
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+***
+
+## `CreateSection`
+
+A two-column layout with text on the left and an optional accessory (thumbnail or button) on the right.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `addComponents(...textDisplays)` | Adds `CreateTextDisplay`s to the left column. |
+| `setAccessory(accessory)` | Sets a `CreateThumbnail` or `CreateButton` accessory on the right. |
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const section = new CreateSection()
+      .addComponents(new CreateTextDisplay().setContent("**Lunibee v0.2.1** is here!"))
+      .setAccessory(
+        new CreateThumbnail()
+          .setUrl("https://example.com/release.png")
+          .setDescription("Release banner"),
+      );
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const section = new CreateSection()
+      .addComponents(new CreateTextDisplay().setContent("**Lunibee v0.2.1** is here!"))
+      .setAccessory(
+        new CreateThumbnail()
+          .setUrl("https://example.com/release.png")
+          .setDescription("Release banner"),
+      );
+    ```
+  </TabItem>
+</Tabs>
+
+***
+
+## `CreateTextDisplay`
+
+Renders markdown text in a V2 layout.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setContent(text)` | Sets the markdown text content. |
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const text = new CreateTextDisplay().setContent(
+      `## Server Stats\n- Members: **1,234**\n- Online: **456**`
+    );
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const text = new CreateTextDisplay().setContent(
+      `## Server Stats\n- Members: **1,234**\n- Online: **456**`
+    );
+    ```
+  </TabItem>
+</Tabs>
+
+***
+
+## `CreateMediaGallery`
+
+Displays a grid of images.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `addItems(...items)` | Adds media items. Each item: `{ url, description? }`. |
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const gallery = new CreateMediaGallery().addItems(
+      { url: "https://example.com/img1.png", description: "Screenshot 1" },
+      { url: "https://example.com/img2.png", description: "Screenshot 2" },
+    );
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const gallery = new CreateMediaGallery().addItems(
+      { url: "https://example.com/img1.png", description: "Screenshot 1" },
+      { url: "https://example.com/img2.png", description: "Screenshot 2" },
+    );
+    ```
+  </TabItem>
+</Tabs>
+
+***
+
+## `CreateThumbnail`
+
+A small image accessory used in `CreateSection`.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setUrl(url)` | Sets the image URL. |
+| `setDescription(text)` | Sets alt text for accessibility. |
+| `setSpoiler(spoiler)` | Marks as a spoiler image. |
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const thumb = new CreateThumbnail()
+      .setUrl("https://example.com/avatar.png")
+      .setDescription("User avatar");
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const thumb = new CreateThumbnail()
+      .setUrl("https://example.com/avatar.png")
+      .setDescription("User avatar");
+    ```
+  </TabItem>
+</Tabs>
+
+***
+
+## `CreateSeparator`
+
+Renders a visual divider between components.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setSpacing(spacing)` | Sets the spacing size (`1` = small, `2` = large). |
+| `setDivider(show)` | Whether to show a visible line (default: `true`). |
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const sep = new CreateSeparator().setSpacing(2);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const sep = new CreateSeparator().setSpacing(2);
+    ```
+  </TabItem>
+</Tabs>
+
+***
+
+## `CreateFileComponent`
+
+Attaches an uploaded file component to the layout.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `setUrl(url)` | Sets the attachment URL (`attachment://filename`). |
+| `setSpoiler(spoiler)` | Marks as spoiler. |
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const file = new CreateFileComponent().setUrl("attachment://report.pdf");
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const file = new CreateFileComponent().setUrl("attachment://report.pdf");
+    ```
+  </TabItem>
+</Tabs>
+
+***
+
+## Full V2 Layout Example
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import {
+      CreateContainer,
+      CreateSection,
+      CreateTextDisplay,
+      CreateMediaGallery,
+      CreateSeparator,
+      CreateThumbnail,
+      CreateButton,
+      ButtonType,
+      CreateActionRow,
+    } from "lunibee";
+
+    const layout = new CreateContainer().addComponents(
+      // Header section
+      new CreateSection()
+        .addComponents(new CreateTextDisplay().setContent("## 🐝 Release Notes — v0.2.1"))
+        .setAccessory(new CreateThumbnail().setUrl("https://example.com/bee.png")),
+
+      new CreateSeparator().setSpacing(1),
+
+      // Body text
+      new CreateTextDisplay().setContent(
+        "This release includes bug fixes, new builders, and improved documentation.\n\n" +
+        "- Fixed duplicate `delete` in managers\n" +
+        "- Added DTS build exclusions\n" +
+        "- Overhauled `create-lunibee` CLI"
+      ),
+
+      new CreateSeparator(),
+
+      // Screenshots
+      new CreateMediaGallery().addItems(
+        { url: "https://example.com/screenshot1.png", description: "New CLI output" },
+        { url: "https://example.com/screenshot2.png", description: "Docs preview" },
+      ),
+    );
+
+    await channel.send({
+      components: [layout],
+      flags: 1 << 15, // IS_COMPONENTS_V2
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import {
+      CreateContainer,
+      CreateSection,
+      CreateTextDisplay,
+      CreateMediaGallery,
+      CreateSeparator,
+      CreateThumbnail,
+      CreateButton,
+      ButtonType,
+      CreateActionRow,
+    } from "lunibee";
+
+    const layout = new CreateContainer().addComponents(
+      // Header section
+      new CreateSection()
+        .addComponents(new CreateTextDisplay().setContent("## 🐝 Release Notes — v0.2.1"))
+        .setAccessory(new CreateThumbnail().setUrl("https://example.com/bee.png")),
+
+      new CreateSeparator().setSpacing(1),
+
+      // Body text
+      new CreateTextDisplay().setContent(
+        "This release includes bug fixes, new builders, and improved documentation.\n\n" +
+        "- Fixed duplicate `delete` in managers\n" +
+        "- Added DTS build exclusions\n" +
+        "- Overhauled `create-lunibee` CLI"
+      ),
+
+      new CreateSeparator(),
+
+      // Screenshots
+      new CreateMediaGallery().addItems(
+        { url: "https://example.com/screenshot1.png", description: "New CLI output" },
+        { url: "https://example.com/screenshot2.png", description: "Docs preview" },
+      ),
+    );
+
+    await channel.send({
+      components: [layout],
+      flags: 1 << 15, // IS_COMPONENTS_V2
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+## 0.2.1 Additions
+
+### `componentsV2Message(components, options?)`
+
+Builds a Components V2 message payload: the components' JSON plus the `IsComponentsV2` flag Discord requires. `options` adds other message fields; their `flags` are combined with the V2 flag (for example `64` for ephemeral). A V2 message cannot also carry `content` or `embeds`.
+
+```ts
+import { componentsV2Message, CreateContainer, CreateTextDisplay } from "lunibee";
+
+await channel.send(componentsV2Message(
+  new CreateContainer().setAccentColor(0x57f287).addComponents(new CreateTextDisplay().setContent("## Settings")),
+  { allowed_mentions: { parse: [] } },
+));
+```

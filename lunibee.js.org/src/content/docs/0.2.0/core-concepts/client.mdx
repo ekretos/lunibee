@@ -1,0 +1,290 @@
+---
+title: Client & Gateway Lifecycle
+description: Initializing the Lunibee Client, configuring intents, presence, and
+  event dispatching.
+slug: 0.2.0/core-concepts/client
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+The `Client` class in `lunibee` is the primary orchestrator that connects the REST API, Gateway WebSocket, caching layers, and event dispatchers into a cohesive bot interface.
+
+## Initialization & Intents
+
+Lunibee supports specifying intents as arrays or bitwise OR combinations. The public constants are:
+
+* `IntentBits` — idiomatic camelCase constants.
+* `GatewayIntentBits` — Discord-standard PascalCase constants.
+* `Intents` — alias for `IntentBits`.
+
+### Using `IntentBits` (Recommended)
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { Client, IntentBits } from "lunibee";
+
+    const client = new Client({
+      token: process.env.DISCORD_TOKEN!,
+      intents: [
+        IntentBits.guilds,
+        IntentBits.guildMessages,
+        IntentBits.messageContent,
+      ],
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { Client, IntentBits } from "lunibee";
+
+    const client = new Client({
+      token: process.env.DISCORD_TOKEN,
+      intents: [
+        IntentBits.guilds,
+        IntentBits.guildMessages,
+        IntentBits.messageContent,
+      ],
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+### Using `GatewayIntentBits`
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { Client, GatewayIntentBits } from "lunibee";
+
+    const client = new Client({
+      token: process.env.DISCORD_TOKEN!,
+      intents:
+        GatewayIntentBits.Guilds |
+        GatewayIntentBits.GuildMessages |
+        GatewayIntentBits.MessageContent,
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { Client, GatewayIntentBits } from "lunibee";
+
+    const client = new Client({
+      token: process.env.DISCORD_TOKEN,
+      intents:
+        GatewayIntentBits.Guilds |
+        GatewayIntentBits.GuildMessages |
+        GatewayIntentBits.MessageContent,
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+### Using `IntentsBitField`
+
+A discord.js-style bitfield, accepted anywhere intents are:
+
+```ts
+import { Client, IntentsBitField } from "lunibee";
+
+const intents = new IntentsBitField([
+  IntentsBitField.Flags.Guilds,
+  "GuildMessages",
+]).add("MessageContent");
+
+intents.has("Guilds");  // true
+intents.toArray();      // ["Guilds", "GuildMessages", "MessageContent"]
+
+const client = new Client({ token: process.env.DISCORD_TOKEN!, intents });
+```
+
+## Gateway Intents Reference
+
+| PascalCase (`GatewayIntentBits`) | camelCase (`IntentBits`) | Bit Shift | Type |
+| :--- | :--- | :--- | :--- |
+| `Guilds` | `guilds` | `1 << 0` | Standard |
+| `GuildMembers` | `guildMembers` | `1 << 1` | Privileged |
+| `GuildModeration` | `guildModeration` | `1 << 2` | Standard |
+| `GuildExpressions` | `guildExpressions` | `1 << 3` | Standard |
+| `GuildIntegrations` | `guildIntegrations` | `1 << 4` | Standard |
+| `GuildWebhooks` | `guildWebhooks` | `1 << 5` | Standard |
+| `GuildInvites` | `guildInvites` | `1 << 6` | Standard |
+| `GuildVoiceStates` | `guildVoiceStates` | `1 << 7` | Standard |
+| `GuildPresences` | `guildPresences` | `1 << 8` | Privileged |
+| `GuildMessages` | `guildMessages` | `1 << 9` | Standard |
+| `GuildMessageReactions` | `guildMessageReactions` | `1 << 10` | Standard |
+| `GuildMessageTyping` | `guildMessageTyping` | `1 << 11` | Standard |
+| `DirectMessages` | `directMessages` | `1 << 12` | Standard |
+| `DirectMessageReactions` | `directMessageReactions` | `1 << 13` | Standard |
+| `DirectMessageTyping` | `directMessageTyping` | `1 << 14` | Standard |
+| `MessageContent` | `messageContent` | `1 << 15` | Privileged |
+| `GuildScheduledEvents` | `guildScheduledEvents` | `1 << 16` | Standard |
+| `AutoModerationConfiguration` | `autoModerationConfiguration` | `1 << 20` | Standard |
+| `AutoModerationExecution` | `autoModerationExecution` | `1 << 21` | Standard |
+| `GuildMessagePolls` | `guildMessagePolls` | `1 << 24` | Standard |
+| `DirectMessagePolls` | `directMessagePolls` | `1 << 25` | Standard |
+
+## Privileged Intents
+
+`GuildMembers`, `GuildPresences`, and `MessageContent` are privileged Gateway intents and must be enabled for the bot in the Discord Developer Portal before use.
+
+## Managing Bot Presence
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    client.setPresence({
+      status: "online",
+      activities: [
+        {
+          name: "custom_status",
+          state: "⚡ Running on Bun & Lunibee",
+          type: 4,
+        },
+      ],
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    client.setPresence({
+      status: "online",
+      activities: [
+        {
+          name: "custom_status",
+          state: "⚡ Running on Bun & Lunibee",
+          type ,
+        },
+      ],
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+## Client Properties
+
+### `ping`
+
+Returns the current WebSocket ping in milliseconds. This value is updated continuously as heartbeats are exchanged with the gateway.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    console.log(`Current ping: ${client.ping}ms`);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    console.log(`Current ping: ${client.ping}ms`);
+    ```
+  </TabItem>
+</Tabs>
+
+## Client Methods
+
+### Utility Fetchers
+
+The client exposes several top-level methods to fetch resources without needing a cached guild or channel:
+
+* `fetchWebhook(id, token?)`: Fetches a webhook.
+* `fetchGuildPreview(guildId)`: Fetches preview information for a guild.
+* `fetchVoiceRegions()`: Returns an array of available voice regions.
+* `generateInvite(options)`: Generates a bot invite link based on the provided permissions and scopes.
+* `fetchInvite(code, options?)`: Fetches an invite by its code.
+* `fetchSticker(id)`: Fetches a specific sticker by its ID.
+* `fetchPremiumStickerPacks()`: Fetches the list of premium sticker packs.
+* `fetchGuildTemplate(code)`: Fetches a guild template by its code.
+
+### `setVoiceState`
+
+Updates the client's voice state in a guild. Used to connect to, move between, or disconnect from voice channels.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    client.setVoiceState(guildId, channelId, {
+      selfDeaf: false,
+      selfMute: true,
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    client.setVoiceState(guildId, channelId, {
+      selfDeaf ,
+      selfMute ,
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+### `requestGuildMembers`
+
+Requests offline or all members for a guild. This requires the `GuildMembers` intent.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    client.requestGuildMembers(guildId, {
+      query: "",
+      limit: 0,
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    client.requestGuildMembers(guildId, {
+      query: "",
+      limit ,
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+## Client Events
+
+In addition to standard entity events (like `MessageCreate`), the client emits events related to the gateway session lifecycle:
+
+* `Ready`: Emitted when the client connects and identifies successfully.
+* `Resumed`: Emitted when the client successfully resumes a dropped WebSocket connection without needing to re-identify.
+* `InvalidSession`: Emitted when the gateway rejects the session. Depending on the payload, the client will either attempt to resume or start a fresh session.
+
+## Collectors
+
+`client.createCollector(event, options)` collects the first argument of a
+client event and unsubscribes when it ends.
+
+```ts
+const collector = client.createCollector("interactionCreate", {
+  filter: (i) => i.isButton(),
+  idle: 30_000,               // stop after 30s without a match
+  max: 5,
+  signal: controller.signal,  // stop on abort
+});
+
+for await (const interaction of collector) {
+  await interaction.deferUpdate();
+}
+const collected = await collector.wait();
+```
+
+## Polls, Stickers, Soundboard and Monetization
+
+```ts
+await client.channels.endPoll(channelId, messageId);
+await client.channels.fetchPollVoters(channelId, messageId, answerId);
+
+await client.guilds.stickers(guildId).fetchAll();
+await client.guilds.soundboard(guildId).fetchAll();
+await client.channels.sendSoundboardSound(voiceChannelId, { soundId });
+
+await client.monetization?.fetchEntitlements({ userId });
+client.on("entitlementCreate", (entitlement) => { /* grant premium */ });
+```

@@ -1,0 +1,185 @@
+---
+title: GuildMember
+description: Represents a member of a Discord guild, with nickname, roles,
+  permissions, and avatar helpers.
+slug: 0.2.2/reference/guild-member
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`GuildMember` combines a `User` with guild-specific data: nickname, role assignments, permission bitfield, and per-guild avatar.
+
+## Import
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { GuildMember } from "lunibee";
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { GuildMember } from "lunibee";
+    ```
+  </TabItem>
+</Tabs>
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `user` | `User` | The underlying Discord user. |
+| `guildId` | `string` | Guild this member belongs to. |
+| `nickname` | `string \| null` | Server nickname, or `null` if not set. |
+| `roleIds` | `string[]` | Array of assigned role snowflake IDs. |
+| `pending` | `boolean` | Whether the member is pending membership screening. |
+| `joinedAt` | `Date \| undefined` | When the member joined the guild. |
+| `permissions` | `PermissionsBitField` | The member's permissions. From an interaction, Discord's resolved value; anywhere else, computed at guild level from the cached roles each time it is read (empty when the guild's roles are not cached). |
+| `avatarHash` | `string \| null` | Server-specific avatar hash. |
+| `premiumSince` | `Date \| null` | When they started boosting, or `null`. |
+| `timedOutUntil` | `Date \| null` | Timeout expiry, or `null` if not timed out. |
+| `flags` | `number` | Member flags bitfield. |
+| `displayName` | `string` | Nickname if set, otherwise `user.displayName`. |
+| `isTimedOut` | `boolean` | `true` if currently timed out. |
+
+## Methods
+
+### `avatarURL(options?)`
+
+Returns the server-specific member avatar URL, falling back to the user's avatar, or `null`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const avatar = member.avatarURL({ size: 128 });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const avatar = member.avatarURL({ size: 128 });
+    ```
+  </TabItem>
+</Tabs>
+
+### `displayAvatarURL(options?)`
+
+Always returns a URL — member avatar → user avatar → default avatar.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const avatar = member.displayAvatarURL({ size: 256 });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const avatar = member.displayAvatarURL({ size: 256 });
+    ```
+  </TabItem>
+</Tabs>
+
+### `toString()`
+
+Returns the Discord user mention string (`<@userId>`).
+
+## Examples
+
+**Check permissions before acting**
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    client.on("interactionCreate", async (interaction) => {
+      if (!interaction.isChatInputCommand() || interaction.commandName !== "purge") return;
+      const member = interaction.member;
+      if (!member?.permissions.has(Permission.manageMessages)) {
+        return interaction.reply({ content: "You need Manage Messages.", ephemeral: true });
+      }
+      // proceed with purge...
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    client.on("interactionCreate", async (interaction) => {
+      if (!interaction.isChatInputCommand() || interaction.commandName !== "purge") return;
+      const member = interaction.member;
+      if (!member?.permissions.has(Permission.manageMessages)) {
+        return interaction.reply({ content: "You need Manage Messages.", ephemeral: true });
+      }
+      // proceed with purge...
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+**Member info command**
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    client.on("interactionCreate", async (interaction) => {
+      if (!interaction.isChatInputCommand() || interaction.commandName !== "memberinfo") return;
+      const member = interaction.member;
+      if (!member) return;
+      const embed = new CreateEmbed()
+        .setTitle(member.displayName)
+        .setThumbnail(member.displayAvatarURL({ size: 128 }))
+        .addFields(
+          { name: "Joined", value: member.joinedAt ? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:R>` : "Unknown", inline: true },
+          { name: "Boosting", value: member.premiumSince ? "Yes 💎" : "No", inline: true },
+          { name: "Timed Out", value: member.isTimedOut ? "Yes ⏱️" : "No", inline: true },
+        );
+      await interaction.reply({ embeds: [embed] });
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    client.on("interactionCreate", async (interaction) => {
+      if (!interaction.isChatInputCommand() || interaction.commandName !== "memberinfo") return;
+      const member = interaction.member;
+      if (!member) return;
+      const embed = new CreateEmbed()
+        .setTitle(member.displayName)
+        .setThumbnail(member.displayAvatarURL({ size: 128 }))
+        .addFields(
+          { name: "Joined", value: member.joinedAt ? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:R>` : "Unknown", inline: true },
+          { name: "Boosting", value: member.premiumSince ? "Yes 💎" : "No", inline: true },
+          { name: "Timed Out", value: member.isTimedOut ? "Yes ⏱️" : "No", inline: true },
+        );
+      await interaction.reply({ embeds: [embed] });
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+## 0.2.1 Additions
+
+Members from messages, interactions, the member cache and `guilds.members(id).fetch()` are attached to the client, so they can act on themselves. Every action takes an optional audit-log `reason`.
+
+| Method | Description |
+|---|---|
+| `permissionsIn(channelId)` | Permissions in a channel, with its overwrites; `null` when the channel or guild is not cached. |
+| `kick(reason?)` | Kicks the member. |
+| `ban({ reason?, deleteMessageSeconds? })` | Bans the member. |
+| `timeout(ms \| null, reason?)` | Times the member out, or clears the timeout with `null`. |
+| `setNickname(nick \| null, reason?)` | Sets or clears the nickname. |
+| `addRole(roleId, reason?)` / `removeRole(roleId, reason?)` | Changes one role. |
+| `edit(options, reason?)` | Any member field Discord accepts. |
+
+```ts
+client.on("messageCreate", async (message) => {
+  if (message.content !== "!mute" || !message.member) return;
+  if (!message.member.permissions.has("ModerateMembers")) return message.reply("You can't do that.");
+  const target = message.mentions[0];
+  if (target) await client.guilds.members(message.guildId!).timeout(target.id, 10 * 60_000, "Muted by a moderator");
+});
+```
+
+The `GuildMemberManager` methods (`kick`, `addRole`, `removeRole`, `edit`, `timeout`) take the same optional `reason`.
