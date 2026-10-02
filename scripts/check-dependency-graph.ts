@@ -70,7 +70,9 @@ async function loadManifests(): Promise<Map<string, PackageManifest>> {
                 devDependencies: Object.keys(rootManifest.devDependencies ?? {}),
             });
         }
-    } catch (e) {}
+    } catch (error) {
+        console.error(error);
+    }
 
     return manifests;
 }

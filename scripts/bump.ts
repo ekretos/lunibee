@@ -17,7 +17,10 @@ async function bumpVersions() {
       pkg.version = NEW_VERSION;
       await writeFile(pkgJsonPath, JSON.stringify(pkg, null, 2) + "\n");
       console.log(`Bumped ${pkg.name} to ${NEW_VERSION}`);
-    } catch {}
+    } catch (error) {
+      // Folders without a package.json are not packages.
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.error(error);
+    }
   }
 
   // Root package
