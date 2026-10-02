@@ -1,0 +1,166 @@
+---
+title: Caching & Structures
+description: Canonical caching patterns, memory bounds, and structure identity in Lunibee.
+slug: 0.2.0/core-concepts/caching
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Lunibee manages Discord resources (Users, Guilds, Channels, Roles, Messages) using **Canonical Identity Caching**.
+
+## Canonical Identity Guarantee
+
+When a resource is received via Gateway event or fetched via REST, the resource manager checks if an existing instance already exists in memory.
+
+If it exists, Lunibee mutates the existing structure in place and returns the same object reference. This prevents subtle desynchronization bugs where two parts of your application hold different versions of the same guild or user.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const userA = client.users.cache.get("123456789012345678");
+    const userB = await client.users.fetch("123456789012345678");
+
+    console.log(userA === userB); // true! Exact same instance
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const userA = client.users.cache.get("123456789012345678");
+    const userB = await client.users.fetch("123456789012345678");
+
+    console.log(userA === userB); // true Exact same instance
+    ```
+  </TabItem>
+</Tabs>
+
+## Resource State Never Expires
+
+Every manager cache is a `Collection`. Managers store Discord resources with
+`setWithoutTTL()`, so a guild, channel, role, member or user leaves the cache
+only through an explicit delete — a Gateway `*_DELETE` event or your own
+`manager.delete(id)` — never because nobody read it.
+
+Gateway events keep the caches current: `GUILD_CREATE` fills roles, emojis,
+members and channels; updates merge into the cached object; `GUILD_DELETE`
+removes the guild with its channels and per-guild managers.
+
+```ts
+client.guilds.members(guildId).get(userId); // GuildMember
+client.guilds.roles(guildId).get(roleId);   // Role
+client.guilds.emojis(guildId).cache.size;
+```
+
+A REST fetch that finishes after a Gateway update (or delete) for the same
+resource is returned to you but not cached, so it cannot overwrite newer state.
+Concurrent fetches of one resource share a single request.
+
+## TTL & LRU Collections for Your Own Data
+
+`Collection` doubles as a bounded cache for application data:
+
+```ts
+import { Collection } from "lunibee";
+
+const cooldowns = new Collection<string, number>(null, {
+  ttl: 60_000,     // sliding: each get() restarts the window
+  maxSize: 10_000, // least-recently-used set() entries are evicted
+  onEvict: (key, value, reason) => console.debug(key, reason), // "expired" | "evicted"
+});
+
+cooldowns.set(userId, Date.now());          // TTL/LRU entry
+cooldowns.set(userId, Date.now(), 5_000);   // per-entry TTL
+cooldowns.setWithoutTTL("pinned", 0);       // never expires, never evicted
+cooldowns.peek(userId);                     // read without sliding the TTL
+cooldowns.stats;                            // { hits, misses, expired, evicted }
+```
+
+## Messages Are Not Cached by Default
+
+Messages are temporary data. Enable a bounded per-channel cache only if you
+need the previous content on edits and deletes:
+
+```ts
+const client = new Client({
+  token, intents,
+  messageCache: { maxSize: 200, ttl: 30 * 60_000 },
+});
+```
+
+## Turning Caches Off on Large Bots
+
+Events still carry full objects when a resource is not cached:
+
+```ts
+const client = new Client({
+  token, intents,
+  cache: { members: false, users: false }, // roles and emojis stay cached
+});
+```
+
+## Structure Resource Methods
+
+Structures like `Message`, `Guild`, and `Channel` expose intuitive helper methods that automatically route through the manager's REST client:
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    client.on("messageCreate", async (message) => {
+      // Directly edit the message
+      await message.edit({ content: "Updated content!" });
+
+      // Or delete it
+      await message.delete();
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    client.on("messageCreate", async (message) => {
+      // Directly edit the message
+      await message.edit({ content: "Updated content!" });
+
+      // Or delete it
+      await message.delete();
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+## Channel Classes
+
+Channels built by the client and managers use `createChannel(data)`, which returns the
+most specific class. All of them extend `Channel`.
+
+| Type | Class |
+|---|---|
+| Text (0) | `TextChannel` |
+| DM (1), Group DM (3) | `DMChannel` (`recipients`, `ownerId`) |
+| Voice (2) | `VoiceChannel` (`bitrate`, `userLimit`, `rtcRegion`) |
+| Category (4) | `CategoryChannel` |
+| Announcement (5) | `NewsChannel` |
+| Threads (10, 11, 12) | `ThreadChannel` (`archived`, `locked`, `messageCount`, `ownerId`) |
+| Stage (13) | `StageChannel` |
+| Forum (15) | `ForumChannel` (`availableTags`, …) |
+| Media (16) | `MediaChannel` |
+
+Every channel has `isThread()`, `isTextBased()`, `isVoiceBased()` and `isDMBased()`.
+
+## Guild Resource Managers
+
+| Access | Manager | Covers |
+|---|---|---|
+| `client.guilds.bans(guildId)` | `GuildBanManager` | `fetch`, `fetchAll`, `create`, `remove` |
+| `client.guilds.scheduledEvents(guildId)` | `GuildScheduledEventManager` | `fetch`, `fetchAll`, `create`, `edit`, `remove`, `fetchSubscribers` |
+| `client.channels.permissionOverwrites(channelId)` | `PermissionOverwriteManager` | `edit`, `remove` |
+| `client.stageInstances` | `StageInstanceManager` | `create`, `fetch`, `edit`, `remove` |
+
+```ts
+await client.guilds.bans(guildId).create(userId, {
+  deleteMessageSeconds: 3600,
+  reason: "Spam",
+});
+```
+
+These managers cache raw Discord payloads. `CachedManager` is an alias of `ResourceManager`.
