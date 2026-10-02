@@ -1,6 +1,6 @@
-import { REST } from "./index.js";
+import { REST, type RESTFileAttachment } from "./index.js";
 import { Routes } from "./routes.js";
-import type { APIEmbed, APIMessage } from "@lunibee/types";
+import type { APIEmbed, APIMessage, APIMessageComponent } from "@lunibee/types";
 
 export interface WebhookClientOptions {
     id?: string;
@@ -14,8 +14,9 @@ export interface WebhookMessageOptions {
     avatar_url?: string;
     tts?: boolean;
     embeds?: (APIEmbed | { toJSON(): APIEmbed })[];
-    components?: any[];
-    files?: any[];
+    components?: (APIMessageComponent | { toJSON(): APIMessageComponent })[];
+    /** Uploaded as multipart form data. */
+    files?: RESTFileAttachment[];
     flags?: number;
     thread_id?: string;
 }
@@ -57,30 +58,34 @@ export class WebhookClient {
     ): Promise<APIMessage> {
         const payload =
             typeof options === "string" ? { content: options } : options;
-        const { thread_id, ...body } = payload;
+        const { thread_id, files, ...body } = payload;
         const params = new URLSearchParams({ wait: "true" });
         if (thread_id) params.set("thread_id", String(thread_id));
         const query = `?${params}`;
         const formattedEmbeds: APIEmbed[] | undefined = body.embeds?.map((e) =>
             "toJSON" in e ? e.toJSON() : e,
         );
-        return this.#rest.post<APIMessage>(
-            `${Routes.webhook(this.id, this.token)}${query}`,
-            {
-                ...body,
-                embeds: formattedEmbeds,
-            },
-        );
+        const formattedComponents: APIMessageComponent[] | undefined =
+            body.components?.map((c) => ("toJSON" in c ? c.toJSON() : c));
+        const path = `${Routes.webhook(this.id, this.token)}${query}`;
+        const json = {
+            ...body,
+            embeds: formattedEmbeds,
+            components: formattedComponents,
+        };
+        return files?.length
+            ? this.#rest.postWithFiles<APIMessage>(path, json, files)
+            : this.#rest.post<APIMessage>(path, json);
     }
 
     /** Edits a previously sent webhook message. */
     public async editMessage(
         messageId: string,
-        options: string | { content?: string; embeds?: any[] },
-    ): Promise<any> {
+        options: string | { content?: string; embeds?: APIEmbed[] },
+    ): Promise<APIMessage> {
         const payload =
             typeof options === "string" ? { content: options } : options;
-        return this.#rest.patch(
+        return this.#rest.patch<APIMessage>(
             Routes.webhookMessage(this.id, this.token, messageId),
             payload,
         );

@@ -85,10 +85,14 @@ export type EvictionReason = "expired" | "evicted";
 
 /** Cumulative counters from {@link Collection.stats}. */
 export interface CollectionStats {
-    /** `get`/`peek` calls that found a value. */ hits: number;
-    /** `get`/`peek` calls that found nothing. */ misses: number;
-    /** Entries removed because their TTL lapsed. */ expired: number;
-    /** Entries removed to stay within `maxSize`. */ evicted: number;
+    /** `get`/`peek` calls that found a value. */
+    hits: number;
+    /** `get`/`peek` calls that found nothing. */
+    misses: number;
+    /** Entries removed because their TTL lapsed. */
+    expired: number;
+    /** Entries removed to stay within `maxSize`. */
+    evicted: number;
 }
 
 type Expiry = { deadline: number; window: number; filed: number };

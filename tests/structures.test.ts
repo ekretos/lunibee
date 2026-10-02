@@ -12,7 +12,12 @@ import {
     ComponentInteraction,
     ModalSubmitInteraction,
     AutocompleteInteraction,
+    CommandOptions,
+    InteractionResponse,
+    type InteractionClient,
+    type InteractionReplyOptions,
 } from "../packages/structures/src/interactions.ts";
+import type { ResourceContext } from "../packages/structures/src/base.ts";
 
 describe("Structures & Interactions Full Coverage", () => {
     test("Role, GuildMember, TextChannel properties and string conversions", async () => {
@@ -136,23 +141,25 @@ describe("Structures & Interactions Full Coverage", () => {
         expect(noImageGuild.splashURL()).toBeNull();
         expect(noImageGuild.bannerURL()).toBeNull();
         expect(noImageGuild.discoverySplashURL()).toBeNull();
-
-        // Base checks
         expect(() => new User({ id: "invalid", username: "u" })).toThrow(
             TypeError,
         );
         expect(() => new User({ id: "200", username: "" })).toThrow(TypeError);
-        expect(() => new TextChannel({ id: "100" } as any)).toThrow(RangeError);
+        // @ts-expect-error a channel payload without `type` is rejected at runtime
+        expect(() => new TextChannel({ id: "100" })).toThrow(RangeError);
 
         // Channel alias methods
         const mockCtx = {
-            editChannel: async (id: string, opts: any) =>
+            editChannel: async (id: string, opts: { name?: string }) =>
                 new TextChannel({ id, type: 0, ...opts }),
-            sendMessage: async (id: string, opts: any) => ({
+            sendMessage: async (id: string, opts: { content?: string }) => ({
                 content: opts.content,
             }),
         };
-        const c = new TextChannel({ id: "100", type: 0 }, mockCtx as any);
+        const c = new TextChannel(
+            { id: "100", type: 0 },
+            mockCtx as Partial<ResourceContext> as ResourceContext,
+        );
         expect(() => c.editName("   ")).toThrow(TypeError);
         await expect(c.editName("New")).resolves.toBeDefined();
         await expect(c.send({ content: "hi" })).resolves.toBeDefined();
@@ -215,9 +222,6 @@ describe("Structures & Interactions Full Coverage", () => {
     });
 
     test("CommandOptions getters and validations", () => {
-        const {
-            CommandOptions,
-        } = require("../packages/structures/src/interactions.ts");
         const optionsData = [
             {
                 type: 2,
@@ -293,9 +297,6 @@ describe("Structures & Interactions Full Coverage", () => {
         expect(emptyOpts.getSubcommandGroup()).toBeNull();
 
         // CommandInteraction parsing subcommand
-        const {
-            CommandInteraction,
-        } = require("../packages/structures/src/interactions.ts");
         const cmdData = {
             type: 2,
             id: "1",
@@ -314,14 +315,11 @@ describe("Structures & Interactions Full Coverage", () => {
                 type: 1,
             },
         };
-        const cmdInt = new CommandInteraction({} as any, cmdData);
+        const cmdInt = new CommandInteraction({} as InteractionClient, cmdData);
         expect(cmdInt.commandName).toBe("test");
         expect(cmdInt.options.getString("str")).toBe("foo");
 
         // ModalSubmitInteraction testing
-        const {
-            ModalSubmitInteraction,
-        } = require("../packages/structures/src/interactions.ts");
         const modalData = {
             type: 5,
             id: "1",
@@ -339,7 +337,10 @@ describe("Structures & Interactions Full Coverage", () => {
                 ],
             },
         };
-        const modalInt = new ModalSubmitInteraction({} as any, modalData);
+        const modalInt = new ModalSubmitInteraction(
+            {} as InteractionClient,
+            modalData,
+        );
         expect(modalInt.customId).toBe("mod1");
         expect(modalInt.getInputValue("f1")).toBe("val1");
         expect(modalInt.getRequiredInputValue("f1")).toBe("val1");
@@ -348,26 +349,39 @@ describe("Structures & Interactions Full Coverage", () => {
     });
 
     test("Interaction structures reply, deferReply, editReply, deleteReply, followUp", async () => {
-        let lastPosted: any = null;
-        let lastPatched: any = null;
+        let lastPosted:
+            | {
+                  id: string;
+                  token: string;
+                  res: ReturnType<InteractionResponse["toJSON"]>;
+              }
+            | undefined;
+        let lastPatched:
+            { token: string; opts: InteractionReplyOptions } | undefined;
         let lastDeleted = false;
 
-        const mockContext: any = {
+        const mockContext: InteractionClient = {
             postInteractionResponse: async (
                 id: string,
                 token: string,
-                res: any,
+                res: InteractionResponse,
             ) => {
                 lastPosted = { id, token, res: res.toJSON() };
             },
-            editInteractionReply: async (token: string, opts: any) => {
+            editInteractionReply: async (
+                token: string,
+                opts: InteractionReplyOptions,
+            ) => {
                 lastPatched = { token, opts };
                 return opts;
             },
             deleteInteractionReply: async (token: string) => {
                 lastDeleted = true;
             },
-            followUpInteraction: async (token: string, opts: any) => {
+            followUpInteraction: async (
+                token: string,
+                opts: InteractionReplyOptions,
+            ) => {
                 return { token, opts };
             },
         };
@@ -384,7 +398,7 @@ describe("Structures & Interactions Full Coverage", () => {
 
         expect(cmdInteraction.commandName).toBe("ping");
         await cmdInteraction.reply("Pong!");
-        expect(lastPosted.res.data.content).toBe("Pong!");
+        expect(lastPosted?.res.data?.content).toBe("Pong!");
         expect(cmdInteraction.replied).toBe(true);
 
         const deferCmd = new CommandInteraction(mockContext, {
@@ -399,7 +413,7 @@ describe("Structures & Interactions Full Coverage", () => {
         expect(deferCmd.deferred).toBe(true);
 
         await deferCmd.editReply({ content: "Deferred content ready" });
-        expect(lastPatched.opts.content).toBe("Deferred content ready");
+        expect(lastPatched?.opts.content).toBe("Deferred content ready");
 
         await deferCmd.deleteReply();
         expect(lastDeleted).toBe(true);
@@ -437,7 +451,9 @@ describe("Structures & Interactions Full Coverage", () => {
         });
         expect(autoInteraction.focusedOption?.name).toBe("opt");
         await autoInteraction.respond([{ name: "Result 1", value: "r1" }]);
-        expect(lastPosted.res.data.choices.length).toBe(1);
+        expect(lastPosted?.res.data).toHaveProperty("choices", [
+            { name: "Result 1", value: "r1" },
+        ]);
 
         const modalInteraction = new ModalSubmitInteraction(mockContext, {
             id: "mod_1",
@@ -480,9 +496,6 @@ describe("Structures & Interactions Full Coverage", () => {
         expect(modalInteraction.isModalSubmit()).toBe(true);
         expect(autoInteraction.isAutocomplete()).toBe(true);
 
-        // InteractionResponse static methods
-        const pong = (CommandInteraction as any).Response?.pong?.() ?? {
-            type: 1,
-        };
+        expect(InteractionResponse.pong().toJSON()).toEqual({ type: 1 });
     });
 });

@@ -54,11 +54,14 @@ function handshakeSent(gateway: Gateway, timeout: number): Promise<void> {
 
 /** Configuration for a sharded Gateway client. */
 export interface ShardManagerOptions {
-    /** Bot token. */ token: string;
-    /** Gateway intents. */ intents: number;
-    /** Number of shards. Use `"auto"` to request Discord's recommended count. */ shardCount?:
-        number | "auto";
-    /** Gateway reconnect behavior. */ reconnect?: boolean;
+    /** Bot token. */
+    token: string;
+    /** Gateway intents. */
+    intents: number;
+    /** Number of shards. Use `"auto"` to request Discord's recommended count. */
+    shardCount?: number | "auto";
+    /** Gateway reconnect behavior. */
+    reconnect?: boolean;
     /**
      * Delay between shard starts in milliseconds. Defaults to 5000 to respect
      * Discord's IDENTIFY rate limit (one per 5s per rate-limit key); set 0 to
@@ -73,45 +76,55 @@ export interface ShardManagerOptions {
      * How long a startup round waits for its shards to send IDENTIFY/RESUME
      * before the next round's `spawnDelay` starts. Defaults to 15000 ms.
      */ handshakeTimeout?: number;
-    /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */ autoScaleInterval?: number;
-    /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */ onAutoScaleError?: (
-        error: unknown,
-    ) => void;
+    /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */
+    autoScaleInterval?: number;
+    /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */
+    onAutoScaleError?: (error: unknown) => void;
 }
 /** `/gateway/bot` information used to pace shard startup. */
 export interface GatewayBotInfo {
-    /** Recommended shard count. */ shards: number;
-    /** IDENTIFY budget, when Discord reported it. */ sessionStartLimit?: {
+    /** Recommended shard count. */
+    shards: number;
+    /** IDENTIFY budget, when Discord reported it. */
+    sessionStartLimit?: {
         total: number;
         remaining: number;
-        /** Milliseconds until `remaining` resets. */ resetAfter: number;
+        /** Milliseconds until `remaining` resets. */
+        resetAfter: number;
         maxConcurrency: number;
     };
 }
 /** Health snapshot for one shard. */
 export interface ShardHealth {
     id: number;
-    /** Gateway connection state. */ state: Gateway["state"];
-    /** Last heartbeat round-trip in ms, or -1 before the first ACK. */ ping: number;
+    /** Gateway connection state. */
+    state: Gateway["state"];
+    /** Last heartbeat round-trip in ms, or -1 before the first ACK. */
+    ping: number;
 }
 /** Runtime state for a managed shard. */
 export interface ShardInfo {
-    /** Shard identifier. */ id: number;
-    /** Gateway instance. */ gateway: Gateway;
+    /** Shard identifier. */
+    id: number;
+    /** Gateway instance. */
+    gateway: Gateway;
 }
 
 /** Manages independent Discord Gateway shards with explicit destruction and reinitialization semantics. */
 export class ShardManager {
     /** Discord's minimum interval between IDENTIFY payloads, in milliseconds. */
     public static readonly IDENTIFY_INTERVAL = 5000;
-    /** Active Gateway shards indexed by shard identifier. */ public readonly shards =
-        new Map<number, Gateway>();
-    /** Number of shards managed by this instance after initialization. */ public get shardCount(): number {
+    /** Active Gateway shards indexed by shard identifier. */
+    public readonly shards = new Map<number, Gateway>();
+    /** Number of shards managed by this instance after initialization. */
+    public get shardCount(): number {
         return this.shards.size;
     }
     readonly #options: ShardManagerOptions;
-    /** Whether the shard set has been initialized. */ #resolved = false;
-    /** Whether this manager is currently destroyed. */ #destroyed = false;
+    /** Whether the shard set has been initialized. */
+    #resolved = false;
+    /** Whether this manager is currently destroyed. */
+    #destroyed = false;
     /** Whether the manager was created in auto shard-count mode. Preserved across reshards so auto-scaling keeps running. */
     readonly #auto: boolean;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
@@ -327,9 +340,8 @@ export class ShardManager {
         const id = BigInt(guildId);
         return Number((id >> 22n) % BigInt(this.shardCount || 1));
     }
-    /** Gets a shard by ID. @param id Shard identifier. @returns Gateway instance or undefined. */ public get(
-        id: number,
-    ): Gateway | undefined {
+    /** Gets a shard by ID. @param id Shard identifier. @returns Gateway instance or undefined. */
+    public get(id: number): Gateway | undefined {
         return this.shards.get(id);
     }
     /** Returns each shard's connection state and heartbeat latency. */
@@ -340,7 +352,8 @@ export class ShardManager {
             ping: gateway.ping,
         }));
     }
-    /** Returns information for all managed shards. @returns Shard information snapshots. */ public values(): ShardInfo[] {
+    /** Returns information for all managed shards. @returns Shard information snapshots. */
+    public values(): ShardInfo[] {
         return [...this.shards].map(([id, gateway]) => ({ id, gateway }));
     }
     /** Ensures a live shard set exists. @returns A promise fulfilled after initialization. @throws {Error} If initialization fails. */

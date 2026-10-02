@@ -37,12 +37,18 @@ export interface VoiceUdpTransport {
     onMessage?(listener: (packet: Uint8Array) => void): void;
 }
 
+/** A JSON frame for the voice gateway, e.g. `{ op: 5, d: { speaking, delay, ssrc } }`. */
+export interface VoiceGatewayPayload {
+    op: number;
+    d: Record<string, string | number | boolean | null>;
+}
+
 /** Voice Gateway transport abstraction. */
 export interface VoiceGatewayTransport {
     /** Opens the voice gateway. @param endpoint Voice gateway endpoint. @param sessionId Voice session identifier. @returns Promise fulfilled when connected. */
     connect(endpoint: string, sessionId: string): Promise<void>;
     /** Sends a voice gateway payload. @param payload Gateway payload. @returns Nothing. */
-    send(payload: unknown): void;
+    send(payload: VoiceGatewayPayload): void;
     /** Closes the voice gateway. @param code Optional close code. @param reason Optional close reason. @returns Nothing. */
     close(code?: number, reason?: string): void;
 }
@@ -64,7 +70,17 @@ export interface VoiceEvents {
     error: [VoiceError];
 }
 
-type VoiceListener = (...args: any[]) => unknown;
+type ListenerSets<E extends Record<keyof E, unknown[]>> = {
+    [K in keyof E]?: Set<(...args: E[K]) => unknown>;
+};
+
+/** Returns the listener set for `event`, creating it on first use. */
+function listenerSet<E extends Record<keyof E, unknown[]>, K extends keyof E>(
+    sets: ListenerSets<E>,
+    event: K,
+): Set<(...args: E[K]) => unknown> {
+    return (sets[event] ??= new Set());
+}
 
 /** Tracks a Discord voice session and exposes transport-independent lifecycle controls. */
 export class VoiceConnection {
@@ -83,7 +99,7 @@ export class VoiceConnection {
     /** Active UDP transport, when attached. */
     public udp?: VoiceUdpTransport;
     /** Registered lifecycle listeners. */
-    readonly #listeners = new Map<keyof VoiceEvents, Set<VoiceListener>>();
+    #listeners: ListenerSets<VoiceEvents> = {};
     /** Receives incoming audio. */
     public readonly receiver: VoiceReceiver;
 
@@ -110,9 +126,7 @@ export class VoiceConnection {
     ): this {
         if (typeof listener !== "function")
             throw new TypeError("Voice listener must be a function.");
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
+        listenerSet(this.#listeners, event).add(listener);
         return this;
     }
 
@@ -121,7 +135,7 @@ export class VoiceConnection {
         event: K,
         listener: (...args: VoiceEvents[K]) => unknown,
     ): this {
-        this.#listeners.get(event)?.delete(listener);
+        this.#listeners[event]?.delete(listener);
         return this;
     }
 
@@ -174,7 +188,7 @@ export class VoiceConnection {
         this.receiver.close();
         this.channelId = undefined;
         this.#transition(VoiceConnectionState.Destroyed);
-        this.#listeners.clear();
+        this.#listeners = {};
     }
 
     /** Updates the voice channel and connection state. @param channelId Voice channel identifier. @returns Nothing. @throws {VoiceError} If the connection is destroyed. @throws {TypeError} If channelId is empty. */
@@ -249,7 +263,7 @@ export class VoiceConnection {
         const previous = this.state;
         this.state = next;
         if (previous === next) return;
-        for (const listener of this.#listeners.get("stateChange") ?? []) {
+        for (const listener of this.#listeners.stateChange ?? []) {
             try {
                 void listener(next, previous);
             } catch (error) {
@@ -272,7 +286,7 @@ export class VoiceConnection {
         event: K,
         ...args: VoiceEvents[K]
     ): void {
-        for (const listener of this.#listeners.get(event) ?? []) {
+        for (const listener of this.#listeners[event] ?? []) {
             try {
                 void listener(...args);
             } catch {
@@ -294,9 +308,12 @@ export type AudioPlayerState = "idle" | "playing" | "paused" | "stopped";
 
 /** An audio stream — wraps a `ReadableStream<Uint8Array>` with optional metadata. */
 export class AudioStream {
-    /** Underlying binary stream. */ public readonly stream: ReadableStream<Uint8Array>;
-    /** Optional human-readable title for the stream. */ public readonly title?: string;
-    /** Optional duration hint in seconds. */ public readonly duration?: number;
+    /** Underlying binary stream. */
+    public readonly stream: ReadableStream<Uint8Array>;
+    /** Optional human-readable title for the stream. */
+    public readonly title?: string;
+    /** Optional duration hint in seconds. */
+    public readonly duration?: number;
 
     /** Creates an audio stream.
      * @param stream Binary audio data stream.
@@ -339,10 +356,7 @@ export class AudioPlayer {
     #reader?: ReadableStreamDefaultReader<Uint8Array>;
     /** Resolves the pump's pause await when the player is resumed or stopped. */
     #resumeSignal?: () => void;
-    readonly #listeners = new Map<
-        string,
-        Set<AudioPlayerListener<keyof AudioPlayerEvents>>
-    >();
+    readonly #playerListeners: ListenerSets<AudioPlayerEvents> = {};
 
     /** Current player state. */
     public get state(): AudioPlayerState {
@@ -415,17 +429,7 @@ export class AudioPlayer {
         event: K,
         listener: AudioPlayerListener<K>,
     ): this {
-        let set = this.#listeners.get(event) as
-            Set<AudioPlayerListener<K>> | undefined;
-        if (!set) {
-            this.#listeners.set(
-                event,
-                (set = new Set() as unknown as Set<
-                    AudioPlayerListener<keyof AudioPlayerEvents>
-                >),
-            );
-        }
-        (set as unknown as Set<AudioPlayerListener<K>>).add(listener);
+        listenerSet(this.#playerListeners, event).add(listener);
         return this;
     }
 
@@ -434,10 +438,7 @@ export class AudioPlayer {
         event: K,
         listener: AudioPlayerListener<K>,
     ): this {
-        (
-            this.#listeners.get(event) as
-                Set<AudioPlayerListener<K>> | undefined
-        )?.delete(listener);
+        this.#playerListeners[event]?.delete(listener);
         return this;
     }
 
@@ -498,9 +499,9 @@ export class AudioPlayer {
         event: K,
         ...args: AudioPlayerEvents[K]
     ): void {
-        for (const listener of this.#listeners.get(event) ?? []) {
+        for (const listener of this.#playerListeners[event] ?? []) {
             try {
-                void (listener as (...a: unknown[]) => unknown)(...args);
+                void listener(...args);
             } catch {
                 /* Listener failures are isolated. */
             }

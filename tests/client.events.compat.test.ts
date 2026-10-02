@@ -4,6 +4,7 @@ import {
     ClientEvent,
     Collector,
     type ClientEventName,
+    type ClientEvents,
 } from "../packages/core/src/index.ts";
 
 /**
@@ -158,7 +159,7 @@ describe("Collector — Discord.js-familiar collection primitive", () => {
 describe("Interaction — Discord.js acknowledgement methods", () => {
     test("interactionCreate yields an interaction exposing reply/defer/etc.", () => {
         const client = new Client({ token: "test-token", intents: 1 });
-        let interaction: any;
+        let interaction: ClientEvents["interactionCreate"][0] | undefined;
         client.on("interactionCreate", (i) => {
             interaction = i;
         });
@@ -178,8 +179,8 @@ describe("Interaction — Discord.js acknowledgement methods", () => {
             "deleteReply",
             "followUp",
             "showModal",
-        ]) {
-            expect(typeof interaction[method]).toBe("function");
+        ] as const) {
+            expect(typeof interaction?.[method]).toBe("function");
         }
         client.destroy();
     });

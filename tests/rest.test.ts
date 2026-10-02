@@ -1,13 +1,16 @@
 import { expect, test } from "bun:test";
 import { REST, RESTError } from "../packages/rest/src/index.ts";
+import { fakeFetch } from "./helpers/fetch.ts";
 
 test("REST returns JSON responses", async () => {
     const original = globalThis.fetch;
-    (globalThis as any).fetch = async () =>
-        new Response(JSON.stringify({ id: "1" }), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-        });
+    globalThis.fetch = fakeFetch(
+        async () =>
+            new Response(JSON.stringify({ id: "1" }), {
+                status: 200,
+                headers: { "content-type": "application/json" },
+            }),
+    );
     try {
         const rest = new REST({ token: "token" });
         expect(await rest.get<{ id: string }>("/users/@me")).toEqual({
@@ -21,7 +24,7 @@ test("REST returns JSON responses", async () => {
 test("REST retries idempotent server errors", async () => {
     const original = globalThis.fetch;
     let attempts = 0;
-    (globalThis as any).fetch = async () => {
+    globalThis.fetch = fakeFetch(async () => {
         attempts++;
         if (attempts === 1)
             return new Response(JSON.stringify({ message: "busy" }), {
@@ -32,7 +35,7 @@ test("REST retries idempotent server errors", async () => {
             status: 200,
             headers: { "content-type": "application/json" },
         });
-    };
+    });
     try {
         const rest = new REST({ token: "token", retries: 1 });
         expect(await rest.get<{ ok: boolean }>("/users/@me")).toEqual({
@@ -46,11 +49,13 @@ test("REST retries idempotent server errors", async () => {
 
 test("REST supports multipart/form-data for files", async () => {
     const original = globalThis.fetch;
-    (globalThis as any).fetch = async () =>
-        new Response(JSON.stringify({ id: "1" }), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-        });
+    globalThis.fetch = fakeFetch(
+        async () =>
+            new Response(JSON.stringify({ id: "1" }), {
+                status: 200,
+                headers: { "content-type": "application/json" },
+            }),
+    );
     try {
         const rest = new REST({ token: "token" });
         const files = [
@@ -74,14 +79,19 @@ test("REST supports multipart/form-data for files", async () => {
 
 test("REST exposes rate-limit errors", async () => {
     const original = globalThis.fetch;
-    (globalThis as any).fetch = async () =>
-        new Response(
-            JSON.stringify({ message: "Too Many Requests", retry_after: 0.1 }),
-            {
-                status: 429,
-                headers: { "content-type": "application/json" },
-            },
-        );
+    globalThis.fetch = fakeFetch(
+        async () =>
+            new Response(
+                JSON.stringify({
+                    message: "Too Many Requests",
+                    retry_after: 0.1,
+                }),
+                {
+                    status: 429,
+                    headers: { "content-type": "application/json" },
+                },
+            ),
+    );
     try {
         const rest = new REST({ token: "token", retries: 0 });
         await expect(rest.get("/users/@me")).rejects.toThrow(RESTError);
@@ -92,18 +102,23 @@ test("REST exposes rate-limit errors", async () => {
 
 test("REST cancels queued request waiting on rate limit", async () => {
     const original = globalThis.fetch;
-    (globalThis as any).fetch = async () =>
-        new Response(
-            JSON.stringify({ message: "Too Many Requests", retry_after: 2 }),
-            {
-                status: 429,
-                headers: {
-                    "content-type": "application/json",
-                    "x-ratelimit-remaining": "0",
-                    "x-ratelimit-reset-after": "2",
+    globalThis.fetch = fakeFetch(
+        async () =>
+            new Response(
+                JSON.stringify({
+                    message: "Too Many Requests",
+                    retry_after: 2,
+                }),
+                {
+                    status: 429,
+                    headers: {
+                        "content-type": "application/json",
+                        "x-ratelimit-remaining": "0",
+                        "x-ratelimit-reset-after": "2",
+                    },
                 },
-            },
-        );
+            ),
+    );
     try {
         const rest = new REST({ token: "token", retries: 0 });
         await expect(rest.get("/channels/123/messages")).rejects.toThrow();

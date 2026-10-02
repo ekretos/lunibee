@@ -3,6 +3,7 @@ import { WebhookClient } from "../packages/rest/src/index.ts";
 import { cdnURL } from "../packages/structures/src/index.ts";
 import { codeBlock, link } from "../packages/formatters/src/index.ts";
 import { Client, ClientEvent } from "../packages/core/src/index.ts";
+import { fakeFetch } from "./helpers/fetch.ts";
 
 // Security report for 0.2.3, findings L1, L2, L3, L5 and L7 (fixed in 0.2.4).
 // L4 (login returns the token) and L6 (ShardBus) are documented, accepted risks.
@@ -35,13 +36,13 @@ test("L2: thread_id cannot inject query parameters", async () => {
     const client = new WebhookClient({ id: "1", token: "tok" });
     // WebhookClient makes its own REST instance, so fetch is swapped globally.
     const original = globalThis.fetch;
-    globalThis.fetch = (async (url: string | URL) => {
+    globalThis.fetch = fakeFetch(async (url: string | URL) => {
         urls.push(String(url));
         return new Response("{}", {
             status: 200,
             headers: { "content-type": "application/json" },
         });
-    }) as typeof fetch;
+    });
     try {
         await client.send({ content: "hi", thread_id: "1&wait=false" });
     } finally {

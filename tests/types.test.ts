@@ -15,7 +15,8 @@ describe("Types & Intent Resolvers", () => {
         expect(resolveGatewayIntents("Guilds")).toBe(1);
         expect(resolveGatewayIntents("guilds")).toBe(1);
         expect(resolveGatewayIntents("guildMembers")).toBe(2);
-        expect(resolveGatewayIntents("513" as any)).toBe(513);
+        // @ts-expect-error numeric strings are accepted at runtime only
+        expect(resolveGatewayIntents("513")).toBe(513);
         expect(resolveGatewayIntents(["Guilds", "GuildMessages"])).toBe(
             1 | 512,
         );
@@ -25,7 +26,8 @@ describe("Types & Intent Resolvers", () => {
                 GatewayIntentBits.MessageContent,
             ]),
         ).toBe(1 | 32768);
-        expect(resolveGatewayIntents("unknown_intent_string" as any)).toBe(0);
+        // @ts-expect-error unknown names resolve to 0 at runtime
+        expect(resolveGatewayIntents("unknown_intent_string")).toBe(0);
     });
 
     test("ChannelEnum enum constants", () => {

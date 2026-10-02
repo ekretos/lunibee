@@ -233,6 +233,7 @@ Before declaring a release complete:
 - [ ] Production build passes
 - [ ] DTS build passes
 - [ ] Documentation build passes
+- [ ] Previous release archived in the docs version picker (`starlightVersions` in `lunibee.js.org/astro.config.mjs`)
 - [ ] Generated API docs are valid
 - [ ] Final smoke test passes
 

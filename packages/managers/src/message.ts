@@ -8,7 +8,8 @@ export interface MessageCacheOptions {
     /** Sliding TTL in ms. Omit for no expiry. */
     ttl?: number;
 }
-import { REST, Routes } from "@lunibee/rest";
+import { REST, Routes, type RESTFileAttachment } from "@lunibee/rest";
+import type { AllowedMentions } from "@lunibee/types";
 import { Message, type ResourceContext } from "@lunibee/structures";
 
 /** A file to upload with a message. */
@@ -32,8 +33,13 @@ export type MessageEditOptions = MessageCreateOptions;
  */
 export function toRequest(
     options: MessageCreateOptions,
-    allowedMentions?: unknown,
-): unknown {
+    allowedMentions?: AllowedMentions,
+):
+    | Omit<MessageCreateOptions, "files">
+    | {
+          body: Omit<MessageCreateOptions, "files">;
+          files: RESTFileAttachment[];
+      } {
     const { files, ...body } = options;
     if (allowedMentions !== undefined && body.allowed_mentions === undefined)
         body.allowed_mentions = allowedMentions;
@@ -60,14 +66,14 @@ export class MessageManager {
     readonly #channelId: string;
 
     /** The client's default `allowed_mentions`, for payloads without their own. */
-    readonly #allowedMentions?: unknown;
+    readonly #allowedMentions?: AllowedMentions;
 
     public constructor(
         rest: REST,
         context: ResourceContext,
         channelId: string,
         cache?: MessageCacheOptions,
-        allowedMentions?: unknown,
+        allowedMentions?: AllowedMentions,
     ) {
         if (!channelId) throw new TypeError("Channel ID is required.");
         this.#allowedMentions = allowedMentions;

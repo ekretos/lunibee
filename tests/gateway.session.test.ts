@@ -6,6 +6,7 @@ import {
     GatewayCloseCodes,
     GatewaySession,
 } from "../packages/ws/src/index.ts";
+import { FakeWebSocket, installWebSocket } from "./helpers/fake-websocket.ts";
 
 /**
  * Stage 1B acceptance: the session owns session id, sequence, resume host and
@@ -168,53 +169,6 @@ describe("GatewaySession state", () => {
     });
 });
 
-class FakeWebSocket {
-    static readonly OPEN = 1;
-    static readonly CLOSED = 3;
-    static instances: FakeWebSocket[] = [];
-    readonly url: string;
-    readyState = 0;
-    sent: string[] = [];
-    closeCode?: number;
-    #listeners = new Map<string, Set<(event: any) => void>>();
-
-    constructor(url: string) {
-        this.url = url;
-        FakeWebSocket.instances.push(this);
-    }
-    addEventListener(event: string, listener: (event: any) => void): void {
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
-    }
-    send(data: string): void {
-        if (this.readyState !== FakeWebSocket.OPEN)
-            throw new Error("socket is not open");
-        this.sent.push(data);
-    }
-    close(code = 1000, reason = ""): void {
-        this.closeCode = code;
-        if (this.readyState === FakeWebSocket.CLOSED) return;
-        this.readyState = FakeWebSocket.CLOSED;
-        this.emit("close", { code, reason });
-    }
-    open(): void {
-        this.readyState = FakeWebSocket.OPEN;
-        this.emit("open", {});
-    }
-    receive(payload: unknown): void {
-        this.emit("message", { data: JSON.stringify(payload) });
-    }
-    emit(event: string, value: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? [])
-            listener(value);
-    }
-    /** Payloads sent on this socket, decoded. */
-    payloads(): Array<{ op: number; d?: any }> {
-        return this.sent.map((raw) => JSON.parse(raw));
-    }
-}
-
 /** Drives a Gateway to a READY session on its first socket. */
 async function connectReady(gateway: Gateway, sequence = 1): Promise<void> {
     const connecting = gateway.connect("wss://main.test");
@@ -239,7 +193,7 @@ describe("Gateway session wiring", () => {
     const OriginalWebSocket = globalThis.WebSocket;
     beforeEach(() => {
         FakeWebSocket.instances = [];
-        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+        installWebSocket(FakeWebSocket);
     });
     afterEach(() => {
         globalThis.WebSocket = OriginalWebSocket;

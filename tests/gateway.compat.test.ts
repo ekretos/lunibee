@@ -6,6 +6,7 @@ import {
     GatewayState,
     Status,
 } from "../packages/ws/src/index.ts";
+import { FakeWebSocket, installWebSocket } from "./helpers/fake-websocket.ts";
 
 /**
  * Discord.js-familiarity + reconnect/resume regression suite for the Gateway.
@@ -15,56 +16,6 @@ import {
  * the additive `Status` / `GatewayCloseCodes` surface, resumable INVALID_SESSION
  * handling, RESUMED backoff reset, and identify-path resume-URL hygiene.
  */
-class FakeWebSocket {
-    static readonly OPEN = 1;
-    static readonly CLOSED = 3;
-    static instances: FakeWebSocket[] = [];
-    readonly url: string;
-    readyState = 0;
-    sent: string[] = [];
-    closeCode?: number;
-    closeReason?: string;
-    #listeners = new Map<string, Set<(event: any) => void>>();
-
-    constructor(url: string) {
-        this.url = url;
-        FakeWebSocket.instances.push(this);
-    }
-
-    addEventListener(event: string, listener: (event: any) => void): void {
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
-    }
-
-    send(data: string): void {
-        if (this.readyState !== FakeWebSocket.OPEN)
-            throw new Error("socket is not open");
-        this.sent.push(data);
-    }
-
-    close(code = 1000, reason = ""): void {
-        this.closeCode = code;
-        this.closeReason = reason;
-        if (this.readyState === FakeWebSocket.CLOSED) return;
-        this.readyState = FakeWebSocket.CLOSED;
-        this.emit("close", { code, reason });
-    }
-
-    open(): void {
-        this.readyState = FakeWebSocket.OPEN;
-        this.emit("open", {});
-    }
-
-    receive(payload: unknown): void {
-        this.emit("message", { data: JSON.stringify(payload) });
-    }
-
-    emit(event: string, value: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? [])
-            listener(value);
-    }
-}
 
 const OriginalWebSocket = globalThis.WebSocket;
 const DEFAULT_GATEWAY = "wss://gateway.discord.gg/?v=10&encoding=json";
@@ -100,7 +51,7 @@ async function connectReady(options: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     FakeWebSocket.instances = [];
-    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+    installWebSocket(FakeWebSocket);
 });
 
 afterEach(() => {

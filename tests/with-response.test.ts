@@ -10,19 +10,19 @@ const CHANNEL = "200000000000000001";
 const MESSAGE = "200000000000000002";
 const USER = "200000000000000003";
 
+/** Interaction callback body as the REST stub receives it. */
+type SentBody = { type: number; data: Record<string, string | number> };
+
 function setup() {
     const bot = new Client({ token: "a.b", intents: 0 });
-    const calls: { path: string; body: any }[] = [];
-    (bot.rest as unknown as Record<string, unknown>).post = async (
-        path: string,
-        body?: unknown,
-    ) => {
+    const calls: { path: string; body: SentBody }[] = [];
+    bot.rest.post = (async (path: string, body: SentBody) => {
         calls.push({ path, body });
         return path.includes("with_response=true")
             ? {
                   interaction: { id: "1", type: 2 },
                   resource: {
-                      type: (body as { type: number }).type,
+                      type: body.type,
                       message: {
                           id: MESSAGE,
                           channel_id: CHANNEL,
@@ -32,7 +32,7 @@ function setup() {
                   },
               }
             : undefined;
-    };
+    }) as typeof bot.rest.post;
     return { bot, calls };
 }
 

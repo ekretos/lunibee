@@ -3,21 +3,15 @@ export class HandlerRegistry<
     Events extends { [K in keyof Events]: unknown[] },
 > {
     /** Registered event handlers. */
-    readonly #handlers = new Map<
-        keyof Events,
-        Set<(...args: any[]) => unknown>
-    >();
+    readonly #handlers: {
+        [K in keyof Events]?: Set<(...args: Events[K]) => unknown>;
+    } = {};
     /** Registers a handler for an event. @param event Event key. @param handler Handler callback. @returns This registry. */
     public on<K extends keyof Events>(
         event: K,
         handler: (...args: Events[K]) => unknown,
     ): this {
-        let handlers = this.#handlers.get(event);
-        if (!handlers) {
-            handlers = new Set();
-            this.#handlers.set(event, handlers);
-        }
-        handlers.add(handler);
+        (this.#handlers[event] ??= new Set()).add(handler);
         return this;
     }
     /** Registers a one-shot handler. @param event Event key. @param handler Handler callback. @returns This registry. */
@@ -36,7 +30,7 @@ export class HandlerRegistry<
         event: K,
         handler: (...args: Events[K]) => unknown,
     ): this {
-        this.#handlers.get(event)?.delete(handler);
+        this.#handlers[event]?.delete(handler);
         return this;
     }
     /** Dispatches an event to registered handlers. @param event Event key. @param args Event arguments. @returns A promise fulfilled after handlers complete. */
@@ -44,7 +38,7 @@ export class HandlerRegistry<
         event: K,
         ...args: Events[K]
     ): Promise<void> {
-        for (const handler of this.#handlers.get(event) ?? [])
+        for (const handler of this.#handlers[event] ?? [])
             await handler(...args);
     }
     /** Emits an event using the conventional emitter name. @param event Event key. @param args Event arguments. @returns A promise fulfilled after handlers complete. */

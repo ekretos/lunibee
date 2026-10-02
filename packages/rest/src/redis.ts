@@ -46,7 +46,7 @@ export interface MinimalRedisClient {
         value: string | number,
         mode?: string,
         duration?: number,
-    ): Promise<any>;
+    ): Promise<string | null>;
     del(...keys: string[]): Promise<number>;
     /**
      * Optional Lua evaluation (ioredis/node-redis compatible). When present,

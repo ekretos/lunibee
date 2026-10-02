@@ -23,13 +23,16 @@ class StubSocket {
     closeCalls: Array<{ code: number; reason: string }> = [];
     binaryType = "blob";
     throwOnSend = false;
-    #listeners = new Map<string, Set<(event: any) => void>>();
+    #listeners = new Map<string, Set<(event: FakeSocketEvent) => void>>();
 
     constructor(url: string) {
         this.url = url;
         StubSocket.instances.push(this);
     }
-    addEventListener(event: string, listener: (event: any) => void): void {
+    addEventListener(
+        event: string,
+        listener: (event: FakeSocketEvent) => void,
+    ): void {
         let listeners = this.#listeners.get(event);
         if (!listeners) this.#listeners.set(event, (listeners = new Set()));
         listeners.add(listener);
@@ -48,7 +51,7 @@ class StubSocket {
         this.readyState = 1;
         this.emit("open", {});
     }
-    emit(event: string, value: unknown): void {
+    emit(event: string, value: FakeSocketEvent): void {
         for (const listener of this.#listeners.get(event) ?? [])
             listener(value);
     }
@@ -393,6 +396,7 @@ describe("ZlibStreamDecoder", () => {
 });
 
 import { SendBudget } from "../packages/ws/src/send-budget.ts";
+import type { FakeSocketEvent } from "./helpers/fake-websocket.ts";
 
 describe("SendBudget", () => {
     test("caps application sends per window but never privileged ones", () => {

@@ -2,9 +2,12 @@ import { REST, type RetryPolicy } from "@lunibee/rest";
 
 /** A recorded REST request used by integration-style tests. */
 export interface RecordedRequest {
-    /** HTTP method. */ method: string;
-    /** API path. */ path: string;
-    /** Request body. */ body?: unknown;
+    /** HTTP method. */
+    method: string;
+    /** API path. */
+    path: string;
+    /** Request body. */
+    body?: unknown;
 }
 
 /** Lightweight mock REST transport that records calls while returning configured values. */

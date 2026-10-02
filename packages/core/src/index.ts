@@ -103,7 +103,7 @@ type GuildMemberEvent = APIGuildMember & { guild_id: string };
 
 /** Minimal typed event emitter used by the client. */
 class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
-    readonly #listeners = new Map<keyof Events, Set<Listener<any>>>();
+    #listeners: { [K in keyof Events]?: Set<Listener<Events[K]>> } = {};
     /** Removes secrets from text this emitter prints; the client removes its token. */
     protected readonly redactSecrets = (text: string): string => text;
     public on<K extends keyof Events>(
@@ -112,9 +112,7 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
     ): this {
         if (typeof listener !== "function")
             throw new TypeError("Event listener must be a function.");
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
+        (this.#listeners[event] ??= new Set()).add(listener);
         return this;
     }
     public once<K extends keyof Events>(
@@ -131,7 +129,7 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
         event: K,
         listener: Listener<Events[K]>,
     ): this {
-        this.#listeners.get(event)?.delete(listener);
+        this.#listeners[event]?.delete(listener);
         return this;
     }
     /** Alias of {@link off}, provided for Node.js/Discord.js familiarity. */
@@ -142,15 +140,15 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
         return this.off(event, listener);
     }
     public removeAllListeners<K extends keyof Events>(event?: K): this {
-        if (event === undefined) this.#listeners.clear();
-        else this.#listeners.delete(event);
+        if (event === undefined) this.#listeners = {};
+        else delete this.#listeners[event];
         return this;
     }
     protected emit<K extends keyof Events>(
         event: K,
         ...args: Events[K]
     ): boolean {
-        const listeners = this.#listeners.get(event);
+        const listeners = this.#listeners[event];
         if (!listeners?.size) return false;
         for (const listener of [...listeners]) {
             try {
@@ -176,14 +174,12 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
             error instanceof Error
                 ? error
                 : new Error(String(error), { cause: error });
+        // Every emitter in this file declares `error: [Error]`.
+        const errorListeners = this.#listeners[
+            ClientEvent.Error as keyof Events
+        ] as Set<Listener<[Error]>> | undefined;
         const listeners =
-            event === ClientEvent.Error
-                ? []
-                : [
-                      ...(this.#listeners.get(
-                          ClientEvent.Error as keyof Events,
-                      ) ?? []),
-                  ];
+            event === ClientEvent.Error ? [] : [...(errorListeners ?? [])];
         if (listeners.length === 0)
             return warnListenerError(event, normalized, this.redactSecrets);
         for (const listener of listeners) {
@@ -1165,9 +1161,9 @@ export class Client
             throw new Error("Cannot login a destroyed client.");
         if (token?.trim()) {
             this.rest.setToken(token);
-            (this as any).options.token = token;
+            this.options.token = token;
         }
-        const usedToken = (this as any).options.token as string;
+        const usedToken = this.options.token;
         if (!usedToken?.trim())
             throw new TypeError("A bot token is required to log in.");
         this.state = "connecting";

@@ -16,10 +16,14 @@ export type RESTQuery =
  * make two channels share one counter.
  */
 export interface RouteKey {
-    /** Uppercased HTTP method. */ method: string;
-    /** Raw request path, without query string. */ path: string;
-    /** Normalized `METHOD:/path/:id` route used for bucket-hash lookup. */ route: string;
-    /** Major parameter scoping the limit (channel, guild, webhook id[:token]). */ major: string;
+    /** Uppercased HTTP method. */
+    method: string;
+    /** Raw request path, without query string. */
+    path: string;
+    /** Normalized `METHOD:/path/:id` route used for bucket-hash lookup. */
+    route: string;
+    /** Major parameter scoping the limit (channel, guild, webhook id[:token]). */
+    major: string;
 }
 
 /** Normalizes Discord routes for stable bucket discovery. */

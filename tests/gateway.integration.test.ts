@@ -5,64 +5,13 @@ import {
     GatewayOpcodes,
     GatewayState,
 } from "../packages/ws/src/index.ts";
-
-class FakeWebSocket {
-    static readonly OPEN = 1;
-    static readonly CLOSED = 3;
-    readonly url: string;
-    readyState = 0;
-    sent: string[] = [];
-    closeCode?: number;
-    closeReason?: string;
-    #listeners = new Map<string, Set<(event: any) => void>>();
-
-    constructor(url: string) {
-        this.url = url;
-        FakeWebSocket.instances.push(this);
-    }
-
-    static instances: FakeWebSocket[] = [];
-
-    addEventListener(event: string, listener: (event: any) => void): void {
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
-    }
-
-    send(data: string): void {
-        if (this.readyState !== FakeWebSocket.OPEN)
-            throw new Error("socket is not open");
-        this.sent.push(data);
-    }
-
-    close(code = 1000, reason = ""): void {
-        this.closeCode = code;
-        this.closeReason = reason;
-        if (this.readyState === FakeWebSocket.CLOSED) return;
-        this.readyState = FakeWebSocket.CLOSED;
-        this.emit("close", { code, reason });
-    }
-
-    open(): void {
-        this.readyState = FakeWebSocket.OPEN;
-        this.emit("open", {});
-    }
-
-    receive(payload: unknown): void {
-        this.emit("message", { data: JSON.stringify(payload) });
-    }
-
-    emit(event: string, value: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? [])
-            listener(value);
-    }
-}
+import { FakeWebSocket, installWebSocket } from "./helpers/fake-websocket.ts";
 
 const OriginalWebSocket = globalThis.WebSocket;
 
 beforeEach(() => {
     FakeWebSocket.instances = [];
-    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+    installWebSocket(FakeWebSocket);
 });
 
 afterEach(() => {
@@ -344,9 +293,9 @@ describe("Gateway integration lifecycle", () => {
             heartbeatAckTimeout: 10,
             reconnect: false,
         });
-        let gwError: any;
+        let gwError: Error | undefined;
         gwCloseErr.on("error", (e) => {
-            gwError = e;
+            if (e instanceof Error) gwError = e;
         });
         const p = gwCloseErr.connect();
         const s = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
@@ -367,11 +316,13 @@ describe("Gateway integration lifecycle", () => {
             intents: 1,
             reconnect: false,
         });
-        globalThis.WebSocket = class FailingWebSocket {
-            constructor() {
-                throw "raw connection error";
-            }
-        } as any;
+        installWebSocket(
+            class FailingWebSocket {
+                constructor() {
+                    throw "raw connection error";
+                }
+            },
+        );
         await expect(gateway.connect()).rejects.toThrow();
         gateway.close();
 
@@ -380,11 +331,13 @@ describe("Gateway integration lifecycle", () => {
             intents: 1,
             reconnect: false,
         });
-        globalThis.WebSocket = class FailingGwWebSocket {
-            constructor() {
-                throw new GatewayError("Custom Gateway error");
-            }
-        } as any;
+        installWebSocket(
+            class FailingGwWebSocket {
+                constructor() {
+                    throw new GatewayError("Custom Gateway error");
+                }
+            },
+        );
         await expect(gw2.connect()).rejects.toThrow("Custom Gateway error");
         gw2.close();
     });
@@ -395,9 +348,9 @@ describe("Gateway integration lifecycle", () => {
             intents: 1,
             reconnect: false,
         });
-        let error: any;
+        let error: Error | undefined;
         gateway.on("error", (e) => {
-            error = e;
+            if (e instanceof Error) error = e;
         });
         const promise = gateway.connect();
         const socket = FakeWebSocket.instances[0]!;
@@ -435,9 +388,9 @@ describe("Gateway integration lifecycle", () => {
         for (let i = 0; i < 112; i++) {
             gateway.send({ op: 1, d: null, s: null, t: null });
         }
-        let error: any;
+        let error: Error | undefined;
         gateway.on("error", (e) => {
-            error = e;
+            if (e instanceof Error) error = e;
         });
         expect(gateway.send({ op: 1, d: null, s: null, t: null })).toBe(false);
         gateway.close();
@@ -518,9 +471,9 @@ describe("Gateway integration lifecycle", () => {
 
     test("emits and removes custom event listeners with emit and off", async () => {
         const gateway = new Gateway({ token: "token", intents: 0 });
-        let val: any;
-        const fn = (v: any) => {
-            val = v;
+        let val: number | undefined;
+        const fn: Parameters<Gateway["on"]>[1] = (v) => {
+            if (typeof v === "number") val = v;
         };
         gateway.on("custom", fn);
         gateway.emit("custom", 42);
@@ -529,9 +482,9 @@ describe("Gateway integration lifecycle", () => {
         gateway.emit("custom", 99);
         expect(val).toBe(42);
 
-        let caughtError: any;
+        let caughtError: Error | undefined;
         gateway.on("error", (e) => {
-            caughtError = e;
+            if (e instanceof Error) caughtError = e;
         });
         gateway.on("syncThrow", () => {
             throw new Error("sync error");

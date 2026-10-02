@@ -1,6 +1,7 @@
 import { REST, Routes } from "@lunibee/rest";
 import { GuildMember, type ResourceContext } from "@lunibee/structures";
 import { ResourceManager, splitReason } from "./base.js";
+import type { APIGuildMember } from "@lunibee/types";
 
 export interface MemberEditOptions {
     /** Audit-log reason. */
@@ -33,9 +34,9 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
         super(
             (id: string) =>
                 rest
-                    .get(Routes.guildMember(guildId, id))
+                    .get<APIGuildMember>(Routes.guildMember(guildId, id))
                     .then(
-                        (data: any) =>
+                        (data) =>
                             new GuildMember(
                                 { ...data, guild_id: guildId },
                                 context(),

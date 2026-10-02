@@ -1,5 +1,3 @@
-// Re-export the canonical ButtonType from @lunibee/types so the builders package
-// never ships a drifting duplicate (the old local copy was missing `Premium: 6`).
 import { ButtonType } from "@lunibee/types";
 export { ButtonType };
 

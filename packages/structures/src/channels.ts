@@ -15,8 +15,10 @@ export class NewsChannel extends TextChannel {}
 
 /** A direct-message or group DM channel. */
 export class DMChannel extends Channel {
-    /** Users in the conversation. */ public readonly recipients: User[];
-    /** Owner of a group DM. */ public readonly ownerId: string | null;
+    /** Users in the conversation. */
+    public readonly recipients: User[];
+    /** Owner of a group DM. */
+    public readonly ownerId: string | null;
 
     public constructor(data: APIChannel, context?: ResourceContext) {
         super(data, context);
@@ -27,11 +29,14 @@ export class DMChannel extends Channel {
 
 /** A guild voice channel. */
 export class VoiceChannel extends Channel {
-    /** Bitrate in bits per second. */ public bitrate: number;
-    /** User limit (0 = unlimited). */ public userLimit: number;
-    /** Voice region override, or null for automatic. */ public rtcRegion:
-        string | null;
-    /** Camera video quality mode. */ public videoQualityMode: number;
+    /** Bitrate in bits per second. */
+    public bitrate: number;
+    /** User limit (0 = unlimited). */
+    public userLimit: number;
+    /** Voice region override, or null for automatic. */
+    public rtcRegion: string | null;
+    /** Camera video quality mode. */
+    public videoQualityMode: number;
 
     public constructor(data: APIChannel, context?: ResourceContext) {
         super(data, context);
@@ -50,10 +55,14 @@ export class CategoryChannel extends Channel {}
 
 /** A thread (announcement, public or private). */
 export class ThreadChannel extends Channel {
-    /** User who created the thread. */ public readonly ownerId: string | null;
-    /** Approximate message count. */ public messageCount: number;
-    /** Approximate member count (stops counting at 50). */ public memberCount: number;
-    /** Thread metadata. */ public metadata: APIThreadMetadata | null;
+    /** User who created the thread. */
+    public readonly ownerId: string | null;
+    /** Approximate message count. */
+    public messageCount: number;
+    /** Approximate member count (stops counting at 50). */
+    public memberCount: number;
+    /** Thread metadata. */
+    public metadata: APIThreadMetadata | null;
 
     public constructor(data: APIChannel, context?: ResourceContext) {
         super(data, context);
@@ -81,11 +90,14 @@ export class ThreadChannel extends Channel {
 
 /** A guild forum channel. */
 export class ForumChannel extends Channel {
-    /** Tags that threads can apply. */ public availableTags: APIForumTag[];
-    /** Default reaction for new threads. */ public defaultReactionEmoji: APIPartialEmoji | null;
-    /** Default slowmode for new threads. */ public defaultThreadRateLimitPerUser: number;
-    /** Default auto-archive duration for new threads. */ public defaultAutoArchiveDuration:
-        number | null;
+    /** Tags that threads can apply. */
+    public availableTags: APIForumTag[];
+    /** Default reaction for new threads. */
+    public defaultReactionEmoji: APIPartialEmoji | null;
+    /** Default slowmode for new threads. */
+    public defaultThreadRateLimitPerUser: number;
+    /** Default auto-archive duration for new threads. */
+    public defaultAutoArchiveDuration: number | null;
 
     public constructor(data: APIChannel, context?: ResourceContext) {
         super(data, context);

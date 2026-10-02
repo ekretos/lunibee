@@ -7,62 +7,14 @@ import {
 import { Gateway, GatewayOpcodes } from "../packages/ws/src/index.ts";
 import { Cache } from "../packages/collection/src/cache.ts";
 import { Collector } from "../packages/core/src/collector.ts";
-
-class FakeWebSocket {
-    static readonly OPEN = 1;
-    static readonly CLOSED = 3;
-    static instances: FakeWebSocket[] = [];
-    readonly url: string;
-    readyState = 0;
-    sent: string[] = [];
-    closeCode?: number;
-    #listeners = new Map<string, Set<(event: any) => void>>();
-
-    constructor(url: string) {
-        this.url = url;
-        FakeWebSocket.instances.push(this);
-    }
-    addEventListener(event: string, listener: (event: any) => void): void {
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
-    }
-    send(data: string): void {
-        if (this.readyState !== FakeWebSocket.OPEN)
-            throw new Error("socket is not open");
-        this.sent.push(data);
-    }
-    close(code = 1000, reason = ""): void {
-        this.closeCode = code;
-        if (this.readyState === FakeWebSocket.CLOSED) return;
-        this.readyState = FakeWebSocket.CLOSED;
-        this.emit("close", { code, reason });
-    }
-    open(): void {
-        this.readyState = FakeWebSocket.OPEN;
-        this.emit("open", {});
-    }
-    dispatch(event: string, data: unknown, sequence: number): void {
-        this.emit("message", {
-            data: JSON.stringify({
-                op: GatewayOpcodes.Dispatch,
-                t: event,
-                s: sequence,
-                d: data,
-            }),
-        });
-    }
-    emit(event: string, value: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? [])
-            listener(value);
-    }
-}
+import { FakeWebSocket, installWebSocket } from "./helpers/fake-websocket.ts";
+import { fakeFetch } from "./helpers/fetch.ts";
 
 describe("Gateway connect idempotency (P1: duplicate sockets)", () => {
     const OriginalWebSocket = globalThis.WebSocket;
     beforeEach(() => {
         FakeWebSocket.instances = [];
-        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+        installWebSocket(FakeWebSocket);
     });
     afterEach(() => {
         globalThis.WebSocket = OriginalWebSocket;
@@ -188,16 +140,18 @@ describe("RedisRateLimitStore failure semantics (P1)", () => {
                 resetAt: Date.now() + 120,
             });
 
-            globalThis.fetch = (async () =>
-                new Response("{}", {
-                    status: 200,
-                    headers: {
-                        "content-type": "application/json",
-                        "X-RateLimit-Bucket": "abc",
-                        "X-RateLimit-Remaining": "0",
-                        "X-RateLimit-Reset-After": "0.12",
-                    },
-                })) as unknown as typeof fetch;
+            globalThis.fetch = fakeFetch(
+                async () =>
+                    new Response("{}", {
+                        status: 200,
+                        headers: {
+                            "content-type": "application/json",
+                            "X-RateLimit-Bucket": "abc",
+                            "X-RateLimit-Remaining": "0",
+                            "X-RateLimit-Reset-After": "0.12",
+                        },
+                    }),
+            );
 
             const rest = new REST({ token: "token", store });
             // First request discovers the bucket hash "abc" for this route.

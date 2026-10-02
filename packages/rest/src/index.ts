@@ -57,14 +57,16 @@ export interface RESTFileAttachment {
  * `reason`, `auth`) additively without changing that positional default.
  */
 export interface RESTRequestOptions {
-    /** Abort signal used to cancel the request and any queued wait. */ signal?: AbortSignal;
-    /** Query-string appended to the path (`URLSearchParams`, a record, or a raw string). */ query?: RESTQuery;
-    /** Extra request headers merged in (library headers such as `Authorization` win). */ headers?: Record<
-        string,
-        string
-    >;
-    /** Audit-log reason, sent as the `X-Audit-Log-Reason` header. */ reason?: string;
-    /** Set `false` to omit the `Authorization` header for this request. Defaults to `true`. */ auth?: boolean;
+    /** Abort signal used to cancel the request and any queued wait. */
+    signal?: AbortSignal;
+    /** Query-string appended to the path (`URLSearchParams`, a record, or a raw string). */
+    query?: RESTQuery;
+    /** Extra request headers merged in (library headers such as `Authorization` win). */
+    headers?: Record<string, string>;
+    /** Audit-log reason, sent as the `X-Audit-Log-Reason` header. */
+    reason?: string;
+    /** Set `false` to omit the `Authorization` header for this request. Defaults to `true`. */
+    auth?: boolean;
 }
 
 /**
@@ -73,8 +75,10 @@ export interface RESTRequestOptions {
  * additive `method(path, { body })` overloads without breaking the positional signature.
  */
 export interface RequestData extends RESTRequestOptions {
-    /** Request body. Encoded as JSON unless `files` are present (then multipart). */ body?: unknown;
-    /** File attachments; presence upgrades the request to `multipart/form-data`. */ files?: RESTFileAttachment[];
+    /** Request body. Encoded as JSON unless `files` are present (then multipart). */
+    body?: unknown;
+    /** File attachments; presence upgrades the request to `multipart/form-data`. */
+    files?: RESTFileAttachment[];
 }
 
 /** Keys recognised on a {@link RequestData} wrapper, used to disambiguate it from a raw body. */
@@ -165,15 +169,12 @@ export interface RESTHooks {
 
 /** Configures which REST failures may be retried. */
 export interface RetryPolicy {
-    /** Maximum retry attempts. */ maxRetries: number;
-    /** Determines whether a request may be retried. @param method HTTP method. @param status HTTP status, or zero for transport errors. @returns True when retrying is safe under the policy. */ shouldRetry(
-        method: string,
-        status: number,
-    ): boolean;
-    /** Calculates delay before the next attempt. @param attempt Zero-based retry number. @param retryAfter Server-provided delay, when available. @returns Delay in milliseconds. */ getDelay(
-        attempt: number,
-        retryAfter?: number,
-    ): number;
+    /** Maximum retry attempts. */
+    maxRetries: number;
+    /** Determines whether a request may be retried. @param method HTTP method. @param status HTTP status, or zero for transport errors. @returns True when retrying is safe under the policy. */
+    shouldRetry(method: string, status: number): boolean;
+    /** Calculates delay before the next attempt. @param attempt Zero-based retry number. @param retryAfter Server-provided delay, when available. @returns Delay in milliseconds. */
+    getDelay(attempt: number, retryAfter?: number): number;
 }
 /** Creates the default conservative REST retry policy. @param maxRetries Maximum retries. @returns Retry policy that retries rate limits and idempotent transient failures. @throws {TypeError} If maxRetries is negative or not finite. */
 export function createRetryPolicy(maxRetries = 2): RetryPolicy {
@@ -507,9 +508,8 @@ export class REST {
             );
         return this.request<T>(method, path, bodyOrOptions, options);
     }
-    /** Sends a GET request. @param path API path. @param options Request options (`query`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */ public get<
-        T,
-    >(path: string, options?: RequestData): Promise<T> {
+    /** Sends a GET request. @param path API path. @param options Request options (`query`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */
+    public get<T>(path: string, options?: RequestData): Promise<T> {
         return this.request<T>("GET", path, options?.body, options);
     }
     /** Sends a POST request. Accepts a raw body (`post(path, body)`) or a Discord.js-familiar `post(path, { body })`. @param path API path. @param body Optional JSON body, or a `RequestData` wrapper. @param options Request options. @returns Decoded response. @throws {RESTError} When the request fails. */
@@ -554,9 +554,8 @@ export class REST {
     ): Promise<T> {
         return this.#dispatch<T>("PUT", path, body, options);
     }
-    /** Sends a DELETE request. @param path API path. @param options Request options (`reason`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */ public delete<
-        T,
-    >(path: string, options?: RequestData): Promise<T> {
+    /** Sends a DELETE request. @param path API path. @param options Request options (`reason`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */
+    public delete<T>(path: string, options?: RequestData): Promise<T> {
         return this.request<T>("DELETE", path, options?.body, options);
     }
     /**

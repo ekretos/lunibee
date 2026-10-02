@@ -30,6 +30,19 @@ Security release. Fixes the findings of the 0.2.3 security review; the status of
 * **`CreateAttachment(path, { root })`**: confines a file path to a folder (symlinks resolved). Use it, or pass bytes, whenever the path comes from a user.
 * `Routes.currentUserGuild`, `Routes.sticker`, `Routes.messageReactionUser`.
 
+### 🐛 Fixed
+
+* **`WebhookClient.send({ files })` uploads the files.** They were serialized into the JSON body and never reached Discord; they are now sent as multipart form data. Component builders in `components` are serialized with `toJSON()` like embeds.
+
+### 🔧 Changed
+
+* **Stricter public types, no `any`.** `WebhookClient.editMessage()` resolves to `APIMessage`; `WebhookMessageOptions.components` / `files` take component payloads (or builders) and `RESTFileAttachment`s; `VoiceGatewayTransport.send()` takes a `VoiceGatewayPayload`; `identifyPayload()` returns `GatewayPayload<IdentifyData>`; extra `GatewayProperties` / `IdentifyProperties` keys are strings; `MinimalRedisClient.set()` resolves to `string | null`. Code that compiled before only breaks if it relied on these being `any`.
+
+### 📚 Documentation
+
+* **Version picker.** The site keeps the docs of every release (v0.1.0 to v0.2.3) next to the latest; pick one from the header.
+
+## v0.2.3
 
 Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existing code keeps working; deprecated APIs are struck through in your editor and **removed in 0.3.0**.
 

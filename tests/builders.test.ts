@@ -85,7 +85,8 @@ describe("Builders Full Coverage", () => {
         const blobBuf = await blobAtt.toBuffer();
         expect(new TextDecoder().decode(blobBuf)).toBe("hello");
 
-        const invalidAtt = new CreateAttachment(123 as any);
+        // @ts-expect-error a number is not a file source
+        const invalidAtt = new CreateAttachment(123);
         await expect(invalidAtt.toBuffer()).rejects.toThrow(TypeError);
     });
 
@@ -174,7 +175,7 @@ describe("Builders Full Coverage", () => {
         expect(json.dm_permission).toBeUndefined();
         expect(json.default_member_permissions).toBe("8");
         expect(json.nsfw).toBe(true);
-        expect((json.options as any[]).length).toBe(11);
+        expect(json.options).toHaveLength(11);
     });
 
     test("Component Builders cover buttons, selects, modals and text inputs", () => {

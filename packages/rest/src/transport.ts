@@ -5,14 +5,16 @@ export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 /** One HTTP attempt, fully resolved: no routing, retry or rate-limit concerns. */
 export interface TransportRequest {
-    /** Uppercased HTTP method. */ method: string;
-    /** Path with query string, relative to the transport's base URL. */ path: string;
-    /** Request headers, already including authorization. */ headers: Record<
-        string,
-        string
-    >;
-    /** Encoded body, or undefined for a bodyless request. */ body?: BodyInit;
-    /** Caller cancellation signal. */ signal?: AbortSignal;
+    /** Uppercased HTTP method. */
+    method: string;
+    /** Path with query string, relative to the transport's base URL. */
+    path: string;
+    /** Request headers, already including authorization. */
+    headers: Record<string, string>;
+    /** Encoded body, or undefined for a bodyless request. */
+    body?: BodyInit;
+    /** Caller cancellation signal. */
+    signal?: AbortSignal;
 }
 
 /** Thrown by {@link HttpTransport} when the attempt never produced a response. */

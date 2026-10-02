@@ -3,6 +3,7 @@ export { Manager, ResourceManager } from "./base.js";
 /** Discord.js-familiar alias for {@link ResourceManager}. */
 export { ResourceManager as CachedManager } from "./base.js";
 import { REST, Routes } from "@lunibee/rest";
+import type { AllowedMentions } from "@lunibee/types";
 import {
     Channel,
     createChannel,
@@ -70,7 +71,7 @@ export class ChannelManager extends Manager<string, Channel> {
     readonly #context: ResourceContext;
     readonly #messageManagers = new Map<string, MessageManager>();
     readonly #messageCache?: MessageCacheOptions;
-    readonly #allowedMentions?: unknown;
+    readonly #allowedMentions?: AllowedMentions;
     /**
      * @param options.messageCache Enables a bounded per-channel message cache; messages are not cached by default.
      * @param options.allowedMentions Default `allowed_mentions` for sends and edits without their own.
@@ -79,7 +80,7 @@ export class ChannelManager extends Manager<string, Channel> {
         rest: REST,
         options: {
             messageCache?: MessageCacheOptions;
-            allowedMentions?: unknown;
+            allowedMentions?: AllowedMentions;
         } = {},
     ) {
         super();

@@ -167,7 +167,7 @@ export interface IdentifyProperties {
     os?: string;
     browser?: string;
     device?: string;
-    [key: string]: unknown;
+    [key: string]: string | undefined;
 }
 
 /** Everything IDENTIFY needs. */
@@ -180,8 +180,19 @@ export interface IdentifyOptions {
     presence?: GatewayPresence;
 }
 
+/** The `d` field of an IDENTIFY payload. */
+export interface IdentifyData {
+    token: string;
+    intents: number;
+    properties: IdentifyProperties;
+    presence: Required<GatewayPresence>;
+    shard: [shardId: number, shardCount: number];
+}
+
 /** Builds an IDENTIFY payload. */
-export function identifyPayload(options: IdentifyOptions): GatewayPayload {
+export function identifyPayload(
+    options: IdentifyOptions,
+): GatewayPayload<IdentifyData> {
     const props = options.properties ?? {};
     const os = props.os ?? process.platform;
     const browser = props.browser ?? "Lunibee";

@@ -55,13 +55,20 @@ const HINTS: Readonly<Record<number, string>> = {
 
 /** Error thrown when Discord rejects a REST request. */
 export class RESTError extends Error {
-    /** Failure category. */ public readonly kind: RESTErrorKind;
-    /** HTTP status returned by Discord. */ public readonly status: number;
-    /** Discord API error code, when provided. */ public readonly code?: number;
-    /** Raw Discord validation/error payload. */ public readonly errors?: unknown;
-    /** HTTP method used for the failed request. */ public readonly method?: string;
-    /** API path used for the failed request. */ public readonly path?: string;
-    /** What to check next, for errors with a common cause (missing access or permissions). */ public readonly hint?: string;
+    /** Failure category. */
+    public readonly kind: RESTErrorKind;
+    /** HTTP status returned by Discord. */
+    public readonly status: number;
+    /** Discord API error code, when provided. */
+    public readonly code?: number;
+    /** Raw Discord validation/error payload. */
+    public readonly errors?: unknown;
+    /** HTTP method used for the failed request. */
+    public readonly method?: string;
+    /** API path used for the failed request. */
+    public readonly path?: string;
+    /** What to check next, for errors with a common cause (missing access or permissions). */
+    public readonly hint?: string;
     /** Creates a REST error with request context. @param message Error message. @param status HTTP status. @param code Discord error code. @param errors Raw error payload. @param options Request context and cause. */
     public constructor(
         message: string,

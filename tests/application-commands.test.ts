@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ApplicationCommandManager } from "../packages/managers/src/application.ts";
+import type { REST } from "../packages/rest/src/index.ts";
 
 describe("ApplicationCommandManager", () => {
     const recordedCalls: { method: string; path: string; body?: unknown }[] =
@@ -18,12 +19,15 @@ describe("ApplicationCommandManager", () => {
                 },
             ] as T;
         },
-        post: async <T>(path: string, body?: unknown): Promise<T> => {
+        post: async <T>(
+            path: string,
+            body?: { name?: string; description?: string },
+        ): Promise<T> => {
             recordedCalls.push({ method: "POST", path, body });
             return {
                 id: "cmd_2",
-                name: (body as any)?.name,
-                description: (body as any)?.description,
+                name: body?.name,
+                description: body?.description,
                 application_id: "app_123",
                 version: "1",
             } as T;
@@ -57,7 +61,7 @@ describe("ApplicationCommandManager", () => {
     };
 
     const manager = new ApplicationCommandManager(
-        mockRest as any,
+        mockRest as Partial<REST> as REST,
         "123456789012345678",
     );
 

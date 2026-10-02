@@ -375,7 +375,4 @@ export {
 export * from "./interactions.js";
 export { Embed } from "./embed.js";
 export { AuditLog, AuditLogEntry } from "./audit-log.js";
-// KI-4: PermissionsBitField lives canonically in @lunibee/core (single source of
-// truth). Re-export it here for discord.js-style top-level access from structures,
-// replacing the former structures-local duplicate.
 export { PermissionsBitField } from "@lunibee/core";

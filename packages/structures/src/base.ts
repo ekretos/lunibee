@@ -384,20 +384,24 @@ export class Guild extends BaseStructure {
     public explicitContentFilter: number;
     /** Default notification level for new members. */
     public defaultMessageNotifications: number;
-    /** AFK voice channel, or null. */ public afkChannelId: string | null;
-    /** Seconds before a silent member is moved to the AFK channel. */ public afkTimeout?: number;
-    /** Whether the server widget is on. */ public widgetEnabled: boolean;
-    /** Channel the widget invites to, or null. */ public widgetChannelId:
-        string | null;
-    /** Application that created the guild, if a bot did. */ public applicationId:
-        string | null;
-    /** Channel for Discord's community updates, or null. */ public publicUpdatesChannelId:
-        string | null;
-    /** Channel for safety alerts, or null. */ public safetyAlertsChannelId:
-        string | null;
-    /** Maximum presences (null for the default limit). */ public maxPresences:
-        number | null;
-    /** Maximum users in a video channel. */ public maxVideoChannelUsers?: number;
+    /** AFK voice channel, or null. */
+    public afkChannelId: string | null;
+    /** Seconds before a silent member is moved to the AFK channel. */
+    public afkTimeout?: number;
+    /** Whether the server widget is on. */
+    public widgetEnabled: boolean;
+    /** Channel the widget invites to, or null. */
+    public widgetChannelId: string | null;
+    /** Application that created the guild, if a bot did. */
+    public applicationId: string | null;
+    /** Channel for Discord's community updates, or null. */
+    public publicUpdatesChannelId: string | null;
+    /** Channel for safety alerts, or null. */
+    public safetyAlertsChannelId: string | null;
+    /** Maximum presences (null for the default limit). */
+    public maxPresences: number | null;
+    /** Maximum users in a video channel. */
+    public maxVideoChannelUsers?: number;
 
     public constructor(data: import("@lunibee/types").APIGuild) {
         super(data.id);

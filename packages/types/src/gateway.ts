@@ -75,26 +75,27 @@ export type GatewayIntentResolvable =
 export function resolveGatewayIntents(
     intents: GatewayIntentResolvable,
 ): number {
-    if (typeof intents === "number") return intents;
-    if (intents && typeof intents === "object" && !Array.isArray(intents))
-        return intents.bitfield;
-    if (Array.isArray(intents)) {
-        return intents.reduce<number>((acc, intent) => {
-            return acc | resolveGatewayIntents(intent as any);
-        }, 0);
-    }
-    if (typeof intents === "string") {
-        if (intents in GatewayIntentBits)
-            return (GatewayIntentBits as Record<string, number>)[intents]!;
-        if (intents in IntentBits)
-            return (IntentBits as Record<string, number>)[intents]!;
-        const lower = intents.charAt(0).toLowerCase() + intents.slice(1);
-        if (lower in IntentBits)
-            return (IntentBits as Record<string, number>)[lower]!;
-        const num = Number(intents);
-        if (!Number.isNaN(num)) return num;
-    }
-    return 0;
+    if (Array.isArray(intents))
+        return intents.reduce<number>(
+            (acc, intent) => acc | resolveIntent(intent),
+            0,
+        );
+    if (typeof intents === "object") return intents.bitfield;
+    return resolveIntent(intents);
+}
+
+/** Resolves one intent: a bitfield, an intent name in either casing, or a numeric string. */
+function resolveIntent(intent: number | string): number {
+    if (typeof intent === "number") return intent;
+    const bits: Record<string, number> = {
+        ...IntentBits,
+        ...GatewayIntentBits,
+    };
+    const lower = intent.charAt(0).toLowerCase() + intent.slice(1);
+    if (Object.hasOwn(bits, intent)) return bits[intent]!;
+    if (Object.hasOwn(bits, lower)) return bits[lower]!;
+    const num = Number(intent);
+    return Number.isNaN(num) ? 0 : num;
 }
 
 /**
@@ -162,7 +163,7 @@ export interface GatewayProperties {
     os?: string;
     browser?: string;
     device?: string;
-    [key: string]: unknown;
+    [key: string]: string | undefined;
 }
 /** Gateway presence activity. */
 export interface GatewayPresenceActivity {

@@ -22,41 +22,57 @@ export {
 } from "@lunibee/types";
 /** Data shared by Discord interactions. */
 export interface InteractionData {
-    /** Interaction identifier. */ id: string;
-    /** Application identifier. */ application_id: string;
-    /** Interaction type. */ type: number;
-    /** Interaction token. */ token: string;
-    /** Gateway/API version. */ version?: number;
-    /** Guild identifier. */ guild_id?: string;
-    /** Channel identifier. */ channel_id?: string;
-    /** Interaction-specific data. */ data?: Record<string, unknown>;
+    /** Interaction identifier. */
+    id: string;
+    /** Application identifier. */
+    application_id: string;
+    /** Interaction type. */
+    type: number;
+    /** Interaction token. */
+    token: string;
+    /** Gateway/API version. */
+    version?: number;
+    /** Guild identifier. */
+    guild_id?: string;
+    /** Channel identifier. */
+    channel_id?: string;
+    /** Interaction-specific data. */
+    data?: Record<string, unknown>;
     [key: string]: unknown;
 }
 /** Options for an interaction response message. */
 export interface InteractionReplyOptions {
-    /** Message content. */ content?: string;
-    /** Whether the response is ephemeral. */ ephemeral?: boolean;
-    /** Message components. */ components?: unknown[];
-    /** Message embeds. */ embeds?: unknown[];
-    /** Discord message flags. */ flags?: number;
-    /** On `reply()` / `update()`: return the created message (one request, no `fetchReply()`). */ withResponse?: boolean;
+    /** Message content. */
+    content?: string;
+    /** Whether the response is ephemeral. */
+    ephemeral?: boolean;
+    /** Message components. */
+    components?: unknown[];
+    /** Message embeds. */
+    embeds?: unknown[];
+    /** Discord message flags. */
+    flags?: number;
+    /** On `reply()` / `update()`: return the created message (one request, no `fetchReply()`). */
+    withResponse?: boolean;
     [key: string]: unknown;
 }
 /** Transport required by an interaction structure. */
 export interface InteractionClient {
-    /** Sends the initial interaction callback. @param id Interaction identifier. @param token Interaction token. @param response Callback payload. @returns Discord response. @throws {Error} When REST fails. */ postInteractionResponse(
+    /** Sends the initial interaction callback. @param id Interaction identifier. @param token Interaction token. @param response Callback payload. @returns Discord response. @throws {Error} When REST fails. */
+    postInteractionResponse(
         id: string,
         token: string,
         response: InteractionResponse,
     ): Promise<unknown>;
-    /** Edits the original interaction response. @param token Interaction token. @param data Message payload. @returns Discord response. @throws {Error} When REST fails. */ editInteractionReply(
+    /** Edits the original interaction response. @param token Interaction token. @param data Message payload. @returns Discord response. @throws {Error} When REST fails. */
+    editInteractionReply(
         token: string,
         data: InteractionReplyOptions,
     ): Promise<unknown>;
-    /** Deletes the original interaction response. @param token Interaction token. @returns Promise fulfilled after deletion. @throws {Error} When REST fails. */ deleteInteractionReply(
-        token: string,
-    ): Promise<void>;
-    /** Sends a follow-up interaction webhook message. @param token Interaction token. @param data Message payload. @returns Discord response. @throws {Error} When REST fails. */ followUpInteraction(
+    /** Deletes the original interaction response. @param token Interaction token. @returns Promise fulfilled after deletion. @throws {Error} When REST fails. */
+    deleteInteractionReply(token: string): Promise<void>;
+    /** Sends a follow-up interaction webhook message. @param token Interaction token. @param data Message payload. @returns Discord response. @throws {Error} When REST fails. */
+    followUpInteraction(
         token: string,
         data: InteractionReplyOptions,
     ): Promise<unknown>;
@@ -123,7 +139,8 @@ export class InteractionResponse {
         this.type = type;
         this.data = data;
     }
-    /** Serializes the response for Discord. @returns Discord callback payload. */ public toJSON(): {
+    /** Serializes the response for Discord. @returns Discord callback payload. */
+    public toJSON(): {
         type: number;
         data?: InteractionReplyOptions;
     } {
@@ -131,7 +148,8 @@ export class InteractionResponse {
             ? { type: this.type }
             : { type: this.type, data: this.data };
     }
-    /** Creates an immediate message response. @param options Response message options. @returns Callback payload. */ public static message(
+    /** Creates an immediate message response. @param options Response message options. @returns Callback payload. */
+    public static message(
         options: InteractionReplyOptions,
     ): InteractionResponse {
         return new InteractionResponse(
@@ -139,15 +157,15 @@ export class InteractionResponse {
             toMessageData(options),
         );
     }
-    /** Creates a deferred channel response. @param ephemeral Whether the eventual response is ephemeral. @returns Callback payload. */ public static defer(
-        ephemeral = false,
-    ): InteractionResponse {
+    /** Creates a deferred channel response. @param ephemeral Whether the eventual response is ephemeral. @returns Callback payload. */
+    public static defer(ephemeral = false): InteractionResponse {
         return new InteractionResponse(
             InteractionResponseEnum.DeferredChannelMessage,
             ephemeral ? { flags: EPHEMERAL } : undefined,
         );
     }
-    /** Creates a Pong response. @returns Callback payload. */ public static pong(): InteractionResponse {
+    /** Creates a Pong response. @returns Callback payload. */
+    public static pong(): InteractionResponse {
         return new InteractionResponse(InteractionResponseEnum.Pong);
     }
 }
@@ -156,22 +174,29 @@ export class InteractionResponse {
 
 /** Base interaction structure. */
 export class Interaction<TData extends InteractionData = InteractionData> {
-    /** Interaction identifier. */ public readonly id: string;
-    /** Application identifier. */ public readonly applicationId: string;
-    /** Interaction token. */ public readonly token: string;
-    /** Guild identifier. */ public readonly guildId?: string;
-    /** Channel identifier. */ public readonly channelId?: string;
-    /** Interaction type. */ public readonly type: number;
-    /** Raw interaction data. */ public readonly data: TData;
-    /** Whether the initial response was sent. */ public replied = false;
-    /** Whether the initial response was deferred. */ public deferred = false;
+    /** Interaction identifier. */
+    public readonly id: string;
+    /** Application identifier. */
+    public readonly applicationId: string;
+    /** Interaction token. */
+    public readonly token: string;
+    /** Guild identifier. */
+    public readonly guildId?: string;
+    /** Channel identifier. */
+    public readonly channelId?: string;
+    /** Interaction type. */
+    public readonly type: number;
+    /** Raw interaction data. */
+    public readonly data: TData;
+    /** Whether the initial response was sent. */
+    public replied = false;
+    /** Whether the initial response was deferred. */
+    public deferred = false;
     readonly #client: InteractionClient;
     /** An initial response is in flight; a second one must not be sent. */
     #acknowledging = false;
-    /** Creates an interaction from a Gateway payload. @param client Interaction transport. @param data Gateway interaction payload. @throws {TypeError} If required identifiers are missing. */ public constructor(
-        client: InteractionClient,
-        data: TData,
-    ) {
+    /** Creates an interaction from a Gateway payload. @param client Interaction transport. @param data Gateway interaction payload. @throws {TypeError} If required identifiers are missing. */
+    public constructor(client: InteractionClient, data: TData) {
         if (!data.id || !data.token)
             throw new TypeError("Interaction ID and token are required.");
         this.#client = client;
@@ -253,13 +278,16 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         });
         return collector.next() as Promise<ModalSubmitInteraction>;
     }
-    /** Whether this interaction is a message component. @returns True for component interactions. */ public isMessageComponent(): this is ComponentInteraction {
+    /** Whether this interaction is a message component. @returns True for component interactions. */
+    public isMessageComponent(): this is ComponentInteraction {
         return this.type === InteractionEnum.MessageComponent;
     }
-    /** Whether this interaction is a modal submission. @returns True for modal submissions. */ public isModalSubmit(): this is ModalSubmitInteraction {
+    /** Whether this interaction is a modal submission. @returns True for modal submissions. */
+    public isModalSubmit(): this is ModalSubmitInteraction {
         return this.type === InteractionEnum.ModalSubmit;
     }
-    /** Whether this interaction is autocomplete. @returns True for autocomplete interactions. */ public isAutocomplete(): this is AutocompleteInteraction {
+    /** Whether this interaction is autocomplete. @returns True for autocomplete interactions. */
+    public isAutocomplete(): this is AutocompleteInteraction {
         return this.type === InteractionEnum.ApplicationCommandAutocomplete;
     }
     /** Message component type of this interaction, or 0 when it is not a component. */
@@ -268,28 +296,36 @@ export class Interaction<TData extends InteractionData = InteractionData> {
             ? ((this.data.data?.component_type as number | undefined) ?? 0)
             : 0;
     }
-    /** Whether this is a button interaction. */ public isButton(): this is ComponentInteraction {
+    /** Whether this is a button interaction. */
+    public isButton(): this is ComponentInteraction {
         return this.#componentType() === 2;
     }
-    /** Whether this is a string select menu interaction. */ public isStringSelectMenu(): this is ComponentInteraction {
+    /** Whether this is a string select menu interaction. */
+    public isStringSelectMenu(): this is ComponentInteraction {
         return this.#componentType() === 3;
     }
-    /** Whether this is a user select menu interaction. */ public isUserSelectMenu(): this is ComponentInteraction {
+    /** Whether this is a user select menu interaction. */
+    public isUserSelectMenu(): this is ComponentInteraction {
         return this.#componentType() === 5;
     }
-    /** Whether this is a role select menu interaction. */ public isRoleSelectMenu(): this is ComponentInteraction {
+    /** Whether this is a role select menu interaction. */
+    public isRoleSelectMenu(): this is ComponentInteraction {
         return this.#componentType() === 6;
     }
-    /** Whether this is a mentionable select menu interaction. */ public isMentionableSelectMenu(): this is ComponentInteraction {
+    /** Whether this is a mentionable select menu interaction. */
+    public isMentionableSelectMenu(): this is ComponentInteraction {
         return this.#componentType() === 7;
     }
-    /** Whether this is a channel select menu interaction. */ public isChannelSelectMenu(): this is ComponentInteraction {
+    /** Whether this is a channel select menu interaction. */
+    public isChannelSelectMenu(): this is ComponentInteraction {
         return this.#componentType() === 8;
     }
-    /** Whether this is any select menu interaction. */ public isAnySelectMenu(): this is ComponentInteraction {
+    /** Whether this is any select menu interaction. */
+    public isAnySelectMenu(): this is ComponentInteraction {
         return [3, 5, 6, 7, 8].includes(this.#componentType());
     }
-    /** Ensures the interaction has not already been acknowledged. @returns Nothing. @throws {Error} When already acknowledged. */ protected assertUnacknowledged(): void {
+    /** Ensures the interaction has not already been acknowledged. @returns Nothing. @throws {Error} When already acknowledged. */
+    protected assertUnacknowledged(): void {
         if (this.replied || this.deferred || this.#acknowledging)
             throw new Error("Interaction has already been acknowledged.");
     }
@@ -383,7 +419,8 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     public async deleteFollowUp(messageId: string): Promise<void> {
         await this.#webhookMessage("DELETE", messageId);
     }
-    /** Ensures the interaction has been acknowledged. @returns Nothing. @throws {Error} When not acknowledged. */ protected assertAcknowledged(): void {
+    /** Ensures the interaction has been acknowledged. @returns Nothing. @throws {Error} When not acknowledged. */
+    protected assertAcknowledged(): void {
         if (!this.replied && !this.deferred)
             throw new Error("Interaction has not been acknowledged.");
     }
@@ -464,20 +501,21 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         );
         if (withResponse) return result as Message | null;
     }
-    /** Edits the original response. @param options Replacement message options. @returns Discord response. @throws {Error} When not acknowledged or REST fails. */ public editReply(
-        options: InteractionReplyOptions,
-    ): Promise<unknown> {
+    /** Edits the original response. @param options Replacement message options. @returns Discord response. @throws {Error} When not acknowledged or REST fails. */
+    public editReply(options: InteractionReplyOptions): Promise<unknown> {
         this.assertAcknowledged();
         return this.#client.editInteractionReply(
             this.token,
             toMessageData(options),
         );
     }
-    /** Deletes the original response. @returns Promise fulfilled after deletion. @throws {Error} When not acknowledged or REST fails. */ public deleteReply(): Promise<void> {
+    /** Deletes the original response. @returns Promise fulfilled after deletion. @throws {Error} When not acknowledged or REST fails. */
+    public deleteReply(): Promise<void> {
         this.assertAcknowledged();
         return this.#client.deleteInteractionReply(this.token);
     }
-    /** Sends a follow-up message using the interaction webhook. @param options Follow-up message options. @returns Discord response. @throws {Error} When REST fails. */ public followUp(
+    /** Sends a follow-up message using the interaction webhook. @param options Follow-up message options. @returns Discord response. @throws {Error} When REST fails. */
+    public followUp(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
         return this.#client.followUpInteraction(
@@ -547,7 +585,8 @@ export class CommandInteraction extends Interaction {
     /** Typed option resolver. Access slash command options with full type safety. */
     public readonly options: CommandOptions;
 
-    /** Invoked command name. @returns Command name or an empty string. */ public get commandName(): string {
+    /** Invoked command name. @returns Command name or an empty string. */
+    public get commandName(): string {
         return typeof this.data.data?.name === "string"
             ? this.data.data.name
             : "";

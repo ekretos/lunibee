@@ -10,9 +10,12 @@
 
 /** Everything needed to send a RESUME, or nothing when one is impossible. */
 export interface ResumeInfo {
-    /** Discord's session identifier from READY. */ sessionId: string;
-    /** Last sequence number observed on this session. */ sequence: number;
-    /** Host READY nominated for resuming this session. */ resumeURL: string;
+    /** Discord's session identifier from READY. */
+    sessionId: string;
+    /** Last sequence number observed on this session. */
+    sequence: number;
+    /** Host READY nominated for resuming this session. */
+    resumeURL: string;
 }
 
 /**

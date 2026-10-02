@@ -1,5 +1,6 @@
 import { REST, Routes } from "@lunibee/rest";
 import { Role } from "@lunibee/structures";
+import type { APIRole } from "@lunibee/types";
 import { ResourceManager } from "./base.js";
 
 export interface RoleCreateOptions {
@@ -30,8 +31,8 @@ export class RoleManager extends ResourceManager<string, Role> {
         super(
             (id: string) =>
                 rest
-                    .get(Routes.guildRole(guildId, id))
-                    .then((data: any) => new Role(data)),
+                    .get<APIRole>(Routes.guildRole(guildId, id))
+                    .then((data) => new Role(data)),
             (role: Role) => role.id,
         );
         this.guildId = guildId;
@@ -40,7 +41,7 @@ export class RoleManager extends ResourceManager<string, Role> {
 
     /** Fetches all roles in the guild. */
     public async fetchAll(): Promise<Role[]> {
-        const data = await this.#rest.get<any[]>(
+        const data = await this.#rest.get<APIRole[]>(
             Routes.guildRoles(this.guildId),
         );
         return data.map((item) => {
@@ -53,7 +54,7 @@ export class RoleManager extends ResourceManager<string, Role> {
     /** Creates a new role in the guild. */
     public async create(options: RoleCreateOptions): Promise<Role> {
         const { reason, ...payload } = options;
-        const data = await this.#rest.post<any>(
+        const data = await this.#rest.post<APIRole>(
             Routes.guildRoles(this.guildId),
             {
                 ...payload,
@@ -72,7 +73,7 @@ export class RoleManager extends ResourceManager<string, Role> {
     /** Edits an existing role. */
     public async edit(roleId: string, options: RoleEditOptions): Promise<Role> {
         const { reason, ...payload } = options;
-        const data = await this.#rest.patch<any>(
+        const data = await this.#rest.patch<APIRole>(
             Routes.guildRole(this.guildId, roleId),
             {
                 ...payload,

@@ -30,6 +30,7 @@ export {
     type ProtocolViolation,
     type IdentifyOptions,
     type IdentifyProperties,
+    type IdentifyData,
 } from "./protocol.js";
 
 export {
@@ -79,18 +80,30 @@ import { GatewayState, GatewayError } from "./state.js";
 import { SendBudget } from "./send-budget.js";
 /** Gateway connection configuration. */
 export interface GatewayOptions {
-    /** Authentication token. */ token: string;
-    /** Gateway intent bitfield or resolvable. */ intents: GatewayIntentResolvable;
-    /** Shard identifier. */ shardId?: number;
-    /** Total shard count. */ shardCount?: number;
-    /** Whether automatic reconnect is enabled. */ reconnect?: boolean;
-    /** Maximum reconnect attempts. */ maxReconnectAttempts?: number;
-    /** Initial reconnect delay. */ reconnectBaseDelay?: number;
-    /** Maximum reconnect delay. */ reconnectMaxDelay?: number;
-    /** Heartbeat acknowledgement timeout. */ heartbeatAckTimeout?: number;
-    /** Zombie connection timeout. */ zombieTimeout?: number;
-    /** Identification properties. */ properties?: GatewayProperties;
-    /** Presence data. */ presence?: GatewayPresence;
+    /** Authentication token. */
+    token: string;
+    /** Gateway intent bitfield or resolvable. */
+    intents: GatewayIntentResolvable;
+    /** Shard identifier. */
+    shardId?: number;
+    /** Total shard count. */
+    shardCount?: number;
+    /** Whether automatic reconnect is enabled. */
+    reconnect?: boolean;
+    /** Maximum reconnect attempts. */
+    maxReconnectAttempts?: number;
+    /** Initial reconnect delay. */
+    reconnectBaseDelay?: number;
+    /** Maximum reconnect delay. */
+    reconnectMaxDelay?: number;
+    /** Heartbeat acknowledgement timeout. */
+    heartbeatAckTimeout?: number;
+    /** Zombie connection timeout. */
+    zombieTimeout?: number;
+    /** Identification properties. */
+    properties?: GatewayProperties;
+    /** Presence data. */
+    presence?: GatewayPresence;
     /**
      * Whether to enable zlib-stream transport compression.
      * Decoded with a persistent `node:zlib` inflate stream, matching

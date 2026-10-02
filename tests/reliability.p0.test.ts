@@ -3,6 +3,8 @@ import { createDeflate, constants as zlibConstants } from "node:zlib";
 import { REST, createRetryPolicy } from "../packages/rest/src/index.ts";
 import { Gateway, GatewayOpcodes } from "../packages/ws/src/index.ts";
 import { ShardManager } from "../packages/sharding/src/index.ts";
+import { FakeWebSocket, installWebSocket } from "./helpers/fake-websocket.ts";
+import { fakeFetch } from "./helpers/fetch.ts";
 
 /**
  * Regression coverage for the P0/P1 reliability findings:
@@ -17,13 +19,13 @@ describe("REST bucket queue (P0: abort deadlock)", () => {
     });
 
     test("an aborted queued request does not wedge later requests on the bucket", async () => {
-        globalThis.fetch = (async () => {
+        globalThis.fetch = fakeFetch(async () => {
             await new Promise((resolve) => setTimeout(resolve, 60));
             return new Response("{}", {
                 status: 200,
                 headers: { "content-type": "application/json" },
             });
-        }) as unknown as typeof fetch;
+        });
 
         const rest = new REST({ token: "token" });
         const first = rest.get("/channels/1/messages");
@@ -49,11 +51,13 @@ describe("REST bucket queue (P0: abort deadlock)", () => {
     });
 
     test("a signal aborted before enqueue leaves the bucket usable", async () => {
-        globalThis.fetch = (async () =>
-            new Response("{}", {
-                status: 200,
-                headers: { "content-type": "application/json" },
-            })) as unknown as typeof fetch;
+        globalThis.fetch = fakeFetch(
+            async () =>
+                new Response("{}", {
+                    status: 200,
+                    headers: { "content-type": "application/json" },
+                }),
+        );
 
         const rest = new REST({ token: "token" });
         const controller = new AbortController();
@@ -86,45 +90,6 @@ describe("REST retry policy (P1: transport failures)", () => {
     });
 });
 
-class FakeWebSocket {
-    static readonly OPEN = 1;
-    static readonly CLOSED = 3;
-    static instances: FakeWebSocket[] = [];
-    readonly url: string;
-    readyState = 0;
-    binaryType = "blob";
-    sent: string[] = [];
-    #listeners = new Map<string, Set<(event: any) => void>>();
-
-    constructor(url: string) {
-        this.url = url;
-        FakeWebSocket.instances.push(this);
-    }
-    addEventListener(event: string, listener: (event: any) => void): void {
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
-    }
-    send(data: string): void {
-        if (this.readyState !== FakeWebSocket.OPEN)
-            throw new Error("socket is not open");
-        this.sent.push(data);
-    }
-    close(code = 1000, reason = ""): void {
-        if (this.readyState === FakeWebSocket.CLOSED) return;
-        this.readyState = FakeWebSocket.CLOSED;
-        this.emit("close", { code, reason });
-    }
-    open(): void {
-        this.readyState = FakeWebSocket.OPEN;
-        this.emit("open", {});
-    }
-    emit(event: string, value: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? [])
-            listener(value);
-    }
-}
-
 /** Encodes payloads as Discord does: one zlib stream, Z_SYNC_FLUSH per frame. */
 function createFramer(): (payload: unknown) => Promise<Uint8Array> {
     const deflate = createDeflate();
@@ -145,7 +110,7 @@ describe("Gateway zlib-stream (P0: compressed payloads)", () => {
     const OriginalWebSocket = globalThis.WebSocket;
     beforeEach(() => {
         FakeWebSocket.instances = [];
-        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+        installWebSocket(FakeWebSocket);
     });
     afterEach(() => {
         globalThis.WebSocket = OriginalWebSocket;
@@ -263,7 +228,7 @@ describe("Gateway handshake budget (P1: starved IDENTIFY)", () => {
     const OriginalWebSocket = globalThis.WebSocket;
     beforeEach(() => {
         FakeWebSocket.instances = [];
-        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+        installWebSocket(FakeWebSocket);
     });
     afterEach(() => {
         globalThis.WebSocket = OriginalWebSocket;

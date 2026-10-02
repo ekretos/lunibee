@@ -1,62 +1,76 @@
 /** Discord API embed field payload. */
 export interface EmbedField {
-    /** Field name. */ name: string;
-    /** Field value. */ value: string;
-    /** Whether the field is displayed inline. */ inline?: boolean;
+    /** Field name. */
+    name: string;
+    /** Field value. */
+    value: string;
+    /** Whether the field is displayed inline. */
+    inline?: boolean;
 }
 /** Discord API embed footer payload. */
 export interface EmbedFooter {
-    /** Footer text. */ text: string;
-    /** Footer icon URL. */ icon_url?: string;
+    /** Footer text. */
+    text: string;
+    /** Footer icon URL. */
+    icon_url?: string;
 }
 /** Discord API embed author payload. */
 export interface EmbedAuthor {
-    /** Author display name. */ name: string;
-    /** Author URL. */ url?: string;
-    /** Author icon URL. */ icon_url?: string;
+    /** Author display name. */
+    name: string;
+    /** Author URL. */
+    url?: string;
+    /** Author icon URL. */
+    icon_url?: string;
 }
 /** Strict Discord API embed payload. */
 export interface APIEmbed {
-    /** Embed title. */ title?: string;
-    /** Embed description. */ description?: string;
-    /** Embed URL. */ url?: string;
-    /** Embed color. */ color?: number;
-    /** ISO-8601 timestamp. */ timestamp?: string;
-    /** Embed footer. */ footer?: EmbedFooter;
-    /** Embed author. */ author?: EmbedAuthor;
-    /** Thumbnail payload. */ thumbnail?: { /** Thumbnail URL. */ url: string };
-    /** Image payload. */ image?: { /** Image URL. */ url: string };
-    /** Embed fields. */ fields?: EmbedField[];
+    /** Embed title. */
+    title?: string;
+    /** Embed description. */
+    description?: string;
+    /** Embed URL. */
+    url?: string;
+    /** Embed color. */
+    color?: number;
+    /** ISO-8601 timestamp. */
+    timestamp?: string;
+    /** Embed footer. */
+    footer?: EmbedFooter;
+    /** Embed author. */
+    author?: EmbedAuthor;
+    /** Thumbnail payload. */
+    thumbnail?: { /** Thumbnail URL. */ url: string };
+    /** Image payload. */
+    image?: { /** Image URL. */ url: string };
+    /** Embed fields. */
+    fields?: EmbedField[];
 }
 
 /** Builds compile-time-safe rich embed payloads for Discord API requests. */
 export class CreateEmbed {
     readonly #data: APIEmbed = {};
-    /** Sets the embed title. @param value Title text, or null to clear. @returns This builder. @throws {RangeError} If title exceeds Discord's limit. */ public setTitle(
-        value: string | null,
-    ): this {
+    /** Sets the embed title. @param value Title text, or null to clear. @returns This builder. @throws {RangeError} If title exceeds Discord's limit. */
+    public setTitle(value: string | null): this {
         if (value === null) delete this.#data.title;
         else this.#data.title = validate(value, 256, "Embed title");
         return this;
     }
-    /** Sets the embed description. @param value Description text, or null to clear. @returns This builder. @throws {RangeError} If description exceeds Discord's limit. */ public setDescription(
-        value: string | null,
-    ): this {
+    /** Sets the embed description. @param value Description text, or null to clear. @returns This builder. @throws {RangeError} If description exceeds Discord's limit. */
+    public setDescription(value: string | null): this {
         if (value === null) delete this.#data.description;
         else
             this.#data.description = validate(value, 4096, "Embed description");
         return this;
     }
-    /** Sets the embed URL. @param value Absolute URL, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */ public setURL(
-        value: string | null,
-    ): this {
+    /** Sets the embed URL. @param value Absolute URL, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */
+    public setURL(value: string | null): this {
         if (value === null) delete this.#data.url;
         else this.#data.url = url(value, "Embed URL");
         return this;
     }
-    /** Sets the embed color. @param value RGB integer. @returns This builder. @throws {RangeError} If color is outside 24-bit RGB range. */ public setColor(
-        value: number,
-    ): this {
+    /** Sets the embed color. @param value RGB integer. @returns This builder. @throws {RangeError} If color is outside 24-bit RGB range. */
+    public setColor(value: number): this {
         if (!Number.isInteger(value) || value < 0 || value > 0xffffff)
             throw new RangeError(
                 "Embed color must be an integer between 0 and 16777215.",
@@ -64,18 +78,16 @@ export class CreateEmbed {
         this.#data.color = value;
         return this;
     }
-    /** Sets the embed timestamp. @param value Date value. @returns This builder. @throws {RangeError} If date is invalid. */ public setTimestamp(
-        value = new Date(),
-    ): this {
+    /** Sets the embed timestamp. @param value Date value. @returns This builder. @throws {RangeError} If date is invalid. */
+    public setTimestamp(value = new Date()): this {
         const date = value instanceof Date ? value : new Date(value);
         if (Number.isNaN(date.getTime()))
             throw new RangeError("Embed timestamp must be a valid date.");
         this.#data.timestamp = date.toISOString();
         return this;
     }
-    /** Sets the embed footer. @param value Footer payload. @returns This builder. @throws {RangeError} If footer text exceeds Discord's limit. */ public setFooter(
-        value: EmbedFooter,
-    ): this {
+    /** Sets the embed footer. @param value Footer payload. @returns This builder. @throws {RangeError} If footer text exceeds Discord's limit. */
+    public setFooter(value: EmbedFooter): this {
         this.#data.footer = {
             text: validate(value.text, 2048, "Footer text"),
             ...(value.icon_url
@@ -84,9 +96,8 @@ export class CreateEmbed {
         };
         return this;
     }
-    /** Sets the embed author. @param value Author payload. @returns This builder. @throws {RangeError} If author name exceeds Discord's limit. */ public setAuthor(
-        value: EmbedAuthor,
-    ): this {
+    /** Sets the embed author. @param value Author payload. @returns This builder. @throws {RangeError} If author name exceeds Discord's limit. */
+    public setAuthor(value: EmbedAuthor): this {
         this.#data.author = {
             name: validate(value.name, 256, "Author name"),
             ...(value.url ? { url: url(value.url, "Author URL") } : {}),
@@ -96,9 +107,8 @@ export class CreateEmbed {
         };
         return this;
     }
-    /** Sets the thumbnail URL. @param value Thumbnail URL or payload, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */ public setThumbnail(
-        value: { url: string } | string | null,
-    ): this {
+    /** Sets the thumbnail URL. @param value Thumbnail URL or payload, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */
+    public setThumbnail(value: { url: string } | string | null): this {
         if (value === null) {
             delete this.#data.thumbnail;
             return this;
@@ -107,9 +117,8 @@ export class CreateEmbed {
         this.#data.thumbnail = { url: url(valueURL, "Thumbnail URL") };
         return this;
     }
-    /** Sets the image URL. @param value Image URL or payload, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */ public setImage(
-        value: { url: string } | string | null,
-    ): this {
+    /** Sets the image URL. @param value Image URL or payload, or null to clear. @returns This builder. @throws {TypeError} If URL is invalid. */
+    public setImage(value: { url: string } | string | null): this {
         if (value === null) {
             delete this.#data.image;
             return this;
@@ -120,9 +129,8 @@ export class CreateEmbed {
     }
     /** Adds embed fields. Accepts both the spread form `addFields(a, b)` and the
      * single-array form `addFields([a, b])` for discord.js `RestOrArray` parity.
-     * @param fields Field payloads, spread or as a single array. @returns This builder. @throws {RangeError} If the 25-field limit is exceeded. */ public addFields(
-        ...fields: EmbedField[] | [EmbedField[]]
-    ): this {
+     * @param fields Field payloads, spread or as a single array. @returns This builder. @throws {RangeError} If the 25-field limit is exceeded. */
+    public addFields(...fields: EmbedField[] | [EmbedField[]]): this {
         const resolved = (
             fields.length === 1 && Array.isArray(fields[0]) ? fields[0] : fields
         ) as EmbedField[];
@@ -147,7 +155,8 @@ export class CreateEmbed {
         this.#data.fields = [];
         return this.addFields(...fields);
     }
-    /** Replaces fields starting at an index. @param index Start index. @param deleteCount Number of fields to remove. @param fields Replacement fields. @returns This builder. @throws {RangeError} If arguments are invalid or the 25-field limit is exceeded. */ public spliceFields(
+    /** Replaces fields starting at an index. @param index Start index. @param deleteCount Number of fields to remove. @param fields Replacement fields. @returns This builder. @throws {RangeError} If arguments are invalid or the 25-field limit is exceeded. */
+    public spliceFields(
         index: number,
         deleteCount: number,
         ...fields: EmbedField[]
@@ -170,19 +179,23 @@ export class CreateEmbed {
         this.#data.fields = current;
         return this;
     }
-    /** Removes all embed fields. @returns This builder. */ public clearFields(): this {
+    /** Removes all embed fields. @returns This builder. */
+    public clearFields(): this {
         delete this.#data.fields;
         return this;
     }
-    /** Removes the embed title. @returns This builder. */ public clearTitle(): this {
+    /** Removes the embed title. @returns This builder. */
+    public clearTitle(): this {
         delete this.#data.title;
         return this;
     }
-    /** Removes the embed description. @returns This builder. */ public clearDescription(): this {
+    /** Removes the embed description. @returns This builder. */
+    public clearDescription(): this {
         delete this.#data.description;
         return this;
     }
-    /** Returns a deep-cloned Discord API payload. @returns Strict embed payload. */ public get data(): APIEmbed {
+    /** Returns a deep-cloned Discord API payload. @returns Strict embed payload. */
+    public get data(): APIEmbed {
         return this.toJSON();
     }
     public toJSON(): APIEmbed {

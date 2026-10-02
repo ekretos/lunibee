@@ -20,7 +20,7 @@ import {
     CreateEmbed,
 } from "../packages/builders/src/index.ts";
 import { Cache } from "../packages/collection/src/index.ts";
-import { Client } from "../packages/core/src/index.ts";
+import { Client, type ClientEvents } from "../packages/core/src/index.ts";
 import { HandlerRegistry } from "../packages/handlers/src/index.ts";
 import {
     UserManager,
@@ -33,7 +33,8 @@ import {
 } from "../packages/managers/src/index.ts";
 import { REST } from "../packages/rest/src/index.ts";
 import { ShardManager } from "../packages/sharding/src/index.ts";
-import { ShardBus } from "../packages/sharding/src/bus.ts";
+import { ShardBus, type ShardMessage } from "../packages/sharding/src/bus.ts";
+import { fakeFetch } from "./helpers/fetch.ts";
 import {
     BaseStructure,
     User,
@@ -51,8 +52,6 @@ import {
     AutocompleteInteraction,
     createInteraction,
 } from "../packages/structures/src/interactions.ts";
-// KI-4: the structures-local permissions duplicate was removed; PermissionsBitField
-// and friends now live canonically in @lunibee/core (single source of truth).
 import {
     PermissionSet as StructPermSet,
     Permissions as StructPerms,
@@ -63,58 +62,16 @@ import {
     GatewayOpcodes,
 } from "../packages/ws/src/index.ts";
 
-class MockWebSocket {
-    static readonly OPEN = 1;
-    static readonly CLOSED = 3;
-    readonly url: string;
-    readyState = 0;
-    sent: string[] = [];
-    closeCode?: number;
-    closeReason?: string;
-    #listeners = new Map<string, Set<(event: any) => void>>();
+/** First argument of a client event. */
+type EventArg<K extends keyof ClientEvents> = ClientEvents[K][0];
 
-    constructor(url: string) {
-        if (url.includes("throw-string-error")) {
-            throw "raw string error";
-        }
-        this.url = url;
-        MockWebSocket.instances.push(this);
-    }
-
-    static instances: MockWebSocket[] = [];
-
-    addEventListener(event: string, listener: (event: any) => void): void {
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
-    }
-
-    send(data: string): void {
-        if (this.readyState !== MockWebSocket.OPEN)
-            throw new Error("socket is not open");
-        this.sent.push(data);
-    }
-
-    close(code = 1000, reason = ""): void {
-        this.closeCode = code;
-        this.closeReason = reason;
-        if (this.readyState === MockWebSocket.CLOSED) return;
-        this.readyState = MockWebSocket.CLOSED;
-        this.emit("close", { code, reason });
-    }
-
-    open(): void {
-        this.readyState = MockWebSocket.OPEN;
-        this.emit("open", {});
-    }
-
-    receive(payload: unknown): void {
-        this.emit("message", { data: JSON.stringify(payload) });
-    }
-
-    emit(event: string, value: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? [])
-            listener(value);
+/** Client that exposes `emit` so tests can fire events directly. */
+class TestClient extends Client {
+    public fire<K extends keyof ClientEvents>(
+        event: K,
+        ...args: ClientEvents[K]
+    ): boolean {
+        return this.emit(event, ...args);
     }
 }
 
@@ -216,7 +173,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             ),
         ).toThrow();
         expect(() =>
-            subGroup.addSubcommand((s: any) => {
+            subGroup.addSubcommand((s) => {
                 s.toJSON = () => ({ type: 3, name: "invalid" });
                 return s;
             }),
@@ -403,14 +360,14 @@ describe("100% Comprehensive Codebase Coverage", () => {
         await registry.emit("test", "second");
         expect(onceCalled).toBe(1);
 
-        const client = new Client({ token: "test.token", intents: 0 });
+        const client = new TestClient({ token: "test.token", intents: 0 });
         let onceCount = 0;
         const onceFn = () => {
             onceCount++;
         };
         client.once("open", onceFn);
-        (client as any).emit("open");
-        (client as any).emit("open");
+        client.fire("open");
+        client.fire("open");
         expect(onceCount).toBe(1);
 
         const offFn = () => {};
@@ -429,16 +386,13 @@ describe("100% Comprehensive Codebase Coverage", () => {
         client.on("messageDelete", () => {
             throw new Error("sync failure");
         });
-        (client as any).emit("messageDelete", { id: "1", channel_id: "2" });
+        client.fire("messageDelete", { id: "1", channel_id: "2" });
         expect(errorReceived?.message).toBe("sync failure");
 
         client.on("messageDeleteBulk", async () => {
             throw new Error("async failure");
         });
-        (client as any).emit("messageDeleteBulk", {
-            ids: ["1"],
-            channel_id: "2",
-        });
+        client.fire("messageDeleteBulk", { ids: ["1"], channel_id: "2" }, []);
         await Bun.sleep(10);
         expect(errorReceived?.message).toBe("async failure");
     });
@@ -455,9 +409,9 @@ describe("100% Comprehensive Codebase Coverage", () => {
         await expect(
             client.editInteractionReply("tok", { content: "hi" }),
         ).rejects.toThrow("Client is unauthenticated.");
-        (client.rest as any).delete = async () => {
+        client.rest.delete = (async () => {
             throw new Error("mocked delete");
-        };
+        }) as typeof client.rest.delete;
         await expect(client.deleteInteractionReply("tok")).rejects.toThrow(
             "Client is unauthenticated.",
         );
@@ -473,15 +427,16 @@ describe("100% Comprehensive Codebase Coverage", () => {
     test("Client Gateway event dispatchers coverage", async () => {
         const client = new Client({ token: "bot.token", intents: 0 });
 
-        let threadCreated: any;
-        let threadUpdated: any;
-        let threadDeleted: any;
-        let memberAdded: any;
-        let memberUpdated: any;
-        let memberRemoved: any;
-        let reactionAdded: any;
-        let reactionRemoved: any;
-        let reactionRemovedAll: any;
+        let threadCreated: EventArg<"threadCreate"> | undefined;
+        let threadUpdated: EventArg<"threadUpdate"> | undefined;
+        let threadDeleted: EventArg<"threadDelete"> | undefined;
+        let memberAdded: EventArg<"guildMemberAdd"> | undefined;
+        let memberUpdated: EventArg<"guildMemberUpdate"> | undefined;
+        let memberRemoved: EventArg<"guildMemberRemove"> | undefined;
+        let reactionAdded: EventArg<"messageReactionAdd"> | undefined;
+        let reactionRemoved: EventArg<"messageReactionRemove"> | undefined;
+        let reactionRemovedAll:
+            EventArg<"messageReactionRemoveAll"> | undefined;
         let rawReceived = 0;
 
         client.on("threadCreate", (ch) => {
@@ -560,20 +515,20 @@ describe("100% Comprehensive Codebase Coverage", () => {
             channel_id: "500000000000000000",
         });
 
-        expect(threadCreated.id).toBe("100000000000000000");
-        expect(threadUpdated.id).toBe("100000000000000000");
-        expect(threadDeleted.id).toBe("100000000000000000");
-        expect(memberAdded.user.id).toBe("300000000000000000");
-        expect(memberUpdated.user.id).toBe("300000000000000000");
-        expect(memberRemoved.user.id).toBe("300000000000000000");
-        expect(reactionAdded.message_id).toBe("400000000000000000");
-        expect(reactionRemoved.message_id).toBe("400000000000000000");
-        let roleCreated: any;
-        let roleUpdated: any;
-        let roleDeleted: any;
-        let banAdded: any;
-        let banRemoved: any;
-        let emojisUpdated: any;
+        expect(threadCreated?.id).toBe("100000000000000000");
+        expect(threadUpdated?.id).toBe("100000000000000000");
+        expect(threadDeleted?.id).toBe("100000000000000000");
+        expect(memberAdded?.user.id).toBe("300000000000000000");
+        expect(memberUpdated?.user.id).toBe("300000000000000000");
+        expect(memberRemoved?.user.id).toBe("300000000000000000");
+        expect(reactionAdded?.message_id).toBe("400000000000000000");
+        expect(reactionRemoved?.message_id).toBe("400000000000000000");
+        let roleCreated: EventArg<"guildRoleCreate"> | undefined;
+        let roleUpdated: EventArg<"guildRoleUpdate"> | undefined;
+        let roleDeleted: EventArg<"guildRoleDelete"> | undefined;
+        let banAdded: EventArg<"guildBanAdd"> | undefined;
+        let banRemoved: EventArg<"guildBanRemove"> | undefined;
+        let emojisUpdated: EventArg<"guildEmojisUpdate"> | undefined;
 
         client.on("guildRoleCreate", (r) => {
             roleCreated = r;
@@ -619,12 +574,12 @@ describe("100% Comprehensive Codebase Coverage", () => {
             emojis: [],
         });
 
-        expect(roleCreated.role.id).toBe("1");
-        expect(roleUpdated.role.id).toBe("1");
-        expect(roleDeleted.role_id).toBe("1");
-        expect(banAdded.user.id).toBe("300000000000000000");
-        expect(banRemoved.user.id).toBe("300000000000000000");
-        expect(emojisUpdated.guild_id).toBe("200000000000000000");
+        expect(roleCreated?.role.id).toBe("1");
+        expect(roleUpdated?.role.id).toBe("1");
+        expect(roleDeleted?.role_id).toBe("1");
+        expect(banAdded?.user.id).toBe("300000000000000000");
+        expect(banRemoved?.user.id).toBe("300000000000000000");
+        expect(emojisUpdated?.guild_id).toBe("200000000000000000");
 
         gw.emit("MESSAGE_REACTION_REMOVE_EMOJI", {});
         gw.emit("MESSAGE_POLL_VOTE_ADD", {});
@@ -660,16 +615,12 @@ describe("100% Comprehensive Codebase Coverage", () => {
         gw.emit("RAW", { event: "TEST", data: {} });
         gw.emit("ERROR", new Error("test"));
         gw.emit("ERROR", "test string error");
-
-        // Lifecycle events
         gw.emit("READY", {
             user: { id: "100000000000000000" },
             application: { id: "200000000000000000" },
         });
         gw.emit("open");
         gw.emit("close", { code: 1000, action: "test" });
-
-        // Missing complex payloads
         gw.emit("GUILD_CREATE", { id: "100000000000000000", name: "Guild" });
         gw.emit("GUILD_CREATE", {
             id: "101000000000000000",
@@ -689,9 +640,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         gw.emit("MESSAGE_UPDATE", { id: "1", channel_id: "2" });
         gw.emit("MESSAGE_DELETE", { id: "1", channel_id: "2" });
         gw.emit("MESSAGE_DELETE_BULK", { ids: ["1"], channel_id: "2" });
-
-        // Cover client resource context
-        let msgCreated: any;
+        let msgCreated: EventArg<"messageCreate"> | undefined;
         client.on("messageCreate", (m) => {
             msgCreated = m;
         });
@@ -702,26 +651,24 @@ describe("100% Comprehensive Codebase Coverage", () => {
             author: { id: "300000000000000000", username: "U" },
         });
 
-        (client.rest as any).post = async () => ({
+        client.rest.post = (async () => ({
             id: "501000000000000000",
             channel_id: "100000000000000000",
             content: "reply",
             author: { id: "300000000000000000", username: "U" },
-        });
-        (client.rest as any).patch = async () => ({
+        })) as typeof client.rest.post;
+        client.rest.patch = (async () => ({
             id: "500000000000000000",
             channel_id: "100000000000000000",
             content: "edit",
             author: { id: "300000000000000000", username: "U" },
-        });
-        (client.rest as any).delete = async () => {};
+        })) as typeof client.rest.patch;
+        client.rest.delete = (async () => {}) as typeof client.rest.delete;
 
-        await msgCreated.reply("reply");
-        await msgCreated.edit({ content: "edit" });
-        await msgCreated.crosspost();
-        await msgCreated.delete();
-
-        // Cover client interaction response
+        await msgCreated?.reply("reply");
+        await msgCreated?.edit({ content: "edit" });
+        await msgCreated?.crosspost();
+        await msgCreated?.delete();
         await client.postInteractionResponse(
             "1",
             "tok",
@@ -731,7 +678,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
     test("Managers full coverage", async () => {
         const rest = new REST({ token: "test.token" });
-        (rest as any).get = async (path: string) => {
+        rest.get = (async (path: string) => {
             if (path.includes("/users/"))
                 return { id: "101000000000000000", username: "User101" };
             if (path.includes("/guilds/") && path.includes("/members/"))
@@ -758,7 +705,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             if (path.includes("/channels/"))
                 return { id: "301000000000000000", type: 0, name: "General" };
             return {};
-        };
+        }) as typeof rest.get;
 
         const userMgr = new UserManager(rest);
         const fetchedUser = await userMgr.fetch("101000000000000000");
@@ -814,7 +761,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
         const msgMgr = new MessageManager(
             rest,
-            {} as any,
+            {} as ResourceContext,
             "301000000000000000",
             {},
         );
@@ -830,7 +777,9 @@ describe("100% Comprehensive Codebase Coverage", () => {
         const fetchedMany = await msgMgr.fetchMany(["999000000000000000"]);
         expect(fetchedMany.length).toBe(1);
 
-        expect(() => new MessageManager(rest, {} as any, "")).toThrow();
+        expect(
+            () => new MessageManager(rest, {} as ResourceContext, ""),
+        ).toThrow();
     });
 
     test("REST setToken, abort and cancellation", async () => {
@@ -855,15 +804,26 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
         // Trigger request timeout
         const originalFetch = globalThis.fetch;
-        globalThis.fetch = (() =>
-            new Promise((resolve) => setTimeout(resolve, 500))) as any;
+        globalThis.fetch = fakeFetch(
+            (_url, init) =>
+                new Promise((resolve, reject) => {
+                    const timer = setTimeout(
+                        () => resolve(new Response("{}")),
+                        500,
+                    );
+                    init.signal?.addEventListener("abort", () => {
+                        clearTimeout(timer);
+                        reject(init.signal?.reason);
+                    });
+                }),
+        );
         await expect(rest.request("GET", "/timeout-test")).rejects.toThrow();
         globalThis.fetch = originalFetch;
     });
 
     test("Sharding Manager discovery, connect and bus broadcast", async () => {
         const originalFetch = globalThis.fetch;
-        globalThis.fetch = (async (url: string) => {
+        globalThis.fetch = fakeFetch(async (url) => {
             if (url.includes("/gateway/bot")) {
                 return new Response(JSON.stringify({ shards: 2 }), {
                     status: 200,
@@ -871,7 +831,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
                 });
             }
             return new Response("{}", { status: 200 });
-        }) as any;
+        });
 
         const mgr = new ShardManager({
             token: "bot.token",
@@ -886,8 +846,6 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(
             mgr.getShardIdForGuild("123456789012345678"),
         ).toBeGreaterThanOrEqual(0);
-
-        // Mock shard connections
         const origConnect = Gateway.prototype.connect;
         Gateway.prototype.connect = async function () {};
         await mgr.connect();
@@ -896,26 +854,27 @@ describe("100% Comprehensive Codebase Coverage", () => {
         mgr.destroy();
         Gateway.prototype.connect = origConnect;
 
-        globalThis.fetch = (async () =>
-            new Response("error", { status: 500 })) as any;
+        globalThis.fetch = fakeFetch(
+            async () => new Response("error", { status: 500 }),
+        );
         await expect(mgr.fetchRecommendedShardCount()).rejects.toThrow();
 
-        globalThis.fetch = (async () =>
-            new Response(JSON.stringify({ shards: 0 }), {
-                status: 200,
-            })) as any;
+        globalThis.fetch = fakeFetch(
+            async () =>
+                new Response(JSON.stringify({ shards: 0 }), { status: 200 }),
+        );
         await expect(mgr.fetchRecommendedShardCount()).rejects.toThrow();
 
         globalThis.fetch = originalFetch;
 
         const bus1 = new ShardBus(0, "test-bus-channel");
         const bus2 = new ShardBus(1, "test-bus-channel");
-        let targetedMsg: any;
-        let broadcastMsg: any;
-        const targetHandler = (msg: any) => {
+        let targetedMsg: ShardMessage<string> | undefined;
+        let broadcastMsg: ShardMessage<string> | undefined;
+        const targetHandler = (msg: ShardMessage<string>) => {
             targetedMsg = msg;
         };
-        const broadcastHandler = (msg: any) => {
+        const broadcastHandler = (msg: ShardMessage<string>) => {
             broadcastMsg = msg;
         };
         bus2.on("ping", targetHandler);
@@ -925,8 +884,8 @@ describe("100% Comprehensive Codebase Coverage", () => {
         bus1.broadcast("broadcastMsg", "hello all shards");
 
         await Bun.sleep(20);
-        expect(targetedMsg.data).toBe("hello shard 1");
-        expect(broadcastMsg.data).toBe("hello all shards");
+        expect(targetedMsg?.data).toBe("hello shard 1");
+        expect(broadcastMsg?.data).toBe("hello all shards");
 
         bus2.off("ping", targetHandler);
         bus1.close();
@@ -1118,7 +1077,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
         const actualModal = new ModalSubmitInteraction(
             mockClient,
-            modalInteraction.data as any,
+            modalInteraction.data,
         );
         expect(actualModal.customId).toBe("modal_submit");
         expect(actualModal.getInputValue("inp_name")).toBe("Lunibee");
@@ -1151,7 +1110,13 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
         // Interaction base constructor and methods
         expect(
-            () => new Interaction(mockClient, { id: "", token: "" } as any),
+            () =>
+                new Interaction(mockClient, {
+                    id: "",
+                    token: "",
+                    application_id: "app",
+                    type: 2,
+                }),
         ).toThrow();
         const unackInteraction = new Interaction(mockClient, {
             id: "u",
@@ -1246,8 +1211,8 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
     test("WS Gateway full methods and edge cases", () => {
         const gw = new Gateway({ token: "bot.token", intents: 0 });
-        let emittedData: any;
-        const listener = (d: any) => {
+        let emittedData: Parameters<Parameters<Gateway["on"]>[1]>[0];
+        const listener: Parameters<Gateway["on"]>[1] = (d) => {
             emittedData = d;
         };
         gw.on("customEvent", listener);
@@ -1261,6 +1226,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         expect(gw.setPresence({ status: "dnd" })).toBe(false);
         expect(gw.setVoiceState({ channel_id: "123" })).toBe(false);
         expect(gw.requestGuildMembers({ guild_id: "456" })).toBe(false);
-        expect(() => gw.send({} as any)).toThrow();
+        // @ts-expect-error a payload without `op` is rejected at runtime
+        expect(() => gw.send({})).toThrow();
     });
 });

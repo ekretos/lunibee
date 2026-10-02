@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { WebhookClient } from "../packages/rest/src/webhook.ts";
+import { fakeFetch } from "./helpers/fetch.ts";
 
 describe("WebhookClient Coverage", () => {
     test("instantiates with URL or id/token", () => {
@@ -31,7 +32,7 @@ describe("WebhookClient Coverage", () => {
             token: "secret",
         });
 
-        (globalThis as any).fetch = async (url: string, opts: any) => {
+        globalThis.fetch = fakeFetch(async (url: string, opts: RequestInit) => {
             if (opts.method === "POST") {
                 return new Response(
                     JSON.stringify({
@@ -60,7 +61,7 @@ describe("WebhookClient Coverage", () => {
                 return new Response(null, { status: 204 });
             }
             return new Response(null, { status: 404 });
-        };
+        });
 
         try {
             const sent = await client.send("hello");
@@ -79,6 +80,34 @@ describe("WebhookClient Coverage", () => {
             expect(edited.content).toBe("edited");
 
             await client.deleteMessage("123456789012345678");
+        } finally {
+            globalThis.fetch = original;
+        }
+    });
+
+    test("uploads files as multipart and serializes component builders", async () => {
+        const original = globalThis.fetch;
+        let body: RequestInit["body"];
+        globalThis.fetch = fakeFetch((_url, init) => {
+            body = init.body;
+            return new Response(JSON.stringify({ id: "1", content: "" }), {
+                status: 200,
+                headers: { "content-type": "application/json" },
+            });
+        });
+        try {
+            const client = new WebhookClient({ id: "1", token: "t" });
+            await client.send({
+                content: "file",
+                files: [{ name: "a.txt", data: new TextEncoder().encode("a") }],
+                components: [{ toJSON: () => ({ type: 1, components: [] }) }],
+            });
+            expect(body).toBeInstanceOf(FormData);
+            const form = body as FormData;
+            expect(form.get("files[0]")).toBeInstanceOf(Blob);
+            const payload = JSON.parse(String(form.get("payload_json")));
+            expect(payload.files).toBeUndefined();
+            expect(payload.components).toEqual([{ type: 1, components: [] }]);
         } finally {
             globalThis.fetch = original;
         }

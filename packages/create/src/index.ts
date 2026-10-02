@@ -1,7 +1,9 @@
 /** Options used when generating a Lunibee project. */
 export interface CreateProjectOptions {
-    /** Project directory. */ directory: string;
-    /** Package name. */ name: string;
+    /** Project directory. */
+    directory: string;
+    /** Package name. */
+    name: string;
 }
 
 /** Returns the files needed for a minimal Lunibee application. */

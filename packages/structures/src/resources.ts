@@ -13,17 +13,26 @@ function toDateOrNull(value?: string | null): Date | null {
 
 /** A Discord guild member. */
 export class GuildMember {
-    /** User represented by the member. */ public readonly user: User;
-    /** Guild containing the member. */ public readonly guildId: string;
-    /** Nickname, if configured. */ public nickname: string | null;
-    /** Role IDs assigned to the member. */ public readonly roleIds: string[];
-    /** Whether the member is pending membership screening. */ public pending: boolean;
-    /** Member join timestamp. */ public joinedAt?: Date;
-    /** Member-specific avatar hash, if set. */ public avatarHash:
-        string | null;
-    /** When the member started boosting the guild. */ public premiumSince: Date | null;
-    /** When the member's timeout expires (null if not timed out). */ public timedOutUntil: Date | null;
-    /** Member flags bitfield. */ public flags: number;
+    /** User represented by the member. */
+    public readonly user: User;
+    /** Guild containing the member. */
+    public readonly guildId: string;
+    /** Nickname, if configured. */
+    public nickname: string | null;
+    /** Role IDs assigned to the member. */
+    public readonly roleIds: string[];
+    /** Whether the member is pending membership screening. */
+    public pending: boolean;
+    /** Member join timestamp. */
+    public joinedAt?: Date;
+    /** Member-specific avatar hash, if set. */
+    public avatarHash: string | null;
+    /** When the member started boosting the guild. */
+    public premiumSince: Date | null;
+    /** When the member's timeout expires (null if not timed out). */
+    public timedOutUntil: Date | null;
+    /** Member flags bitfield. */
+    public flags: number;
     /** Permissions Discord sent with the member (interactions only). */
     readonly #suppliedPermissions?: PermissionsBitField;
     readonly #context?: ResourceContext;
@@ -226,21 +235,26 @@ export class GuildMember {
 
 /** A Discord guild role. */
 export class Role extends BaseStructure {
-    /** Role name. */ public name: string;
-    /** Role color as a 24-bit RGB integer. */ public color: number;
-    /** Whether the role is hoisted. */ public hoist: boolean;
-    /** Permission bitfield. */ public permissions: PermissionsBitField;
-    /** Whether the role is managed by an integration. */ public managed: boolean;
-    /** Whether the role is mentionable. */ public mentionable: boolean;
-    /** Role position in the hierarchy. */ public position: number;
-    /** Unicode emoji used as the role icon, if any. */ public unicodeEmoji:
-        string | null;
-    /** Hash of the role's custom icon image, if any. */ public iconHash:
-        string | null;
-    /** Role tags metadata (bot, premium subscriber, etc). */ public tags: Record<
-        string,
-        unknown
-    > | null;
+    /** Role name. */
+    public name: string;
+    /** Role color as a 24-bit RGB integer. */
+    public color: number;
+    /** Whether the role is hoisted. */
+    public hoist: boolean;
+    /** Permission bitfield. */
+    public permissions: PermissionsBitField;
+    /** Whether the role is managed by an integration. */
+    public managed: boolean;
+    /** Whether the role is mentionable. */
+    public mentionable: boolean;
+    /** Role position in the hierarchy. */
+    public position: number;
+    /** Unicode emoji used as the role icon, if any. */
+    public unicodeEmoji: string | null;
+    /** Hash of the role's custom icon image, if any. */
+    public iconHash: string | null;
+    /** Role tags metadata (bot, premium subscriber, etc). */
+    public tags: Record<string, unknown> | null;
 
     /** Creates a role from Discord data. @param data Discord role payload. */
     public constructor(data: {
@@ -319,18 +333,26 @@ export class TextChannel extends Channel {
 
 /** A Discord invite link and its metadata. */
 export class Invite {
-    /** Invite code (the unique part of the URL). */ public readonly code: string;
-    /** Guild this invite belongs to, if any. */ public readonly guildId:
-        string | null;
-    /** Channel this invite points to, if any. */ public readonly channelId:
-        string | null;
-    /** User who created the invite, if available. */ public readonly inviter: User | null;
-    /** Number of times the invite has been used. */ public uses: number;
-    /** Maximum number of uses (0 = unlimited). */ public maxUses: number;
-    /** Duration in seconds until the invite expires (0 = never). */ public maxAge: number;
-    /** Whether the invite is temporary (kicks uninducted members on disconnect). */ public temporary: boolean;
-    /** When the invite was created. */ public readonly createdAt: Date | null;
-    /** When the invite expires, or null if it never expires. */ public readonly expiresAt: Date | null;
+    /** Invite code (the unique part of the URL). */
+    public readonly code: string;
+    /** Guild this invite belongs to, if any. */
+    public readonly guildId: string | null;
+    /** Channel this invite points to, if any. */
+    public readonly channelId: string | null;
+    /** User who created the invite, if available. */
+    public readonly inviter: User | null;
+    /** Number of times the invite has been used. */
+    public uses: number;
+    /** Maximum number of uses (0 = unlimited). */
+    public maxUses: number;
+    /** Duration in seconds until the invite expires (0 = never). */
+    public maxAge: number;
+    /** Whether the invite is temporary (kicks uninducted members on disconnect). */
+    public temporary: boolean;
+    /** When the invite was created. */
+    public readonly createdAt: Date | null;
+    /** When the invite expires, or null if it never expires. */
+    public readonly expiresAt: Date | null;
 
     /** Creates an invite from Discord data. */
     public constructor(data: {
@@ -391,17 +413,20 @@ export type WebhookEnum = (typeof WebhookEnum)[keyof typeof WebhookEnum];
 
 /** A Discord webhook — an HTTP endpoint that can post messages to a channel. */
 export class Webhook extends BaseStructure {
-    /** Webhook type. */ public readonly type: number;
-    /** Webhook display name. */ public name: string | null;
-    /** Webhook avatar hash. */ public avatarHash: string | null;
-    /** Channel this webhook posts to. */ public readonly channelId:
-        string | null;
-    /** Guild this webhook belongs to. */ public readonly guildId:
-        string | null;
-    /** Application that created this webhook, if any. */ public readonly applicationId:
-        string | null;
-    /** Webhook token (only present for incoming webhooks). */ public readonly token:
-        string | null;
+    /** Webhook type. */
+    public readonly type: number;
+    /** Webhook display name. */
+    public name: string | null;
+    /** Webhook avatar hash. */
+    public avatarHash: string | null;
+    /** Channel this webhook posts to. */
+    public readonly channelId: string | null;
+    /** Guild this webhook belongs to. */
+    public readonly guildId: string | null;
+    /** Application that created this webhook, if any. */
+    public readonly applicationId: string | null;
+    /** Webhook token (only present for incoming webhooks). */
+    public readonly token: string | null;
 
     /** Creates a webhook from Discord data. */
     public constructor(data: {
@@ -447,13 +472,20 @@ export class Webhook extends BaseStructure {
 
 /** A Discord emoji. */
 export class Emoji extends BaseStructure {
-    /** Emoji name. */ public name: string | null;
-    /** Roles allowed to use this emoji. */ public roleIds: string[];
-    /** User that created this emoji. */ public user: User | null;
-    /** Whether this emoji must be wrapped in colons. */ public requireColons: boolean;
-    /** Whether this emoji is managed. */ public managed: boolean;
-    /** Whether this emoji is animated. */ public animated: boolean;
-    /** Whether this emoji can be used, may be false due to loss of Server Boosts. */ public available: boolean;
+    /** Emoji name. */
+    public name: string | null;
+    /** Roles allowed to use this emoji. */
+    public roleIds: string[];
+    /** User that created this emoji. */
+    public user: User | null;
+    /** Whether this emoji must be wrapped in colons. */
+    public requireColons: boolean;
+    /** Whether this emoji is managed. */
+    public managed: boolean;
+    /** Whether this emoji is animated. */
+    public animated: boolean;
+    /** Whether this emoji can be used, may be false due to loss of Server Boosts. */
+    public available: boolean;
 
     /** Creates an emoji from Discord data. */
     public constructor(data: {

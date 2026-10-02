@@ -100,6 +100,6 @@ describe("Permissions Full Coverage", () => {
         expect(PermissionOverwriteEnum.Member).toBe(1);
 
         expect(() => new PermissionSet(-1n)).toThrow();
-        expect(() => new PermissionSet("invalid" as any)).toThrow();
+        expect(() => new PermissionSet("invalid")).toThrow();
     });
 });

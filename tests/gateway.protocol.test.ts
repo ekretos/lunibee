@@ -7,7 +7,9 @@ import {
     identifyPayload,
     resumePayload,
     heartbeatPayload,
+    type GatewayOptions,
 } from "../packages/ws/src/index.ts";
+import { FakeWebSocket, installWebSocket } from "./helpers/fake-websocket.ts";
 
 /**
  * Stage 1B.5 acceptance: the protocol answers "what does this payload mean?"
@@ -210,17 +212,17 @@ describe("outbound payload construction", () => {
             shardCount: 4,
         });
         expect(payload.op).toBe(GatewayOpcodes.Identify);
-        const data = payload.d as Record<string, any>;
-        expect(data.token).toBe("token");
-        expect(typeof data.intents).toBe("number");
-        expect(data.shard).toEqual([2, 4]);
+        const data = payload.d;
+        expect(data?.token).toBe("token");
+        expect(typeof data?.intents).toBe("number");
+        expect(data?.shard).toEqual([2, 4]);
         // Lunibee identifies as itself on the real OS, not as Discord's Android app.
-        expect(data.properties.os).toBe(process.platform);
-        expect(data.properties.browser).toBe("Lunibee");
-        expect(data.properties.device).toBe("Lunibee");
+        expect(data?.properties.os).toBe(process.platform);
+        expect(data?.properties.browser).toBe("Lunibee");
+        expect(data?.properties.device).toBe("Lunibee");
         // Both spellings, so the payload works against either expectation.
-        expect(data.properties.$os).toBe(process.platform);
-        expect(data.presence).toEqual({
+        expect(data?.properties.$os).toBe(process.platform);
+        expect(data?.presence).toEqual({
             since: null,
             activities: [],
             status: "online",
@@ -237,13 +239,13 @@ describe("outbound payload construction", () => {
             properties: { os: "linux", browser: "lunibee", device: "server" },
             presence: { status: "dnd", activities: [], afk: true, since: 10 },
         });
-        const data = payload.d as Record<string, any>;
-        expect(data.properties).toMatchObject({
+        const data = payload.d;
+        expect(data?.properties).toMatchObject({
             os: "linux",
             browser: "lunibee",
             $browser: "lunibee",
         });
-        expect(data.presence).toEqual({
+        expect(data?.presence).toEqual({
             since: 10,
             activities: [],
             status: "dnd",
@@ -278,68 +280,25 @@ describe("outbound payload construction", () => {
     });
 });
 
-class FakeWebSocket {
-    static instances: FakeWebSocket[] = [];
-    readonly url: string;
-    readyState = 0;
-    sent: string[] = [];
-    closeCalls: Array<{ code: number; reason: string }> = [];
-    #listeners = new Map<string, Set<(event: any) => void>>();
-
-    constructor(url: string) {
-        this.url = url;
-        FakeWebSocket.instances.push(this);
-    }
-    addEventListener(event: string, listener: (event: any) => void): void {
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
-    }
-    send(data: string): void {
-        if (this.readyState !== 1) throw new Error("socket is not open");
-        this.sent.push(data);
-    }
-    close(code = 1000, reason = ""): void {
-        this.closeCalls.push({ code, reason });
-        if (this.readyState === 3) return;
-        this.readyState = 3;
-        this.emit("close", { code, reason });
-    }
-    open(): void {
-        this.readyState = 1;
-        this.emit("open", {});
-    }
-    receive(payload: unknown): void {
-        this.emit("message", { data: JSON.stringify(payload) });
-    }
-    emit(event: string, value: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? [])
-            listener(value);
-    }
-    payloads(): Array<{ op: number; d?: any }> {
-        return this.sent.map((raw) => JSON.parse(raw));
-    }
-}
-
 describe("Gateway applies protocol actions", () => {
     const OriginalWebSocket = globalThis.WebSocket;
     beforeEach(() => {
         FakeWebSocket.instances = [];
-        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+        installWebSocket(FakeWebSocket);
     });
     afterEach(() => {
         globalThis.WebSocket = OriginalWebSocket;
     });
 
     async function connect(
-        options: Record<string, unknown> = {},
+        options: Partial<GatewayOptions> = {},
     ): Promise<{ gateway: Gateway; socket: FakeWebSocket }> {
         const gateway = new Gateway({
             token: "token",
             intents: 1,
             reconnect: false,
             ...options,
-        } as any);
+        });
         const connecting = gateway.connect("wss://main.test");
         const socket = FakeWebSocket.instances[0]!;
         socket.open();

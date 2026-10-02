@@ -29,14 +29,14 @@ function validateContexts(contexts: number[]): void {
 /** Builds Discord application command payloads. */
 export class CreateSlashCommand {
     readonly #data: Record<string, unknown> = { type: 1 };
-    /** Sets the command name. */ public setName(name: string): this {
+    /** Sets the command name. */
+    public setName(name: string): this {
         validateName(name, "Command name");
         this.#data.name = name;
         return this;
     }
-    /** Sets the command description. */ public setDescription(
-        description: string,
-    ): this {
+    /** Sets the command description. */
+    public setDescription(description: string): this {
         validateText(description, "Command description", 100);
         this.#data.description = description;
         return this;
@@ -61,83 +61,91 @@ export class CreateSlashCommand {
     public setNsfw(nsfw = true): this {
         return this.setNSFW(nsfw);
     }
-    /** Sets command default member permissions. */ public setDefaultMemberPermissions(
+    /** Sets command default member permissions. */
+    public setDefaultMemberPermissions(
         permissions: bigint | number | string | null,
     ): this {
         this.#data.default_member_permissions =
             permissions === null ? null : BigInt(permissions).toString();
         return this;
     }
-    /** Sets command integration types. */ public setIntegrationTypes(
-        ...types: number[]
-    ): this {
+    /** Sets command integration types. */
+    public setIntegrationTypes(...types: number[]): this {
         this.#data.integration_types = [...types];
         return this;
     }
-    /** Adds a string option. */ public addStringOption(
+    /** Adds a string option. */
+    public addStringOption(
         configure: (option: CreateStringOption) => CreateStringOption,
     ): this {
         return this.addOption(configure(new CreateStringOption()));
     }
-    /** Adds an integer option. */ public addIntegerOption(
+    /** Adds an integer option. */
+    public addIntegerOption(
         configure: (option: CreateIntegerOption) => CreateIntegerOption,
     ): this {
         return this.addOption(configure(new CreateIntegerOption()));
     }
-    /** Adds a number option. */ public addNumberOption(
+    /** Adds a number option. */
+    public addNumberOption(
         configure: (option: CreateNumberOption) => CreateNumberOption,
     ): this {
         return this.addOption(configure(new CreateNumberOption()));
     }
-    /** Adds a boolean option. */ public addBooleanOption(
+    /** Adds a boolean option. */
+    public addBooleanOption(
         configure: (option: CreateBooleanOption) => CreateBooleanOption,
     ): this {
         return this.addOption(configure(new CreateBooleanOption()));
     }
-    /** Adds a user option. */ public addUserOption(
+    /** Adds a user option. */
+    public addUserOption(
         configure: (option: CreateUserOption) => CreateUserOption,
     ): this {
         return this.addOption(configure(new CreateUserOption()));
     }
-    /** Adds a channel option. */ public addChannelOption(
+    /** Adds a channel option. */
+    public addChannelOption(
         configure: (option: CreateChannelOption) => CreateChannelOption,
     ): this {
         return this.addOption(configure(new CreateChannelOption()));
     }
-    /** Adds a role option. */ public addRoleOption(
+    /** Adds a role option. */
+    public addRoleOption(
         configure: (option: CreateRoleOption) => CreateRoleOption,
     ): this {
         return this.addOption(configure(new CreateRoleOption()));
     }
-    /** Adds a mentionable option. */ public addMentionableOption(
+    /** Adds a mentionable option. */
+    public addMentionableOption(
         configure: (option: CreateMentionableOption) => CreateMentionableOption,
     ): this {
         return this.addOption(configure(new CreateMentionableOption()));
     }
-    /** Adds an attachment option. */ public addAttachmentOption(
+    /** Adds an attachment option. */
+    public addAttachmentOption(
         configure: (option: CreateAttachmentOption) => CreateAttachmentOption,
     ): this {
         return this.addOption(configure(new CreateAttachmentOption()));
     }
-    /** Adds a subcommand. */ public addSubcommand(
+    /** Adds a subcommand. */
+    public addSubcommand(
         configure: (option: CreateSubcommand) => CreateSubcommand,
     ): this {
         return this.addOption(configure(new CreateSubcommand()));
     }
-    /** Adds a subcommand group. */ public addSubcommandGroup(
+    /** Adds a subcommand group. */
+    public addSubcommandGroup(
         configure: (option: CreateSubcommandGroup) => CreateSubcommandGroup,
     ): this {
         return this.addOption(configure(new CreateSubcommandGroup()));
     }
-    /** Serializes the command payload. */ public toJSON(): Record<
-        string,
-        unknown
-    > {
+    /** Serializes the command payload. */
+    public toJSON(): Record<string, unknown> {
         return structuredClone(this.#data);
     }
-    /** Adds a validated top-level command option. */ protected addOption(
-        option: CreateCommandOption,
-    ): this {
+    /** Adds a validated top-level command option. */
+    protected addOption(option: CreateCommandOption): this {
         const options = (this.#data.options as unknown[] | undefined) ?? [];
         if (options.length >= 25)
             throw new RangeError(
@@ -172,45 +180,46 @@ export class CreateSlashCommand {
 /** Base builder for command options. */
 export class CreateCommandOption {
     protected readonly data: Record<string, unknown>;
-    /** Creates an option builder. */ public constructor(type: number) {
+    /** Creates an option builder. */
+    public constructor(type: number) {
         this.data = { type };
     }
-    /** Sets the option name. */ public setName(name: string): this {
+    /** Sets the option name. */
+    public setName(name: string): this {
         validateName(name, "Option name");
         this.data.name = name;
         return this;
     }
-    /** Sets the option description. */ public setDescription(
-        description: string,
-    ): this {
+    /** Sets the option description. */
+    public setDescription(description: string): this {
         validateText(description, "Option description", 100);
         this.data.description = description;
         return this;
     }
-    /** Makes the option required or optional. */ public setRequired(
-        required = true,
-    ): this {
+    /** Makes the option required or optional. */
+    public setRequired(required = true): this {
         this.data.required = required;
         return this;
     }
-    /** Sets autocomplete. */ public setAutocomplete(enabled = true): this {
+    /** Sets autocomplete. */
+    public setAutocomplete(enabled = true): this {
         this.data.autocomplete = enabled;
         return this;
     }
-    /** Serializes the option payload. */ public toJSON(): Record<
-        string,
-        unknown
-    > {
+    /** Serializes the option payload. */
+    public toJSON(): Record<string, unknown> {
         return structuredClone(this.data);
     }
 }
 
 /** Builds a string command option. */
 export class CreateStringOption extends CreateCommandOption {
-    /** Creates a string option. */ public constructor() {
+    /** Creates a string option. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.String);
     }
-    /** Adds string choices. */ public addChoices(
+    /** Adds string choices. */
+    public addChoices(
         ...choices: Array<{ name: string; value: string }>
     ): this {
         const current = (this.data.choices as unknown[] | undefined) ?? [];
@@ -232,16 +241,14 @@ export class CreateStringOption extends CreateCommandOption {
         ];
         return this;
     }
-    /** Sets the minimum string length. */ public setMinLength(
-        value: number,
-    ): this {
+    /** Sets the minimum string length. */
+    public setMinLength(value: number): this {
         validateIntegerRange(value, 0, 6000, "min_length");
         this.data.min_length = value;
         return this;
     }
-    /** Sets the maximum string length. */ public setMaxLength(
-        value: number,
-    ): this {
+    /** Sets the maximum string length. */
+    public setMaxLength(value: number): this {
         validateIntegerRange(value, 1, 6000, "max_length");
         if (
             (this.data.min_length as number | undefined) !== undefined &&
@@ -364,38 +371,49 @@ export class CreateNumberOption extends CreateCommandOption {
         return this;
     }
 }
-/** Builds a boolean command option. */ export class CreateBooleanOption extends CreateCommandOption {
-    /** Creates a boolean option. */ public constructor() {
+/** Builds a boolean command option. */
+export class CreateBooleanOption extends CreateCommandOption {
+    /** Creates a boolean option. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.Boolean);
     }
 }
-/** Builds a user command option. */ export class CreateUserOption extends CreateCommandOption {
-    /** Creates a user option. */ public constructor() {
+/** Builds a user command option. */
+export class CreateUserOption extends CreateCommandOption {
+    /** Creates a user option. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.User);
     }
 }
-/** Builds a role command option. */ export class CreateRoleOption extends CreateCommandOption {
-    /** Creates a role option. */ public constructor() {
+/** Builds a role command option. */
+export class CreateRoleOption extends CreateCommandOption {
+    /** Creates a role option. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.Role);
     }
 }
-/** Builds a mentionable command option. */ export class CreateMentionableOption extends CreateCommandOption {
-    /** Creates a mentionable option. */ public constructor() {
+/** Builds a mentionable command option. */
+export class CreateMentionableOption extends CreateCommandOption {
+    /** Creates a mentionable option. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.Mentionable);
     }
 }
-/** Builds an attachment command option. */ export class CreateAttachmentOption extends CreateCommandOption {
-    /** Creates an attachment option. */ public constructor() {
+/** Builds an attachment command option. */
+export class CreateAttachmentOption extends CreateCommandOption {
+    /** Creates an attachment option. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.Attachment);
     }
 }
-/** Builds a channel command option. */ export class CreateChannelOption extends CreateCommandOption {
-    /** Creates a channel option. */ public constructor() {
+/** Builds a channel command option. */
+export class CreateChannelOption extends CreateCommandOption {
+    /** Creates a channel option. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.Channel);
     }
-    /** Restricts accepted channel types. */ public addChannelTypes(
-        ...types: number[]
-    ): this {
+    /** Restricts accepted channel types. */
+    public addChannelTypes(...types: number[]): this {
         if (types.some((type) => !Number.isInteger(type) || type < 0))
             throw new RangeError(
                 "Channel types must be non-negative integers.",
@@ -404,51 +422,62 @@ export class CreateNumberOption extends CreateCommandOption {
         return this;
     }
 }
-/** Builds a nested subcommand. */ export class CreateSubcommand extends CreateCommandOption {
-    /** Creates a subcommand. */ public constructor() {
+/** Builds a nested subcommand. */
+export class CreateSubcommand extends CreateCommandOption {
+    /** Creates a subcommand. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.Subcommand);
     }
-    /** Adds a string option to this subcommand. */ public addStringOption(
+    /** Adds a string option to this subcommand. */
+    public addStringOption(
         configure: (option: CreateStringOption) => CreateStringOption,
     ): this {
         return this.addChildOption(configure(new CreateStringOption()));
     }
-    /** Adds an integer option to this subcommand. */ public addIntegerOption(
+    /** Adds an integer option to this subcommand. */
+    public addIntegerOption(
         configure: (option: CreateIntegerOption) => CreateIntegerOption,
     ): this {
         return this.addChildOption(configure(new CreateIntegerOption()));
     }
-    /** Adds a number option to this subcommand. */ public addNumberOption(
+    /** Adds a number option to this subcommand. */
+    public addNumberOption(
         configure: (option: CreateNumberOption) => CreateNumberOption,
     ): this {
         return this.addChildOption(configure(new CreateNumberOption()));
     }
-    /** Adds a boolean option to this subcommand. */ public addBooleanOption(
+    /** Adds a boolean option to this subcommand. */
+    public addBooleanOption(
         configure: (option: CreateBooleanOption) => CreateBooleanOption,
     ): this {
         return this.addChildOption(configure(new CreateBooleanOption()));
     }
-    /** Adds a user option to this subcommand. */ public addUserOption(
+    /** Adds a user option to this subcommand. */
+    public addUserOption(
         configure: (option: CreateUserOption) => CreateUserOption,
     ): this {
         return this.addChildOption(configure(new CreateUserOption()));
     }
-    /** Adds a channel option to this subcommand. */ public addChannelOption(
+    /** Adds a channel option to this subcommand. */
+    public addChannelOption(
         configure: (option: CreateChannelOption) => CreateChannelOption,
     ): this {
         return this.addChildOption(configure(new CreateChannelOption()));
     }
-    /** Adds a role option to this subcommand. */ public addRoleOption(
+    /** Adds a role option to this subcommand. */
+    public addRoleOption(
         configure: (option: CreateRoleOption) => CreateRoleOption,
     ): this {
         return this.addChildOption(configure(new CreateRoleOption()));
     }
-    /** Adds a mentionable option to this subcommand. */ public addMentionableOption(
+    /** Adds a mentionable option to this subcommand. */
+    public addMentionableOption(
         configure: (option: CreateMentionableOption) => CreateMentionableOption,
     ): this {
         return this.addChildOption(configure(new CreateMentionableOption()));
     }
-    /** Adds an attachment option to this subcommand. */ public addAttachmentOption(
+    /** Adds an attachment option to this subcommand. */
+    public addAttachmentOption(
         configure: (option: CreateAttachmentOption) => CreateAttachmentOption,
     ): this {
         return this.addChildOption(configure(new CreateAttachmentOption()));
@@ -494,11 +523,14 @@ export class CreateNumberOption extends CreateCommandOption {
         return this;
     }
 }
-/** Builds a nested subcommand group. */ export class CreateSubcommandGroup extends CreateCommandOption {
-    /** Creates a subcommand group. */ public constructor() {
+/** Builds a nested subcommand group. */
+export class CreateSubcommandGroup extends CreateCommandOption {
+    /** Creates a subcommand group. */
+    public constructor() {
         super(ApplicationCommandOptionEnum.SubcommandGroup);
     }
-    /** Adds a subcommand to this group. */ public addSubcommand(
+    /** Adds a subcommand to this group. */
+    public addSubcommand(
         configure: (option: CreateSubcommand) => CreateSubcommand,
     ): this {
         const options = (this.data.options as unknown[] | undefined) ?? [];

@@ -33,7 +33,9 @@ describe("Testing Utilities", () => {
             "/test/path": { data: "success" },
         });
 
-        const res = await rest.request<any>("GET", "/test/path", { query: 1 });
+        const res = await rest.request<{ data: string }>("GET", "/test/path", {
+            query: 1,
+        });
         expect(res).toEqual({ data: "success" });
         expect(rest.requests).toHaveLength(1);
         expect(rest.requests[0]).toEqual({

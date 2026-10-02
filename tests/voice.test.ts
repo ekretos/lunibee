@@ -4,6 +4,7 @@ import {
     VoiceConnectionState,
     VoiceError,
     SpeakingFlags,
+    type VoiceGatewayPayload,
     type VoiceGatewayTransport,
     type VoiceUdpTransport,
 } from "../packages/voice/src/index.ts";
@@ -59,7 +60,7 @@ describe("Voice", () => {
     test("VoiceConnection attachTransports and setSpeaking", () => {
         const conn = new VoiceConnection("123");
 
-        let sentPayload: any;
+        let sentPayload: VoiceGatewayPayload | undefined;
         let closedGateway = false;
         let closedUdp = false;
 
@@ -124,7 +125,7 @@ describe("Voice", () => {
         const stream = conn.receiver.subscribe("user1");
 
         const reader = stream.stream.getReader();
-        let readResult: any;
+        let readResult: Awaited<ReturnType<typeof reader.read>> | undefined;
         reader.read().then((res) => {
             readResult = res;
         });
@@ -142,8 +143,8 @@ describe("Voice", () => {
             setTimeout(() => {
                 expect(readResult).toBeDefined();
                 // The RTP header is stripped; only the audio payload is delivered.
-                expect(readResult.value).toEqual(payload);
-                expect(readResult.done).toBe(false);
+                expect(readResult?.value).toEqual(payload);
+                expect(readResult?.done).toBe(false);
                 resolve();
             }, 10);
         });

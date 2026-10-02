@@ -38,9 +38,7 @@ describe("Collection Full Coverage", () => {
         const swept = col.sweep((item) => item.num === 1);
         expect(swept).toBe(1);
         expect(col.size).toBe(2);
-
-        // Negative/Empty path coverage
-        const emptyCol = new Collection<string, any>();
+        const emptyCol = new Collection<string, number>();
         expect(emptyCol.first()).toBeUndefined();
         expect(emptyCol.firstKey()).toBeUndefined();
         expect(emptyCol.last()).toBeUndefined();

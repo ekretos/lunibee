@@ -5,6 +5,10 @@ import { GuildMemberManager } from "../packages/managers/src/member.ts";
 import { GuildManager } from "../packages/managers/src/guild.ts";
 import { UserManager } from "../packages/managers/src/user.ts";
 import { REST } from "@lunibee/rest";
+import { fakeFetch } from "./helpers/fetch.ts";
+
+/** JSON body a stubbed REST call receives. */
+type Body = Record<string, string>;
 
 describe("Managers Coverage", () => {
     test("Manager basic collection methods", () => {
@@ -67,7 +71,7 @@ describe("Managers Coverage", () => {
         const original = globalThis.fetch;
         const rest = new REST({ token: "test" });
 
-        (globalThis as any).fetch = async (url: string, opts: any) => {
+        globalThis.fetch = fakeFetch(async (url: string, opts: RequestInit) => {
             if (
                 url.includes("/roles/123456789012345682") &&
                 opts.method === "PATCH"
@@ -130,7 +134,7 @@ describe("Managers Coverage", () => {
                 );
             }
             return new Response(null, { status: 204 });
-        };
+        });
 
         try {
             const roleMgr = new RoleManager("123456789012345678", rest);
@@ -180,9 +184,9 @@ describe("Managers Coverage", () => {
         const rest = new REST({ token: "test" });
         const guildMgr = new GuildManager(rest);
         let lastUrl = "";
-        let lastOpts: any;
+        let lastOpts: Body | undefined;
 
-        (rest as any).get = async (url: string) => {
+        rest.get = (async (url: string) => {
             lastUrl = url;
             if (url === "/guilds/111111111111111111")
                 return { id: "111111111111111111", name: "Guild 1" };
@@ -202,7 +206,7 @@ describe("Managers Coverage", () => {
                     exempt_channels: [],
                 };
             return [];
-        };
+        }) as typeof rest.get;
         const autoModRule = (id: string, name: string) => ({
             id,
             guild_id: "111111111111111111",
@@ -216,23 +220,23 @@ describe("Managers Coverage", () => {
             exempt_roles: [],
             exempt_channels: [],
         });
-        (rest as any).post = async (url: string, opts: any) => {
+        rest.post = (async (url: string, opts: Body) => {
             lastUrl = url;
             lastOpts = opts;
             if (/\/auto-moderation\/rules$/.test(url))
                 return autoModRule("123456789012345679", opts.name);
             return { id: "222222222222222222", name: opts.name };
-        };
-        (rest as any).patch = async (url: string, opts: any) => {
+        }) as typeof rest.post;
+        rest.patch = (async (url: string, opts: Body) => {
             lastUrl = url;
             lastOpts = opts;
             if (/\/auto-moderation\/rules\/\d+$/.test(url))
                 return autoModRule("123456789012345679", opts.name);
             return { id: "111111111111111111", name: opts.name };
-        };
-        (rest as any).delete = async (url: string) => {
+        }) as typeof rest.patch;
+        rest.delete = (async (url: string) => {
             lastUrl = url;
-        };
+        }) as typeof rest.delete;
 
         const created = await guildMgr.create({ name: "New Guild" });
         expect(created.id).toBe("222222222222222222");
@@ -243,7 +247,7 @@ describe("Managers Coverage", () => {
         });
         expect(edited.id).toBe("111111111111111111");
         expect(lastUrl).toBe("/guilds/111111111111111111");
-        expect(lastOpts.name).toBe("Edited Guild");
+        expect(lastOpts?.name).toBe("Edited Guild");
 
         await guildMgr.remove("111111111111111111");
         expect(lastUrl).toBe("/guilds/111111111111111111");
@@ -279,7 +283,7 @@ describe("Managers Coverage", () => {
         expect(lastUrl).toBe(
             "/guilds/111111111111111111/auto-moderation/rules",
         );
-        expect(lastOpts.name).toBe("rule");
+        expect(lastOpts?.name).toBe("rule");
 
         await guildMgr.editAutoModerationRule(
             "111111111111111111",
@@ -289,7 +293,7 @@ describe("Managers Coverage", () => {
         expect(lastUrl).toBe(
             "/guilds/111111111111111111/auto-moderation/rules/123456789012345679",
         );
-        expect(lastOpts.name).toBe("rule2");
+        expect(lastOpts?.name).toBe("rule2");
 
         await guildMgr.deleteAutoModerationRule(
             "111111111111111111",
@@ -308,29 +312,29 @@ describe("Managers Coverage", () => {
         const rest = new REST({ token: "test" });
         const userMgr = new UserManager(rest);
         let lastUrl = "";
-        let lastOpts: any;
+        let lastOpts: Body | undefined;
 
-        (rest as any).get = async (url: string) => {
+        rest.get = (async (url: string) => {
             lastUrl = url;
             if (url === "/users/@me")
                 return { id: "123456789012345679", username: "bot" };
             if (url === "/users/111111111111111111")
                 return { id: "111111111111111111", username: "user1" };
             return {};
-        };
-        (rest as any).post = async (url: string, opts: any) => {
+        }) as typeof rest.get;
+        rest.post = (async (url: string, opts: Body) => {
             lastUrl = url;
             lastOpts = opts;
             return { id: "ch1" };
-        };
-        (rest as any).patch = async (url: string, opts: any) => {
+        }) as typeof rest.post;
+        rest.patch = (async (url: string, opts: Body) => {
             lastUrl = url;
             lastOpts = opts;
             return { id: "123456789012345679", username: opts.username };
-        };
-        (rest as any).delete = async (url: string) => {
+        }) as typeof rest.patch;
+        rest.delete = (async (url: string) => {
             lastUrl = url;
-        };
+        }) as typeof rest.delete;
 
         const me = await userMgr.fetchMe();
         expect(me.id).toBe("123456789012345679");
@@ -339,7 +343,7 @@ describe("Managers Coverage", () => {
         const edited = await userMgr.editMe({ username: "newbot" });
         expect(edited.username).toBe("newbot");
         expect(lastUrl).toBe("/users/@me");
-        expect(lastOpts.username).toBe("newbot");
+        expect(lastOpts?.username).toBe("newbot");
 
         await userMgr.leaveGuild("777777777777777777");
         expect(lastUrl).toBe("/users/@me/guilds/777777777777777777");
@@ -347,7 +351,7 @@ describe("Managers Coverage", () => {
         const dm = await userMgr.createDM("111111111111111111");
         expect(dm.id).toBe("ch1");
         expect(lastUrl).toBe("/users/@me/channels");
-        expect(lastOpts.recipient_id).toBe("111111111111111111");
+        expect(lastOpts?.recipient_id).toBe("111111111111111111");
 
         const fetched = await userMgr.fetch("111111111111111111");
         expect(fetched.id).toBe("111111111111111111");
@@ -362,27 +366,27 @@ describe("Managers Coverage", () => {
         const emojiMgr = new EmojiManager(rest, "555555555555555555");
 
         let lastUrl = "";
-        let lastOpts: any;
+        let lastOpts: Body | undefined;
 
-        (rest as any).get = async (url: string) => {
+        rest.get = (async (url: string) => {
             lastUrl = url;
             if (url.includes("/emojis/"))
                 return { id: "123456789012345678", name: "test_emoji" };
             return [{ id: "123456789012345678", name: "test_emoji" }];
-        };
-        (rest as any).post = async (url: string, body: any) => {
+        }) as typeof rest.get;
+        rest.post = (async (url: string, body: Body) => {
             lastUrl = url;
             lastOpts = body;
             return { id: "123456789012345679", name: body.name };
-        };
-        (rest as any).patch = async (url: string, body: any) => {
+        }) as typeof rest.post;
+        rest.patch = (async (url: string, body: Body) => {
             lastUrl = url;
             lastOpts = body;
             return { id: "123456789012345678", name: body.name };
-        };
-        (rest as any).delete = async (url: string) => {
+        }) as typeof rest.patch;
+        rest.delete = (async (url: string) => {
             lastUrl = url;
-        };
+        }) as typeof rest.delete;
 
         const fetched = await emojiMgr.fetch("123456789012345678");
         expect(fetched.id).toBe("123456789012345678");

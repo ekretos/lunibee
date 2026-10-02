@@ -5,6 +5,7 @@ import {
     DiscordAPIError,
     type RESTFileAttachment,
 } from "../packages/rest/src/index.ts";
+import { fakeFetch } from "./helpers/fetch.ts";
 
 /** Captured shape of a single intercepted `fetch` call. */
 interface CapturedRequest {
@@ -31,7 +32,7 @@ function captureFetch(
         }),
 ): CapturedRequest[] {
     const calls: CapturedRequest[] = [];
-    (globalThis as any).fetch = async (url: string, init: RequestInit) => {
+    globalThis.fetch = fakeFetch(async (url: string, init: RequestInit) => {
         const headers = Object.fromEntries(new Headers(init.headers).entries());
         calls.push({
             url: String(url),
@@ -40,7 +41,7 @@ function captureFetch(
             body: init.body,
         });
         return response();
-    };
+    });
     return calls;
 }
 
@@ -177,22 +178,24 @@ describe("REST — multipart via options.files", () => {
 describe("REST — rate-limit bookkeeping", () => {
     test("onRateLimit hook fires with the global flag on a global 429", async () => {
         let seenGlobal: boolean | undefined;
-        (globalThis as any).fetch = async () =>
-            new Response(
-                JSON.stringify({
-                    message: "Too Many Requests",
-                    retry_after: 0.01,
-                    global: true,
-                }),
-                {
-                    status: 429,
-                    headers: {
-                        "content-type": "application/json",
-                        "x-ratelimit-global": "true",
-                        "retry-after": "0.01",
+        globalThis.fetch = fakeFetch(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        message: "Too Many Requests",
+                        retry_after: 0.01,
+                        global: true,
+                    }),
+                    {
+                        status: 429,
+                        headers: {
+                            "content-type": "application/json",
+                            "x-ratelimit-global": "true",
+                            "retry-after": "0.01",
+                        },
                     },
-                },
-            );
+                ),
+        );
         const rest = new REST({
             token: "t",
             retries: 0,
