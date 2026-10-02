@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { REST, RESTError } from "../packages/rest/src/index.ts";
 
 test("REST returns JSON responses", async () => {

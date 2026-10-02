@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { AuditLog, AuditLogEntry } from "../packages/structures/src/index.js";
+import { AuditLog } from "../packages/structures/src/index.js";
 import type {
     APIAuditLog,
     APIAuditLogEntry,

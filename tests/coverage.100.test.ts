@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFile, writeFile, unlink } from "node:fs/promises";
+import { writeFile, unlink } from "node:fs/promises";
 import {
     CreateAttachment,
     CreateSlashCommand,
@@ -19,7 +19,7 @@ import {
     CreateTextInput,
     CreateEmbed,
 } from "../packages/builders/src/index.ts";
-import { Cache, Collection } from "../packages/collection/src/index.ts";
+import { Cache } from "../packages/collection/src/index.ts";
 import { Client } from "../packages/core/src/index.ts";
 import { HandlerRegistry } from "../packages/handlers/src/index.ts";
 import {
@@ -31,7 +31,7 @@ import {
     GuildMemberManager,
     ThreadManager,
 } from "../packages/managers/src/index.ts";
-import { REST, RESTError, Routes } from "../packages/rest/src/index.ts";
+import { REST } from "../packages/rest/src/index.ts";
 import { ShardManager } from "../packages/sharding/src/index.ts";
 import { ShardBus } from "../packages/sharding/src/bus.ts";
 import {
