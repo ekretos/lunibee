@@ -97,6 +97,30 @@ export interface CollectionStats {
 
 type Expiry = { deadline: number; window: number; filed: number };
 
+/**
+ * Everything a retention policy needs. A Collection without `ttl` or
+ * `maxSize` never creates one, so plain collections cost no more than a Map.
+ */
+type Policy<K> = {
+    /** Deadlines of TTL entries only. */
+    expiry: Map<K, Expiry>;
+    /** `set()` keys in recency order (oldest first); `setWithoutTTL()` keys are never here. */
+    lru: RecencyList<K>;
+    /** Min-heap of filed deadlines; stale records are dropped lazily. */
+    heap: { key: K; deadline: number }[];
+    timer?: ReturnType<typeof setTimeout>;
+    armedFor: number;
+};
+
+function newPolicy<K>(): Policy<K> {
+    return {
+        expiry: new Map(),
+        lru: new RecencyList<K>(),
+        heap: [],
+        armedFor: Infinity,
+    };
+}
+
 function assertTTL(ttl: number | undefined): void {
     if (ttl !== undefined && (!Number.isFinite(ttl) || ttl <= 0))
         throw new RangeError("TTL must be a positive number, or omitted.");
@@ -123,20 +147,12 @@ export class Collection<K, V> extends Map<K, V> {
         value: unknown,
         reason: EvictionReason,
     ) => void;
-    /** Deadlines of TTL entries only. */
-    readonly #expiry = new Map<K, Expiry>();
-    /** `set()` keys in recency order (oldest first), tracked only when `maxSize` is set; `setWithoutTTL()` keys are never here. */
-    readonly #lru = new RecencyList<K>();
-    readonly #stats: CollectionStats = {
-        hits: 0,
-        misses: 0,
-        expired: 0,
-        evicted: 0,
-    };
-    /** Min-heap of filed deadlines; stale records are dropped lazily. */
-    readonly #heap: { key: K; deadline: number }[] = [];
-    #timer?: ReturnType<typeof setTimeout>;
-    #armedFor = Infinity;
+    /** Created with `ttl` or `maxSize`, or by the first `set()` with its own TTL. */
+    #policy?: Policy<K>;
+    #hits = 0;
+    #misses = 0;
+    #expired = 0;
+    #evicted = 0;
 
     /**
      * @param entries Initial entries, stored with `set()`.
@@ -156,6 +172,8 @@ export class Collection<K, V> extends Map<K, V> {
             throw new RangeError("maxSize must be a positive integer.");
         this.#ttl = options.ttl;
         this.#maxSize = options.maxSize;
+        if (options.ttl !== undefined || options.maxSize !== undefined)
+            this.#policy = newPolicy();
         this.#onEvict = options.onEvict as
             | ((key: unknown, value: unknown, reason: EvictionReason) => void)
             | undefined;
@@ -170,12 +188,12 @@ export class Collection<K, V> extends Map<K, V> {
     public override set(key: K, value: V, ttl?: number): this {
         assertTTL(ttl);
         const window = ttl ?? this.#ttl;
-        if (this.#maxSize !== undefined) {
-            this.#lru.touch(key);
-        }
+        if (window !== undefined) this.#policy ??= newPolicy();
+        const policy = this.#policy;
+        if (this.#maxSize !== undefined) policy!.lru.touch(key);
         super.set(key, value);
         if (window !== undefined) this.#schedule(key, window);
-        else if (this.#expiry.size > 0) this.#expiry.delete(key);
+        else if (policy && policy.expiry.size > 0) policy.expiry.delete(key);
         this.#enforceCap();
         return this;
     }
@@ -186,8 +204,11 @@ export class Collection<K, V> extends Map<K, V> {
      * later `set()`.
      */
     public setWithoutTTL(key: K, value: V): this {
-        if (this.#expiry.size > 0) this.#expiry.delete(key);
-        if (this.#lru.size > 0) this.#lru.delete(key);
+        const policy = this.#policy;
+        if (policy) {
+            if (policy.expiry.size > 0) policy.expiry.delete(key);
+            if (policy.lru.size > 0) policy.lru.delete(key);
+        }
         super.set(key, value);
         return this;
     }
@@ -195,34 +216,42 @@ export class Collection<K, V> extends Map<K, V> {
     /** Reads a value; restarts a TTL entry's window and promotes it. */
     public override get(key: K): V | undefined {
         if (this.#expireIfDue(key)) {
-            this.#stats.misses++;
+            this.#misses++;
             return undefined;
         }
         const value = super.get(key);
         if (value === undefined && !super.has(key)) {
-            this.#stats.misses++;
+            this.#misses++;
             return undefined;
         }
-        this.#stats.hits++;
-        const expiry = this.#expiry.get(key);
-        if (expiry) expiry.deadline = Date.now() + expiry.window;
-        this.#lru.promote(key);
+        this.#hits++;
+        const policy = this.#policy;
+        if (policy) {
+            const expiry = policy.expiry.get(key);
+            if (expiry) expiry.deadline = Date.now() + expiry.window;
+            policy.lru.promote(key);
+        }
         return value;
     }
 
     /** Reads a value without restarting its TTL or promoting it. */
     public peek(key: K): V | undefined {
         if (!this.#expireIfDue(key) && super.has(key)) {
-            this.#stats.hits++;
+            this.#hits++;
             return super.get(key);
         }
-        this.#stats.misses++;
+        this.#misses++;
         return undefined;
     }
 
     /** Cumulative hit, miss, expiry and eviction counters (a copy). */
     public get stats(): CollectionStats {
-        return { ...this.#stats };
+        return {
+            hits: this.#hits,
+            misses: this.#misses,
+            expired: this.#expired,
+            evicted: this.#evicted,
+        };
     }
 
     public override has(key: K): boolean {
@@ -231,19 +260,24 @@ export class Collection<K, V> extends Map<K, V> {
 
     public override delete(key: K): boolean {
         if (this.#expireIfDue(key)) return false;
-        this.#expiry.delete(key);
-        this.#lru.delete(key);
+        const policy = this.#policy;
+        if (policy) {
+            policy.expiry.delete(key);
+            policy.lru.delete(key);
+        }
         return super.delete(key);
     }
 
     public override clear(): void {
         super.clear();
-        this.#expiry.clear();
-        this.#lru.clear();
-        this.#heap.length = 0;
-        if (this.#timer) clearTimeout(this.#timer);
-        this.#timer = undefined;
-        this.#armedFor = Infinity;
+        const policy = this.#policy;
+        if (!policy) return;
+        policy.expiry.clear();
+        policy.lru.clear();
+        policy.heap.length = 0;
+        if (policy.timer) clearTimeout(policy.timer);
+        policy.timer = undefined;
+        policy.armedFor = Infinity;
     }
 
     public override get size(): number {
@@ -281,13 +315,13 @@ export class Collection<K, V> extends Map<K, V> {
     /** Milliseconds until a key lapses, or undefined if absent or never expiring. */
     public ttlRemaining(key: K): number | undefined {
         if (this.#expireIfDue(key)) return undefined;
-        const expiry = this.#expiry.get(key);
+        const expiry = this.#policy?.expiry.get(key);
         return expiry && Math.max(0, expiry.deadline - Date.now());
     }
 
     /** Drops every lapsed TTL entry now. @returns How many were dropped. */
     public purge(): number {
-        if (this.#expiry.size === 0) return 0;
+        if (!this.#policy || this.#policy.expiry.size === 0) return 0;
         const now = Date.now();
         let removed = 0;
         const dropped: [K, V][] = [];
@@ -297,25 +331,25 @@ export class Collection<K, V> extends Map<K, V> {
             this.#remove(due.key);
             removed++;
         }
-        this.#stats.expired += removed;
+        this.#expired += removed;
         this.#rearm();
         for (const [key, value] of dropped) this.#notify(key, value, "expired");
         return removed;
     }
 
     #expireIfDue(key: K): boolean {
-        const expiry = this.#expiry.get(key);
+        const expiry = this.#policy?.expiry.get(key);
         if (!expiry || expiry.deadline > Date.now()) return false;
         const value = super.get(key)!;
         this.#remove(key);
-        this.#stats.expired++;
+        this.#expired++;
         this.#notify(key, value, "expired");
         return true;
     }
 
     #remove(key: K): void {
-        this.#expiry.delete(key);
-        this.#lru.delete(key);
+        this.#policy?.expiry.delete(key);
+        this.#policy?.lru.delete(key);
         super.delete(key);
     }
 
@@ -331,11 +365,12 @@ export class Collection<K, V> extends Map<K, V> {
     /** Evicts least-recently-used `set()` entries past `maxSize`; O(1) per eviction. */
     #enforceCap(): void {
         if (this.#maxSize === undefined) return;
-        while (this.#lru.size > this.#maxSize) {
-            const oldest = this.#lru.oldest()!;
+        const lru = this.#policy!.lru;
+        while (lru.size > this.#maxSize) {
+            const oldest = lru.oldest()!;
             const value = super.get(oldest)!;
             this.#remove(oldest);
-            this.#stats.evicted++;
+            this.#evicted++;
             this.#notify(oldest, value, "evicted");
         }
     }
@@ -346,24 +381,26 @@ export class Collection<K, V> extends Map<K, V> {
      * moves earlier (or a new one) is pushed.
      */
     #schedule(key: K, window: number): void {
+        const p = this.#policy!;
         const deadline = Date.now() + window;
-        const expiry = this.#expiry.get(key);
+        const expiry = p.expiry.get(key);
         if (expiry) {
             expiry.deadline = deadline;
             expiry.window = window;
             if (deadline >= expiry.filed) return;
             expiry.filed = deadline;
-        } else this.#expiry.set(key, { deadline, window, filed: deadline });
+        } else p.expiry.set(key, { deadline, window, filed: deadline });
         this.#heapPush({ key, deadline });
-        if (this.#heap.length > 2 * this.#expiry.size + 8) this.#compact();
+        if (p.heap.length > 2 * p.expiry.size + 8) this.#compact();
         this.#rearm();
     }
 
     #nextDeadline(): number {
+        const p = this.#policy!;
         for (;;) {
-            const top = this.#heap[0];
+            const top = p.heap[0];
             if (top === undefined) return Infinity;
-            const expiry = this.#expiry.get(top.key);
+            const expiry = p.expiry.get(top.key);
             if (!expiry || expiry.filed !== top.deadline) {
                 this.#heapPop();
                 continue;
@@ -377,34 +414,37 @@ export class Collection<K, V> extends Map<K, V> {
     }
 
     #compact(): void {
-        const live = this.#heap.filter(
-            (record) => this.#expiry.get(record.key)?.filed === record.deadline,
+        const p = this.#policy!;
+        const live = p.heap.filter(
+            (record) => p.expiry.get(record.key)?.filed === record.deadline,
         );
-        this.#heap.length = 0;
+        p.heap.length = 0;
         for (const record of live) this.#heapPush(record);
     }
 
     #rearm(): void {
+        const p = this.#policy!;
         const deadline = this.#nextDeadline();
-        if (this.#timer !== undefined && deadline >= this.#armedFor) return;
-        if (this.#timer) clearTimeout(this.#timer);
-        this.#timer = undefined;
-        this.#armedFor = deadline;
+        if (p.timer !== undefined && deadline >= p.armedFor) return;
+        if (p.timer) clearTimeout(p.timer);
+        p.timer = undefined;
+        p.armedFor = deadline;
         if (deadline === Infinity) return;
-        this.#timer = setTimeout(
+        p.timer = setTimeout(
             () => {
-                this.#timer = undefined;
-                this.#armedFor = Infinity;
+                p.timer = undefined;
+                p.armedFor = Infinity;
                 this.purge();
             },
             Math.max(0, deadline - Date.now()),
         );
         // Pending expiry is housekeeping, not a reason to keep the process alive.
-        (this.#timer as { unref?: () => void }).unref?.();
+        (p.timer as { unref?: () => void }).unref?.();
     }
 
     #heapPush(record: { key: K; deadline: number }): void {
-        const heap = this.#heap;
+        const p = this.#policy!;
+        const heap = p.heap;
         heap.push(record);
         let i = heap.length - 1;
         while (i > 0) {
@@ -416,7 +456,8 @@ export class Collection<K, V> extends Map<K, V> {
     }
 
     #heapPop(): { key: K; deadline: number } | undefined {
-        const heap = this.#heap;
+        const p = this.#policy!;
+        const heap = p.heap;
         const top = heap[0];
         const last = heap.pop();
         if (top === undefined || heap.length === 0) return top;

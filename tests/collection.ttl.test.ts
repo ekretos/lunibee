@@ -7,6 +7,35 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 afterEach(() => setSystemTime());
 
 describe("Collection TTL", () => {
+    test("a plain collection starts using TTL when set() gets its own", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<string, number>();
+        c.set("plain", 1);
+        expect(c.ttlRemaining("plain")).toBeUndefined();
+        c.set("timed", 2, 100);
+        c.setWithoutTTL("kept", 3);
+        expect(c.ttlRemaining("timed")).toBe(100);
+        setSystemTime(new Date(1_000_150));
+        expect([...c.keys()]).toEqual(["plain", "kept"]);
+        expect(c.stats.expired).toBe(1);
+        c.clear();
+        expect(c.size).toBe(0);
+        c.set("again", 4, 50);
+        expect(c.ttlRemaining("again")).toBe(50);
+    });
+
+    test("plain collections track hits and misses without a policy", () => {
+        const c = new Collection<string, number>();
+        c.set("a", 1);
+        c.get("a");
+        c.peek("a");
+        c.get("b");
+        expect(c.stats).toEqual({ hits: 2, misses: 1, expired: 0, evicted: 0 });
+        expect(c.purge()).toBe(0);
+        expect(c.delete("a")).toBe(true);
+        expect(c.ttlRemaining("a")).toBeUndefined();
+    });
+
     test("validates options and TTL arguments", () => {
         expect(() => new Collection(null, { ttl: 0 })).toThrow(RangeError);
         expect(() => new Collection(null, { maxSize: 1.5 })).toThrow(
