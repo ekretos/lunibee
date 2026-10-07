@@ -27,4 +27,6 @@ bun benchmarks/cache-memory.ts     # heap kept per guild for small, medium and l
 bun run bench:compare              # runtime benchmark vs the committed baseline (build first)
 ```
 
+The [Benchmarks](https://lunibee.js.org/benchmarks/) pages of the docs are generated from all of these with `bun run build && bun scripts/bench-docs.ts`.
+
 Network and Gateway load tests should use controlled fakes or dedicated integration environments rather than making CI depend on Discord availability.

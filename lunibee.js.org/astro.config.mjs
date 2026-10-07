@@ -88,8 +88,19 @@ export default defineConfig({
             { label: "Interactions & Commands", link: "/core-concepts/interactions" },
             { label: "Component & Embed Builders", link: "/core-concepts/builders" },
             { label: "Sharding", link: "/core-concepts/sharding" },
-            { label: "Benchmarks", link: "/core-concepts/benchmarks" },
             { label: "Voice", link: "/core-concepts/voice" },
+          ],
+        },
+        {
+          label: "Benchmarks",
+          items: [
+            { label: "Overview", link: "/benchmarks" },
+            { label: "Collection", link: "/benchmarks/collection" },
+            { label: "Builders", link: "/benchmarks/builders" },
+            { label: "Formatters", link: "/benchmarks/formatters" },
+            { label: "Gateway events", link: "/benchmarks/gateway-events" },
+            { label: "REST", link: "/benchmarks/rest" },
+            { label: "Cache memory", link: "/benchmarks/cache-memory" },
           ],
         },
         {
