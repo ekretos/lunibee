@@ -121,6 +121,7 @@ export default defineConfig({
                 { label: "ClientEvent", link: "/reference/client-event" },
                 { label: "Collector", link: "/reference/collector" },
                 { label: "Handles", link: "/reference/handles" },
+                { label: "Commands", link: "/reference/commands" },
                 { label: "PermissionSet", link: "/reference/permission-set" },
               ],
             },

@@ -1,0 +1,92 @@
+---
+title: Commands
+description: Define a command once with typed options; run it as a slash command, a prefix command, or both.
+---
+
+`command()` takes one object: the name, the options, and the function that runs. The same definition is registered with Discord as a slash command, answers `!name args` as a prefix command, or does both.
+
+```ts
+import { Client, command, option } from "lunibee";
+
+const timeout = command({
+  name: "timeout",
+  description: "Time a member out",
+  permissions: ["ModerateMembers"],
+  options: {
+    user: option.user({ required: true, description: "Who" }),
+    minutes: option.integer({ min: 1, max: 40_320, default: 10 }),
+    reason: option.string({ max: 500 }),
+  },
+  prefix: true,
+  async run({ bot, options, guildId, reply }) {
+    // options.user: string · options.minutes: number · options.reason: string | undefined
+    await bot.member(guildId!, options.user).timeout(`${options.minutes}m`, options.reason);
+    await reply(`Timed out <@${options.user}>.`);
+  },
+});
+
+const bot = new Client({ token, intents });
+bot.commands.add(timeout).listen({ prefix: "!" });
+bot.once("ready", () => bot.commands.deploy());
+```
+
+## The definition
+
+| Field | |
+|---|---|
+| `name` | 1-32 lowercase letters, digits, `-` or `_`. |
+| `description` | 1-100 characters. |
+| `options` | An object; each key is an option's name and the value is an `option.*()` call. |
+| `permissions` | Permission names the person needs, such as `["ModerateMembers"]`. Discord enforces it for slash commands; Lunibee checks it for prefix commands. Implies `guildOnly`. |
+| `guildOnly` | Only allow it in servers. |
+| `nsfw` | Mark the slash command NSFW. |
+| `prefix` | `true` to also answer `!name`; `{ aliases: ["mute"] }` adds other names. |
+| `slash` | `true` by default; `false` makes a prefix-only command. |
+| `run(context)` | Runs the command. |
+
+`command()` throws straight away for a bad name or description, an option Discord would refuse, a command that is neither slash nor prefix, or a required option that follows an optional one (prefix arguments are positional, so required ones come first).
+
+## Options
+
+| Call | The handler gets | Settings besides `description` and `required` |
+|---|---|---|
+| `option.string()` | `string` | `default`, `min`, `max` (length), `choices` |
+| `option.integer()`, `option.number()` | `number` | `default`, `min`, `max`, `choices` |
+| `option.boolean()` | `boolean` | `default` |
+| `option.user()`, `option.role()` | the id (`string`) | |
+| `option.channel()` | the id (`string`) | `kinds`: only these [channel kinds](/reference/channel/#kinds-030) |
+| `option.mentionable()` | `{ id, type: "user" \| "role" }` | |
+| `option.attachment()` | the attachment | |
+| `option.choice(["a", "b"] as const)` | `"a" \| "b"` | `default` |
+
+An option is always present when it has `required: true` or a `default`; otherwise the handler gets `undefined` when it was left out. `choices` are plain values or `{ name, value }` pairs. The description defaults to the option's name.
+
+## The context
+
+| | |
+|---|---|
+| `bot` | The client. |
+| `options` | The options, typed from the definition. |
+| `source` | `"slash"` or `"prefix"`. |
+| `userId`, `member` | Who ran it, and as a guild member when in a guild. |
+| `guildId`, `channelId` | Where. |
+| `interaction`, `message` | The slash interaction, or the prefix message. |
+| `reply(content)` | Text or a full payload. A slash command gets an interaction reply (an edit after `defer()`, follow-ups after that); a prefix command gets a message reply. `ephemeral` only means something for slash commands. |
+| `defer({ ephemeral? })` | Slash commands: say the answer will take a while. A no-op for prefix commands. |
+
+## Prefix commands
+
+The same options are read from the message text: `!timeout @ann 5 being loud`. A user, role or channel can be a mention or an id; the last text option takes the rest of the message. A missing or invalid argument replies with the problem and the usage line, for example `` `minutes` must be at most 60. Usage: `!timeout <user> [minutes] [reason]` ``. An attachment option takes the message's attachments in order.
+
+Prefix commands need the `MessageContent` intent and `GuildMessages` or `DirectMessages`. `listen({ prefix })` prints a `LunibeeWarning` (code `LUNIBEE_MESSAGE_CONTENT_INTENT`) at startup when they are missing, since Discord then sends empty message content and nothing would match.
+
+## `bot.commands`
+
+| Method | |
+|---|---|
+| `add(...commands)` | Adds commands; one with the same name replaces it. Throws if a name or alias is used by another command. |
+| `get(name)`, `list()` | Look commands up. `get` also finds aliases. |
+| `deploy({ guildId? })` | Registers the slash commands, replacing the ones registered before; with `guildId` for one guild (instant) instead of globally. Returns how many. Call it once the client is ready. |
+| `listen({ prefix? })` | Starts answering slash commands and, with `prefix` (text or a list), prefix commands. Call it once. |
+
+An error thrown by a handler goes to the client's `error` listeners, or prints as a warning when there are none, like any other listener error.

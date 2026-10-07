@@ -22,6 +22,23 @@ export {
 } from "./events.js";
 export { Collector, type CollectorOptions } from "./collector.js";
 export {
+    command,
+    option,
+    CommandRegistry,
+    type ChannelConfig,
+    type ChoiceConfig,
+    type BooleanConfig,
+    type Command,
+    type CommandContext,
+    type CommandDefinition,
+    type MentionableValue,
+    type NumberConfig,
+    type OptionDef,
+    type OptionMap,
+    type OptionValues,
+    type StringConfig,
+} from "./commands.js";
+export {
     channelCreatePayload,
     type CreateCategoryChannel,
     type CreateChannelOptions,
@@ -116,6 +133,7 @@ import type {
 import { ClientEvent, type ClientEvents } from "./events.js";
 import { Collector, type CollectorOptions } from "./collector.js";
 import { computePermissions, PermissionSet } from "./permissions.js";
+import { CommandRegistry } from "./commands.js";
 import {
     ChannelHandle,
     GuildHandle,
@@ -268,6 +286,8 @@ export class Client
     /** Stage instances, cached by stage channel ID. */
     public readonly stageInstances: StageInstanceManager;
     public readonly application: { commands: ApplicationCommandManager };
+    /** Slash and prefix commands made with `command()`: `add`, `deploy` and `listen`. */
+    public readonly commands: CommandRegistry = new CommandRegistry(this);
     /** SKUs, entitlements and subscriptions; available after READY (application ID known). */
     public monetization?: MonetizationManager;
     public get ws(): Gateway {

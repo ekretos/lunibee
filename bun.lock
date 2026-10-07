@@ -57,6 +57,7 @@
         "@lunibee/rest": "workspace:*",
         "@lunibee/structures": "workspace:*",
         "@lunibee/types": "workspace:*",
+        "@lunibee/utils": "workspace:*",
         "@lunibee/ws": "workspace:*",
       },
     },
