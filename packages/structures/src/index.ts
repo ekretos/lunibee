@@ -128,7 +128,7 @@ export class Message extends BaseStructure {
 
     /** Unix timestamp (ms) at which the message was created — discord.js parity.
      * Derived from the message `timestamp`, which itself falls back to the id snowflake. */
-    public get createdTimestamp(): number {
+    public override get createdTimestamp(): number {
         return this.timestamp.getTime();
     }
 
@@ -370,5 +370,14 @@ export {
 } from "./channels.js";
 export * from "./interactions.js";
 export { Embed } from "./embed.js";
-export { AuditLog, AuditLogEntry } from "./audit-log.js";
+export {
+    AuditLog,
+    AuditLogEntry,
+    type AuditLogAutoModInfo,
+    type AuditLogInfo,
+    type AuditLogInfoByType,
+    type AuditLogOverwriteInfo,
+    type AuditLogQuery,
+} from "./audit-log.js";
+export { Sticker, stickerURL } from "./sticker.js";
 export { PermissionsBitField } from "@lunibee/core";

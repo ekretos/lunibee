@@ -8,12 +8,14 @@ import {
     GuildScheduledEventManager,
 } from "./guild-resources.js";
 import {
+    AuditLog,
     Guild,
     AutoModerationRule,
     type ResourceContext,
 } from "@lunibee/structures";
 import { type REST, Routes } from "@lunibee/rest";
 import {
+    type APIAuditLog,
     type APIChannel,
     type APIGuildPreview,
     type APIInvite,
@@ -373,6 +375,23 @@ export class GuildManager extends ResourceManager<string, Guild> {
             );
         return this.#rest.get<AuditLogResponse>(
             withQuery(Routes.guildAuditLog(guildId), params),
+        );
+    }
+
+    /**
+     * Fetches the audit log as an {@link AuditLog}: typed `info` per action
+     * type, and `find()` / `filter()` by type, target, user and time.
+     * @example const kick = (await guilds.fetchAuditLogEntries(id, { actionType: AuditLogEvent.MemberKick })).find({ targetId: userId, since: Date.now() - 60_000 });
+     */
+    public async fetchAuditLogEntries(
+        guildId: string,
+        options: Parameters<GuildManager["fetchAuditLog"]>[1] = {},
+    ): Promise<AuditLog> {
+        return new AuditLog(
+            (await this.fetchAuditLog(
+                guildId,
+                options,
+            )) as unknown as APIAuditLog,
         );
     }
 

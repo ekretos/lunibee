@@ -21,9 +21,13 @@ export class BaseStructure {
     public toString(): string {
         return this.id;
     }
+    /** Milliseconds since the Unix epoch at which this snowflake was created. */
+    public get createdTimestamp(): number {
+        return Number((BigInt(this.id) >> 22n) + 1420070400000n);
+    }
     /** Returns the timestamp this snowflake was created at. */
     public get createdAt(): Date {
-        return new Date(Number((BigInt(this.id) >> 22n) + 1420070400000n));
+        return new Date(this.createdTimestamp);
     }
 }
 
@@ -433,6 +437,8 @@ export class Guild extends BaseStructure {
     public maxPresences: number | null;
     /** Maximum users in a video channel. */
     public maxVideoChannelUsers?: number;
+    /** Whether the boost progress bar shows. */
+    public premiumProgressBarEnabled: boolean;
 
     public constructor(data: import("@lunibee/types").APIGuild) {
         super(data.id);
@@ -471,6 +477,8 @@ export class Guild extends BaseStructure {
         this.safetyAlertsChannelId = data.safety_alerts_channel_id ?? null;
         this.maxPresences = data.max_presences ?? null;
         this.maxVideoChannelUsers = data.max_video_channel_users;
+        this.premiumProgressBarEnabled =
+            data.premium_progress_bar_enabled ?? false;
     }
 
     /** Returns the guild icon URL, or null if no icon is set. */

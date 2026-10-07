@@ -254,3 +254,22 @@ cdnURL(`/icons/${guild.id}`, oldIconHash, options); // animated `a_` hashes beco
 cdnURL(`/banners/${guild.id}`, bannerHash, { extension: "webp", forceStatic: true });
 CDN_BASE; // "https://cdn.discordapp.com"
 ```
+
+## Audit log, stickers and creation time (0.3.0)
+
+`createdAt` and `createdTimestamp` are on every snowflake structure (`Role`, `Channel`, `Guild`, ...); a `Message` uses its own `timestamp`. `guild.premiumProgressBarEnabled` is the boost progress bar flag.
+
+`guilds.fetchAuditLogEntries(guildId, options)` returns an `AuditLog` with typed, parsed `info` for the action types that carry details, and `find()` / `filter()`:
+
+```ts
+import { AuditLogEvent } from "lunibee";
+
+const log = await bot.guilds.fetchAuditLogEntries(guildId, { actionType: AuditLogEvent.MessageDelete, limit: 50 });
+const entry = log.find({ type: AuditLogEvent.MessageDelete, targetId: userId, since: Date.now() - 60_000 });
+if (entry?.is(AuditLogEvent.MessageDelete)) console.log(entry.info.channelId, entry.info.count); // typed: { channelId: string; count: number }
+const rename = entry?.change("nick");                                                            // { old, new }
+```
+
+`find` returns the newest match; `filter` returns all. `type` takes one action or an array, `since` a `Date`, ISO string or milliseconds. `entry.options` stays Discord's raw object; `entry.info` is the parsed one.
+
+`new Sticker(apiSticker)` wraps a raw sticker and adds `url({ size })` (PNG, APNG, GIF, or the Lottie `.json`), `animated` and `toItem()`; `stickerURL(id, formatType)` builds the URL from a message's `stickers` items.

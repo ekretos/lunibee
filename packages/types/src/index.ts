@@ -690,6 +690,7 @@ export interface APIGuild {
     preferred_locale?: string;
     public_updates_channel_id?: Snowflake | null;
     max_video_channel_users?: number;
+    premium_progress_bar_enabled?: boolean;
     approximate_member_count?: number;
     approximate_presence_count?: number;
     nsfw_level?: number;
