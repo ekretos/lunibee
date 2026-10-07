@@ -12,7 +12,7 @@ function random(seed: number): () => number {
     };
 }
 
-type Config = { ttl?: number; maxSize?: number };
+type Config = { ttl?: number; maxSize?: number; slide?: boolean };
 
 /** The documented behaviour of Collection, written for clarity instead of speed. */
 class Model {
@@ -74,9 +74,17 @@ class Model {
         if (this.#expireIfDue(key)) return undefined;
         if (!this.data.has(key)) return undefined;
         const timing = this.timing.get(key);
-        if (timing) timing.deadline = this.now + timing.window;
+        if (timing && this.config.slide !== false)
+            timing.deadline = this.now + timing.window;
         if (this.lru.includes(key)) this.#promote(key);
         return this.data.get(key);
+    }
+
+    ensure(key: number, value: number): number {
+        const existing = this.get(key);
+        if (existing !== undefined || this.data.has(key)) return existing!;
+        this.set(key, value);
+        return value;
     }
 
     peek(key: number): number | undefined {
@@ -106,6 +114,8 @@ const configs: Config[] = [
     { maxSize: 4 },
     { ttl: 50, maxSize: 4 },
     { maxSize: 1 },
+    { ttl: 50, maxSize: 4, slide: false },
+    { ttl: 50, slide: false },
 ];
 
 describe("Collection against a plain model", () => {
@@ -119,7 +129,7 @@ describe("Collection against a plain model", () => {
                 for (let step = 0; step < 300; step++) {
                     const key = Math.floor(next() * 7);
                     const value = Math.floor(next() * 1000);
-                    const op = Math.floor(next() * 10);
+                    const op = Math.floor(next() * 11);
                     const at = `seed ${seed} step ${step} op ${op} key ${key}`;
                     if (op < 3) {
                         const ttl =
@@ -137,6 +147,11 @@ describe("Collection against a plain model", () => {
                         expect(real.peek(key), at).toBe(model.peek(key));
                     } else if (op === 7) {
                         expect(real.has(key), at).toBe(model.has(key));
+                    } else if (op === 10) {
+                        expect(
+                            real.ensure(key, () => value),
+                            at,
+                        ).toBe(model.ensure(key, value));
                     } else if (op === 8) {
                         expect(real.delete(key), at).toBe(model.delete(key));
                     } else {

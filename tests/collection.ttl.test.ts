@@ -115,6 +115,63 @@ describe("Collection TTL", () => {
         expect([...c.keys()]).toEqual(["a"]);
     });
 
+    test("slide: false keeps the deadline fixed while reads still promote", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<string, number>(null, {
+            ttl: 100,
+            maxSize: 2,
+            slide: false,
+        });
+        c.set("a", 1);
+        c.set("b", 2);
+        setSystemTime(new Date(1_000_080));
+        expect(c.get("a")).toBe(1);
+        expect(c.ttlRemaining("a")).toBe(20);
+        c.set("c", 3);
+        expect([...c.keys()]).toEqual(["a", "c"]);
+        setSystemTime(new Date(1_000_120));
+        expect([...c.keys()]).toEqual(["c"]);
+    });
+
+    test("ensure() returns what is stored, or stores what the factory makes", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<string, number>(null, { ttl: 100 });
+        let calls = 0;
+        const make = () => {
+            calls++;
+            return 7;
+        };
+        expect(c.ensure("a", make)).toBe(7);
+        expect(c.ensure("a", make)).toBe(7);
+        expect(calls).toBe(1);
+        expect(c.get("a")).toBe(7);
+        c.set("zero", 0);
+        expect(c.ensure("zero", make)).toBe(0);
+        expect(calls).toBe(1);
+        expect(c.ensure("short", () => 1, 20)).toBe(1);
+        expect(c.ttlRemaining("short")).toBe(20);
+        setSystemTime(new Date(1_000_050));
+        expect(c.has("short")).toBe(false);
+        expect(c.ensure("short", () => 2)).toBe(2);
+    });
+
+    test("ensure() passes the key and collection, and stores nothing when the factory throws", () => {
+        const c = new Collection<string, number>();
+        expect(c.ensure("k", (key, col) => (col === c ? key.length : -1))).toBe(
+            1,
+        );
+        expect(() =>
+            c.ensure("boom", () => {
+                throw new Error("no");
+            }),
+        ).toThrow("no");
+        expect(c.has("boom")).toBe(false);
+        c.set("u", undefined as never);
+        let calls = 0;
+        c.ensure("u", () => ++calls);
+        expect(calls).toBe(0);
+    });
+
     test("plain collections track hits and misses without a policy", () => {
         const c = new Collection<string, number>();
         c.set("a", 1);

@@ -43,9 +43,9 @@ new Cache<K, V>(options?: CacheOptions)
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `maxSize` | `number` | `Infinity` | Maximum number of live entries. Evicts the oldest when exceeded. |
+| `maxSize` | `number` | `Infinity` | Maximum number of live entries. Evicts the least recently used when exceeded. |
 | `ttl` | `number` | `0` (disabled) | Entry lifetime in milliseconds. |
-| `sweepInterval` | `number` | `min(ttl, 60_000)` | How often the background sweeper runs. |
+| `sweepInterval` | `number` | `min(ttl, 60_000)` | Kept for compatibility; no longer needed. Expired entries are dropped at their deadline. |
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -74,7 +74,7 @@ const messageCache = new Cache<string, Message>({
 
 ### `get(key)`
 
-Returns a live entry, or `undefined` if missing or expired. Promotes accessed entries to the "most recently used" position.
+Returns a live entry, or `undefined` if missing or expired. Promotes accessed entries to the "most recently used" position; it does not extend the TTL.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -167,7 +167,7 @@ const count = messageCache.invalidate((msg, id) => msg.channelId === channelId);
 
 ### `sweep()`
 
-Manually triggers a TTL sweep, removing expired entries. Returns the count removed.
+Removes expired entries now. Returns the count removed. Entries are also dropped by themselves at their deadline, so calling this is optional.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -186,11 +186,11 @@ console.log(`Swept ${expired} expired messages.`);
 
 ### `values()`
 
-Returns an array of all live values.
+Returns an array of all live values, in the order they were first added.
 
 ### `entries()`
 
-Returns an array of `[key, value]` pairs for all live entries.
+Returns an array of `[key, value]` pairs for all live entries, in the order they were first added.
 
 ### `size`
 
@@ -198,7 +198,7 @@ Property returning the count of live entries (triggers a TTL sweep).
 
 ### `dispose()`
 
-Stops the background sweep timer. Call when you no longer need the cache to prevent memory leaks.
+Kept for compatibility. There is no background sweep timer to stop any more (the cache's single expiry timer is unref'd and never holds the process open), so calling it is optional.
 
 <Tabs>
 <TabItem label="TypeScript">

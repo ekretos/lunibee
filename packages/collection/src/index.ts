@@ -4,6 +4,8 @@ export interface CollectionOptions<K = unknown, V = unknown> {
     ttl?: number;
     /** Maximum entries stored with `set()`; least-recently-used are evicted past it. `setWithoutTTL()` entries are never counted or evicted. */
     maxSize?: number;
+    /** Whether a read restarts a TTL entry's window. Default `true`; with `false` an entry lapses a fixed time after it was set, and reads only mark it recently used. */
+    slide?: boolean;
     /** Called after an entry is removed automatically, with why. Exceptions are swallowed. */
     onEvict?: (key: K, value: V, reason: EvictionReason) => void;
 }
@@ -90,6 +92,7 @@ function assertTTL(ttl: number | undefined): void {
 export class Collection<K, V> extends Map<K, V> {
     readonly #ttl?: number;
     readonly #maxSize?: number;
+    readonly #slide: boolean;
     /** Stored loosely typed so the callback does not make Collection invariant in K and V. */
     readonly #onEvict?: (
         key: unknown,
@@ -121,6 +124,7 @@ export class Collection<K, V> extends Map<K, V> {
             throw new RangeError("maxSize must be a positive integer.");
         this.#ttl = options.ttl;
         this.#maxSize = options.maxSize;
+        this.#slide = options.slide ?? true;
         if (options.ttl !== undefined || options.maxSize !== undefined)
             this.#policy = newPolicy();
         this.#onEvict = options.onEvict as
@@ -176,10 +180,29 @@ export class Collection<K, V> extends Map<K, V> {
         }
         this.#hits++;
         if (entry) {
-            if (timed) entry.deadline = now + entry.window;
+            if (timed && this.#slide) entry.deadline = now + entry.window;
             if (entry.inLru) this.#promote(policy!, entry);
         }
         return value;
+    }
+
+    /**
+     * Returns the value for `key`, or stores and returns what `factory`
+     * makes. Reading counts as a `get()` (restarts the TTL, marks it recently
+     * used); creating stores with `set()`, so `ttl` applies.
+     * @param factory Called with the key and this collection only when the key is missing; if it throws, nothing is stored.
+     * @param ttl TTL in ms for a created entry; defaults to the collection's.
+     */
+    public ensure(
+        key: K,
+        factory: (key: K, collection: this) => V,
+        ttl?: number,
+    ): V {
+        const existing = this.get(key);
+        if (existing !== undefined || super.has(key)) return existing as V;
+        const created = factory(key, this);
+        this.set(key, created, ttl);
+        return created;
     }
 
     /** Reads a value without restarting its TTL or promoting it. */

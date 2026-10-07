@@ -6,85 +6,58 @@ export interface CacheOptions {
     maxSize?: number;
     /** Time-to-live in milliseconds. Omit to disable expiration. */
     ttl?: number;
-    /** Sweep interval in milliseconds. */
+    /**
+     * Accepted for compatibility and still validated. Expired entries are now
+     * dropped at their deadline, so no periodic sweep is needed.
+     */
     sweepInterval?: number;
 }
 
-type Entry<V> = { value: V; expiresAt: number };
-
-/** Bounded cache with TTL expiration and explicit invalidation support. */
+/**
+ * Bounded cache with a fixed TTL, least-recently-used eviction and explicit
+ * invalidation. A thin policy layer over {@link Collection}: reads promote an
+ * entry but do not extend its TTL.
+ */
 export class Cache<K, V> {
-    readonly #entries = new Collection<K, Entry<V>>();
-    readonly #maxSize: number;
-    readonly #ttl: number;
-    #timer?: ReturnType<typeof setInterval>;
+    readonly #entries: Collection<K, V>;
 
     /** Creates a cache using the supplied retention policy. */
     public constructor(options: CacheOptions = {}) {
-        this.#maxSize = options.maxSize ?? Infinity;
-        this.#ttl = options.ttl ?? 0;
-        if (
-            (!Number.isInteger(this.#maxSize) && this.#maxSize !== Infinity) ||
-            this.#maxSize < 1
-        )
+        const maxSize = options.maxSize ?? Infinity;
+        const ttl = options.ttl ?? 0;
+        if ((!Number.isInteger(maxSize) && maxSize !== Infinity) || maxSize < 1)
             throw new RangeError("Cache maxSize must be a positive integer.");
-        if (!Number.isFinite(this.#ttl) || this.#ttl < 0)
+        if (!Number.isFinite(ttl) || ttl < 0)
             throw new RangeError(
                 "Cache ttl must be a non-negative finite number.",
             );
-        if (this.#ttl > 0) {
-            const interval =
-                options.sweepInterval ?? Math.min(this.#ttl, 60_000);
+        if (ttl > 0) {
+            const interval = options.sweepInterval ?? Math.min(ttl, 60_000);
             if (!Number.isFinite(interval) || interval < 1)
                 throw new RangeError("Cache sweepInterval must be positive.");
-            this.#timer = setInterval(() => this.sweep(), interval);
-            // A sweeper is housekeeping, not work: keeping it referenced makes
-            // a TTL cache hold the process open until dispose() is called.
-            (this.#timer as { unref?: () => void }).unref?.();
         }
+        this.#entries = new Collection<K, V>(null, {
+            ttl: ttl > 0 ? ttl : undefined,
+            maxSize: maxSize === Infinity ? undefined : maxSize,
+            slide: false,
+        });
     }
 
     /** Number of currently live entries. */
     public get size(): number {
-        this.#sweepExpired();
         return this.#entries.size;
     }
-    /** Reads a live entry. */
+    /** Reads a live entry and marks it most recently used. */
     public get(key: K): V | undefined {
-        const entry = this.#entries.get(key);
-        if (!entry) return undefined;
-        if (entry.expiresAt > 0 && entry.expiresAt <= Date.now()) {
-            this.#entries.delete(key);
-            return undefined;
-        }
-        // LRU Promotion: move to end of insertion order
-        this.#entries.delete(key);
-        this.#entries.set(key, entry);
-        return entry.value;
+        return this.#entries.get(key);
     }
     /** Returns whether a live entry exists. */
     public has(key: K): boolean {
-        const entry = this.#entries.get(key);
-        if (!entry) return false;
-        if (entry.expiresAt > 0 && entry.expiresAt <= Date.now()) {
-            this.#entries.delete(key);
-            return false;
-        }
-        return true;
+        return this.#entries.has(key);
     }
-    /** Stores an entry and evicts the oldest entries when the bound is exceeded. */
+    /** Stores an entry and evicts the least recently used ones when the bound is exceeded. */
     public set(key: K, value: V): this {
-        const expiresAt = this.#ttl > 0 ? Date.now() + this.#ttl : 0;
-        this.#entries.delete(key);
-        this.#entries.set(key, { value, expiresAt });
-        // Skip eviction entirely for unbounded caches (maxSize === Infinity).
-        if (this.#maxSize !== Infinity) {
-            while (this.#entries.size > this.#maxSize) {
-                const oldest = this.#entries.firstKey();
-                if (oldest !== undefined) this.#entries.delete(oldest);
-                else break;
-            }
-        }
+        this.#entries.set(key, value);
         return this;
     }
     /** Invalidates one key. */
@@ -97,31 +70,20 @@ export class Cache<K, V> {
     }
     /** Invalidates every entry matching a predicate. */
     public invalidate(predicate: (value: V, key: K) => boolean): number {
-        return this.#entries.sweep((entry, key) => predicate(entry.value, key));
+        return this.#entries.sweep(predicate);
     }
-    /** Removes expired entries and returns the number removed. */
+    /** Removes expired entries now and returns the number removed. */
     public sweep(): number {
-        return this.#entries.sweep((entry) => this.#expired(entry));
+        return this.#entries.purge();
     }
-    /** Stops the background sweeper and releases its timer. */
-    public dispose(): void {
-        if (this.#timer) clearInterval(this.#timer);
-        this.#timer = undefined;
-    }
+    /** Kept for compatibility: there is no background sweeper to stop. */
+    public dispose(): void {}
     /** Returns live cached values. */
     public values(): V[] {
-        this.#sweepExpired();
-        return this.#entries.map((entry) => entry.value);
+        return [...this.#entries.values()];
     }
     /** Returns live cached entries. */
     public entries(): [K, V][] {
-        this.#sweepExpired();
-        return this.#entries.map((entry, key) => [key, entry.value]);
-    }
-    #expired(entry: Entry<V>): boolean {
-        return entry.expiresAt > 0 && entry.expiresAt <= Date.now();
-    }
-    #sweepExpired(): void {
-        if (this.#ttl > 0) this.sweep();
+        return [...this.#entries.entries()];
     }
 }

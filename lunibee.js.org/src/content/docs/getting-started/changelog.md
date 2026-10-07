@@ -35,8 +35,14 @@ Security release. Fixes the findings of the 0.2.3 security review; the status of
 * **`WebhookClient.send({ files })` uploads the files.** They were serialized into the JSON body and never reached Discord; they are now sent as multipart form data. Component builders in `components` are serialized with `toJSON()` like embeds.
 * **Integer and number option choices** are checked like string choices: a name must be 1-100 characters. A string choice with an invalid value no longer leaves earlier choices from the same call behind.
 
+### ✨ Added
+
+* **`collection.ensure(key, factory, ttl?)`** returns the stored value or stores and returns what `factory(key, collection)` makes (a get-or-create, as in discord.js).
+* **`slide: false`** on `Collection`: a read still marks an entry recently used but no longer extends its TTL.
+
 ### 🔧 Changed
 
+* **`Cache` is now a thin layer over `Collection`** (fixed TTL, LRU, `maxSize`). A bounded `Cache` used to re-insert an entry on every read, which made it slow once it held many entries: `set` + `get` on a 100,000-entry cache took about 17 µs and now takes about 1.1 µs. Two things differ: `values()` and `entries()` list entries in the order they were first added (they used to follow recency), and `sweepInterval` / `dispose()` are kept but no longer needed, as expired entries are dropped at their deadline.
 * **Plain collections are much lighter.** A `Collection` without `ttl` or `maxSize` no longer allocates expiry, recency and stats structures up front: about 20 bytes per empty collection instead of about 360. They are created when `ttl` or `maxSize` is set, or on the first `set()` with its own TTL. `set()` with a TTL or `maxSize` is also faster (about 40% for a collection with both), and `get()` on one with a TTL is about a third faster. `stats` are unchanged.
 * **Lapsed entries no longer push live ones out of a `maxSize` collection.** When a `set()` takes a collection over `maxSize`, entries whose TTL has already lapsed are dropped first (as `expired`), instead of evicting the least recently used live entry while a dead one lingered.
 * **Stricter public types, no `any`.** `WebhookClient.editMessage()` resolves to `APIMessage`; `WebhookMessageOptions.components` / `files` take component payloads (or builders) and `RESTFileAttachment`s; `VoiceGatewayTransport.send()` takes a `VoiceGatewayPayload`; `identifyPayload()` returns `GatewayPayload<IdentifyData>`; extra `GatewayProperties` / `IdentifyProperties` keys are strings; `MinimalRedisClient.set()` resolves to `string | null`. Code that compiled before only breaks if it relied on these being `any`.

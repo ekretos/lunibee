@@ -166,36 +166,37 @@ describe("RedisRateLimitStore failure semantics (P1)", () => {
     });
 });
 
-describe("Cache sweeper (P2: process retention)", () => {
-    test("the TTL sweeper is unref'd so it cannot hold the process open", () => {
-        const originalSetInterval = globalThis.setInterval;
+describe("Cache expiry timer (P2: process retention)", () => {
+    test("the expiry timer is unref'd so it cannot hold the process open", () => {
+        const originalSetTimeout = globalThis.setTimeout;
         const handles: Array<{ hasRef?: () => boolean }> = [];
-        globalThis.setInterval = ((
+        globalThis.setTimeout = ((
             handler: TimerHandler,
             timeout?: number,
             ...args: unknown[]
         ) => {
-            const handle = originalSetInterval(
+            const handle = originalSetTimeout(
                 handler as never,
                 timeout,
                 ...(args as []),
             );
             handles.push(handle as unknown as { hasRef?: () => boolean });
             return handle;
-        }) as unknown as typeof setInterval;
+        }) as unknown as typeof setTimeout;
 
-        let cache: Cache<string, number>;
+        const cache = new Cache<string, number>({ ttl: 50 });
         try {
-            cache = new Cache<string, number>({ ttl: 50 });
+            cache.set("a", 1);
         } finally {
-            globalThis.setInterval = originalSetInterval;
+            globalThis.setTimeout = originalSetTimeout;
         }
         expect(handles).toHaveLength(1);
         expect(handles[0]!.hasRef?.()).toBe(false);
+        cache.clear();
         cache.dispose();
     });
 
-    test("entries still expire and dispose stops the sweeper", async () => {
+    test("entries still expire without a sweeper, and dispose is safe", async () => {
         const cache = new Cache<string, number>({ ttl: 20, sweepInterval: 5 });
         cache.set("a", 1);
         await new Promise((resolve) => setTimeout(resolve, 40));

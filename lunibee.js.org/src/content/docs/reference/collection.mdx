@@ -357,6 +357,7 @@ bound it:
 const cache = new Collection<string, number>(null, {
   ttl: 60_000,       // default sliding TTL for set()
   maxSize: 1_000,    // LRU cap for set() entries
+  slide: true,       // false: a read promotes but does not extend the TTL
   onEvict: (key, value, reason) => {}, // reason: "expired" | "evicted"
 });
 ```
@@ -367,6 +368,7 @@ const cache = new Collection<string, number>(null, {
 | `setWithoutTTL(key, value)` | Stores an entry that never expires and is never evicted by `maxSize`. Managers store Discord resources this way. |
 | `get(key)` | Reads a value; restarts a TTL entry's window and marks it recently used. |
 | `peek(key)` | Reads without restarting the TTL or promoting. |
+| `ensure(key, factory, ttl?)` | Returns the stored value, or stores and returns what `factory(key, collection)` makes. Reading counts as `get()`; creating uses `set()`. If `factory` throws, nothing is stored. |
 | `ttlRemaining(key)` | Milliseconds until the entry expires, or `undefined` if it never does. |
 | `purge()` | Removes expired entries now; returns how many. |
 | `stats` | `{ hits, misses, expired, evicted }` counters. |
