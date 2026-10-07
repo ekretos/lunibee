@@ -362,6 +362,38 @@ const newest = client.users.cache
 </TabItem>
 </Tabs>
 
+## Combining and transforming
+
+None of these change the collection they are called on; each returns a new one (of the same class, see below) unless noted. `other` may be a `Collection`, any `Map`, or a `ReadonlyCollection`.
+
+| Method | Returns |
+|---|---|
+| `concat(...collections)` | This collection's entries, then each collection's; a later one wins a shared key. |
+| `symmetricDifference(other)` | The entries whose key is in only one of the two. |
+| `merge(other, whenInSelf, whenInOther, whenInBoth)` | A collection of the entries the callbacks keep. Each callback returns `{ keep: true, value }` or `{ keep: false }`. |
+| `mapValues(fn)` | The same keys with each value passed through `fn(value, key, collection)`. |
+| `toReversed()` | The entries in reverse order. |
+| `toSorted(comparator?)` | The entries sorted, stable; same as `sorted()`. |
+| `reduceRight(fn, initial)` | Folds from the last entry to the first, like `reduce()` from the first. |
+| `equals(other)` | `true` when both have the same keys and `===` equal values. Does not touch either side's TTL, recency or `stats`. |
+| `Collection.groupBy(items, keySelector)` | A collection from each key to the array of items with that key. |
+| `Collection.combineEntries(entries, combine)` | A collection from `[key, value]` pairs; `combine(first, second, key)` merges pairs that share a key. |
+
+```ts
+const byBot = Collection.groupBy(users.values(), u => (u.bot ? "bots" : "people"));
+const names = users.mapValues(u => u.username);
+const changes = before.merge(
+  after,
+  () => ({ keep: true, value: "removed" }),
+  () => ({ keep: true, value: "added" }),
+  (a, b) => (a === b ? { keep: false } : { keep: true, value: "changed" }),
+);
+```
+
+`ReadonlyCollection<K, V>` is a `Collection` without `set`, `delete`, `clear`, `get`, `ensure`, `sweep` and the other methods that change it. Accept it in functions that only read.
+
+There is no in-place `sort()` or `reverse()`: reordering a collection that tracks recency and TTL in place would break its bookkeeping. Use `toSorted()` and `toReversed()`.
+
 ## Subclassing
 
 `filter()`, `clone()`, `sorted()`, `partition()`, `union()`, `intersection()` and `difference()` return an instance of the same class (`Symbol.species`), built with no constructor arguments and without any `ttl` or `maxSize`. Override `static get [Symbol.species]()` to return `Collection` (or another class) instead.

@@ -37,6 +37,7 @@ Security release. Fixes the findings of the 0.2.3 security review; the status of
 
 ### ✨ Added
 
+* **More `Collection` methods, matching discord.js:** `mapValues()`, `reduceRight()`, `concat()`, `equals()`, `merge()`, `symmetricDifference()`, `toReversed()`, `toSorted()` (the same as `sorted()`), the static `Collection.groupBy()` and `Collection.combineEntries()`, and the `ReadonlyCollection` and `Keep` types. `union()`, `intersection()` and `difference()` now accept any `ReadonlyCollection`. There is no in-place `sort()` or `reverse()`.
 * **`Symbol.species` on `Collection`.** `filter()`, `clone()`, `sorted()`, `partition()`, `union()`, `intersection()` and `difference()` return an instance of your subclass, as in discord.js. They build it with `new Species()` (no arguments, so no `ttl` or `maxSize`); a subclass that cannot be built that way, or should hand back a plain `Collection`, overrides `static get [Symbol.species]()`. Their return types are now `this`.
 * **`collection.random(amount)` and `randomKey(amount)`** return that many different values or keys (the reference page already said so, but only one could be picked). **`findLast()` and `findLastKey()`** search from the end. `random()` without an amount no longer copies the collection.
 * **`collection.ensure(key, factory, ttl?)`** returns the stored value or stores and returns what `factory(key, collection)` makes (a get-or-create, as in discord.js).

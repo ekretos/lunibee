@@ -88,6 +88,40 @@ function newPolicy<K, V>(options: CollectionOptions<K, V> = {}): Policy<K> {
     };
 }
 
+/**
+ * Reads a value that `has()` just confirmed, without touching a Lunibee
+ * collection's TTL, recency or hit counters.
+ */
+function peekOf<K, V>(
+    collection: ReadonlyCollection<K, V>,
+    key: K,
+): V | undefined {
+    return collection instanceof Map
+        ? (Map.prototype.get.call(collection, key) as V | undefined)
+        : collection.get(key);
+}
+
+/** What `merge()` does with one entry: keep it with `value`, or drop it. */
+export type Keep<V> = { keep: true; value: V } | { keep: false };
+
+/**
+ * A `Collection` seen read-only: every method that does not change it. Pass it
+ * where you only read, so a function cannot add to or remove from the cache.
+ */
+export type ReadonlyCollection<K, V> = Omit<
+    Collection<K, V>,
+    | "set"
+    | "setWithoutTTL"
+    | "delete"
+    | "clear"
+    | "ensure"
+    | "forEach"
+    | "get"
+    | "sweep"
+    | "purge"
+> &
+    ReadonlyMap<K, V>;
+
 /** Picks `amount` different items at random (a partial Fisher-Yates shuffle of `items`). */
 function sample<T>(items: T[], amount: number): T[] {
     if (!Number.isInteger(amount) || amount < 0)
@@ -762,13 +796,13 @@ export class Collection<K, V> extends Map<K, V> {
         return entry;
     }
     /** Returns a new Collection containing elements from both collections. */
-    public union(other: Collection<K, V>): this {
+    public union(other: ReadonlyCollection<K, V>): this {
         const result = this.clone();
         for (const [key, value] of other) result.set(key, value);
         return result;
     }
     /** Returns a new Collection containing only elements present in both collections. */
-    public intersection(other: Collection<K, V>): this {
+    public intersection(other: ReadonlyCollection<K, V>): this {
         const result = this.#derived();
         for (const [key, value] of this) {
             if (other.has(key)) result.set(key, value);
@@ -776,7 +810,7 @@ export class Collection<K, V> extends Map<K, V> {
         return result;
     }
     /** Returns a new Collection containing elements present in this collection but not the other. */
-    public difference(other: Collection<K, V>): this {
+    public difference(other: ReadonlyCollection<K, V>): this {
         const result = this.#derived();
         for (const [key, value] of this) {
             if (!other.has(key)) result.set(key, value);
@@ -796,6 +830,116 @@ export class Collection<K, V> extends Map<K, V> {
             else fail.set(key, value);
         }
         return [pass, fail];
+    }
+    /** Returns the entries of both collections that are in only one of them. */
+    public symmetricDifference(other: ReadonlyCollection<K, V>): this {
+        const result = this.#derived();
+        for (const [key, value] of this)
+            if (!other.has(key)) result.set(key, value);
+        for (const [key, value] of other)
+            if (!this.has(key)) result.set(key, value);
+        return result;
+    }
+    /** Returns a new Collection with this one's entries followed by each of `collections`'; a later collection wins a shared key. */
+    public concat(...collections: ReadonlyCollection<K, V>[]): this {
+        const result = this.clone();
+        for (const collection of collections)
+            for (const [key, value] of collection) result.set(key, value);
+        return result;
+    }
+    /**
+     * Combines this collection with `other`, deciding per key what to keep.
+     * @param whenInSelf Called for a key only in this collection.
+     * @param whenInOther Called for a key only in `other`.
+     * @param whenInBoth Called for a key in both.
+     * @returns A new collection of the entries the callbacks kept, in this collection's order, then `other`'s new keys.
+     */
+    public merge<T, R>(
+        other: ReadonlyCollection<K, T>,
+        whenInSelf: (value: V, key: K) => Keep<R>,
+        whenInOther: (valueOther: T, key: K) => Keep<R>,
+        whenInBoth: (value: V, valueOther: T, key: K) => Keep<R>,
+    ): Collection<K, R> {
+        const result = this.#derived() as unknown as Collection<K, R>;
+        const decide = (key: K, kept: Keep<R>): void => {
+            if (kept.keep) result.set(key, kept.value);
+        };
+        for (const [key, value] of this) {
+            decide(
+                key,
+                other.has(key)
+                    ? whenInBoth(value, peekOf(other, key) as T, key)
+                    : whenInSelf(value, key),
+            );
+        }
+        for (const [key, value] of other)
+            if (!this.has(key)) decide(key, whenInOther(value, key));
+        return result;
+    }
+    /** Returns whether `other` holds the same keys with `===` equal values. Neither side's TTL or recency is touched. */
+    public equals(other: ReadonlyCollection<K, V> | null | undefined): boolean {
+        if (!other) return false;
+        if (other === (this as unknown)) return true;
+        if (this.size !== other.size) return false;
+        for (const [key, value] of this) {
+            if (!other.has(key)) return false;
+            if (value !== peekOf(other, key)) return false;
+        }
+        return true;
+    }
+    /** Returns a new collection with the same keys and each value passed through `transform`. */
+    public mapValues<T>(
+        transform: (value: V, key: K, collection: this) => T,
+    ): Collection<K, T> {
+        const result = this.#derived() as unknown as Collection<K, T>;
+        for (const [key, value] of this)
+            result.set(key, transform(value, key, this));
+        return result;
+    }
+    /** Returns a new collection with the entries in reverse order. */
+    public toReversed(): this {
+        const result = this.#derived();
+        const entries = [...this];
+        for (let i = entries.length - 1; i >= 0; i--)
+            result.set(entries[i]![0], entries[i]![1]);
+        return result;
+    }
+    /** Same as {@link sorted}, under the name the standard `Array` uses. */
+    public toSorted(
+        comparator?: (a: V, b: V, aKey: K, bKey: K) => number,
+    ): this {
+        return this.sorted(comparator);
+    }
+    /**
+     * Groups `items` by the key `keySelector` returns for each.
+     * @param keySelector Called with each item and its index.
+     * @returns A new collection from each key to its items, in input order.
+     */
+    public static override groupBy<K, V>(
+        items: Iterable<V>,
+        keySelector: (item: V, index: number) => K,
+    ): Collection<K, V[]> {
+        const groups = new Collection<K, V[]>();
+        let index = 0;
+        for (const item of items)
+            groups.ensure(keySelector(item, index++), () => []).push(item);
+        return groups;
+    }
+    /**
+     * Builds a collection from `entries`, merging values that share a key.
+     * @param combine Called with the value stored so far, the new one and the key; its result is stored.
+     */
+    public static combineEntries<K, V>(
+        entries: Iterable<readonly [K, V]>,
+        combine: (firstValue: V, secondValue: V, key: K) => V,
+    ): Collection<K, V> {
+        const result = new Collection<K, V>();
+        for (const [key, value] of entries)
+            result.set(
+                key,
+                result.has(key) ? combine(result.get(key)!, value, key) : value,
+            );
+        return result;
     }
     /** Calls `fn` with this collection and returns the collection unchanged.
      * Useful for inserting debug side-effects in a chain without breaking the flow.
@@ -821,6 +965,17 @@ export class Collection<K, V> extends Map<K, V> {
     ): T {
         let acc = initialValue;
         for (const [key, value] of this) acc = fn(acc, value, key, this);
+        return acc;
+    }
+    /** Like {@link reduce}, but from the last entry to the first. */
+    public reduceRight<T>(
+        fn: (accumulator: T, value: V, key: K, collection: this) => T,
+        initialValue: T,
+    ): T {
+        const entries = [...this];
+        let acc = initialValue;
+        for (let i = entries.length - 1; i >= 0; i--)
+            acc = fn(acc, entries[i]![1], entries[i]![0], this);
         return acc;
     }
     /** Returns a new Collection with entries sorted by comparator (non-mutating).

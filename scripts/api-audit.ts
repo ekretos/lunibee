@@ -74,7 +74,7 @@ try {
     const auditConfig = join(tempDir, "tsconfig.json");
     await Bun.write(auditConfig, JSON.stringify({
         compilerOptions: {
-            target: "ES2022",
+            target: "ESNext",
             module: "ESNext",
             moduleResolution: "Bundler",
             types: ["bun"],

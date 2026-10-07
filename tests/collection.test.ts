@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { Collection } from "../packages/collection/src/index.ts";
+import {
+    Collection,
+    type ReadonlyCollection,
+} from "../packages/collection/src/index.ts";
 
 describe("Collection Full Coverage", () => {
     test("covers all collection manipulation and helper methods", () => {
@@ -196,5 +199,181 @@ describe("Symbol.species", () => {
         const copy = bounded.clone();
         copy.set("b", 2);
         expect(copy.size).toBe(2);
+    });
+});
+
+describe("set operations and transforms", () => {
+    const make = (entries: [string, number][]) =>
+        new Collection<string, number>(entries);
+    const left = () =>
+        make([
+            ["a", 1],
+            ["b", 2],
+            ["c", 3],
+        ]);
+    const right = () =>
+        make([
+            ["b", 20],
+            ["c", 3],
+            ["d", 4],
+        ]);
+
+    test("symmetricDifference keeps what only one side has", () => {
+        const result = left().symmetricDifference(right());
+        expect([...result]).toEqual([
+            ["a", 1],
+            ["d", 4],
+        ]);
+    });
+
+    test("concat adds collections in order and a later one wins a shared key", () => {
+        const result = left().concat(right(), make([["e", 5]]));
+        expect([...result]).toEqual([
+            ["a", 1],
+            ["b", 20],
+            ["c", 3],
+            ["d", 4],
+            ["e", 5],
+        ]);
+        const original = left();
+        original.concat(right());
+        expect(original.size).toBe(3);
+    });
+
+    test("merge decides per key what to keep", () => {
+        const result = left().merge(
+            right(),
+            (value) => ({ keep: true, value: `self:${value}` }),
+            (value) => ({ keep: true, value: `other:${value}` }),
+            (value, other) =>
+                value === other
+                    ? { keep: false }
+                    : { keep: true, value: `both:${value}+${other}` },
+        );
+        expect([...result]).toEqual([
+            ["a", "self:1"],
+            ["b", "both:2+20"],
+            ["d", "other:4"],
+        ]);
+        const onlyOther = left().merge(
+            right(),
+            () => ({ keep: false }),
+            (value) => ({ keep: true, value }),
+            () => ({ keep: false }),
+        );
+        expect([...onlyOther]).toEqual([["d", 4]]);
+    });
+
+    test("equals compares keys and values without touching TTL or recency", () => {
+        expect(left().equals(left())).toBe(true);
+        expect(left().equals(right())).toBe(false);
+        expect(left().equals(make([["a", 1]]))).toBe(false);
+        expect(left().equals(null)).toBe(false);
+        expect(left().equals(undefined)).toBe(false);
+        const same = left();
+        expect(same.equals(same)).toBe(true);
+        expect(
+            left().equals(
+                new Map([
+                    ["a", 1],
+                    ["b", 2],
+                    ["c", 3],
+                ]) as never,
+            ),
+        ).toBe(true);
+        expect(
+            left().equals(
+                new Map([
+                    ["a", 1],
+                    ["b", 2],
+                    ["z", 3],
+                ]) as never,
+            ),
+        ).toBe(false);
+        const withUndefined = make([["a", undefined as never]]);
+        expect(withUndefined.equals(make([["b", undefined as never]]))).toBe(
+            false,
+        );
+        expect(withUndefined.equals(make([["a", undefined as never]]))).toBe(
+            true,
+        );
+        const timed = new Collection<string, number>(null, {
+            ttl: 1_000,
+            maxSize: 2,
+        });
+        timed.set("a", 1).set("b", 2);
+        const mirror = new Collection<string, number>([
+            ["a", 1],
+            ["b", 2],
+        ]);
+        mirror.equals(timed);
+        timed.equals(mirror);
+        expect(timed.stats.hits).toBe(0);
+        timed.set("c", 3);
+        expect([...timed.keys()]).toEqual(["b", "c"]);
+    });
+
+    test("mapValues keeps keys and order and changes the value type", () => {
+        const result = left().mapValues((value, key) => `${key}${value * 2}`);
+        expect([...result]).toEqual([
+            ["a", "a2"],
+            ["b", "b4"],
+            ["c", "c6"],
+        ]);
+        class Users extends Collection<string, number> {}
+        expect(
+            new Users([["a", 1]]).mapValues((value) => value),
+        ).toBeInstanceOf(Users);
+    });
+
+    test("reduceRight folds from the last entry and toReversed / toSorted return new collections", () => {
+        const col = left();
+        expect(col.reduceRight((acc, _value, key) => acc + key, "")).toBe(
+            "cba",
+        );
+        expect(col.reduceRight((acc, value) => acc + value, 10)).toBe(16);
+        expect([...col.toReversed().keys()]).toEqual(["c", "b", "a"]);
+        expect([...col.toSorted((x, y) => y - x).keys()]).toEqual([
+            "c",
+            "b",
+            "a",
+        ]);
+        expect([...col.toSorted().keys()]).toEqual(["a", "b", "c"]);
+        expect([...col.keys()]).toEqual(["a", "b", "c"]);
+        expect(new Collection<string, number>().toReversed().size).toBe(0);
+    });
+
+    test("groupBy and combineEntries build collections from iterables", () => {
+        const groups = Collection.groupBy([1, 2, 3, 4, 5], (n, index) =>
+            index === 0 ? "first" : n % 2 === 0 ? "even" : "odd",
+        );
+        expect([...groups]).toEqual([
+            ["first", [1]],
+            ["even", [2, 4]],
+            ["odd", [3, 5]],
+        ]);
+        const sums = Collection.combineEntries<string, number>(
+            [
+                ["a", 1],
+                ["b", 2],
+                ["a", 10],
+            ],
+            (first, second) => first + second,
+        );
+        expect([...sums]).toEqual([
+            ["a", 11],
+            ["b", 2],
+        ]);
+    });
+
+    test("a Collection can be passed as a ReadonlyCollection", () => {
+        const total = (collection: ReadonlyCollection<string, number>) =>
+            collection.reduce((sum, value) => sum + value, 0);
+        expect(total(left())).toBe(6);
+        const mutate = (collection: ReadonlyCollection<string, number>) => {
+            // @ts-expect-error a ReadonlyCollection has no set()
+            collection.set("x", 1);
+        };
+        expect(typeof mutate).toBe("function");
     });
 });
