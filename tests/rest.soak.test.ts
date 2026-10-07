@@ -47,3 +47,21 @@ describe("REST bucket scheduling under load", () => {
         expect(stats.rateLimited).toBeLessThanOrEqual(10_000 * 0.01);
     }, 30_000);
 });
+
+describe("the fake Discord used above", () => {
+    test("answers 429 with Retry-After once a window is spent", async () => {
+        const { transport, stats } = fakeDiscord({
+            limit: 1,
+            windowMs: 1000,
+            latencyMs: 0,
+        });
+        const request = { path: "/channels/1/messages" };
+        const first = await transport.send(request as never);
+        const second = await transport.send(request as never);
+        expect(first.status).toBe(200);
+        expect(first.headers.get("X-RateLimit-Remaining")).toBe("0");
+        expect(second.status).toBe(429);
+        expect(Number(second.headers.get("Retry-After"))).toBeGreaterThan(0);
+        expect(stats).toMatchObject({ requests: 2, rateLimited: 1 });
+    });
+});
