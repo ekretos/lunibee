@@ -30,11 +30,13 @@ export interface CollectionStats {
  * and its TTL. One record serves the policy map, the recency list and the
  * expiry heap, so a write touches one extra hash entry and allocates once.
  */
-type Entry<K> = {
+type Entry<K, V> = {
     key: K;
+    /** A copy of the stored value, so a read needs one lookup instead of two. */
+    value: V;
     /** Neighbours in recency order; meaningful while `inLru`. */
-    older: Entry<K> | undefined;
-    newer: Entry<K> | undefined;
+    older: Entry<K, V> | undefined;
+    newer: Entry<K, V> | undefined;
     inLru: boolean;
     /** TTL window in ms; 0 when the entry does not expire (and is not in the heap). */
     window: number;
@@ -48,15 +50,15 @@ type Entry<K> = {
  * Everything a retention policy needs. A Collection without `ttl` or
  * `maxSize` never creates one, so plain collections cost no more than a Map.
  */
-type Policy<K> = {
+type Policy<K, V> = {
     /** Keys with a TTL or a recency position; `setWithoutTTL()` keys are absent. */
-    entries: Map<K, Entry<K>>;
+    entries: Map<K, Entry<K, V>>;
     /** Oldest and newest entries of the recency list; only `maxSize` collections use it. */
-    oldest: Entry<K> | undefined;
-    newest: Entry<K> | undefined;
+    oldest: Entry<K, V> | undefined;
+    newest: Entry<K, V> | undefined;
     lruSize: number;
     /** Min-heap by `filed`. A record that is no longer its key's map value is stale and dropped lazily. */
-    heap: Entry<K>[];
+    heap: Entry<K, V>[];
     timer?: ReturnType<typeof setTimeout>;
     armedFor: number;
     /** The options, kept here so a plain collection carries none of them. */
@@ -71,12 +73,12 @@ type Policy<K> = {
     evicted: number;
 };
 
-function newPolicy<K, V>(options: CollectionOptions<K, V> = {}): Policy<K> {
+function newPolicy<K, V>(options: CollectionOptions<K, V> = {}): Policy<K, V> {
     return {
         ttl: options.ttl,
         maxSize: options.maxSize,
         slide: options.slide ?? true,
-        onEvict: options.onEvict as Policy<K>["onEvict"],
+        onEvict: options.onEvict as Policy<K, V>["onEvict"],
         expired: 0,
         evicted: 0,
         entries: new Map(),
@@ -122,6 +124,15 @@ export type ReadonlyCollection<K, V> = Omit<
 > &
     ReadonlyMap<K, V>;
 
+const mapGet = Map.prototype.get as (
+    this: Map<unknown, unknown>,
+    key: unknown,
+) => unknown;
+const mapHas = Map.prototype.has as (
+    this: Map<unknown, unknown>,
+    key: unknown,
+) => boolean;
+
 /** Picks `amount` different items at random (a partial Fisher-Yates shuffle of `items`). */
 function sample<T>(items: T[], amount: number): T[] {
     if (!Number.isInteger(amount) || amount < 0)
@@ -154,7 +165,7 @@ function assertTTL(ttl: number | undefined): void {
  */
 export class Collection<K, V> extends Map<K, V> {
     /** Created with any option, or by the first `set()` with its own TTL. */
-    #policy?: Policy<K>;
+    #policy?: Policy<K, V>;
     #hits = 0;
     #misses = 0;
 
@@ -190,6 +201,8 @@ export class Collection<K, V> extends Map<K, V> {
      * a TTL/LRU entry.
      */
     public override set(key: K, value: V, ttl?: number): this {
+        if (ttl === undefined && this.#policy === undefined)
+            return super.set(key, value);
         assertTTL(ttl);
         const window = ttl ?? this.#policy?.ttl;
         if (window !== undefined) this.#policy ??= newPolicy();
@@ -197,7 +210,7 @@ export class Collection<K, V> extends Map<K, V> {
         // A key that was not stored before has no policy entry.
         const before = super.size;
         super.set(key, value);
-        this.#track(key, window, super.size !== before);
+        this.#track(key, value, window, super.size !== before);
         this.#enforceCap();
         return this;
     }
@@ -217,24 +230,26 @@ export class Collection<K, V> extends Map<K, V> {
     public override get(key: K): V | undefined {
         const policy = this.#policy;
         const entry = policy?.entries.get(key);
-        const timed = entry !== undefined && entry.window !== 0;
+        if (entry === undefined) {
+            const value = mapGet.call(this, key) as V | undefined;
+            if (value !== undefined || mapHas.call(this, key)) {
+                this.#hits++;
+                return value;
+            }
+            this.#misses++;
+            return undefined;
+        }
+        const timed = entry.window !== 0;
         const now = timed ? Date.now() : 0;
-        if (entry && timed && entry.deadline <= now) {
+        if (timed && entry.deadline <= now) {
             this.#expire(entry);
             this.#misses++;
             return undefined;
         }
-        const value = super.get(key);
-        if (value === undefined && !super.has(key)) {
-            this.#misses++;
-            return undefined;
-        }
         this.#hits++;
-        if (entry) {
-            if (timed && policy!.slide) entry.deadline = now + entry.window;
-            if (entry.inLru) this.#promote(policy!, entry);
-        }
-        return value;
+        if (timed && policy!.slide) entry.deadline = now + entry.window;
+        if (entry.inLru) this.#promote(policy!, entry);
+        return entry.value;
     }
 
     /**
@@ -367,7 +382,7 @@ export class Collection<K, V> extends Map<K, V> {
         return true;
     }
 
-    #expire(entry: Entry<K>): void {
+    #expire(entry: Entry<K, V>): void {
         const value = super.get(entry.key)!;
         this.#remove(entry.key);
         this.#policy!.expired++;
@@ -395,10 +410,11 @@ export class Collection<K, V> extends Map<K, V> {
      * a later one is a number write and the record re-files itself when it
      * surfaces.
      */
-    #track(key: K, window: number | undefined, isNew: boolean): void {
+    #track(key: K, value: V, window: number | undefined, isNew: boolean): void {
         const policy = this.#policy!;
         const lru = policy.maxSize !== undefined;
         let entry = isNew ? undefined : policy.entries.get(key);
+        if (entry) entry.value = value;
         if (window === undefined) {
             if (entry && entry.window !== 0) {
                 // It had a TTL and now has none.
@@ -409,7 +425,7 @@ export class Collection<K, V> extends Map<K, V> {
                 }
             }
             if (!entry && lru) {
-                entry = this.#create(key, 0, 0);
+                entry = this.#create(key, value, 0, 0);
                 policy.entries.set(key, entry);
             }
             if (entry) this.#promote(policy, entry);
@@ -430,7 +446,7 @@ export class Collection<K, V> extends Map<K, V> {
             entry.window = window;
             entry.deadline = entry.filed = deadline;
         } else {
-            entry = this.#create(key, window, deadline);
+            entry = this.#create(key, value, window, deadline);
             policy.entries.set(key, entry);
         }
         if (lru) this.#promote(policy, entry);
@@ -441,9 +457,10 @@ export class Collection<K, V> extends Map<K, V> {
             this.#rearm();
     }
 
-    #create(key: K, window: number, deadline: number): Entry<K> {
+    #create(key: K, value: V, window: number, deadline: number): Entry<K, V> {
         return {
             key,
+            value,
             older: undefined,
             newer: undefined,
             inLru: false,
@@ -455,12 +472,17 @@ export class Collection<K, V> extends Map<K, V> {
 
     /** Swaps in a fresh record for `old` (which goes stale), keeping its recency position. */
     #replace(
-        policy: Policy<K>,
-        old: Entry<K>,
+        policy: Policy<K, V>,
+        old: Entry<K, V>,
         window: number,
         deadline: number,
-    ): Entry<K> {
-        const entry: Entry<K> = { ...old, window, deadline, filed: deadline };
+    ): Entry<K, V> {
+        const entry: Entry<K, V> = {
+            ...old,
+            window,
+            deadline,
+            filed: deadline,
+        };
         if (old.inLru) {
             if (old.older) old.older.newer = entry;
             else policy.oldest = entry;
@@ -472,7 +494,7 @@ export class Collection<K, V> extends Map<K, V> {
     }
 
     /** Makes an entry the newest in recency order, linking it first if needed. */
-    #promote(policy: Policy<K>, entry: Entry<K>): void {
+    #promote(policy: Policy<K, V>, entry: Entry<K, V>): void {
         if (entry === policy.newest) return;
         if (entry.inLru) this.#unlink(policy, entry, true);
         else {
@@ -487,7 +509,7 @@ export class Collection<K, V> extends Map<K, V> {
     }
 
     /** Takes an entry out of the recency list; `keepCount` is for a move within it. */
-    #unlink(policy: Policy<K>, entry: Entry<K>, keepCount = false): void {
+    #unlink(policy: Policy<K, V>, entry: Entry<K, V>, keepCount = false): void {
         if (entry.older) entry.older.newer = entry.newer;
         else policy.oldest = entry.newer;
         if (entry.newer) entry.newer.older = entry.older;
@@ -593,7 +615,7 @@ export class Collection<K, V> extends Map<K, V> {
         (p.timer as { unref?: () => void }).unref?.();
     }
 
-    #heapPush(entry: Entry<K>): void {
+    #heapPush(entry: Entry<K, V>): void {
         const heap = this.#policy!.heap;
         let i = heap.length;
         heap.push(entry);
@@ -607,7 +629,7 @@ export class Collection<K, V> extends Map<K, V> {
         heap[i] = entry;
     }
 
-    #heapPop(): Entry<K> | undefined {
+    #heapPop(): Entry<K, V> | undefined {
         const heap = this.#policy!.heap;
         const top = heap[0];
         const last = heap.pop();
