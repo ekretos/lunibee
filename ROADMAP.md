@@ -83,6 +83,9 @@ gate, docs build, changelog, upgrade notes).
 
 ### 0.3.0 — complete the platform
 
+- **A workflow of its own** (breaking, direction not chosen yet). Renamed entry
+  points, definition-style events and commands, or result-style errors; the old API
+  stays as deprecated aliases. See Step 0b in `.roadmap/0.3.0.md`.
 - **Typed payloads.** Replace `Record<string, unknown>` message, edit, reply
   and follow-up options with typed interfaces (content, embeds, components,
   files, `allowed_mentions`, flags, poll, message reference), keeping unknown
