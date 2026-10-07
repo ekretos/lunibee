@@ -52,6 +52,69 @@ describe("Collection TTL", () => {
         expect(c.size).toBe(0);
     });
 
+    test("a record that changes its TTL keeps its place in the recency order", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<string, number>(null, {
+            ttl: 1_000,
+            maxSize: 3,
+        });
+        c.set("a", 1);
+        c.set("b", 2);
+        c.set("c", 3);
+        c.set("a", 4, 100);
+        c.set("d", 5);
+        expect([...c.keys()]).toEqual(["a", "c", "d"]);
+        expect(c.stats.evicted).toBe(1);
+        setSystemTime(new Date(1_000_150));
+        expect([...c.keys()]).toEqual(["c", "d"]);
+        c.set("e", 6);
+        c.set("f", 7);
+        expect([...c.keys()]).toEqual(["d", "e", "f"]);
+    });
+
+    test("an entry can lose and regain its TTL while it stays evictable", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<string, number>(null, { maxSize: 2 });
+        c.set("a", 1, 100);
+        c.set("a", 2);
+        setSystemTime(new Date(1_000_500));
+        expect(c.get("a")).toBe(2);
+        expect(c.ttlRemaining("a")).toBeUndefined();
+        c.set("a", 3, 100);
+        expect(c.ttlRemaining("a")).toBe(100);
+        c.set("b", 4);
+        c.set("c", 5);
+        expect([...c.keys()]).toEqual(["b", "c"]);
+        setSystemTime(new Date(1_001_000));
+        expect(c.size).toBe(2);
+    });
+
+    test("without maxSize, dropping the TTL leaves a plain entry", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<string, number>();
+        c.set("a", 1, 100);
+        c.set("a", 2);
+        setSystemTime(new Date(1_000_500));
+        expect(c.get("a")).toBe(2);
+        expect(c.stats.expired).toBe(0);
+    });
+
+    test("setWithoutTTL takes a TTL and LRU entry out of both", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<string, number>(null, {
+            ttl: 100,
+            maxSize: 2,
+        });
+        c.set("a", 1);
+        c.setWithoutTTL("a", 2);
+        c.set("b", 3);
+        c.set("c", 4);
+        c.set("d", 5);
+        expect([...c.keys()]).toEqual(["a", "c", "d"]);
+        setSystemTime(new Date(1_000_500));
+        expect([...c.keys()]).toEqual(["a"]);
+    });
+
     test("plain collections track hits and misses without a policy", () => {
         const c = new Collection<string, number>();
         c.set("a", 1);

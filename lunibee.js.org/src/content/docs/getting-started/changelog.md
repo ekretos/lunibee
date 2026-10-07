@@ -37,7 +37,8 @@ Security release. Fixes the findings of the 0.2.3 security review; the status of
 
 ### 🔧 Changed
 
-* **Plain collections are much lighter.** A `Collection` without `ttl` or `maxSize` no longer allocates expiry, recency and stats structures up front: about 20 bytes per empty collection instead of about 360. They are created when `ttl` or `maxSize` is set, or on the first `set()` with its own TTL. `set()` with a TTL or `maxSize` is also faster (about 25-30% for a collection with both). Behaviour and `stats` are unchanged.
+* **Plain collections are much lighter.** A `Collection` without `ttl` or `maxSize` no longer allocates expiry, recency and stats structures up front: about 20 bytes per empty collection instead of about 360. They are created when `ttl` or `maxSize` is set, or on the first `set()` with its own TTL. `set()` with a TTL or `maxSize` is also faster (about 40% for a collection with both), and `get()` on one with a TTL is about a third faster. `stats` are unchanged.
+* **Lapsed entries no longer push live ones out of a `maxSize` collection.** When a `set()` takes a collection over `maxSize`, entries whose TTL has already lapsed are dropped first (as `expired`), instead of evicting the least recently used live entry while a dead one lingered.
 * **Stricter public types, no `any`.** `WebhookClient.editMessage()` resolves to `APIMessage`; `WebhookMessageOptions.components` / `files` take component payloads (or builders) and `RESTFileAttachment`s; `VoiceGatewayTransport.send()` takes a `VoiceGatewayPayload`; `identifyPayload()` returns `GatewayPayload<IdentifyData>`; extra `GatewayProperties` / `IdentifyProperties` keys are strings; `MinimalRedisClient.set()` resolves to `string | null`. Code that compiled before only breaks if it relied on these being `any`.
 
 ### 📚 Documentation

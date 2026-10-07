@@ -1,93 +1,3 @@
-type RecencyNode<K> = {
-    key: K;
-    older: RecencyNode<K> | undefined;
-    newer: RecencyNode<K> | undefined;
-};
-
-/**
- * Keys in recency order with O(1) touch, promote, delete and oldest. A Set
- * cannot do this: repeatedly removing its first key leaves tombstones that
- * every new iterator scans past.
- */
-class RecencyList<K> {
-    readonly #nodes = new Map<K, RecencyNode<K>>();
-    #oldest: RecencyNode<K> | undefined;
-    #newest: RecencyNode<K> | undefined;
-
-    public get size(): number {
-        return this.#nodes.size;
-    }
-
-    public oldest(): K | undefined {
-        return this.#oldest?.key;
-    }
-
-    /** Removes and returns the oldest key. */
-    public shift(): K | undefined {
-        const node = this.#oldest;
-        if (!node) return undefined;
-        this.#unlink(node);
-        this.#nodes.delete(node.key);
-        return node.key;
-    }
-
-    /** Adds the key as newest, or moves it there. */
-    public touch(key: K): void {
-        const node = this.#nodes.get(key);
-        if (node) this.#moveNewest(node);
-        else this.add(key);
-    }
-
-    /** Adds a key known to be absent as newest. */
-    public add(key: K): void {
-        const created: RecencyNode<K> = {
-            key,
-            older: this.#newest,
-            newer: undefined,
-        };
-        if (this.#newest) this.#newest.newer = created;
-        else this.#oldest = created;
-        this.#newest = created;
-        this.#nodes.set(key, created);
-    }
-
-    /** Moves an existing key to newest; ignores unknown keys. */
-    public promote(key: K): void {
-        const node = this.#nodes.get(key);
-        if (node) this.#moveNewest(node);
-    }
-
-    public delete(key: K): boolean {
-        const node = this.#nodes.get(key);
-        if (!node) return false;
-        this.#unlink(node);
-        this.#nodes.delete(key);
-        return true;
-    }
-
-    public clear(): void {
-        this.#nodes.clear();
-        this.#oldest = this.#newest = undefined;
-    }
-
-    #unlink(node: RecencyNode<K>): void {
-        if (node.older) node.older.newer = node.newer;
-        else this.#oldest = node.newer;
-        if (node.newer) node.newer.older = node.older;
-        else this.#newest = node.older;
-        node.older = node.newer = undefined;
-    }
-
-    #moveNewest(node: RecencyNode<K>): void {
-        if (node === this.#newest) return;
-        this.#unlink(node);
-        node.older = this.#newest;
-        if (this.#newest) this.#newest.newer = node;
-        else this.#oldest = node;
-        this.#newest = node;
-    }
-}
-
 /** Retention policy for a {@link Collection}. */
 export interface CollectionOptions<K = unknown, V = unknown> {
     /** Default sliding TTL in ms for `set()`. Omit for no expiry. */
@@ -114,31 +24,47 @@ export interface CollectionStats {
 }
 
 /**
- * A TTL entry's record, shared by the expiry map and the heap. `filed` is the
- * deadline the heap ordered it by; `deadline` is the current one, which a
- * read moves later without touching the heap.
+ * Everything the policy knows about one key: its place in the recency list
+ * and its TTL. One record serves the policy map, the recency list and the
+ * expiry heap, so a write touches one extra hash entry and allocates once.
  */
-type Expiry<K> = { key: K; filed: number; deadline: number; window: number };
+type Entry<K> = {
+    key: K;
+    /** Neighbours in recency order; meaningful while `inLru`. */
+    older: Entry<K> | undefined;
+    newer: Entry<K> | undefined;
+    inLru: boolean;
+    /** TTL window in ms; 0 when the entry does not expire (and is not in the heap). */
+    window: number;
+    /** The current deadline; a read moves it later without touching the heap. */
+    deadline: number;
+    /** The deadline the heap ordered this record by. */
+    filed: number;
+};
 
 /**
  * Everything a retention policy needs. A Collection without `ttl` or
  * `maxSize` never creates one, so plain collections cost no more than a Map.
  */
 type Policy<K> = {
-    /** Deadlines of TTL entries only. */
-    expiry: Map<K, Expiry<K>>;
-    /** `set()` keys in recency order (oldest first); `setWithoutTTL()` keys are never here. */
-    lru: RecencyList<K>;
-    /** Min-heap by `filed`; a record that is no longer the map's value is stale and dropped lazily. */
-    heap: Expiry<K>[];
+    /** Keys with a TTL or a recency position; `setWithoutTTL()` keys are absent. */
+    entries: Map<K, Entry<K>>;
+    /** Oldest and newest entries of the recency list; only `maxSize` collections use it. */
+    oldest: Entry<K> | undefined;
+    newest: Entry<K> | undefined;
+    lruSize: number;
+    /** Min-heap by `filed`. A record that is no longer its key's map value is stale and dropped lazily. */
+    heap: Entry<K>[];
     timer?: ReturnType<typeof setTimeout>;
     armedFor: number;
 };
 
 function newPolicy<K>(): Policy<K> {
     return {
-        expiry: new Map(),
-        lru: new RecencyList<K>(),
+        entries: new Map(),
+        oldest: undefined,
+        newest: undefined,
+        lruSize: 0,
         heap: [],
         armedFor: Infinity,
     };
@@ -212,18 +138,11 @@ export class Collection<K, V> extends Map<K, V> {
         assertTTL(ttl);
         const window = ttl ?? this.#ttl;
         if (window !== undefined) this.#policy ??= newPolicy();
-        const policy = this.#policy;
-        if (!policy) return super.set(key, value);
-        // A key that was not stored before cannot have an expiry or recency record.
+        if (!this.#policy) return super.set(key, value);
+        // A key that was not stored before has no policy entry.
         const before = super.size;
         super.set(key, value);
-        const isNew = super.size !== before;
-        if (this.#maxSize !== undefined) {
-            if (isNew) policy!.lru.add(key);
-            else policy!.lru.touch(key);
-        }
-        if (window !== undefined) this.#schedule(key, window, isNew);
-        else if (policy.expiry.size > 0) policy.expiry.delete(key);
+        this.#track(key, window, super.size !== before);
         this.#enforceCap();
         return this;
     }
@@ -234,18 +153,19 @@ export class Collection<K, V> extends Map<K, V> {
      * later `set()`.
      */
     public setWithoutTTL(key: K, value: V): this {
-        const policy = this.#policy;
-        if (policy) {
-            if (policy.expiry.size > 0) policy.expiry.delete(key);
-            if (policy.lru.size > 0) policy.lru.delete(key);
-        }
+        if (this.#policy) this.#forget(key);
         super.set(key, value);
         return this;
     }
 
     /** Reads a value; restarts a TTL entry's window and promotes it. */
     public override get(key: K): V | undefined {
-        if (this.#expireIfDue(key)) {
+        const policy = this.#policy;
+        const entry = policy?.entries.get(key);
+        const timed = entry !== undefined && entry.window !== 0;
+        const now = timed ? Date.now() : 0;
+        if (entry && timed && entry.deadline <= now) {
+            this.#expire(entry);
             this.#misses++;
             return undefined;
         }
@@ -255,11 +175,9 @@ export class Collection<K, V> extends Map<K, V> {
             return undefined;
         }
         this.#hits++;
-        const policy = this.#policy;
-        if (policy) {
-            const expiry = policy.expiry.get(key);
-            if (expiry) expiry.deadline = Date.now() + expiry.window;
-            policy.lru.promote(key);
+        if (entry) {
+            if (timed) entry.deadline = now + entry.window;
+            if (entry.inLru) this.#promote(policy!, entry);
         }
         return value;
     }
@@ -290,11 +208,7 @@ export class Collection<K, V> extends Map<K, V> {
 
     public override delete(key: K): boolean {
         if (this.#expireIfDue(key)) return false;
-        const policy = this.#policy;
-        if (policy) {
-            policy.expiry.delete(key);
-            policy.lru.delete(key);
-        }
+        if (this.#policy) this.#forget(key);
         return super.delete(key);
     }
 
@@ -302,8 +216,9 @@ export class Collection<K, V> extends Map<K, V> {
         super.clear();
         const policy = this.#policy;
         if (!policy) return;
-        policy.expiry.clear();
-        policy.lru.clear();
+        policy.entries.clear();
+        policy.oldest = policy.newest = undefined;
+        policy.lruSize = 0;
         policy.heap.length = 0;
         if (policy.timer) clearTimeout(policy.timer);
         policy.timer = undefined;
@@ -345,13 +260,15 @@ export class Collection<K, V> extends Map<K, V> {
     /** Milliseconds until a key lapses, or undefined if absent or never expiring. */
     public ttlRemaining(key: K): number | undefined {
         if (this.#expireIfDue(key)) return undefined;
-        const expiry = this.#policy?.expiry.get(key);
-        return expiry && Math.max(0, expiry.deadline - Date.now());
+        const entry = this.#policy?.entries.get(key);
+        return entry && entry.window !== 0
+            ? Math.max(0, entry.deadline - Date.now())
+            : undefined;
     }
 
     /** Drops every lapsed TTL entry now. @returns How many were dropped. */
     public purge(): number {
-        if (!this.#policy || this.#policy.expiry.size === 0) return 0;
+        if (!this.#policy || this.#policy.heap.length === 0) return 0;
         const now = Date.now();
         let removed = 0;
         const dropped: [K, V][] = [];
@@ -367,20 +284,145 @@ export class Collection<K, V> extends Map<K, V> {
         return removed;
     }
 
+    /** Drops `key` if its TTL has lapsed. @returns Whether it did. */
     #expireIfDue(key: K): boolean {
-        const expiry = this.#policy?.expiry.get(key);
-        if (!expiry || expiry.deadline > Date.now()) return false;
-        const value = super.get(key)!;
-        this.#remove(key);
-        this.#expired++;
-        this.#notify(key, value, "expired");
+        const entry = this.#policy?.entries.get(key);
+        if (!entry || entry.window === 0 || entry.deadline > Date.now())
+            return false;
+        this.#expire(entry);
         return true;
     }
 
+    #expire(entry: Entry<K>): void {
+        const value = super.get(entry.key)!;
+        this.#remove(entry.key);
+        this.#expired++;
+        this.#notify(entry.key, value, "expired");
+    }
+
     #remove(key: K): void {
-        this.#policy?.expiry.delete(key);
-        this.#policy?.lru.delete(key);
+        this.#forget(key);
         super.delete(key);
+    }
+
+    /** Drops a key's policy entry (recency position and TTL); its heap record goes stale. */
+    #forget(key: K): void {
+        const policy = this.#policy!;
+        const entry = policy.entries.get(key);
+        if (!entry) return;
+        if (entry.inLru) this.#unlink(policy, entry);
+        policy.entries.delete(key);
+    }
+
+    /**
+     * Brings the key's policy entry in line with a `set()`: marks it newest
+     * when `maxSize` is set, and gives it a deadline when `window` is defined.
+     * Only a new entry, or a deadline that moves earlier, gets a heap record;
+     * a later one is a number write and the record re-files itself when it
+     * surfaces.
+     */
+    #track(key: K, window: number | undefined, isNew: boolean): void {
+        const policy = this.#policy!;
+        const lru = this.#maxSize !== undefined;
+        let entry = isNew ? undefined : policy.entries.get(key);
+        if (window === undefined) {
+            if (entry && entry.window !== 0) {
+                // It had a TTL and now has none.
+                if (lru) entry = this.#replace(policy, entry, 0, 0);
+                else {
+                    this.#forget(key);
+                    return;
+                }
+            }
+            if (!entry && lru) {
+                entry = this.#create(key, 0, 0);
+                policy.entries.set(key, entry);
+            }
+            if (entry) this.#promote(policy, entry);
+            return;
+        }
+        const deadline = Date.now() + window;
+        if (entry && entry.window !== 0) {
+            entry.deadline = deadline;
+            entry.window = window;
+            if (deadline < entry.filed)
+                // The heap cannot move a record up, and this one is in it: file a fresh one.
+                entry = this.#replace(policy, entry, window, deadline);
+            else {
+                if (entry.inLru) this.#promote(policy, entry);
+                return;
+            }
+        } else if (entry) {
+            entry.window = window;
+            entry.deadline = entry.filed = deadline;
+        } else {
+            entry = this.#create(key, window, deadline);
+            policy.entries.set(key, entry);
+        }
+        if (lru) this.#promote(policy, entry);
+        this.#heapPush(entry);
+        if (policy.heap.length > 2 * policy.entries.size + 8) this.#compact();
+        // A timer already armed for an earlier deadline stays correct.
+        if (policy.timer === undefined || deadline < policy.armedFor)
+            this.#rearm();
+    }
+
+    #create(key: K, window: number, deadline: number): Entry<K> {
+        return {
+            key,
+            older: undefined,
+            newer: undefined,
+            inLru: false,
+            window,
+            deadline,
+            filed: deadline,
+        };
+    }
+
+    /** Swaps in a fresh record for `old` (which goes stale), keeping its recency position. */
+    #replace(
+        policy: Policy<K>,
+        old: Entry<K>,
+        window: number,
+        deadline: number,
+    ): Entry<K> {
+        const entry: Entry<K> = { ...old, window, deadline, filed: deadline };
+        if (old.inLru) {
+            if (old.older) old.older.newer = entry;
+            else policy.oldest = entry;
+            if (old.newer) old.newer.older = entry;
+            else policy.newest = entry;
+        }
+        policy.entries.set(old.key, entry);
+        return entry;
+    }
+
+    /** Makes an entry the newest in recency order, linking it first if needed. */
+    #promote(policy: Policy<K>, entry: Entry<K>): void {
+        if (entry === policy.newest) return;
+        if (entry.inLru) this.#unlink(policy, entry, true);
+        else {
+            entry.inLru = true;
+            policy.lruSize++;
+        }
+        entry.older = policy.newest;
+        entry.newer = undefined;
+        if (policy.newest) policy.newest.newer = entry;
+        else policy.oldest = entry;
+        policy.newest = entry;
+    }
+
+    /** Takes an entry out of the recency list; `keepCount` is for a move within it. */
+    #unlink(policy: Policy<K>, entry: Entry<K>, keepCount = false): void {
+        if (entry.older) entry.older.newer = entry.newer;
+        else policy.oldest = entry.newer;
+        if (entry.newer) entry.newer.older = entry.older;
+        else policy.newest = entry.older;
+        entry.older = entry.newer = undefined;
+        if (!keepCount) {
+            entry.inLru = false;
+            policy.lruSize--;
+        }
     }
 
     #notify(key: K, value: V, reason: EvictionReason): void {
@@ -396,46 +438,30 @@ export class Collection<K, V> extends Map<K, V> {
     #enforceCap(): void {
         if (this.#maxSize === undefined) return;
         const policy = this.#policy!;
-        while (policy.lru.size > this.#maxSize) {
-            const oldest = policy.lru.shift() as K;
-            const value = this.#onEvict ? super.get(oldest) : undefined;
-            policy.expiry.delete(oldest);
-            super.delete(oldest);
+        // Lapsed entries must not push live ones out.
+        if (
+            policy.lruSize > this.#maxSize &&
+            policy.heap.length > 0 &&
+            policy.heap[0]!.filed <= Date.now()
+        )
+            this.purge();
+        while (policy.lruSize > this.#maxSize) {
+            const oldest = policy.oldest!;
+            const value = this.#onEvict ? super.get(oldest.key) : undefined;
+            this.#unlink(policy, oldest);
+            policy.entries.delete(oldest.key);
+            super.delete(oldest.key);
             this.#evicted++;
-            this.#notify(oldest, value as V, "evicted");
+            this.#notify(oldest.key, value as V, "evicted");
         }
-    }
-
-    /**
-     * Gives an entry a deadline. Extending one writes a number; its heap
-     * record re-files itself when it surfaces. Only a deadline that moves
-     * earlier (or a new entry) gets a record in the heap.
-     */
-    #schedule(key: K, window: number, isNew: boolean): void {
-        const p = this.#policy!;
-        const deadline = Date.now() + window;
-        if (!isNew) {
-            const existing = p.expiry.get(key);
-            if (existing) {
-                existing.deadline = deadline;
-                existing.window = window;
-                if (deadline >= existing.filed) return;
-            }
-        }
-        const record: Expiry<K> = { key, filed: deadline, deadline, window };
-        p.expiry.set(key, record);
-        this.#heapPush(record);
-        if (p.heap.length > 2 * p.expiry.size + 8) this.#compact();
-        // A timer already armed for an earlier deadline stays correct.
-        if (p.timer === undefined || deadline < p.armedFor) this.#rearm();
     }
 
     #nextDeadline(): number {
-        const p = this.#policy!;
+        const policy = this.#policy!;
         for (;;) {
-            const top = p.heap[0];
+            const top = policy.heap[0];
             if (top === undefined) return Infinity;
-            if (p.expiry.get(top.key) !== top) {
+            if (policy.entries.get(top.key) !== top) {
                 this.#heapPop();
                 continue;
             }
@@ -448,12 +474,12 @@ export class Collection<K, V> extends Map<K, V> {
     }
 
     #compact(): void {
-        const p = this.#policy!;
-        const live = p.heap.filter(
-            (record) => p.expiry.get(record.key) === record,
+        const policy = this.#policy!;
+        const live = policy.heap.filter(
+            (entry) => policy.entries.get(entry.key) === entry,
         );
-        p.heap.length = 0;
-        for (const record of live) this.#heapPush(record);
+        policy.heap.length = 0;
+        for (const entry of live) this.#heapPush(entry);
     }
 
     #rearm(): void {
@@ -476,21 +502,21 @@ export class Collection<K, V> extends Map<K, V> {
         (p.timer as { unref?: () => void }).unref?.();
     }
 
-    #heapPush(record: Expiry<K>): void {
+    #heapPush(entry: Entry<K>): void {
         const heap = this.#policy!.heap;
         let i = heap.length;
-        heap.push(record);
+        heap.push(entry);
         while (i > 0) {
             const parent = (i - 1) >> 1;
             const above = heap[parent]!;
-            if (above.filed <= record.filed) break;
+            if (above.filed <= entry.filed) break;
             heap[i] = above;
             i = parent;
         }
-        heap[i] = record;
+        heap[i] = entry;
     }
 
-    #heapPop(): Expiry<K> | undefined {
+    #heapPop(): Entry<K> | undefined {
         const heap = this.#policy!.heap;
         const top = heap[0];
         const last = heap.pop();
