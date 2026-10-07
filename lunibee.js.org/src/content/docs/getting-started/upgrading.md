@@ -11,7 +11,10 @@ A security release; upgrade. No code changes are required, but check these:
 * **Timeouts:** permission checks on a timed-out member now return only View Channel and Read Message History, as Discord enforces.
 * **File paths from users:** use `new CreateAttachment(path, { root: "./uploads" })` (or pass bytes) so a path cannot read files outside that folder.
 * **Mentions:** if your bot echoes user text, set `allowedMentions: { parse: [] }` on the client.
+* **Stricter types:** a few public types lost `any` (`WebhookClient.editMessage()` now resolves to `APIMessage`, `VoiceGatewayTransport.send()` takes a `VoiceGatewayPayload`, extra `properties` keys must be strings). TypeScript only flags code that relied on `any`.
+* **Integer and number choices:** names must be 1-100 characters, as for string choices.
 
+## 0.2.2 → 0.2.3
 
 Nothing breaks: deprecated APIs keep working until 0.3.0 and your editor strikes them
 through. `bunx lunibee migrate` lists them in your project and `--fix` renames the old
