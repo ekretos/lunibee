@@ -77,12 +77,6 @@ export const Routes = {
     /** Pins (PUT) or unpins (DELETE) a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Pin route. */
     channelMessagesPin: (channelId: string, messageId: string) =>
         `/channels/${snowflake(channelId, "Channel ID")}/messages/pins/${snowflake(messageId, "Message ID")}`,
-    /** @deprecated Discord deprecated this endpoint. Use {@link Routes.channelMessagesPins}, which returns `{ items, has_more }`. Removed in 0.3.0. */
-    channelPins: (channelId: string) =>
-        `/channels/${snowflake(channelId, "Channel ID")}/pins`,
-    /** @deprecated Discord deprecated this endpoint. Use {@link Routes.channelMessagesPin}. Removed in 0.3.0. */
-    channelPin: (channelId: string, messageId: string) =>
-        `/channels/${snowflake(channelId, "Channel ID")}/pins/${snowflake(messageId, "Message ID")}`,
     /** Creates a thread from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Message-thread route. */
     messageThread: (channelId: string, messageId: string) =>
         `${Routes.message(channelId, messageId)}/threads`,

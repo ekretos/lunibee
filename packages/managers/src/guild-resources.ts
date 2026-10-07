@@ -148,14 +148,13 @@ export class GuildScheduledEventManager extends Manager<
     /** Creates an event. */
     public async create(
         options: GuildScheduledEventOptions,
-        reason?: string,
     ): Promise<APIGuildScheduledEvent> {
         const [payload, optionsReason] = splitReason(options);
         return this.#store(
             await this.#rest.post(
                 Routes.guildScheduledEvents(this.guildId),
                 payload,
-                { reason: optionsReason ?? reason },
+                { reason: optionsReason },
             ),
         );
     }
@@ -164,14 +163,13 @@ export class GuildScheduledEventManager extends Manager<
     public async edit(
         eventId: string,
         options: GuildScheduledEventOptions,
-        reason?: string,
     ): Promise<APIGuildScheduledEvent> {
         const [payload, optionsReason] = splitReason(options);
         return this.#store(
             await this.#rest.patch(
                 Routes.guildScheduledEvent(this.guildId, eventId),
                 payload,
-                { reason: optionsReason ?? reason },
+                { reason: optionsReason },
             ),
         );
     }
@@ -238,7 +236,6 @@ export class StageInstanceManager extends Manager<string, APIStageInstance> {
     public async create(
         channelId: string,
         options: StageInstanceCreateOptions,
-        reason?: string,
     ): Promise<APIStageInstance> {
         return this.#store(
             await this.#rest.post(
@@ -250,7 +247,7 @@ export class StageInstanceManager extends Manager<string, APIStageInstance> {
                     send_start_notification: options.sendStartNotification,
                     guild_scheduled_event_id: options.guildScheduledEventId,
                 },
-                { reason: options.reason ?? reason },
+                { reason: options.reason },
             ),
         );
     }
@@ -266,13 +263,12 @@ export class StageInstanceManager extends Manager<string, APIStageInstance> {
     public async edit(
         channelId: string,
         options: { topic?: string; privacyLevel?: number; reason?: string },
-        reason?: string,
     ): Promise<APIStageInstance> {
         return this.#store(
             await this.#rest.patch(
                 Routes.stageInstanceByChannel(channelId),
                 { topic: options.topic, privacy_level: options.privacyLevel },
-                { reason: options.reason ?? reason },
+                { reason: options.reason },
             ),
         );
     }
@@ -358,14 +354,18 @@ export class PermissionOverwriteManager {
             (BigInt(existing?.allow ?? 0) & ~touched) | (changes.allow ?? 0n);
         const deny =
             (BigInt(existing?.deny ?? 0) & ~touched) | (changes.deny ?? 0n);
-        await this.edit(overwriteId, { type, allow, deny }, options.reason);
+        await this.edit(overwriteId, {
+            type,
+            allow,
+            deny,
+            reason: options.reason,
+        });
     }
 
     /** Creates or replaces the overwrite for a role or member. */
     public async edit(
         overwriteId: string,
         options: PermissionOverwriteOptions,
-        reason?: string,
     ): Promise<void> {
         await this.#rest.put(
             Routes.channelPermission(this.channelId, overwriteId),
@@ -374,7 +374,7 @@ export class PermissionOverwriteManager {
                 allow: BigInt(options.allow ?? 0).toString(),
                 deny: BigInt(options.deny ?? 0).toString(),
             },
-            { reason: options.reason ?? reason },
+            { reason: options.reason },
         );
     }
 

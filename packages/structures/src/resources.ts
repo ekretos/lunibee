@@ -665,8 +665,3 @@ export class GuildOnboarding extends BaseStructure {
         this.mode = data.mode;
     }
 }
-
-/** @deprecated Use {@link WebhookEnum}. Removed in 0.3.0. */
-export const WebhookType = WebhookEnum;
-/** @deprecated Use {@link WebhookEnum}. Removed in 0.3.0. */
-export type WebhookType = WebhookEnum;

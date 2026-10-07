@@ -216,12 +216,3 @@ function url(value: string, field: string): string {
         throw new TypeError(`${field} must be a valid URL.`, { cause: error });
     }
 }
-
-// ─── Deprecated names (0.2.2), removed in 0.3.0 ────────────────────────────────
-// Builders are now `CreateX` (`ButtonBuilder` → `CreateButton`); `…Style` became
-// `…Type` and `…Type` became `…Enum`.
-
-/** @deprecated Use {@link CreateEmbed}. Removed in 0.3.0. */
-export const EmbedBuilder = CreateEmbed;
-/** @deprecated Use {@link CreateEmbed}. Removed in 0.3.0. */
-export type EmbedBuilder = CreateEmbed;

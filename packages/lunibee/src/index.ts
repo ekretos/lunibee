@@ -114,12 +114,6 @@ export {
     ActivityEnum,
     VerificationLevel,
     PremiumTier,
-    // Deprecated names, removed in 0.3.0 (`…Type` became `…Enum`).
-    ChannelType,
-    ApplicationCommandOptionType,
-    ApplicationCommandType,
-    StickerFormatType,
-    StickerType,
 } from "@lunibee/types";
 
 // ── Builders (takes priority over types for component enums) ──────────────────

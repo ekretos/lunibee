@@ -74,17 +74,16 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
         });
     }
 
-    /** Edits a guild member (nickname, roles, timeout, mute, deaf). Put the audit-log reason in `options.reason`. @param reason Deprecated: use `options.reason`. Removed in 0.3.0. */
+    /** Edits a guild member (nickname, roles, timeout, mute, deaf). Put the audit-log reason in `options.reason`.*/
     public async edit(
         userId: string,
         options: MemberEditOptions,
-        reason?: string,
     ): Promise<GuildMember> {
         const [payload, optionsReason] = splitReason(options);
         const data = await this.#rest.patch<
             import("@lunibee/types").APIGuildMember
         >(Routes.guildMember(this.guildId, userId), payload, {
-            reason: optionsReason ?? reason,
+            reason: optionsReason,
         });
         const member = new GuildMember(
             { ...data, guild_id: this.guildId },
@@ -129,10 +128,9 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
             milliseconds === null
                 ? null
                 : new Date(Date.now() + milliseconds).toISOString();
-        return this.edit(
-            userId,
-            { communication_disabled_until: timeoutDate },
+        return this.edit(userId, {
+            communication_disabled_until: timeoutDate,
             reason,
-        );
+        });
     }
 }

@@ -5,7 +5,6 @@ export {
     PermissionSet,
     PermissionsBitField,
     PermissionOverwriteEnum,
-    PermissionOverwriteType,
     computePermissions,
     type PermissionContext,
     type PermissionOverwrite,
@@ -462,7 +461,13 @@ export class Client
             banMember: (guildId, userId, options) =>
                 this.guilds.members(guildId).ban(userId, options),
             editMember: (guildId, userId, options, reason) =>
-                this.guilds.members(guildId).edit(userId, options, reason),
+                this.guilds.members(guildId).edit(userId, {
+                    ...options,
+                    reason:
+                        typeof options.reason === "string"
+                            ? options.reason
+                            : reason,
+                }),
             addMemberRole: (guildId, userId, roleId, reason) =>
                 this.guilds.members(guildId).addRole(userId, roleId, reason),
             removeMemberRole: (guildId, userId, roleId, reason) =>
@@ -1431,8 +1436,6 @@ export class Client
         code: string,
         options?: {
             withCounts?: boolean;
-            /** @deprecated No effect: Discord always returns `expires_at` and deprecated `with_expiration`. Removed in 0.3.0. */
-            withExpiration?: boolean;
             guildScheduledEventId?: string;
         },
     ): Promise<Record<string, unknown>> {

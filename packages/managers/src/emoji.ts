@@ -92,11 +92,6 @@ export class EmojiManager extends Manager<string, Emoji> {
         this.delete(emojiId);
     }
 
-    /** @deprecated Use {@link EmojiManager.remove}, which also takes an audit-log reason. Removed in 0.3.0. */
-    public deleteEmoji(emojiId: string): Promise<void> {
-        return this.remove(emojiId);
-    }
-
     /** Upserts an emoji into the manager cache. Custom emojis are keyed by their
      * snowflake ID; unicode emojis (no ID) are keyed by `unicode:${name}` so repeated
      * upserts reuse the same cached instance instead of allocating a new one each call. */

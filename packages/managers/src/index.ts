@@ -261,10 +261,6 @@ export class ChannelManager extends Manager<string, Channel> {
         await this.#rest.delete(Routes.channel(channelId), { reason });
         this.delete(channelId);
     }
-    /** @deprecated Use {@link ChannelManager.remove}, which also takes an audit-log reason. Removed in 0.3.0. */
-    public deleteChannel(channelId: string): Promise<void> {
-        return this.remove(channelId);
-    }
     /** Evicts a channel, dropping its per-channel message manager with it.
      * Overrides {@link Manager.delete} so cache eviction driven by a Gateway
      * `CHANNEL_DELETE`/`THREAD_DELETE` — which calls `delete` rather than
@@ -279,13 +275,6 @@ export class ChannelManager extends Manager<string, Channel> {
         options: MessageCreateOptions,
     ): Promise<Message> {
         return this.messages(channelId).send(options);
-    }
-    /** @deprecated Use {@link ChannelManager.send}. Removed in 0.3.0. */
-    public sendMessage(
-        channelId: string,
-        options: MessageCreateOptions,
-    ): Promise<Message> {
-        return this.send(channelId, options);
     }
     public async fetchMessage(
         channelId: string,
@@ -541,10 +530,6 @@ export class ChannelManager extends Manager<string, Channel> {
             after: messages[messages.length - 1]?.id,
             hasMore: messages.length === limit,
         };
-    }
-    /** @deprecated Use {@link ChannelManager.bulkDeleteMessages}, which also takes an audit-log reason. Removed in 0.3.0. */
-    public bulkDelete(channelId: string, messageIds: string[]): Promise<void> {
-        return this.bulkDeleteMessages(channelId, messageIds);
     }
     public override clear(): void {
         this.#messageManagers.clear();

@@ -229,10 +229,6 @@ export class GuildManager extends ResourceManager<string, Guild> {
     public async remove(id: string): Promise<void> {
         await this.#rest.delete(Routes.guild(id));
     }
-    /** @deprecated Use {@link GuildManager.remove}. Removed in 0.3.0. */
-    public deleteGuild(id: string): Promise<void> {
-        return this.remove(id);
-    }
 
     /** Fetches a guild's preview (even if the bot is not in the guild). */
     public async fetchPreview(id: string): Promise<APIGuildPreview> {

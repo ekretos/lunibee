@@ -109,10 +109,6 @@ export class RoleManager extends ResourceManager<string, Role> {
             return role;
         });
     }
-    /** @deprecated Use {@link RoleManager.remove}, which also takes an audit-log reason. Removed in 0.3.0. */
-    public deleteRole(roleId: string): Promise<void> {
-        return this.remove(roleId);
-    }
 }
 
 /** Role options as Discord expects them: `permissions` as a decimal string. */

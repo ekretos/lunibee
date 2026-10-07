@@ -16,10 +16,7 @@ export const InteractionEnum = {
 export type InteractionEnum =
     (typeof InteractionEnum)[keyof typeof InteractionEnum];
 // Re-export for consumers who import from structures directly
-export {
-    InteractionResponseEnum,
-    InteractionResponseType,
-} from "@lunibee/types";
+export { InteractionResponseEnum } from "@lunibee/types";
 /** Data shared by Discord interactions. */
 export interface InteractionData {
     /** Interaction identifier. */
@@ -839,8 +836,3 @@ export function createInteraction(
             return new Interaction(client, data);
     }
 }
-
-/** @deprecated Use {@link InteractionEnum}. Removed in 0.3.0. */
-export const InteractionType = InteractionEnum;
-/** @deprecated Use {@link InteractionEnum}. Removed in 0.3.0. */
-export type InteractionType = InteractionEnum;

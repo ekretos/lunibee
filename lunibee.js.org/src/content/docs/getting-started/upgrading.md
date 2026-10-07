@@ -5,7 +5,7 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 
 ## 0.2.x → 0.3.0 (unreleased)
 
-Nothing you wrote stops working: the new workflow sits beside the old API. Move at your own pace.
+Two parts. **Removed:** the APIs deprecated in 0.2.x are gone (see the changelog's Removed list); run `bunx lunibee migrate --fix` to rename the old names, then `bunx lunibee migrate` lists the calls to change by hand (`deleteRole` → `roles.remove`, `sendMessage` → `send`, `edit(id, options, reason)` → `edit(id, { ...options, reason })`…). **New workflow:** it sits beside the manager API, so move at your own pace.
 
 | Before | After |
 | --- | --- |
@@ -21,7 +21,7 @@ Nothing you wrote stops working: the new workflow sits beside the old API. Move 
 * `bot` is only a name: `new Client(...)` is unchanged.
 * `bot.person(id)` is a user by id; `bot.user` is still the bot's own account.
 * `lunibee create command` now writes `command()` files (`--slash`, `--prefix`, `--both`); run `lunibee sync commands` after adding files by hand.
-* `lunibee migrate` still handles the renamed 0.2.x APIs only. The calls above cannot be rewritten safely by text, because a `guilds.fetch()` on a Lunibee client and one on another object look the same.
+* `lunibee migrate` handles the removed 0.2.x APIs only. The calls above cannot be rewritten safely by text, because a `guilds.fetch()` on a Lunibee client and one on another object look the same.
 
 ## 0.2.3 → 0.2.4
 
@@ -92,7 +92,7 @@ bunx lunibee handler --fix    # add the client parameter, fix folder case, resyn
 `create command` now also generates `data` and `execute()`; existing command
 files keep working. See the [CLI page](/packages/cli/).
 
-The old names keep working in 0.2.x and are **removed in 0.3.0**. To move to the new names, rename imports and uses:
+The old names keep working in 0.2.x and are **removed in 0.3.0** (see [0.2.x → 0.3.0](#02x--030-unreleased)). To move to the new names, rename imports and uses:
 
 | Before | Now |
 |---|---|

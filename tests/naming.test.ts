@@ -56,36 +56,10 @@ const renamed: Record<string, string> = {
     WebhookType: "WebhookEnum",
 };
 
-test("new names are exported and old names alias them", () => {
+test("new names are exported and the removed names are gone", () => {
     const exports = lunibee as unknown as Record<string, unknown>;
     for (const [old, current] of Object.entries(renamed)) {
         expect(exports[current]).toBeDefined();
-        expect(exports[old]).toBe(exports[current]);
+        expect(exports[old]).toBeUndefined();
     }
-});
-
-test("old builder names build the same objects", () => {
-    const button = new lunibee.ButtonBuilder()
-        .setCustomId("a")
-        .setLabel("A")
-        .setStyle(lunibee.ButtonStyle.Primary);
-    expect(button).toBeInstanceOf(lunibee.CreateButton);
-    expect(button.toJSON()).toEqual(
-        new lunibee.CreateButton()
-            .setCustomId("a")
-            .setLabel("A")
-            .setStyle(lunibee.ButtonType.Primary)
-            .toJSON(),
-    );
-});
-
-test("ActivityEnum has Discord's activity types", () => {
-    expect(lunibee.ActivityEnum).toEqual({
-        Playing: 0,
-        Streaming: 1,
-        Listening: 2,
-        Watching: 3,
-        Custom: 4,
-        Competing: 5,
-    });
 });

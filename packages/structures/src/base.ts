@@ -267,13 +267,6 @@ export class Channel extends BaseStructure {
         return this.#context.sendMessage(this.id, options);
     }
 
-    /** @deprecated Use {@link Channel.send}. Removed in 0.3.0. */
-    public sendMessage(
-        options: Record<string, unknown> & { content?: string },
-    ): Promise<import("./index.js").Message> {
-        return this.send(options);
-    }
-
     /** Edits this channel. @param options Channel fields to change. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
     public edit(options: Record<string, unknown>): Promise<Channel> {
         if (!this.#context?.editChannel)

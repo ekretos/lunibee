@@ -45,53 +45,6 @@ export {
     CreateContextMenuCommand,
 } from "./commands.js";
 export { CreateAttachment, type AttachmentData } from "./attachment.js";
-
-// Deprecated names (0.2.2), removed in 0.3.0.
-export { AttachmentBuilder } from "./attachment.js";
-export { EmbedBuilder } from "./embed.js";
-export {
-    AttachmentOptionBuilder,
-    BooleanOptionBuilder,
-    ChannelOptionBuilder,
-    CommandOptionBuilder,
-    ContextMenuCommandBuilder,
-    IntegerOptionBuilder,
-    MentionableOptionBuilder,
-    MessageCommandBuilder,
-    NumberOptionBuilder,
-    RoleOptionBuilder,
-    SlashCommandBuilder,
-    StringOptionBuilder,
-    SubcommandBuilder,
-    SubcommandGroupBuilder,
-    UserCommandBuilder,
-    UserOptionBuilder,
-    ApplicationCommandOptionType,
-} from "./commands.js";
-export {
-    ButtonBuilder,
-    ChannelSelectMenuBuilder,
-    ContainerBuilder,
-    ContentInventoryEntryBuilder,
-    EntitySelectBuilder,
-    FileComponentBuilder,
-    MediaGalleryBuilder,
-    MentionableSelectMenuBuilder,
-    ModalBuilder,
-    RoleSelectMenuBuilder,
-    SectionBuilder,
-    SeparatorBuilder,
-    StringSelectBuilder,
-    StringSelectMenuBuilder,
-    TextDisplayBuilder,
-    TextInputBuilder,
-    ThumbnailBuilder,
-    UserSelectMenuBuilder,
-    ActionRowBuilder,
-    ButtonStyle,
-    TextInputStyle,
-    ComponentType,
-} from "./components.js";
 export type {
     APIComponent,
     APIComponentEmoji,

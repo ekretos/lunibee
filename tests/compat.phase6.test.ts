@@ -100,7 +100,7 @@ describe("guild resource managers", () => {
         expect(events).toBeInstanceOf(GuildScheduledEventManager);
         await events.fetch("9", { withUserCount: true });
         await events.fetchAll();
-        await events.create({ name: "e" }, "why");
+        await events.create({ name: "e", reason: "why" });
         await events.edit("9", { name: "f" });
         await events.fetchSubscribers("9", { limit: 500, withMember: true });
         await events.remove("9");
@@ -145,7 +145,12 @@ describe("guild resource managers", () => {
         const { rest, calls } = recordingRest(() => undefined);
         const overwrites = new ChannelManager(rest).permissionOverwrites("4");
         expect(overwrites).toBeInstanceOf(PermissionOverwriteManager);
-        await overwrites.edit("8", { type: 0, allow: 1024n, deny: 2 }, "r");
+        await overwrites.edit("8", {
+            type: 0,
+            allow: 1024n,
+            deny: 2,
+            reason: "r",
+        });
         await overwrites.remove("8");
         expect(calls).toEqual([
             [

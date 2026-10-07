@@ -17,6 +17,17 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 * **`parseDuration()`** turns `"90s"`, `"10m"`, `"1h30m"` into milliseconds.
 * **CLI: `create command --slash|--prefix|--both`** writes a `command()` file (slash by default, `--prefix` for prefix-only, `--both` for one file answering both) and **`lunibee sync commands`** regenerates `src/commands/index.ts` with `registerCommands(bot)`. `create command` now emits the `command()` form instead of `data` + `execute()`; existing command files keep working.
 
+### ⚠️ Removed
+
+Everything deprecated in 0.2.x is gone. `lunibee migrate --fix` renames the old names and lists the calls to change by hand.
+
+* **The 49 pre-0.2.2 names:** every `…Builder` (`ButtonBuilder` → `CreateButton`, `SlashCommandBuilder` → `CreateSlashCommand`, `EmbedBuilder` → `CreateEmbed`…), `ButtonStyle` / `TextInputStyle` (→ `ButtonType` / `TextInputType`) and the old `…Type` sets (`ChannelType` → `ChannelEnum`, `ComponentType` → `ComponentEnum`, `InteractionType` → `InteractionEnum`, `WebhookType` → `WebhookEnum`, `PermissionOverwriteType` → `PermissionOverwriteEnum`…).
+* **`Routes.channelPins` and `Routes.channelPin`** → `Routes.channelMessagesPins` (returns `{ items, has_more }`) and `Routes.channelMessagesPin`.
+* **`setDMPermission()` and `dm_permission`** → `setContexts(0)` for guilds only, `setContexts(0, 1)` to allow the bot's DMs.
+* **`fetchInvite({ withExpiration })`**: Discord always returns `expires_at`.
+* **`deleteRole`, `deleteEmoji`, `deleteChannel`, `deleteGuild`** → `remove(id, reason?)`. **`sendMessage()`** on `Channel` and `ChannelManager` → `send()`. **`ChannelManager.bulkDelete()`** → `bulkDeleteMessages(id, ids, reason?)`.
+* **The positional `reason` after an options object** on `members.edit`, scheduled events `create`/`edit`, stage instances `create`/`edit` and permission overwrites `edit` → `{ …options, reason }`.
+
 ### 📚 Documentation
 
 * Quick Start, `examples/basic` and the Upgrading page use `bot`, `command()` and handles. The Upgrading page has a before/after table for 0.3.0.

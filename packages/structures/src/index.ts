@@ -352,7 +352,6 @@ export {
     Invite,
     Webhook,
     WebhookEnum,
-    WebhookType,
     Emoji,
     AutoModerationRule,
     WelcomeScreenChannel,

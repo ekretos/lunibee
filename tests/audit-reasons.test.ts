@@ -145,17 +145,6 @@ describe("audit-log reasons", () => {
         calls.forEach((call, i) => expectReason(call, reasons[i]!));
     });
 
-    test("the old positional reason after options still works", async () => {
-        const { calls, guilds } = setup();
-        await guilds.members(GUILD).edit(USER, { nick: "n" }, "legacy");
-        await guilds.scheduledEvents(GUILD).create({ name: "e" }, "legacy");
-        // options.reason wins when both are given.
-        await guilds
-            .members(GUILD)
-            .edit(USER, { nick: "n", reason: "new" }, "old");
-        expect(calls.map((c) => c.reason)).toEqual(["legacy", "legacy", "new"]);
-    });
-
     test("role create and edit send their reason (they used to drop it)", async () => {
         const { calls, guilds } = setup();
         await guilds.roles(GUILD).create({ name: "mods", reason: "new team" });

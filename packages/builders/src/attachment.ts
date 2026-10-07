@@ -82,15 +82,6 @@ export class CreateAttachment {
     }
 }
 
-// ─── Deprecated names (0.2.2), removed in 0.3.0 ────────────────────────────────
-// Builders are now `CreateX` (`ButtonBuilder` → `CreateButton`); `…Style` became
-// `…Type` and `…Type` became `…Enum`.
-
-/** @deprecated Use {@link CreateAttachment}. Removed in 0.3.0. */
-export const AttachmentBuilder = CreateAttachment;
-/** @deprecated Use {@link CreateAttachment}. Removed in 0.3.0. */
-export type AttachmentBuilder = CreateAttachment;
-
 /** Resolves `file` against `root`, refusing anything outside it (after following symlinks). */
 async function insideRoot(root: string, file: string): Promise<string> {
     const base = await realpath(root);
