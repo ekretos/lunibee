@@ -24,6 +24,34 @@ describe("Collection TTL", () => {
         expect(c.ttlRemaining("again")).toBe(50);
     });
 
+    test("a shorter TTL on an existing entry brings its expiry forward", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<string, number>(null, { ttl: 1_000 });
+        c.set("a", 1);
+        c.set("b", 2);
+        c.set("a", 3, 100);
+        expect(c.ttlRemaining("a")).toBe(100);
+        setSystemTime(new Date(1_000_150));
+        expect(c.has("a")).toBe(false);
+        expect(c.get("b")).toBe(2);
+        setSystemTime(new Date(1_001_200));
+        expect(c.size).toBe(0);
+        expect(c.stats.expired).toBe(2);
+    });
+
+    test("many re-sets keep the expiry heap bounded and correct", () => {
+        setSystemTime(new Date(1_000_000));
+        const c = new Collection<number, number>(null, { ttl: 1_000 });
+        for (let round = 0; round < 50; round++)
+            for (let key = 0; key < 20; key++) {
+                c.set(key, round, 1_000 - round);
+                setSystemTime(new Date(1_000_000 + round));
+            }
+        expect(c.size).toBe(20);
+        setSystemTime(new Date(1_002_000));
+        expect(c.size).toBe(0);
+    });
+
     test("plain collections track hits and misses without a policy", () => {
         const c = new Collection<string, number>();
         c.set("a", 1);

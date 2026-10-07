@@ -1,7 +1,7 @@
 type RecencyNode<K> = {
     key: K;
-    older?: RecencyNode<K>;
-    newer?: RecencyNode<K>;
+    older: RecencyNode<K> | undefined;
+    newer: RecencyNode<K> | undefined;
 };
 
 /**
@@ -11,8 +11,8 @@ type RecencyNode<K> = {
  */
 class RecencyList<K> {
     readonly #nodes = new Map<K, RecencyNode<K>>();
-    #oldest?: RecencyNode<K>;
-    #newest?: RecencyNode<K>;
+    #oldest: RecencyNode<K> | undefined;
+    #newest: RecencyNode<K> | undefined;
 
     public get size(): number {
         return this.#nodes.size;
@@ -22,11 +22,29 @@ class RecencyList<K> {
         return this.#oldest?.key;
     }
 
+    /** Removes and returns the oldest key. */
+    public shift(): K | undefined {
+        const node = this.#oldest;
+        if (!node) return undefined;
+        this.#unlink(node);
+        this.#nodes.delete(node.key);
+        return node.key;
+    }
+
     /** Adds the key as newest, or moves it there. */
     public touch(key: K): void {
         const node = this.#nodes.get(key);
-        if (node) return this.#moveNewest(node);
-        const created: RecencyNode<K> = { key, older: this.#newest };
+        if (node) this.#moveNewest(node);
+        else this.add(key);
+    }
+
+    /** Adds a key known to be absent as newest. */
+    public add(key: K): void {
+        const created: RecencyNode<K> = {
+            key,
+            older: this.#newest,
+            newer: undefined,
+        };
         if (this.#newest) this.#newest.newer = created;
         else this.#oldest = created;
         this.#newest = created;
@@ -95,7 +113,12 @@ export interface CollectionStats {
     evicted: number;
 }
 
-type Expiry = { deadline: number; window: number; filed: number };
+/**
+ * A TTL entry's record, shared by the expiry map and the heap. `filed` is the
+ * deadline the heap ordered it by; `deadline` is the current one, which a
+ * read moves later without touching the heap.
+ */
+type Expiry<K> = { key: K; filed: number; deadline: number; window: number };
 
 /**
  * Everything a retention policy needs. A Collection without `ttl` or
@@ -103,11 +126,11 @@ type Expiry = { deadline: number; window: number; filed: number };
  */
 type Policy<K> = {
     /** Deadlines of TTL entries only. */
-    expiry: Map<K, Expiry>;
+    expiry: Map<K, Expiry<K>>;
     /** `set()` keys in recency order (oldest first); `setWithoutTTL()` keys are never here. */
     lru: RecencyList<K>;
-    /** Min-heap of filed deadlines; stale records are dropped lazily. */
-    heap: { key: K; deadline: number }[];
+    /** Min-heap by `filed`; a record that is no longer the map's value is stale and dropped lazily. */
+    heap: Expiry<K>[];
     timer?: ReturnType<typeof setTimeout>;
     armedFor: number;
 };
@@ -190,10 +213,17 @@ export class Collection<K, V> extends Map<K, V> {
         const window = ttl ?? this.#ttl;
         if (window !== undefined) this.#policy ??= newPolicy();
         const policy = this.#policy;
-        if (this.#maxSize !== undefined) policy!.lru.touch(key);
+        if (!policy) return super.set(key, value);
+        // A key that was not stored before cannot have an expiry or recency record.
+        const before = super.size;
         super.set(key, value);
-        if (window !== undefined) this.#schedule(key, window);
-        else if (policy && policy.expiry.size > 0) policy.expiry.delete(key);
+        const isNew = super.size !== before;
+        if (this.#maxSize !== undefined) {
+            if (isNew) policy!.lru.add(key);
+            else policy!.lru.touch(key);
+        }
+        if (window !== undefined) this.#schedule(key, window, isNew);
+        else if (policy.expiry.size > 0) policy.expiry.delete(key);
         this.#enforceCap();
         return this;
     }
@@ -365,34 +395,39 @@ export class Collection<K, V> extends Map<K, V> {
     /** Evicts least-recently-used `set()` entries past `maxSize`; O(1) per eviction. */
     #enforceCap(): void {
         if (this.#maxSize === undefined) return;
-        const lru = this.#policy!.lru;
-        while (lru.size > this.#maxSize) {
-            const oldest = lru.oldest()!;
-            const value = super.get(oldest)!;
-            this.#remove(oldest);
+        const policy = this.#policy!;
+        while (policy.lru.size > this.#maxSize) {
+            const oldest = policy.lru.shift() as K;
+            const value = this.#onEvict ? super.get(oldest) : undefined;
+            policy.expiry.delete(oldest);
+            super.delete(oldest);
             this.#evicted++;
-            this.#notify(oldest, value, "evicted");
+            this.#notify(oldest, value as V, "evicted");
         }
     }
 
     /**
-     * Gives an entry a deadline. Extending one writes a number; the stale
-     * heap record re-files itself when it surfaces. Only a deadline that
-     * moves earlier (or a new one) is pushed.
+     * Gives an entry a deadline. Extending one writes a number; its heap
+     * record re-files itself when it surfaces. Only a deadline that moves
+     * earlier (or a new entry) gets a record in the heap.
      */
-    #schedule(key: K, window: number): void {
+    #schedule(key: K, window: number, isNew: boolean): void {
         const p = this.#policy!;
         const deadline = Date.now() + window;
-        const expiry = p.expiry.get(key);
-        if (expiry) {
-            expiry.deadline = deadline;
-            expiry.window = window;
-            if (deadline >= expiry.filed) return;
-            expiry.filed = deadline;
-        } else p.expiry.set(key, { deadline, window, filed: deadline });
-        this.#heapPush({ key, deadline });
+        if (!isNew) {
+            const existing = p.expiry.get(key);
+            if (existing) {
+                existing.deadline = deadline;
+                existing.window = window;
+                if (deadline >= existing.filed) return;
+            }
+        }
+        const record: Expiry<K> = { key, filed: deadline, deadline, window };
+        p.expiry.set(key, record);
+        this.#heapPush(record);
         if (p.heap.length > 2 * p.expiry.size + 8) this.#compact();
-        this.#rearm();
+        // A timer already armed for an earlier deadline stays correct.
+        if (p.timer === undefined || deadline < p.armedFor) this.#rearm();
     }
 
     #nextDeadline(): number {
@@ -400,23 +435,22 @@ export class Collection<K, V> extends Map<K, V> {
         for (;;) {
             const top = p.heap[0];
             if (top === undefined) return Infinity;
-            const expiry = p.expiry.get(top.key);
-            if (!expiry || expiry.filed !== top.deadline) {
+            if (p.expiry.get(top.key) !== top) {
                 this.#heapPop();
                 continue;
             }
-            if (expiry.deadline === top.deadline) return top.deadline;
+            if (top.deadline === top.filed) return top.filed;
             // Extended since it was filed: re-file for its current deadline.
             this.#heapPop();
-            expiry.filed = expiry.deadline;
-            this.#heapPush({ key: top.key, deadline: expiry.deadline });
+            top.filed = top.deadline;
+            this.#heapPush(top);
         }
     }
 
     #compact(): void {
         const p = this.#policy!;
         const live = p.heap.filter(
-            (record) => p.expiry.get(record.key)?.filed === record.deadline,
+            (record) => p.expiry.get(record.key) === record,
         );
         p.heap.length = 0;
         for (const record of live) this.#heapPush(record);
@@ -442,44 +476,39 @@ export class Collection<K, V> extends Map<K, V> {
         (p.timer as { unref?: () => void }).unref?.();
     }
 
-    #heapPush(record: { key: K; deadline: number }): void {
-        const p = this.#policy!;
-        const heap = p.heap;
+    #heapPush(record: Expiry<K>): void {
+        const heap = this.#policy!.heap;
+        let i = heap.length;
         heap.push(record);
-        let i = heap.length - 1;
         while (i > 0) {
             const parent = (i - 1) >> 1;
-            if (heap[parent]!.deadline <= heap[i]!.deadline) break;
-            [heap[parent], heap[i]] = [heap[i]!, heap[parent]!];
+            const above = heap[parent]!;
+            if (above.filed <= record.filed) break;
+            heap[i] = above;
             i = parent;
         }
+        heap[i] = record;
     }
 
-    #heapPop(): { key: K; deadline: number } | undefined {
-        const p = this.#policy!;
-        const heap = p.heap;
+    #heapPop(): Expiry<K> | undefined {
+        const heap = this.#policy!.heap;
         const top = heap[0];
         const last = heap.pop();
         if (top === undefined || heap.length === 0) return top;
-        heap[0] = last!;
-        for (let i = 0; ;) {
-            const left = 2 * i + 1;
-            const right = left + 1;
-            let smallest = i;
+        let i = 0;
+        for (;;) {
+            let child = 2 * i + 1;
+            if (child >= heap.length) break;
             if (
-                left < heap.length &&
-                heap[left]!.deadline < heap[smallest]!.deadline
+                child + 1 < heap.length &&
+                heap[child + 1]!.filed < heap[child]!.filed
             )
-                smallest = left;
-            if (
-                right < heap.length &&
-                heap[right]!.deadline < heap[smallest]!.deadline
-            )
-                smallest = right;
-            if (smallest === i) break;
-            [heap[smallest], heap[i]] = [heap[i]!, heap[smallest]!];
-            i = smallest;
+                child++;
+            if (heap[child]!.filed >= last!.filed) break;
+            heap[i] = heap[child]!;
+            i = child;
         }
+        heap[i] = last!;
         return top;
     }
 
