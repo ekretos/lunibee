@@ -51,6 +51,33 @@ Handles lead to each other: `bot.guild(id).member(userId)`, `.role(roleId)`, `.c
 | `MessageHandle` | `edit(message)`, `delete(reason?)`, `reply(message)`, `react(emoji)`, `pin(reason?)`, `unpin(reason?)`, `crosspost()` |
 | `UserHandle` | `dm()`, `send(message)` |
 
+`bot.channel(id).as("voice")` gets the channel and returns it typed as that [kind](/reference/channel/#kinds-030), or rejects with a `TypeError`.
+
+## Creating channels
+
+`bot.guild(id).createChannel(options)` takes a `kind`, which decides the other options, and returns a channel typed to match.
+
+```ts
+const category = await bot.guild(id).createChannel({ kind: "category", name: "Support" });
+const text = await bot.guild(id).createChannel({
+  kind: "text", name: "general", parent: category.id, topic: "Say hi", slowmode: 5,
+});
+const voice = await bot.guild(id).createChannel({ kind: "voice", name: "Talk", userLimit: 10 }); // VoiceChannel
+const forum = await bot.guild(id).createChannel({
+  kind: "forum", name: "help",
+  tags: [{ name: "bug", emoji: "🐛" }], defaultReaction: "👍", layout: "list",
+});
+```
+
+| Kind | Options besides `name`, `parent`, `position`, `permissionOverwrites`, `reason` |
+|---|---|
+| `"text"`, `"announcement"` | `topic`, `nsfw`, `slowmode` (0-21600 s), `autoArchive` |
+| `"voice"`, `"stage"` | `bitrate`, `userLimit` (0-99), `region`, `videoQuality` (`"auto"` or `"720p"`), `nsfw` |
+| `"category"` | none |
+| `"forum"`, `"media"` | `topic`, `nsfw`, `slowmode`, `threadSlowmode`, `autoArchive`, `tags`, `defaultReaction`, `sortOrder` (`"latest-activity"` or `"creation-date"`), `layout` (forum only: `"list"` or `"gallery"`) |
+
+Emojis are a unicode character or a custom emoji's id. A name outside 1-100 characters or a number Discord would refuse rejects with a `RangeError` before any request.
+
 `message` is text or a full payload (`embeds`, `components`, `files`, …). The audit-log reason goes in `reason`, or in `options.reason` where the method takes options.
 
 ## Durations

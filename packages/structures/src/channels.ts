@@ -7,8 +7,8 @@ import type {
     APIThreadMetadata,
 } from "@lunibee/types";
 
-// Discord.js-familiar channel subclasses. Every class extends Channel, so
-// existing `instanceof Channel` checks and Channel methods keep working.
+// Every channel class extends Channel, so `instanceof Channel` checks and
+// Channel methods keep working.
 
 /** A guild announcement (news) channel. */
 export class NewsChannel extends TextChannel {}
@@ -147,3 +147,22 @@ export function createChannel(
             return new Channel(data, context);
     }
 }
+
+/** The class of each channel kind, so `channel.is("voice")` can narrow to `VoiceChannel`. */
+export interface ChannelsByKind {
+    text: TextChannel;
+    announcement: NewsChannel;
+    voice: VoiceChannel;
+    stage: StageChannel;
+    category: CategoryChannel;
+    thread: ThreadChannel;
+    forum: ForumChannel;
+    media: MediaChannel;
+    dm: DMChannel;
+    "group-dm": DMChannel;
+    directory: Channel;
+    unknown: Channel;
+}
+
+/** The channel class for a kind (or a union of them). */
+export type ChannelOfKind<K extends keyof ChannelsByKind> = ChannelsByKind[K];

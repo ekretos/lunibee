@@ -1,6 +1,7 @@
 /** Discord API snowflake identifier. */
 export type Snowflake = string;
 
+export * from "./channel-kind.js";
 export * from "./gateway.js";
 export * from "./gateway-events.js";
 

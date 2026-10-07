@@ -1,4 +1,5 @@
 import type { Collection } from "@lunibee/collection";
+import type { ChannelKind, UnknownChannelKind } from "@lunibee/types";
 import type {
     BanOptions,
     ChannelEditOptions,
@@ -11,6 +12,7 @@ import type {
 } from "@lunibee/managers";
 import type {
     Channel,
+    ChannelOfKind,
     Guild,
     GuildMember,
     Message,
@@ -18,6 +20,10 @@ import type {
     User,
 } from "@lunibee/structures";
 import type { Client } from "./index.js";
+import {
+    channelCreatePayload,
+    type CreateChannelOptions,
+} from "./channel-create.js";
 
 /** A length of time: milliseconds, or text such as `"90s"`, `"10m"`, `"2h"`, `"1d"`, `"1w"` or `"1h30m"`. */
 export type Duration = number | string;
@@ -147,6 +153,21 @@ export class GuildHandle implements Handle<Guild> {
     }
     public channel(channelId: string): ChannelHandle {
         return new ChannelHandle(this.bot, channelId);
+    }
+
+    /**
+     * Creates a channel. `kind` decides which other options apply, and the
+     * result is typed to match: a `"voice"` option gives a `VoiceChannel`.
+     * @example await bot.guild(id).createChannel({ kind: "text", name: "general", parent: categoryId });
+     */
+    public async createChannel<O extends CreateChannelOptions>(
+        options: O,
+    ): Promise<ChannelOfKind<O["kind"]>> {
+        const channel = await this.bot.channels.create(
+            this.id,
+            channelCreatePayload(options),
+        );
+        return channel.as(options.kind) as ChannelOfKind<O["kind"]>;
     }
 
     /** Bans a user, whether or not they are a member. */
@@ -280,6 +301,17 @@ export class ChannelHandle implements Handle<Channel> {
 
     public message(messageId: string): MessageHandle {
         return new MessageHandle(this.bot, this.id, messageId);
+    }
+
+    /**
+     * Gets the channel (cache, else Discord) and returns it typed as one of
+     * `kinds`.
+     * @throws {TypeError} If it is a different kind.
+     */
+    public async as<K extends ChannelKind | UnknownChannelKind>(
+        ...kinds: K[]
+    ): Promise<ChannelOfKind<K>> {
+        return (await this.get()).as(...kinds);
     }
 
     /** Sends a message: text, or a full payload (`embeds`, `components`, `files`, …). */

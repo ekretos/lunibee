@@ -1,3 +1,10 @@
+import {
+    channelKindOf,
+    type ChannelKind,
+    type UnknownChannelKind,
+} from "@lunibee/types";
+import type { ChannelOfKind } from "./channels.js";
+
 /** Common Discord snowflake-backed structure. */
 export class BaseStructure {
     public readonly id: string;
@@ -322,6 +329,35 @@ export class Channel extends BaseStructure {
     /** Updates this channel using the same resource operation as edit. @param options Channel fields to change. @returns The updated channel. @throws {Error} If the channel is not attached to a client. */
     public update(options: Record<string, unknown>): Promise<Channel> {
         return this.edit(options);
+    }
+
+    /** What kind of channel this is: `"text"`, `"voice"`, `"thread"`, `"forum"`… (`"unknown"` for a type this version does not know). */
+    public get kind(): ChannelKind | UnknownChannelKind {
+        return channelKindOf(this.type);
+    }
+
+    /**
+     * Whether this channel is one of `kinds`, narrowing its type to match.
+     * @example if (channel.is("text", "announcement")) await channel.send("hi");
+     */
+    public is<K extends ChannelKind | UnknownChannelKind>(
+        ...kinds: K[]
+    ): this is ChannelOfKind<K> {
+        return (kinds as string[]).includes(this.kind);
+    }
+
+    /**
+     * Returns this channel typed as one of `kinds`.
+     * @throws {TypeError} If it is a different kind.
+     */
+    public as<K extends ChannelKind | UnknownChannelKind>(
+        ...kinds: K[]
+    ): ChannelOfKind<K> {
+        if (!this.is(...kinds))
+            throw new TypeError(
+                `Channel ${this.id} is a ${this.kind} channel, not ${kinds.join(" or ")}.`,
+            );
+        return this;
     }
 
     /** Whether this is a thread (announcement, public or private). */

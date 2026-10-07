@@ -22,6 +22,38 @@ import { Channel } from "lunibee";
 </TabItem>
 </Tabs>
 
+## Kinds (0.3.0)
+
+Every channel has a `kind`, a short name in place of the numeric `type`:
+
+| `kind` | `type` | Class |
+|---|---|---|
+| `"text"` | 0 | `TextChannel` |
+| `"dm"`, `"group-dm"` | 1, 3 | `DMChannel` |
+| `"voice"` | 2 | `VoiceChannel` |
+| `"category"` | 4 | `CategoryChannel` |
+| `"announcement"` | 5 | `NewsChannel` |
+| `"thread"` | 10, 11, 12 | `ThreadChannel` |
+| `"stage"` | 13 | `StageChannel` |
+| `"directory"` | 14 | `Channel` |
+| `"forum"` | 15 | `ForumChannel` |
+| `"media"` | 16 | `MediaChannel` |
+| `"unknown"` | anything else | `Channel` |
+
+`channel.is(...kinds)` tells you whether it is one of them and narrows the type; `channel.as(...kinds)` returns it typed that way, or throws a `TypeError` that names both kinds.
+
+```ts
+const channel = await bot.channel(id).get();
+if (channel.is("text", "announcement")) await channel.send("hi");   // TextChannel | NewsChannel
+
+const voice = await bot.channel(id).as("voice");                      // VoiceChannel, or a clear error
+switch (channel.kind) {
+  case "forum": case "media": /* … */ break;
+}
+```
+
+`channelKindOf(type)` and `channelTypesOf(kind)` convert between the two, and `ChannelEnum` still holds the raw numbers that appear in payloads.
+
 ## Properties
 
 | Property | Type | Description |

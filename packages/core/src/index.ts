@@ -22,6 +22,15 @@ export {
 } from "./events.js";
 export { Collector, type CollectorOptions } from "./collector.js";
 export {
+    channelCreatePayload,
+    type CreateCategoryChannel,
+    type CreateChannelOptions,
+    type CreateForumChannel,
+    type CreateTextChannel,
+    type CreateVoiceChannel,
+    type ForumTagInput,
+} from "./channel-create.js";
+export {
     ChannelHandle,
     GuildHandle,
     MemberHandle,

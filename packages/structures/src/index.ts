@@ -371,6 +371,8 @@ export {
     ForumChannel,
     MediaChannel,
     createChannel,
+    type ChannelOfKind,
+    type ChannelsByKind,
 } from "./channels.js";
 export * from "./interactions.js";
 export { Embed } from "./embed.js";
