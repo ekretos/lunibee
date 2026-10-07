@@ -22,6 +22,10 @@ import {
     type APIInviteCreate,
     type APIVoiceState,
     type APIPresenceUpdate,
+    type APIWelcomeScreen,
+    type APIWelcomeScreenChannel,
+    type APIGuildOnboarding,
+    type APIOnboardingPrompt,
 } from "@lunibee/types";
 
 type GuildData = ConstructorParameters<typeof Guild>[0];
@@ -241,6 +245,84 @@ export class GuildManager extends ResourceManager<string, Guild> {
     /** Fetches a guild's preview (even if the bot is not in the guild). */
     public async fetchPreview(id: string): Promise<APIGuildPreview> {
         return this.#rest.get<APIGuildPreview>(Routes.guildPreview(id));
+    }
+
+    /** Fetches the welcome screen of a community guild. */
+    public async fetchWelcomeScreen(id: string): Promise<APIWelcomeScreen> {
+        return this.#rest.get<APIWelcomeScreen>(Routes.guildWelcomeScreen(id));
+    }
+
+    /** Edits the welcome screen (needs Manage Guild and the Community feature). */
+    public async editWelcomeScreen(
+        id: string,
+        options: {
+            enabled?: boolean;
+            description?: string | null;
+            welcomeChannels?: APIWelcomeScreenChannel[] | null;
+            reason?: string;
+        },
+    ): Promise<APIWelcomeScreen> {
+        const { reason, welcomeChannels, ...rest } = options;
+        return this.#rest.patch<APIWelcomeScreen>(
+            Routes.guildWelcomeScreen(id),
+            { ...rest, welcome_channels: welcomeChannels },
+            { reason },
+        );
+    }
+
+    /** Fetches a guild's onboarding: prompts, default channels and mode. */
+    public async fetchOnboarding(id: string): Promise<APIGuildOnboarding> {
+        return this.#rest.get<APIGuildOnboarding>(Routes.guildOnboarding(id));
+    }
+
+    /** Replaces parts of a guild's onboarding (needs Manage Guild and Manage Roles). */
+    public async editOnboarding(
+        id: string,
+        options: {
+            prompts?: APIOnboardingPrompt[];
+            defaultChannelIds?: string[];
+            enabled?: boolean;
+            mode?: number;
+            reason?: string;
+        },
+    ): Promise<APIGuildOnboarding> {
+        const { reason, defaultChannelIds, ...rest } = options;
+        return this.#rest.put<APIGuildOnboarding>(
+            Routes.guildOnboarding(id),
+            { ...rest, default_channel_ids: defaultChannelIds },
+            { reason },
+        );
+    }
+
+    /**
+     * Edits a voice state in a stage channel: unsuppress the bot to speak, or
+     * move a speaker back to the audience. `userId` may be `"@me"`.
+     */
+    public async editVoiceState(
+        id: string,
+        userId: string,
+        options: {
+            channelId: string;
+            suppress?: boolean;
+            requestToSpeakTimestamp?: string | null;
+        },
+    ): Promise<void> {
+        await this.#rest.patch(Routes.guildVoiceState(id, userId), {
+            channel_id: options.channelId,
+            suppress: options.suppress,
+            request_to_speak_timestamp: options.requestToSpeakTimestamp,
+        });
+    }
+
+    /** Removes an integration (and the bot or role it created) from a guild. */
+    public async removeIntegration(
+        id: string,
+        integrationId: string,
+        reason?: string,
+    ): Promise<void> {
+        await this.#rest.delete(Routes.guildIntegration(id, integrationId), {
+            reason,
+        });
     }
 
     /** Fetches all active threads in the guild. */

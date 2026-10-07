@@ -1,5 +1,6 @@
 import {
     InteractionResponseEnum,
+    type APIEntitlement,
     type InteractionReplyOptions,
 } from "@lunibee/types";
 import { User, type ResourceContext } from "./base.js";
@@ -192,6 +193,23 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         this.channelId = data.channel_id;
         this.type = data.type;
         this.data = data;
+    }
+    /** The entitlements of the person (and guild) that ran this interaction: what they own from your SKUs. */
+    public get entitlements(): readonly APIEntitlement[] {
+        const entitlements = this.data.entitlements;
+        return Array.isArray(entitlements)
+            ? (entitlements as APIEntitlement[])
+            : [];
+    }
+    /** Whether the interaction carries an active entitlement for a SKU. */
+    public hasEntitlement(skuId: string): boolean {
+        const now = Date.now();
+        return this.entitlements.some(
+            (entitlement) =>
+                entitlement.sku_id === skuId &&
+                !entitlement.deleted &&
+                (!entitlement.ends_at || Date.parse(entitlement.ends_at) > now),
+        );
     }
     /** The application command's own type (1 chat input, 2 user, 3 message); 0 when this is not a command. */
     #commandType(): number {

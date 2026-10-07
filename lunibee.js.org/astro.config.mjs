@@ -202,6 +202,7 @@ export default defineConfig({
             { label: "Buttons & Select Menus", link: "/recipes/buttons-and-selects" },
             { label: "Modals & Form Inputs", link: "/recipes/modals" },
             { label: "Sending Messages", link: "/recipes/sending-messages" },
+            { label: "Threads, Forums & More", link: "/recipes/threads-forums-and-more" },
             { label: "Paginator Component", link: "/recipes/paginators" },
             { label: "Graceful Shutdown", link: "/recipes/graceful-shutdown" },
             { label: "Error Handling & Retries", link: "/recipes/error-handling" },

@@ -68,6 +68,9 @@ export const Routes = {
     /** Returns reactions for a message and emoji. @param channelId Channel identifier. @param messageId Message identifier. @param emoji Emoji name or ID. @returns Reaction route. */
     messageReactions: (channelId: string, messageId: string, emoji: string) =>
         `${Routes.message(channelId, messageId)}/reactions/${encodeURIComponent(emoji)}`,
+    /** The bot's own reaction: PUT adds it, DELETE removes it. @param channelId Channel identifier. @param messageId Message identifier. @param emoji Emoji name or ID. */
+    messageReactionMe: (channelId: string, messageId: string, emoji: string) =>
+        `${Routes.messageReactions(channelId, messageId, emoji)}/@me`,
     /** Removes all reactions from a message. @param channelId Channel identifier. @param messageId Message identifier. @returns Reaction collection route. */
     messageReactionsAll: (channelId: string, messageId: string) =>
         `${Routes.message(channelId, messageId)}/reactions`,
@@ -124,6 +127,18 @@ export const Routes = {
     /** Returns private archived threads for a channel. @param channelId Channel identifier. @returns Private-archive route. */
     channelPrivateArchivedThreads: (channelId: string) =>
         `/channels/${snowflake(channelId, "Channel ID")}/threads/archived/private`,
+    /** Returns the private archived threads the current user joined. @param channelId Channel identifier. */
+    channelJoinedPrivateArchivedThreads: (channelId: string) =>
+        `/channels/${snowflake(channelId, "Channel ID")}/users/@me/threads/archived/private`,
+    /** Returns one member of a thread; `"@me"` is the current user (PUT joins, DELETE leaves). @param threadId Thread identifier. @param userId User identifier or `"@me"`. */
+    threadMember: (threadId: string, userId: string) =>
+        `/channels/${snowflake(threadId, "Thread ID")}/thread-members/${userOrMe(userId)}`,
+    /** Starts a typing indicator (POST). @param channelId Channel identifier. */
+    channelTyping: (channelId: string) =>
+        `/channels/${snowflake(channelId, "Channel ID")}/typing`,
+    /** Creates a thread that is not tied to a message, or a forum or media post (POST). @param channelId Channel identifier. */
+    channelThreads: (channelId: string) =>
+        `/channels/${snowflake(channelId, "Channel ID")}/threads`,
     /** Returns a thread's members. @param threadId Thread identifier. @returns Thread-member route. */
     threadMembers: (threadId: string) =>
         `/channels/${snowflake(threadId, "Thread ID")}/thread-members`,
@@ -161,6 +176,29 @@ export const Routes = {
     /** Returns members in a guild (paginated). @param guildId Guild identifier. @returns Members collection route. */
     guildMembers: (guildId: string) =>
         `/guilds/${snowflake(guildId, "Guild ID")}/members`,
+
+    /** Searches members by nickname or username. @param guildId Guild identifier. */
+    guildMembersSearch: (guildId: string) =>
+        `/guilds/${snowflake(guildId, "Guild ID")}/members/search`,
+    /** Edits the bot's own member, e.g. its nickname (PATCH). @param guildId Guild identifier. */
+    guildMemberMe: (guildId: string) =>
+        `/guilds/${snowflake(guildId, "Guild ID")}/members/@me`,
+    /** Bans up to 200 users at once (POST). @param guildId Guild identifier. */
+    guildBulkBan: (guildId: string) =>
+        `/guilds/${snowflake(guildId, "Guild ID")}/bulk-ban`,
+    /** Edits a voice state in a stage channel (PATCH); `"@me"` is the bot. @param guildId Guild identifier. @param userId User identifier or `"@me"`. */
+    guildVoiceState: (guildId: string, userId: string) =>
+        `/guilds/${snowflake(guildId, "Guild ID")}/voice-states/${userOrMe(userId)}`,
+    /** Removes an integration from a guild (DELETE). @param guildId Guild identifier. @param integrationId Integration identifier. */
+    guildIntegration: (guildId: string, integrationId: string) =>
+        `/guilds/${snowflake(guildId, "Guild ID")}/integrations/${snowflake(integrationId, "Integration ID")}`,
+    /** Returns the guilds the bot is in (paged with `before`, `after`, `limit`). */
+    userGuilds: () => "/users/@me/guilds",
+    /** Returns the sticker packs Nitro users can use, or one pack. @param packId Optional pack identifier. */
+    stickerPacks: (packId?: string) =>
+        packId
+            ? `/sticker-packs/${snowflake(packId, "Sticker pack ID")}`
+            : "/sticker-packs",
 
     // ─── Welcome Screen & Onboarding ──────────────────────────────────────────────
     /** Returns the welcome screen for a guild. @param guildId Guild identifier. */
@@ -252,6 +290,11 @@ export const Routes = {
 } as const;
 
 /** Validates a non-negative integer route parameter. */
+/** A user id, or `"@me"` for the current user. */
+function userOrMe(value: string): string {
+    return value === "@me" ? value : snowflake(value, "User ID");
+}
+
 function integer(value: number, field: string): string {
     if (!Number.isInteger(value) || value < 0)
         throw new TypeError(`${field} must be a non-negative integer.`);

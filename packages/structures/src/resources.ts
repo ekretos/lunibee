@@ -253,6 +253,12 @@ export class Role extends BaseStructure {
     public unicodeEmoji: string | null;
     /** Hash of the role's custom icon image, if any. */
     public iconHash: string | null;
+    /** Gradient or holographic colours, when the role has more than a solid colour. */
+    public colors: {
+        primary: number;
+        secondary: number | null;
+        tertiary: number | null;
+    } | null;
     /** Role tags metadata (bot, premium subscriber, etc). */
     public tags: Record<string, unknown> | null;
 
@@ -268,6 +274,11 @@ export class Role extends BaseStructure {
         position?: number;
         unicode_emoji?: string | null;
         icon?: string | null;
+        colors?: {
+            primary_color: number;
+            secondary_color: number | null;
+            tertiary_color: number | null;
+        };
         tags?: Record<string, unknown> | null;
     }) {
         super(data.id);
@@ -280,6 +291,13 @@ export class Role extends BaseStructure {
         this.mentionable = data.mentionable ?? false;
         this.position = data.position ?? 0;
         this.unicodeEmoji = data.unicode_emoji ?? null;
+        this.colors = data.colors
+            ? {
+                  primary: data.colors.primary_color,
+                  secondary: data.colors.secondary_color,
+                  tertiary: data.colors.tertiary_color,
+              }
+            : null;
         this.iconHash = data.icon ?? null;
         this.tags = data.tags ?? null;
     }

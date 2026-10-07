@@ -5,6 +5,8 @@ export { ResourceManager as CachedManager } from "./base.js";
 import { REST, Routes } from "@lunibee/rest";
 import type {
     AllowedMentions,
+    APIForumTag,
+    ForumTagInput,
     MessageCreateOptions,
     MessageEditOptions,
 } from "@lunibee/types";
@@ -409,7 +411,7 @@ export class ChannelManager extends Manager<string, Channel> {
         // PUT .../reactions/{emoji}/@me — the bare .../reactions/{emoji} path
         // is not a valid target for PUT.
         await this.#rest.put(
-            `${Routes.messageReactions(channelId, messageId, emoji)}/@me`,
+            Routes.messageReactionMe(channelId, messageId, emoji),
         );
     }
     public async fetchReactions(
@@ -436,7 +438,7 @@ export class ChannelManager extends Manager<string, Channel> {
         emoji: string,
     ): Promise<void> {
         await this.#rest.delete(
-            `${Routes.messageReactions(channelId, messageId, emoji)}/@me`,
+            Routes.messageReactionMe(channelId, messageId, emoji),
         );
     }
     public async removeReaction(
@@ -465,6 +467,99 @@ export class ChannelManager extends Manager<string, Channel> {
         return data.items.map((item) =>
             this.messages(channelId).upsert(item.message),
         );
+    }
+    /** Fetches pinned messages a page at a time, newest first (`limit` 1-50, `before` an ISO timestamp from the previous page). */
+    public async fetchPins(
+        channelId: string,
+        options: { before?: string; limit?: number } = {},
+    ): Promise<{ messages: Message[]; hasMore: boolean }> {
+        const params = new URLSearchParams();
+        if (options.before) params.set("before", options.before);
+        if (options.limit !== undefined)
+            params.set(
+                "limit",
+                String(Math.min(50, Math.max(1, options.limit))),
+            );
+        const query = params.toString();
+        const data = await this.#rest.get<{
+            items: {
+                pinned_at: string;
+                message: ConstructorParameters<typeof Message>[0];
+            }[];
+            has_more: boolean;
+        }>(
+            `${Routes.channelMessagesPins(channelId)}${query ? `?${query}` : ""}`,
+        );
+        return {
+            messages: data.items.map((item) =>
+                this.messages(channelId).upsert(item.message),
+            ),
+            hasMore: data.has_more,
+        };
+    }
+    /** Shows "the bot is typing…" for about ten seconds, or until it sends a message. */
+    public async triggerTyping(channelId: string): Promise<void> {
+        await this.#rest.post(Routes.channelTyping(channelId));
+    }
+    /** Adds a tag to a forum or media channel and returns the channel's tags. @param reason Audit-log reason. */
+    public async createForumTag(
+        channelId: string,
+        tag: ForumTagInput,
+        reason?: string,
+    ): Promise<APIForumTag[]> {
+        const tags = await this.#forumTags(channelId);
+        return this.#saveForumTags(channelId, [...tags, tag], reason);
+    }
+    /** Changes a forum tag and returns the channel's tags. */
+    public async editForumTag(
+        channelId: string,
+        tagId: string,
+        changes: Partial<ForumTagInput>,
+        reason?: string,
+    ): Promise<APIForumTag[]> {
+        const tags = await this.#forumTags(channelId);
+        if (!tags.some((tag) => tag.id === tagId))
+            throw new Error(`Channel ${channelId} has no tag ${tagId}.`);
+        return this.#saveForumTags(
+            channelId,
+            tags.map((tag) =>
+                tag.id === tagId ? { ...tag, ...changes } : tag,
+            ),
+            reason,
+        );
+    }
+    /** Removes a forum tag and returns the channel's remaining tags. */
+    public async removeForumTag(
+        channelId: string,
+        tagId: string,
+        reason?: string,
+    ): Promise<APIForumTag[]> {
+        const tags = await this.#forumTags(channelId);
+        if (!tags.some((tag) => tag.id === tagId))
+            throw new Error(`Channel ${channelId} has no tag ${tagId}.`);
+        return this.#saveForumTags(
+            channelId,
+            tags.filter((tag) => tag.id !== tagId),
+            reason,
+        );
+    }
+    /** The channel's current tags, read fresh so edits never clobber newer ones. */
+    async #forumTags(channelId: string): Promise<APIForumTag[]> {
+        const channel = await this.#rest.get<{
+            available_tags?: APIForumTag[];
+        }>(Routes.channel(channelId));
+        return channel.available_tags ?? [];
+    }
+    /** Discord replaces the whole list; tags that keep their `id` are kept. */
+    async #saveForumTags(
+        channelId: string,
+        tags: Array<ForumTagInput & { id?: string }>,
+        reason?: string,
+    ): Promise<APIForumTag[]> {
+        const updated = await this.#rest.patch<{
+            available_tags?: APIForumTag[];
+        }>(Routes.channel(channelId), { available_tags: tags }, { reason });
+        return updated.available_tags ?? [];
     }
     /** Pins a message. @param reason Audit-log reason. */
     public async pinMessage(
@@ -589,6 +684,7 @@ export {
     GuildStickerManager,
     GuildSoundboardManager,
     MonetizationManager,
+    ApplicationEmojiManager,
     type APIEntitlement,
     type APISKU,
     type APISoundboardSound,

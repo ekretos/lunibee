@@ -82,6 +82,33 @@ export class GuildBanManager extends Manager<string, APIBan> {
         );
     }
 
+    /**
+     * Bans up to 200 users at once. Users that cannot be banned (already
+     * banned, higher role, owner) come back in `failed`, not as an error.
+     */
+    public async bulk(
+        userIds: readonly string[],
+        options: GuildBanCreateOptions = {},
+    ): Promise<{ banned: string[]; failed: string[] }> {
+        if (userIds.length < 1 || userIds.length > 200)
+            throw new RangeError("Bulk ban takes 1 to 200 user IDs.");
+        const result = await this.#rest.post<{
+            banned_users: string[] | null;
+            failed_users: string[] | null;
+        }>(
+            Routes.guildBulkBan(this.guildId),
+            {
+                user_ids: userIds,
+                delete_message_seconds: options.deleteMessageSeconds,
+            },
+            { reason: options.reason },
+        );
+        return {
+            banned: result.banned_users ?? [],
+            failed: result.failed_users ?? [],
+        };
+    }
+
     /** Lifts a ban. */
     public async remove(userId: string, reason?: string): Promise<void> {
         await this.#rest.delete(Routes.guildBan(this.guildId, userId), {

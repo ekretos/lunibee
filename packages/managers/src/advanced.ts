@@ -1,6 +1,7 @@
 import { Manager } from "./base.js";
 import { Routes, type REST } from "@lunibee/rest";
 import type {
+    APIEmoji,
     APIEntitlement,
     APISKU,
     APISoundboardSound,
@@ -373,5 +374,86 @@ export class MonetizationManager extends Manager<string, APIEntitlement> {
         return this.#rest.get<APISubscription>(
             Routes.skuSubscription(skuId, subscriptionId),
         );
+    }
+}
+
+// ─── Application emojis ──────────────────────────────────────────────────────
+
+/** Fields for {@link ApplicationEmojiManager.create}. */
+export interface ApplicationEmojiCreateOptions {
+    /** 2-32 characters: letters, digits and underscores. */
+    name: string;
+    /** The image as a data URI (PNG, JPEG, GIF or WebP, up to 256 KB). */
+    image: string;
+}
+
+/**
+ * The application's own emojis: they belong to the bot, not to a guild, so any
+ * server can show them. Cached by emoji ID.
+ */
+export class ApplicationEmojiManager extends Manager<string, APIEmoji> {
+    readonly #rest: REST;
+    public readonly applicationId: string;
+
+    public constructor(rest: REST, applicationId: string) {
+        super();
+        this.#rest = rest;
+        this.applicationId = applicationId;
+    }
+
+    #store(emoji: APIEmoji): APIEmoji {
+        if (emoji.id) this.set(emoji.id, emoji);
+        return emoji;
+    }
+
+    /** Fetches every application emoji, replacing the cache. */
+    public async fetchAll(): Promise<APIEmoji[]> {
+        const { items } = await this.#rest.get<{ items: APIEmoji[] }>(
+            Routes.applicationEmoji(this.applicationId),
+        );
+        this.clear();
+        return items.map((emoji) => this.#store(emoji));
+    }
+
+    /** Fetches one application emoji. */
+    public async fetch(emojiId: string): Promise<APIEmoji> {
+        return this.#store(
+            await this.#rest.get<APIEmoji>(
+                Routes.applicationEmoji(this.applicationId, emojiId),
+            ),
+        );
+    }
+
+    /** Uploads a new application emoji. */
+    public async create(
+        options: ApplicationEmojiCreateOptions,
+    ): Promise<APIEmoji> {
+        return this.#store(
+            await this.#rest.post<APIEmoji>(
+                Routes.applicationEmoji(this.applicationId),
+                options,
+            ),
+        );
+    }
+
+    /** Renames an application emoji. */
+    public async edit(
+        emojiId: string,
+        options: { name: string },
+    ): Promise<APIEmoji> {
+        return this.#store(
+            await this.#rest.patch<APIEmoji>(
+                Routes.applicationEmoji(this.applicationId, emojiId),
+                options,
+            ),
+        );
+    }
+
+    /** Deletes an application emoji. */
+    public async remove(emojiId: string): Promise<void> {
+        await this.#rest.delete(
+            Routes.applicationEmoji(this.applicationId, emojiId),
+        );
+        this.delete(emojiId);
     }
 }

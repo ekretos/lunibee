@@ -537,6 +537,22 @@ export interface APIThreadMetadata {
     create_timestamp?: string | null;
 }
 
+/** Fields for a forum or media channel tag. */
+export interface ForumTagInput {
+    name: string;
+    /** Only moderators (Manage Threads) can apply it. */
+    moderated?: boolean;
+    emoji_id?: Snowflake | null;
+    emoji_name?: string | null;
+}
+
+/** A role's colours: a solid colour, or a gradient or holographic style. */
+export interface APIRoleColors {
+    primary_color: number;
+    secondary_color: number | null;
+    tertiary_color: number | null;
+}
+
 /** Raw Discord forum tag. */
 export interface APIForumTag {
     id: Snowflake;
@@ -555,6 +571,52 @@ export interface APIThreadMember {
     member?: APIGuildMember;
 }
 
+// ─── Guild welcome screen and onboarding ──────────────────────────────────────
+
+/** A channel shown on the welcome screen. */
+export interface APIWelcomeScreenChannel {
+    channel_id: Snowflake;
+    description: string;
+    emoji_id: Snowflake | null;
+    emoji_name: string | null;
+}
+
+/** Raw Discord welcome screen. */
+export interface APIWelcomeScreen {
+    description: string | null;
+    welcome_channels: APIWelcomeScreenChannel[];
+}
+
+/** One answer to an onboarding question. */
+export interface APIOnboardingOption {
+    id: Snowflake;
+    channel_ids: Snowflake[];
+    role_ids: Snowflake[];
+    emoji?: APIPartialEmoji;
+    title: string;
+    description: string | null;
+}
+
+/** A question in a guild's onboarding. */
+export interface APIOnboardingPrompt {
+    id: Snowflake;
+    type: number;
+    options: APIOnboardingOption[];
+    title: string;
+    single_select: boolean;
+    required: boolean;
+    in_onboarding: boolean;
+}
+
+/** Raw Discord guild onboarding. */
+export interface APIGuildOnboarding {
+    guild_id: Snowflake;
+    prompts: APIOnboardingPrompt[];
+    default_channel_ids: Snowflake[];
+    enabled: boolean;
+    mode: number;
+}
+
 // ─── Roles ────────────────────────────────────────────────────────────────────
 
 /** Raw Discord role object. */
@@ -565,6 +627,8 @@ export interface APIRole {
     hoist: boolean;
     icon?: string | null;
     unicode_emoji?: string | null;
+    /** Gradient and holographic colours; `color` stays the primary colour. */
+    colors?: APIRoleColors;
     position: number;
     permissions: string;
     managed: boolean;

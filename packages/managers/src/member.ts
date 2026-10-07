@@ -49,6 +49,45 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
         this.#context = context;
     }
 
+    /** Finds members whose username or nickname starts with `query` (up to `limit`, 1-1000, default 1). */
+    public async search(query: string, limit = 1): Promise<GuildMember[]> {
+        if (!query.trim()) throw new TypeError("A search query is required.");
+        const params = new URLSearchParams({
+            query,
+            limit: String(Math.min(1000, Math.max(1, limit))),
+        });
+        const found = await this.#rest.get<APIGuildMember[]>(
+            `${Routes.guildMembersSearch(this.guildId)}?${params}`,
+        );
+        return found.map((data) => {
+            const member = new GuildMember(
+                { ...data, guild_id: this.guildId },
+                this.#context(),
+            );
+            this.set(member.user.id, member);
+            return member;
+        });
+    }
+
+    /** Changes the bot's own nickname in this guild (`null` clears it). */
+    public async editMe(options: {
+        nick?: string | null;
+        reason?: string;
+    }): Promise<GuildMember> {
+        const [payload, reason] = splitReason(options);
+        const data = await this.#rest.patch<APIGuildMember>(
+            Routes.guildMemberMe(this.guildId),
+            payload,
+            { reason },
+        );
+        const member = new GuildMember(
+            { ...data, guild_id: this.guildId },
+            this.#context(),
+        );
+        this.set(member.user.id, member);
+        return member;
+    }
+
     /** Kicks a member from the guild. @param reason Audit-log reason. */
     public async kick(userId: string, reason?: string): Promise<void> {
         await this.#rest.delete(Routes.guildMember(this.guildId, userId), {

@@ -3,23 +3,33 @@ import { Role } from "@lunibee/structures";
 import type { APIRole } from "@lunibee/types";
 import { ResourceManager } from "./base.js";
 
-export interface RoleCreateOptions {
-    name: string;
+/** Role fields shared by create and edit. */
+interface RoleStyleOptions {
     permissions?: bigint | number | string;
+    /** A solid colour as a 24-bit integer. Use `colors` for a gradient. */
     color?: number;
+    /** Primary, secondary and tertiary colours: two make a gradient, three the holographic style. */
+    colors?: {
+        primary: number;
+        secondary?: number | null;
+        tertiary?: number | null;
+    };
     hoist?: boolean;
     mentionable?: boolean;
+    /** The role's icon as a data URI (needs the guild's role-icons boost level), or `null` to remove it. */
+    icon?: string | null;
+    /** A unicode emoji as the role icon, or `null` to remove it. */
+    unicodeEmoji?: string | null;
     reason?: string;
 }
 
-export interface RoleEditOptions {
+export interface RoleCreateOptions extends RoleStyleOptions {
+    name: string;
+}
+
+export interface RoleEditOptions extends RoleStyleOptions {
     name?: string;
-    permissions?: bigint | number | string;
-    color?: number;
-    hoist?: boolean;
-    mentionable?: boolean;
     position?: number;
-    reason?: string;
 }
 
 /** Manages Discord guild roles. */
@@ -113,10 +123,16 @@ export class RoleManager extends ResourceManager<string, Role> {
 
 /** Role options as Discord expects them: `permissions` as a decimal string. */
 function rolePayload(options: Omit<RoleEditOptions, "reason">) {
-    const { permissions, ...rest } = options;
+    const { permissions, colors, unicodeEmoji, ...rest } = options;
     return {
         ...rest,
         permissions:
             permissions !== undefined ? String(permissions) : undefined,
+        colors: colors && {
+            primary_color: colors.primary,
+            secondary_color: colors.secondary ?? null,
+            tertiary_color: colors.tertiary ?? null,
+        },
+        unicode_emoji: unicodeEmoji,
     };
 }

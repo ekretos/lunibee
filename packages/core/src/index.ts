@@ -90,6 +90,7 @@ import {
     ChannelManager,
     GuildManager,
     MonetizationManager,
+    ApplicationEmojiManager,
     StageInstanceManager,
     UserManager,
     toRequest,
@@ -316,6 +317,8 @@ export class Client
     public readonly commands: CommandRegistry = new CommandRegistry(this);
     /** SKUs, entitlements and subscriptions; available after READY (application ID known). */
     public monetization?: MonetizationManager;
+    /** The application's own emojis; available after READY (application ID known). */
+    public applicationEmojis?: ApplicationEmojiManager;
     public get ws(): Gateway {
         return this.#gateway;
     }
@@ -523,6 +526,11 @@ export class Client
             ).commands = new ApplicationCommandManager(this.rest, appId);
             if (this.monetization?.applicationId !== appId)
                 this.monetization = new MonetizationManager(this.rest, appId);
+            if (this.applicationEmojis?.applicationId !== appId)
+                this.applicationEmojis = new ApplicationEmojiManager(
+                    this.rest,
+                    appId,
+                );
             this.emit(ClientEvent.Ready, this.user);
         });
         this.#gateway.on("RESUMED", () => {
@@ -1481,7 +1489,7 @@ export class Client
 
     /** Fetches premium sticker packs from Discord. */
     public fetchPremiumStickerPacks(): Promise<Record<string, unknown>> {
-        return this.rest.get(`/sticker-packs`) as Promise<
+        return this.rest.get(Routes.stickerPacks()) as Promise<
             Record<string, unknown>
         >;
     }

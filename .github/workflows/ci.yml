@@ -41,6 +41,9 @@ jobs:
       - name: Audit public API
         run: bun run audit:api
 
+      - name: REST coverage report is current
+        run: bun run audit:coverage
+
       - name: Typecheck every workspace package
         shell: bash
         run: |

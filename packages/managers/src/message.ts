@@ -19,6 +19,20 @@ import { Message, type ResourceContext } from "@lunibee/structures";
 
 export type { MessageCreateOptions, MessageEditOptions, MessageFile };
 
+/** Turns message files into REST uploads, encoding string data as UTF-8. */
+export function toAttachments(
+    files: readonly MessageFile[],
+): RESTFileAttachment[] {
+    return files.map((file) => ({
+        name: file.name,
+        data:
+            typeof file.data === "string"
+                ? new TextEncoder().encode(file.data)
+                : file.data,
+        contentType: file.contentType,
+    }));
+}
+
 /**
  * Splits `files` out of a message payload into a REST upload, encoding string
  * data as UTF-8. `allowedMentions` is the client's default, applied only when
@@ -39,14 +53,7 @@ export function toRequest(
     if (!files?.length) return body;
     return {
         body,
-        files: files.map((file) => ({
-            name: file.name,
-            data:
-                typeof file.data === "string"
-                    ? new TextEncoder().encode(file.data)
-                    : file.data,
-            contentType: file.contentType,
-        })),
+        files: toAttachments(files),
     };
 }
 
