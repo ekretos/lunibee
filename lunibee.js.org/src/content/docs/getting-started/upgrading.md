@@ -1,7 +1,27 @@
 ---
 title: Upgrading
-description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.2.3.
+description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.3.0.
 ---
+
+## 0.2.x → 0.3.0 (unreleased)
+
+Nothing you wrote stops working: the new workflow sits beside the old API. Move at your own pace.
+
+| Before | After |
+| --- | --- |
+| `client.guilds.cache.get(id)` | `bot.guild(id).peek()` |
+| `await client.guilds.fetch(id)` | `await bot.guild(id).get()` (cache first) or `.fetch()` (Discord) |
+| `await client.guilds.members(g).fetch(u)` | `await bot.member(g, u).get()` |
+| `client.guilds.members(g).kick(u, why)` | `bot.member(g, u).kick(why)` |
+| `client.channels.cache.get(id)` | `bot.channel(id).peek()` |
+| `channel.type === ChannelEnum.GuildVoice` | `channel.is("voice")` / `channel.kind === "voice"` |
+| `client.rest.get(Routes.guildMembers(g), { query })` | `bot.api.guilds(g).members.all()` |
+| `CreateSlashCommand` + `interactionCreate` + `getUser("user")` | `command({ options: { user: option.user() }, run })` |
+
+* `bot` is only a name: `new Client(...)` is unchanged.
+* `bot.person(id)` is a user by id; `bot.user` is still the bot's own account.
+* `lunibee create command` now writes `command()` files (`--slash`, `--prefix`, `--both`); run `lunibee sync commands` after adding files by hand.
+* `lunibee migrate` still handles the renamed 0.2.x APIs only. The calls above cannot be rewritten safely by text, because a `guilds.fetch()` on a Lunibee client and one on another object look the same.
 
 ## 0.2.3 → 0.2.4
 

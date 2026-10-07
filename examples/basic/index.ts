@@ -1,22 +1,30 @@
-import { Client, GatewayIntentBits, PermissionFlagsBits } from "lunibee";
+import { Client, GatewayIntentBits, PermissionFlagsBits, command } from "lunibee";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) throw new Error("DISCORD_TOKEN is required");
 
-const client = new Client({ token, intents: GatewayIntentBits.Guilds });
+const bot = new Client({ token, intents: GatewayIntentBits.Guilds });
 
-client.on("ready", user => {
+bot.commands.add(
+    command({
+        name: "ping",
+        description: "Show the gateway latency",
+        async run({ bot, reply }) {
+            await reply(`Pong! ${bot.ping}ms`);
+        },
+    }),
+);
+
+bot.once("ready", async user => {
     console.log(`Connected as ${user.username}`);
-    console.log(`Ping: ${client.ping}ms`);
-    console.log(`Invite link: ${client.generateInvite({ scopes: ["bot"], permissions: PermissionFlagsBits.Administrator })}`);
+    console.log(`Invite link: ${bot.generateInvite({ scopes: ["bot", "applications.commands"], permissions: PermissionFlagsBits.Administrator })}`);
+    await bot.commands.deploy();
 });
 
-client.on("resumed", () => {
+bot.on("resumed", () => {
     console.log("Session resumed.");
 });
 
-client.on("invalidSession", isRecoverable => {
-    console.log(`Session invalid. Recoverable: ${isRecoverable}`);
-});
+bot.commands.listen();
 
-await client.login();
+await bot.login();

@@ -28,64 +28,51 @@ Never commit your real bot token to Git.
 
 ## 3. Create `src/index.ts`
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-import { Client, IntentBits } from "lunibee";
+import { Client, IntentBits, command, option } from "lunibee";
 
-const client = new Client({
+const bot = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents: [
-    IntentBits.guilds,
-    IntentBits.guildMessages,
-    IntentBits.messageContent,
-  ],
+  intents: [IntentBits.guilds, IntentBits.guildMessages, IntentBits.messageContent],
 });
 
-client.on("ready", (user) => {
+// One definition: runs as /ping and as !ping.
+bot.commands.add(
+  command({
+    name: "ping",
+    description: "Check that the bot is alive",
+    prefix: true,
+    async run({ reply }) {
+      await reply("Pong! 🏓");
+    },
+  }),
+  command({
+    name: "kick",
+    description: "Kick a member",
+    permissions: ["KickMembers"],
+    prefix: true,
+    options: {
+      user: option.user({ required: true }),
+      reason: option.string({ max: 500 }),
+    },
+    async run({ bot, options, guildId, reply }) {
+      // options.user is an id, options.reason is string | undefined
+      await bot.member(guildId!, options.user).kick(options.reason);
+      await reply(`Kicked <@${options.user}>.`);
+    },
+  }),
+);
+
+bot.once("ready", async (user) => {
   console.log(`🐝 Logged in as ${user.username} (${user.id})`);
+  await bot.commands.deploy();
 });
+bot.commands.listen({ prefix: "!" });
 
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-
-  if (message.content === "!ping") {
-    await message.reply("Pong! 🏓");
-  }
-});
-
-await client.login();
+await bot.login();
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { Client, IntentBits } from "lunibee";
 
-const client = new Client({
-  token: process.env.DISCORD_TOKEN,
-  intents: [
-    IntentBits.guilds,
-    IntentBits.guildMessages,
-    IntentBits.messageContent,
-  ],
-});
-
-client.on("ready", (user) => {
-  console.log(`🐝 Logged in as ${user.username} (${user.id})`);
-});
-
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-
-  if (message.content === "!ping") {
-    await message.reply("Pong 🏓");
-  }
-});
-
-await client.login();
-```
-</TabItem>
-</Tabs>
+`prefix: true` needs the `MessageContent` intent; Lunibee warns at startup when it is missing.
 
 ## 4. Run it
 
@@ -99,53 +86,28 @@ During development:
 bun --watch src/index.ts
 ```
 
-Send `!ping` in a channel the bot can access.
+Send `!ping` or run `/ping` in a server the bot is in.
 
 ## What next?
 
 Once the bot is running, these are the most useful next steps:
 
-As the bot grows, scaffold one file per event handler, command and component with the
-[CLI](/packages/cli/): `bunx lunibee create handler messageCreate`, then call
-`registerEvents(client)` from the generated `src/handlers/event.ts`.
+As the bot grows, scaffold one file per command, event handler and component with the
+[CLI](/packages/cli/): `bunx lunibee create command ping --both`, then call
+`registerCommands(bot)` from the generated `src/commands/index.ts`.
 
-<Tabs>
-<TabItem label="TypeScript">
+Reach Discord by ids, with one rule for every read: `peek()` is the cache, `get()` is the cache
+then Discord, `fetch()` is Discord.
+
 ```ts
-// Send a message
-await channel.send({ content: "Hello!" });
+const member = await bot.member(guildId, userId).get();
+await bot.member(guildId, userId).timeout("10m", "spam");
+await bot.channel(channelId).send("Hello!");
 
-// Edit a message
-await message.edit({ content: "Updated!" });
+const channel = await bot.channel(channelId).get();
+if (channel.is("text")) await channel.send("Typed as a text channel.");
 
-// Get a message's channel
-const channel = message.channel;
-
-// Rename a channel
-await channel.editName("support");
-
-// Reply to an interaction
-await interaction.reply({ content: "Done!" });
+await bot.api.guilds(guildId).members(userId).patch({ nick: "x" }, { reason: "rename" });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-// Send a message
-await channel.send({ content: "Hello!" });
 
-// Edit a message
-await message.edit({ content: "Updated!" });
-
-// Get a message's channel
-const channel = message.channel;
-
-// Rename a channel
-await channel.editName("support");
-
-// Reply to an interaction
-await interaction.reply({ content: "Done!" });
-```
-</TabItem>
-</Tabs>
-
-For slash commands, build the command with `CreateSlashCommand`, register its payload through the application-command API, and handle it with `interactionCreate`. See the **Builders** and **Interactions** guides for the command payload and interaction lifecycle.
+See [Handles](/reference/handles/), [Commands](/reference/commands/) and [bot.api](/reference/api/).

@@ -17,6 +17,10 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 * **`parseDuration()`** turns `"90s"`, `"10m"`, `"1h30m"` into milliseconds.
 * **CLI: `create command --slash|--prefix|--both`** writes a `command()` file (slash by default, `--prefix` for prefix-only, `--both` for one file answering both) and **`lunibee sync commands`** regenerates `src/commands/index.ts` with `registerCommands(bot)`. `create command` now emits the `command()` form instead of `data` + `execute()`; existing command files keep working.
 
+### 📚 Documentation
+
+* Quick Start, `examples/basic` and the Upgrading page use `bot`, `command()` and handles. The Upgrading page has a before/after table for 0.3.0.
+
 ## v0.2.4
 
 Security release. Fixes the findings of the 0.2.3 security review; the status of each one is in [`docs/audits/security-0.2.3.md`](https://github.com/ekretos/lunibee/blob/0.2.4/docs/audits/security-0.2.3.md). **Upgrade recommended.**
