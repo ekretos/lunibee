@@ -6,8 +6,16 @@ const sleep = (ms: number): Promise<void> =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export { ShardBus } from "./bus.js";
+export {
+    BroadcastChannelTransport,
+    IpcTransport,
+    type IpcEndpoint,
+    type ShardBusTransport,
+} from "./transport.js";
+export { ShardSupervisor, type SupervisorOptions } from "./supervisor.js";
 export type {
     ShardBusErrorHandler,
+    ShardBusOptions,
     ShardMessage,
     ShardMessageHandler,
     ShardReply,

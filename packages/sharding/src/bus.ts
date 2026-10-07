@@ -1,3 +1,5 @@
+import { defaultTransport, type ShardBusTransport } from "./transport.js";
+
 /** Message envelope exchanged between Lunibee shards. */
 export interface ShardMessage<T = unknown> {
     /** Sending shard ID. */
@@ -35,10 +37,22 @@ export type ShardBusErrorHandler = (
     error: unknown,
     message: ShardMessage,
 ) => void;
-/** Bun/Node-compatible cross-shard transport using BroadcastChannel. */
+/** Options for a {@link ShardBus}. */
+export interface ShardBusOptions {
+    /**
+     * How messages travel. Defaults to IPC inside a cluster forked by
+     * `ClusterManager`, and to a `BroadcastChannel` otherwise.
+     */
+    transport?: ShardBusTransport;
+    /** Most requests waiting for a reply at once (default 10,000); more are rejected. */
+    maxPending?: number;
+}
+/** Cross-shard messaging: send, broadcast, and request/reply over a {@link ShardBusTransport}. */
 export class ShardBus {
-    /** Underlying broadcast channel. */
-    readonly #channel: BroadcastChannel;
+    /** Underlying transport. */
+    readonly #transport: ShardBusTransport;
+    /** Most requests waiting for a reply at once. */
+    readonly #maxPending: number;
     /** Message handlers by message type. */
     readonly #handlers = new Map<string, Set<ShardMessageHandler>>();
     /** Handler error listeners. */
@@ -52,9 +66,20 @@ export class ShardBus {
     /** Monotonic message counter. */
     #counter = 0;
     /** Reply collectors for in-flight requests, by request message ID. */
-    readonly #pending = new Map<string, (reply: ShardReply) => void>();
+    readonly #pending = new Map<
+        string,
+        {
+            target: number | null;
+            reply: (reply: ShardReply) => void;
+            fail: (error: Error) => void;
+        }
+    >();
     /** Creates a shard bus. @param shardId Shard ID. @param channelName Application-specific channel name. @throws {RangeError} If shard ID is invalid. @throws {TypeError} If channel name is empty. */
-    public constructor(shardId: number, channelName: string) {
+    public constructor(
+        shardId: number,
+        channelName: string,
+        options: ShardBusOptions = {},
+    ) {
         if (!Number.isInteger(shardId) || shardId < 0)
             throw new RangeError("Shard ID must be a non-negative integer.");
         if (!channelName?.trim())
@@ -64,10 +89,11 @@ export class ShardBus {
         this.#shardId = shardId;
         this.#namespace = channelName.trim();
         this.channelName = this.#namespace;
-        this.#channel = new BroadcastChannel(this.channelName);
-        this.#channel.addEventListener("message", (event) =>
-            this.#dispatch(event.data as ShardMessage),
-        );
+        this.#maxPending = options.maxPending ?? 10_000;
+        this.#transport =
+            options.transport ?? defaultTransport(this.channelName);
+        this.#transport.onMessage((message) => this.#dispatch(message));
+        this.#transport.onPeerDown?.((shardIds) => this.#peerDown(shardIds));
     }
     /** Registers a message handler. @param type Message type. @param handler Handler callback. @returns This bus. @throws {TypeError} If type or handler is invalid. */
     public on<T>(type: string, handler: ShardMessageHandler<T>): this {
@@ -149,6 +175,7 @@ export class ShardBus {
             data,
             timeoutMs,
             1,
+            true,
         );
         if (!reply)
             throw new Error(
@@ -181,9 +208,16 @@ export class ShardBus {
         data: unknown,
         timeoutMs: number,
         expected: number,
+        rejectOnPeerDown = false,
     ): Promise<ShardReply<R>[]> {
         const replies: ShardReply<R>[] = [];
-        return new Promise((resolve) => {
+        if (this.#pending.size >= this.#maxPending)
+            return Promise.reject(
+                new Error(
+                    `Too many shard requests waiting for a reply (${this.#maxPending}).`,
+                ),
+            );
+        return new Promise((resolve, reject) => {
             let requestId = "";
             const finish = (): void => {
                 clearTimeout(timer);
@@ -192,15 +226,25 @@ export class ShardBus {
             };
             const timer = setTimeout(finish, timeoutMs);
             requestId = this.#publish(target, type, data, true);
-            this.#pending.set(requestId, (reply) => {
-                replies.push(reply as ShardReply<R>);
-                if (replies.length >= expected) finish();
+            this.#pending.set(requestId, {
+                target,
+                reply: (reply) => {
+                    replies.push(reply as ShardReply<R>);
+                    if (replies.length >= expected) finish();
+                },
+                fail: (error) => {
+                    if (rejectOnPeerDown) {
+                        clearTimeout(timer);
+                        this.#pending.delete(requestId);
+                        reject(error);
+                    }
+                },
             });
         });
     }
     /** Closes the transport. @returns Nothing. */
     public close(): void {
-        this.#channel.close();
+        this.#transport.close();
         this.#handlers.clear();
         this.#errorHandlers.clear();
     }
@@ -214,7 +258,7 @@ export class ShardBus {
         if (!type.trim())
             throw new TypeError("Shard message type is required.");
         const id = `${this.#namespace}:${this.#shardId}:${++this.#counter}`;
-        this.#channel.postMessage({
+        this.#transport.post({
             source: this.#shardId,
             target,
             type,
@@ -239,7 +283,7 @@ export class ShardBus {
             return;
         if (message.type === REPLY_TYPE) {
             const reply = message.data as ReplyPayload;
-            this.#pending.get(reply?.requestId)?.({
+            this.#pending.get(reply?.requestId)?.reply({
                 shardId: message.source,
                 ...(reply.error !== undefined
                     ? { error: reply.error }
@@ -262,8 +306,28 @@ export class ShardBus {
             }
         }
     }
-    /** Forwards a handler error to error listeners, isolating listener failures. @param error Handler error. @param message Message being handled. @returns Nothing. */
+    /** Fails requests waiting on shards that no longer exist. */
+    #peerDown(shardIds: readonly number[]): void {
+        const down = new Set(shardIds);
+        for (const [id, pending] of this.#pending)
+            if (pending.target !== null && down.has(pending.target)) {
+                pending.fail(
+                    new Error(
+                        `Shard ${pending.target} went away before it replied.`,
+                    ),
+                );
+                this.#pending.delete(id);
+            }
+    }
+    /** Forwards a handler error to error listeners, isolating listener failures. Without a listener it is raised as a process warning, never dropped. @param error Handler error. @param message Message being handled. @returns Nothing. */
     #reportError(error: unknown, message: ShardMessage): void {
+        if (this.#errorHandlers.size === 0) {
+            process.emitWarning(
+                error instanceof Error ? error : new Error(String(error)),
+                { code: "LUNIBEE_SHARD_BUS_ERROR" },
+            );
+            return;
+        }
         for (const handler of this.#errorHandlers) {
             try {
                 handler(error, message);

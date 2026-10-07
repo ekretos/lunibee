@@ -1,6 +1,8 @@
 import packageJson from "../package.json" with { type: "json" };
 import { fork, type ChildProcess } from "node:child_process";
 import { cpus } from "node:os";
+import { ShardSupervisor, type SupervisorOptions } from "./supervisor.js";
+import { BUS_FRAME, PEER_DOWN_FRAME } from "./transport.js";
 
 /** Runtime-agnostic delay used to stagger cluster spawns (works under Node and Bun). @param ms Milliseconds to wait. */
 const sleep = (ms: number): Promise<void> =>
@@ -30,6 +32,16 @@ export interface ClusterManagerOptions {
     restartOnExit?: boolean;
     /** Delay in milliseconds before re-forking a crashed cluster. Defaults to 5000. */
     restartDelay?: number;
+    /**
+     * Backoff, jitter and a give-up limit for restarts. `restartDelay` is its
+     * first delay unless it sets its own. The default restarts every crash
+     * after a fixed delay, as before.
+     */
+    supervisor?: Omit<SupervisorOptions, "restartDelay"> & {
+        restartDelay?: number;
+    };
+    /** Called when a cluster crashed more often than `supervisor.maxRestarts` allows and will not be restarted. */
+    onGiveUp?(cluster: ClusterInfo): void;
     /** Called whenever a cluster process exits, before any restart. */
     onClusterExit?(
         cluster: ClusterInfo,
@@ -71,6 +83,7 @@ export class ClusterManager {
     #stopping = false;
     /** Pending restart timers, kept so shutdown can cancel them. */
     readonly #restartTimers = new Set<ReturnType<typeof setTimeout>>();
+    readonly #supervisor: ShardSupervisor;
 
     /** Creates a cluster manager. @param options Clustering configuration. @throws {TypeError} If token or script is missing. */
     public constructor(options: ClusterManagerOptions) {
@@ -90,6 +103,10 @@ export class ClusterManager {
 
         this.#auto = options.shardCount === "auto";
         this.#options = { ...options };
+        this.#supervisor = new ShardSupervisor({
+            restartDelay: options.restartDelay,
+            ...options.supervisor,
+        });
     }
 
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
@@ -180,10 +197,12 @@ export class ClusterManager {
                 SHARD_LIST: shards.join(","),
                 SHARD_COUNT: shardCount.toString(),
                 CLUSTER_ID: id.toString(),
+                LUNIBEE_SHARD_BUS: "ipc",
             },
         });
         const info: ClusterInfo = { id, process: child, shards };
         this.clusters.set(id, info);
+        child.on("message", (frame) => this.#relay(id, frame));
         child.once("exit", (code, signal) => {
             // Only act on the process still registered as this cluster: a
             // restart or respawn may already have replaced it.
@@ -193,18 +212,53 @@ export class ClusterManager {
             } catch {
                 // A faulty consumer callback must not break supervision.
             }
+            if (!this.#stopping) this.#announceDown(id, shards);
             if (this.#stopping || this.#options.restartOnExit === false) return;
             this.clusters.delete(id);
+            const delay = this.#supervisor.next(id);
+            if (delay === null) {
+                try {
+                    this.#options.onGiveUp?.(info);
+                } catch {
+                    // A faulty consumer callback must not break supervision.
+                }
+                return;
+            }
             const timer = setTimeout(() => {
                 this.#restartTimers.delete(timer);
                 if (this.#stopping || !this.#spawned) return;
                 this.#launch(id, shards, shardCount);
-            }, this.#options.restartDelay ?? 5000);
+            }, delay);
             // Do not hold the event loop open purely for a pending restart.
             (timer as { unref?: () => void }).unref?.();
             this.#restartTimers.add(timer);
         });
         return info;
+    }
+
+    /** Passes a shard-bus frame from one cluster to every other cluster. */
+    #relay(from: number, frame: unknown): void {
+        if (!frame || typeof frame !== "object" || !(BUS_FRAME in frame))
+            return;
+        for (const [id, cluster] of this.clusters)
+            if (id !== from) this.#sendFrame(cluster, frame);
+    }
+
+    /** Tells the surviving clusters that these shards are gone, so requests to them fail now instead of timing out. */
+    #announceDown(exited: number, shards: number[]): void {
+        for (const [id, cluster] of this.clusters)
+            if (id !== exited)
+                this.#sendFrame(cluster, { [PEER_DOWN_FRAME]: shards });
+    }
+
+    #sendFrame(cluster: ClusterInfo, frame: unknown): void {
+        const child = cluster.process;
+        if (typeof child.send !== "function" || !child.connected) return;
+        try {
+            child.send(frame as never);
+        } catch {
+            // The child is exiting; its own exit handler takes over.
+        }
     }
 
     /** Checks if the recommended shard count has changed and respawns if so. */
@@ -229,6 +283,7 @@ export class ClusterManager {
         this.#options.shardCount = newShardCount;
         await this.shutdownAll();
         this.#spawned = false;
+        this.#supervisor.reset();
         await this.spawn();
     }
 

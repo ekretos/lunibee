@@ -17,6 +17,9 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 * **`parseDuration()`** turns `"90s"`, `"10m"`, `"1h30m"` into milliseconds.
 * **CLI: `create command --slash|--prefix|--both`** writes a `command()` file (slash by default, `--prefix` for prefix-only, `--both` for one file answering both) and **`lunibee sync commands`** regenerates `src/commands/index.ts` with `registerCommands(bot)`. `create command` now emits the `command()` form instead of `data` + `execute()`; existing command files keep working.
 
+* **Cross-process `ShardBus`.** `ShardBusTransport` with `BroadcastChannelTransport` (one process) and `IpcTransport` (forked clusters, relayed by the `ClusterManager`). Children forked by the manager use IPC automatically. A request to a shard whose cluster died rejects immediately, pending requests are capped (`maxPending`), and handler errors without an `onError` listener become a `LUNIBEE_SHARD_BUS_ERROR` process warning instead of being dropped. See [Sharding](/core-concepts/sharding/).
+* **`ShardSupervisor`** and `ClusterManager` options `supervisor` (backoff, jitter, `maxRestarts` per `window`) and `onGiveUp`. Defaults keep today's fixed-delay restarts.
+
 ### 🔧 Changed
 
 * **Typed message options.** `MessageCreateOptions`, `MessageEditOptions`, `InteractionReplyOptions`, `InteractionUpdateOptions` and `FollowUpOptions` live in `@lunibee/types` and replace `Record<string, unknown>` on channel send/edit, message reply/edit and interaction replies. `embeds` take `CreateEmbed` builders or raw embeds, `files` need a `name` and `data`, `ephemeral` is a boolean. Unknown keys still pass through. A caller that passed a wrongly-shaped value (for example `embeds: unknown[]`) now gets a compile error. See [Sending Messages](/recipes/sending-messages/).

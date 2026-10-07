@@ -48,7 +48,16 @@ await manager.connect();
 
 ## Cross-Shard Messaging with `ShardBus`
 
-`ShardBus` passes messages between shards over a named `BroadcastChannel`.
+`ShardBus` passes messages between shards. Inside one process it uses a named `BroadcastChannel`; in a cluster forked by `ClusterManager` it uses IPC automatically (0.3.0), because a `BroadcastChannel` does not cross `fork()`ed processes.
+
+```text
+ClusterManager (parent)
+ ├─ cluster 0 ── shards 0, 2 ──┐  worker.send(frame)
+ ├─ cluster 1 ── shards 1, 3 ──┼─▶ parent relays the frame to every other cluster
+ └─ cluster 2 ── shards 4    ──┘  and, when a cluster exits, tells the others which shards are gone
+```
+
+Your code does not change: `new ShardBus(shardId, "my-bot")` picks the transport. Pass `{ transport }` (a `ShardBusTransport`: `post`, `onMessage`, `close`) to override it. A request to a shard whose cluster dies rejects at once instead of waiting for its timeout, `maxPending` (10,000 by default) bounds the requests waiting for replies, and an error thrown by a handler reaches `onError` listeners, or becomes a process warning (`LUNIBEE_SHARD_BUS_ERROR`) when there are none.
 
 ```ts
 import { ShardBus } from "lunibee";
@@ -100,3 +109,17 @@ socket open (`handshakeTimeout`, default 15 s, bounds that wait). A
 `maxConcurrency` override is capped at Discord's value. Shards that are
 already connected do not count against the session start limit, and a
 too-small budget never tears down running shards.
+
+## Restarting crashed clusters
+
+`ClusterManager` re-forks a cluster that exits. By default every crash is restarted after `restartDelay`. For a crash loop, add a supervisor policy:
+
+```ts
+new ClusterManager({
+  token, script: "./bot.js",
+  supervisor: { restartDelay: 1000, backoff: 2, maxDelay: 60_000, jitter: 0.2, maxRestarts: 5, window: 60_000 },
+  onGiveUp: (cluster) => console.error(`cluster ${cluster.id} keeps crashing`),
+});
+```
+
+Each crash inside `window` doubles the delay (up to `maxDelay`, plus jitter); more than `maxRestarts` crashes inside `window` stops restarting that cluster and calls `onGiveUp`. A cluster that stays up for a full `window` starts over. `ShardSupervisor` is exported for custom managers.
