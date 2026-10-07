@@ -28,6 +28,8 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 
 * **Structures.** `createdTimestamp` on every snowflake structure; `guild.premiumProgressBarEnabled`; a `Sticker` structure with `url()`; `AuditLogEntry.info` (typed and parsed per action type), `is()` and `change()`, and `AuditLog.find()` / `filter()` by type, target, user and time, via `guilds.fetchAuditLogEntries()`.
 
+* **Faster Collection scans.** `at()` and `keyAt()` walk to the index instead of copying the collection (about 30x faster at 1,000 items); `filter`, `clone`, `each` and `map` no longer allocate a pair per entry; `findLast` / `findLastKey` stop building entry tuples. `bun run bench:compare` compares the runtime benchmark with a committed baseline and warns on regressions.
+
 ### 🔧 Changed
 
 * **REST runs requests on a known bucket concurrently by default** (`concurrentBuckets` is now `true`). A bucket's allowance is used in parallel instead of one request at a time, about twice as fast in `benchmarks/rest-buckets.ts`, with no extra 429s in a 10,000-request soak test. Requests on one bucket may now finish out of order; pass `concurrentBuckets: false` if you rely on strict per-bucket ordering (for example, several messages to one channel that must arrive in sequence).

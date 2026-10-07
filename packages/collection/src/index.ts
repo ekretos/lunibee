@@ -686,22 +686,20 @@ export class Collection<K, V> extends Map<K, V> {
     public findLast(
         predicate: (value: V, key: K, collection: this) => boolean,
     ): V | undefined {
-        const entries = [...this];
-        for (let i = entries.length - 1; i >= 0; i--) {
-            const [key, value] = entries[i]!;
-            if (predicate(value, key, this)) return value;
-        }
+        const keys = this.keyArray();
+        const values = this.array();
+        for (let i = values.length - 1; i >= 0; i--)
+            if (predicate(values[i]!, keys[i]!, this)) return values[i];
         return undefined;
     }
     /** Finds the key of the last entry (in insertion order) matching a predicate. */
     public findLastKey(
         predicate: (value: V, key: K, collection: this) => boolean,
     ): K | undefined {
-        const entries = [...this];
-        for (let i = entries.length - 1; i >= 0; i--) {
-            const [key, value] = entries[i]!;
-            if (predicate(value, key, this)) return key;
-        }
+        const keys = this.keyArray();
+        const values = this.array();
+        for (let i = values.length - 1; i >= 0; i--)
+            if (predicate(values[i]!, keys[i]!, this)) return keys[i];
         return undefined;
     }
     /** Returns all values matching a predicate. */
@@ -709,17 +707,18 @@ export class Collection<K, V> extends Map<K, V> {
         predicate: (value: V, key: K, collection: this) => boolean,
     ): this {
         const result = this.#derived();
-        for (const [key, value] of this) {
+        // forEach walks the entries without allocating a [key, value] pair each.
+        this.forEach((value, key) => {
             if (predicate(value, key, this)) result.set(key, value);
-        }
+        });
         return result;
     }
     /** Transforms every stored value into an array. */
     public map<T>(transform: (value: V, key: K, collection: this) => T): T[] {
         const result: T[] = [];
-        for (const [key, value] of this) {
+        this.forEach((value, key) => {
             result.push(transform(value, key, this));
-        }
+        });
         return result;
     }
     /** Returns whether at least one stored value satisfies a predicate. */
@@ -744,9 +743,9 @@ export class Collection<K, V> extends Map<K, V> {
     public each(
         callback: (value: V, key: K, collection: this) => unknown,
     ): this {
-        for (const [key, value] of this) {
+        this.forEach((value, key) => {
             callback(value, key, this);
-        }
+        });
         return this;
     }
     /** Returns an array containing all stored values. */
@@ -764,7 +763,9 @@ export class Collection<K, V> extends Map<K, V> {
     /** Returns a new collection with the same entries. */
     public clone(): this {
         const copy = this.#derived();
-        for (const [key, value] of this) copy.set(key, value);
+        this.forEach((value, key) => {
+            copy.set(key, value);
+        });
         return copy;
     }
     /** Returns whether all supplied keys are present. */
@@ -1061,15 +1062,17 @@ export class Collection<K, V> extends Map<K, V> {
     }
     /** Returns the value at a given insertion-order index (supports negative indices). */
     public at(index: number): V | undefined {
-        const arr = [...this.values()];
-        const i = index < 0 ? arr.length + index : index;
-        return arr[i];
+        let remaining = index < 0 ? this.size + index : index;
+        if (remaining < 0) return undefined;
+        for (const value of this.values()) if (remaining-- === 0) return value;
+        return undefined;
     }
     /** Returns the key at a given insertion-order index (supports negative indices). */
     public keyAt(index: number): K | undefined {
-        const arr = [...this.keys()];
-        const i = index < 0 ? arr.length + index : index;
-        return arr[i];
+        let remaining = index < 0 ? this.size + index : index;
+        if (remaining < 0) return undefined;
+        for (const key of this.keys()) if (remaining-- === 0) return key;
+        return undefined;
     }
     /** Serializes the collection to a plain `[key, value]` array. */
     public toJSON(): [K, V][] {
