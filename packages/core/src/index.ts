@@ -22,6 +22,18 @@ export {
 } from "./events.js";
 export { Collector, type CollectorOptions } from "./collector.js";
 export {
+    ChannelHandle,
+    GuildHandle,
+    MemberHandle,
+    MessageHandle,
+    RoleHandle,
+    UserHandle,
+    parseDuration,
+    type Duration,
+    type Handle,
+    type MessageInput,
+} from "./handles.js";
+export {
     GatewayIntentBits,
     IntentBits,
     Intents,
@@ -95,6 +107,14 @@ import type {
 import { ClientEvent, type ClientEvents } from "./events.js";
 import { Collector, type CollectorOptions } from "./collector.js";
 import { computePermissions, PermissionSet } from "./permissions.js";
+import {
+    ChannelHandle,
+    GuildHandle,
+    MemberHandle,
+    MessageHandle,
+    RoleHandle,
+    UserHandle,
+} from "./handles.js";
 
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
@@ -1104,6 +1124,37 @@ export class Client
         this.on(event, listener);
         collector.onDispose(() => this.off(event, listener));
         return collector;
+    }
+
+    /**
+     * Names a guild by id. The handle reads it (`peek()` from the cache, `get()`
+     * from the cache or Discord, `fetch()` from Discord) and acts on it.
+     */
+    public guild(id: string): GuildHandle {
+        return new GuildHandle(this, id);
+    }
+    /** Names a channel by id; see {@link Client.guild} for the read methods. */
+    public channel(id: string): ChannelHandle {
+        return new ChannelHandle(this, id);
+    }
+    /**
+     * Names a user by id; see {@link Client.guild} for the read methods.
+     * (`bot.user` is the bot's own account, hence the different name.)
+     */
+    public person(id: string): UserHandle {
+        return new UserHandle(this, id);
+    }
+    /** Names a guild member by guild id and user id. */
+    public member(guildId: string, userId: string): MemberHandle {
+        return new MemberHandle(this, guildId, userId);
+    }
+    /** Names a role by guild id and role id. */
+    public role(guildId: string, roleId: string): RoleHandle {
+        return new RoleHandle(this, guildId, roleId);
+    }
+    /** Names a message by channel id and message id. */
+    public message(channelId: string, messageId: string): MessageHandle {
+        return new MessageHandle(this, channelId, messageId);
     }
 
     /** Structures built by this client (members from interactions...) act through this. */

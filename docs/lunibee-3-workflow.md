@@ -1,6 +1,6 @@
 # Lunibee 0.3 workflow: design
 
-Status: **proposal, not built.** Step 0b of `.roadmap/0.3.0.md`. Agree the names here,
+Status: **decided; step 1 (handles) is built.** Step 0b of `.roadmap/0.3.0.md`. Agree the names here,
 then build in the order at the end.
 
 ## Why
@@ -40,8 +40,9 @@ await bot.channel(channelId).send("hi");
 await bot.guild(guildId).member(userId).timeout("10m", "spam");
 ```
 
-- Entry points: `bot.guild(id)`, `bot.channel(id)`, `bot.user(id)`, `bot.member(guildId, userId)`,
-  `bot.role(guildId, roleId)`, `bot.message(channelId, messageId)`.
+- Entry points: `bot.guild(id)`, `bot.channel(id)`, `bot.person(id)`, `bot.member(guildId, userId)`,
+  `bot.role(guildId, roleId)`, `bot.message(channelId, messageId)`. A user is `bot.person(id)`
+  because `bot.user` is already the bot's own account.
 - A handle holds ids only. It is cheap, can be created before the thing is cached, and
   never throws until you use it.
 - Every handle has `peek()`, `get()`, `fetch()`; actions that Discord offers on that
@@ -154,11 +155,9 @@ Flags: `--slash`, `--prefix`, `--both` (exclusive; slash by default), plus the e
 
 Each step ships with tests and keeps the old API working.
 
-## Open questions
+## Decisions
 
-- Entry object name: the examples use `bot`. Keep `Client` as the class and create it with
-  `new Client(...)`, or add `lunibee()` that returns the same object?
-- Handle method for the cached collection: `bot.guild(id).members` (a `Collection`) is
-  proposed; the alternative is `.cached()` returning an array.
-- Whether `prefix: true` needs the `MessageContent` intent flagged at login time (a warning
-  at startup when it is missing is proposed).
+- The entry object stays `new Client(...)`; examples call the instance `bot`.
+- `bot.guild(id).members`, `.roles` are the cached `Collection`s (live); `.channels` is a
+  `Collection` of that guild's cached channels, taken when you read it.
+- `prefix: true` warns at startup when the client has no `MessageContent` intent.

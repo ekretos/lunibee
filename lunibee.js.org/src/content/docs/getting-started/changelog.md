@@ -3,6 +3,15 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
+## v0.3.0 (unreleased)
+
+A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3-workflow.md`](https://github.com/ekretos/lunibee/blob/0.3.0/docs/lunibee-3-workflow.md).
+
+### ✨ Added
+
+* **Handles.** `bot.guild(id)`, `bot.channel(id)`, `bot.member(guildId, userId)`, `bot.role(guildId, roleId)`, `bot.person(id)` and `bot.message(channelId, messageId)` name a thing by its ids. Every handle reads the same way (`peek()` cache only, `get()` cache then Discord, `fetch()` Discord now) and carries the actions Discord offers on it (`kick`, `timeout("10m")`, `send`, `reply`, `react`, …). `bot.guild(id).members`, `.roles` and `.channels` are collections. See [Handles](/reference/handles/).
+* **`parseDuration()`** turns `"90s"`, `"10m"`, `"1h30m"` into milliseconds.
+
 ## v0.2.4
 
 Security release. Fixes the findings of the 0.2.3 security review; the status of each one is in [`docs/audits/security-0.2.3.md`](https://github.com/ekretos/lunibee/blob/0.2.4/docs/audits/security-0.2.3.md). **Upgrade recommended.**

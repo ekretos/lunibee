@@ -1,0 +1,69 @@
+---
+title: Handles
+description: Name a guild, channel, member, role, user or message by its ids, then read it with peek, get or fetch and act on it.
+---
+
+A **handle** refers to one Discord thing by its ids. It holds no data, so it is cheap to create, can be made before the thing is cached, and fails only when you use it.
+
+```ts
+import { Client } from "lunibee";
+
+const bot = new Client({ token: process.env.DISCORD_TOKEN!, intents });
+
+const member = await bot.member(guildId, userId).get(); // cache, else Discord
+await bot.member(guildId, userId).timeout("10m", "spam");
+await bot.channel(channelId).send("hello");
+```
+
+## The three reads
+
+Every handle reads the same way:
+
+| Method | What it does |
+|---|---|
+| `peek()` | Returns the cached value, or `undefined`. Never makes a request. |
+| `get()` | Returns the cached value, or fetches it from Discord when it is not cached. |
+| `fetch()` | Asks Discord now and refreshes the cache. |
+
+A `get()` and a `fetch()` for the same id at the same time share one request, and a Gateway update that arrives while a fetch is in flight is not overwritten by it.
+
+## Entry points
+
+| Call | Handle |
+|---|---|
+| `bot.guild(guildId)` | `GuildHandle` |
+| `bot.channel(channelId)` | `ChannelHandle` |
+| `bot.member(guildId, userId)` | `MemberHandle` |
+| `bot.role(guildId, roleId)` | `RoleHandle` |
+| `bot.person(userId)` | `UserHandle` (`bot.user` is the bot's own account) |
+| `bot.message(channelId, messageId)` | `MessageHandle` |
+
+Handles lead to each other: `bot.guild(id).member(userId)`, `.role(roleId)`, `.channel(channelId)`, `bot.channel(id).message(messageId)`, `member.guild()`, `member.user()`, `message.channel()`.
+
+## Actions
+
+| Handle | Methods |
+|---|---|
+| `GuildHandle` | `ban(userId, options?)`, `unban(userId, reason?)`, `edit(options)`, `leave()` |
+| `MemberHandle` | `kick(reason?)`, `ban(options?)`, `unban(reason?)`, `edit(options)`, `addRole(roleId, reason?)`, `removeRole(roleId, reason?)`, `timeout(duration \| null, reason?)` |
+| `RoleHandle` | `edit(options)`, `delete(reason?)` |
+| `ChannelHandle` | `send(message)`, `messages(query?)`, `edit(options)`, `delete(reason?)`, `bulkDelete(ids, reason?)` |
+| `MessageHandle` | `edit(message)`, `delete(reason?)`, `reply(message)`, `react(emoji)`, `pin(reason?)`, `unpin(reason?)`, `crosspost()` |
+| `UserHandle` | `dm()`, `send(message)` |
+
+`message` is text or a full payload (`embeds`, `components`, `files`, …). The audit-log reason goes in `reason`, or in `options.reason` where the method takes options.
+
+## Durations
+
+`timeout()` takes milliseconds or text: `"90s"`, `"10m"`, `"2h"`, `"1d"`, `"1w"`, `"1h30m"`. `null` lifts the timeout. A bad duration rejects with a `RangeError` before any request. `parseDuration()` is exported if you need the same parsing.
+
+## Collections
+
+`bot.guild(id).members` and `.roles` are the guild's cached collections and change as the Gateway updates them. `.channels` is a collection of that guild's cached channels, taken when you read it.
+
+```ts
+const admins = bot.guild(guildId).members.filter(m => m.permissions.has("Administrator"));
+const text = bot.guild(guildId).channels.find(c => c.name === "general");
+```
+
+The managers (`bot.guilds`, `bot.channels`, `bot.users`) are still there, and are what handles use underneath.
