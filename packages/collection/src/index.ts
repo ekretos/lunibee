@@ -59,10 +59,26 @@ type Policy<K> = {
     heap: Entry<K>[];
     timer?: ReturnType<typeof setTimeout>;
     armedFor: number;
+    /** The options, kept here so a plain collection carries none of them. */
+    ttl: number | undefined;
+    maxSize: number | undefined;
+    slide: boolean;
+    /** Stored loosely typed so the callback does not make Collection invariant in K and V. */
+    onEvict:
+        | ((key: unknown, value: unknown, reason: EvictionReason) => void)
+        | undefined;
+    expired: number;
+    evicted: number;
 };
 
-function newPolicy<K>(): Policy<K> {
+function newPolicy<K, V>(options: CollectionOptions<K, V> = {}): Policy<K> {
     return {
+        ttl: options.ttl,
+        maxSize: options.maxSize,
+        slide: options.slide ?? true,
+        onEvict: options.onEvict as Policy<K>["onEvict"],
+        expired: 0,
+        evicted: 0,
         entries: new Map(),
         oldest: undefined,
         newest: undefined,
@@ -103,21 +119,10 @@ function assertTTL(ttl: number | undefined): void {
  * Without options, a Collection behaves like a plain Map.
  */
 export class Collection<K, V> extends Map<K, V> {
-    readonly #ttl?: number;
-    readonly #maxSize?: number;
-    readonly #slide: boolean;
-    /** Stored loosely typed so the callback does not make Collection invariant in K and V. */
-    readonly #onEvict?: (
-        key: unknown,
-        value: unknown,
-        reason: EvictionReason,
-    ) => void;
-    /** Created with `ttl` or `maxSize`, or by the first `set()` with its own TTL. */
+    /** Created with any option, or by the first `set()` with its own TTL. */
     #policy?: Policy<K>;
     #hits = 0;
     #misses = 0;
-    #expired = 0;
-    #evicted = 0;
 
     /**
      * @param entries Initial entries, stored with `set()`.
@@ -135,14 +140,13 @@ export class Collection<K, V> extends Map<K, V> {
             (!Number.isInteger(options.maxSize) || options.maxSize <= 0)
         )
             throw new RangeError("maxSize must be a positive integer.");
-        this.#ttl = options.ttl;
-        this.#maxSize = options.maxSize;
-        this.#slide = options.slide ?? true;
-        if (options.ttl !== undefined || options.maxSize !== undefined)
-            this.#policy = newPolicy();
-        this.#onEvict = options.onEvict as
-            | ((key: unknown, value: unknown, reason: EvictionReason) => void)
-            | undefined;
+        if (
+            options.ttl !== undefined ||
+            options.maxSize !== undefined ||
+            options.slide !== undefined ||
+            options.onEvict !== undefined
+        )
+            this.#policy = newPolicy(options);
         if (entries) for (const [key, value] of entries) this.set(key, value);
     }
 
@@ -153,7 +157,7 @@ export class Collection<K, V> extends Map<K, V> {
      */
     public override set(key: K, value: V, ttl?: number): this {
         assertTTL(ttl);
-        const window = ttl ?? this.#ttl;
+        const window = ttl ?? this.#policy?.ttl;
         if (window !== undefined) this.#policy ??= newPolicy();
         if (!this.#policy) return super.set(key, value);
         // A key that was not stored before has no policy entry.
@@ -193,7 +197,7 @@ export class Collection<K, V> extends Map<K, V> {
         }
         this.#hits++;
         if (entry) {
-            if (timed && this.#slide) entry.deadline = now + entry.window;
+            if (timed && policy!.slide) entry.deadline = now + entry.window;
             if (entry.inLru) this.#promote(policy!, entry);
         }
         return value;
@@ -233,8 +237,8 @@ export class Collection<K, V> extends Map<K, V> {
         return {
             hits: this.#hits,
             misses: this.#misses,
-            expired: this.#expired,
-            evicted: this.#evicted,
+            expired: this.#policy?.expired ?? 0,
+            evicted: this.#policy?.evicted ?? 0,
         };
     }
 
@@ -314,7 +318,7 @@ export class Collection<K, V> extends Map<K, V> {
             this.#remove(due.key);
             removed++;
         }
-        this.#expired += removed;
+        this.#policy!.expired += removed;
         this.#rearm();
         for (const [key, value] of dropped) this.#notify(key, value, "expired");
         return removed;
@@ -332,7 +336,7 @@ export class Collection<K, V> extends Map<K, V> {
     #expire(entry: Entry<K>): void {
         const value = super.get(entry.key)!;
         this.#remove(entry.key);
-        this.#expired++;
+        this.#policy!.expired++;
         this.#notify(entry.key, value, "expired");
     }
 
@@ -359,7 +363,7 @@ export class Collection<K, V> extends Map<K, V> {
      */
     #track(key: K, window: number | undefined, isNew: boolean): void {
         const policy = this.#policy!;
-        const lru = this.#maxSize !== undefined;
+        const lru = policy.maxSize !== undefined;
         let entry = isNew ? undefined : policy.entries.get(key);
         if (window === undefined) {
             if (entry && entry.window !== 0) {
@@ -461,10 +465,26 @@ export class Collection<K, V> extends Map<K, V> {
         }
     }
 
+    /**
+     * An empty collection of the species this one derives, so `filter()` and
+     * friends on a subclass return the subclass. It is built without
+     * arguments and carries no `ttl` or `maxSize`.
+     */
+    #derived(): this {
+        const Species =
+            (
+                this.constructor as {
+                    [Symbol.species]?: new () => Collection<K, V>;
+                }
+            )[Symbol.species] ?? Collection;
+        return new Species() as this;
+    }
+
     #notify(key: K, value: V, reason: EvictionReason): void {
-        if (!this.#onEvict) return;
+        const onEvict = this.#policy?.onEvict;
+        if (!onEvict) return;
         try {
-            this.#onEvict(key, value, reason);
+            onEvict(key, value, reason);
         } catch {
             // A throwing callback must not leave the collection inconsistent.
         }
@@ -472,22 +492,23 @@ export class Collection<K, V> extends Map<K, V> {
 
     /** Evicts least-recently-used `set()` entries past `maxSize`; O(1) per eviction. */
     #enforceCap(): void {
-        if (this.#maxSize === undefined) return;
         const policy = this.#policy!;
+        const max = policy.maxSize;
+        if (max === undefined) return;
         // Lapsed entries must not push live ones out.
         if (
-            policy.lruSize > this.#maxSize &&
+            policy.lruSize > max &&
             policy.heap.length > 0 &&
             policy.heap[0]!.filed <= Date.now()
         )
             this.purge();
-        while (policy.lruSize > this.#maxSize) {
+        while (policy.lruSize > max) {
             const oldest = policy.oldest!;
-            const value = this.#onEvict ? super.get(oldest.key) : undefined;
+            const value = policy.onEvict ? super.get(oldest.key) : undefined;
             this.#unlink(policy, oldest);
             policy.entries.delete(oldest.key);
             super.delete(oldest.key);
-            this.#evicted++;
+            policy.evicted++;
             this.#notify(oldest.key, value as V, "evicted");
         }
     }
@@ -630,8 +651,8 @@ export class Collection<K, V> extends Map<K, V> {
     /** Returns all values matching a predicate. */
     public filter(
         predicate: (value: V, key: K, collection: this) => boolean,
-    ): Collection<K, V> {
-        const result = new Collection<K, V>();
+    ): this {
+        const result = this.#derived();
         for (const [key, value] of this) {
             if (predicate(value, key, this)) result.set(key, value);
         }
@@ -685,8 +706,8 @@ export class Collection<K, V> extends Map<K, V> {
         return [...this.entries()];
     }
     /** Returns a new collection with the same entries. */
-    public clone(): Collection<K, V> {
-        const copy = new Collection<K, V>();
+    public clone(): this {
+        const copy = this.#derived();
         for (const [key, value] of this) copy.set(key, value);
         return copy;
     }
@@ -741,22 +762,22 @@ export class Collection<K, V> extends Map<K, V> {
         return entry;
     }
     /** Returns a new Collection containing elements from both collections. */
-    public union(other: Collection<K, V>): Collection<K, V> {
+    public union(other: Collection<K, V>): this {
         const result = this.clone();
         for (const [key, value] of other) result.set(key, value);
         return result;
     }
     /** Returns a new Collection containing only elements present in both collections. */
-    public intersection(other: Collection<K, V>): Collection<K, V> {
-        const result = new Collection<K, V>();
+    public intersection(other: Collection<K, V>): this {
+        const result = this.#derived();
         for (const [key, value] of this) {
             if (other.has(key)) result.set(key, value);
         }
         return result;
     }
     /** Returns a new Collection containing elements present in this collection but not the other. */
-    public difference(other: Collection<K, V>): Collection<K, V> {
-        const result = new Collection<K, V>();
+    public difference(other: Collection<K, V>): this {
+        const result = this.#derived();
         for (const [key, value] of this) {
             if (!other.has(key)) result.set(key, value);
         }
@@ -767,9 +788,9 @@ export class Collection<K, V> extends Map<K, V> {
      */
     public partition(
         predicate: (value: V, key: K, collection: this) => boolean,
-    ): [Collection<K, V>, Collection<K, V>] {
-        const pass = new Collection<K, V>();
-        const fail = new Collection<K, V>();
+    ): [this, this] {
+        const pass = this.#derived();
+        const fail = this.#derived();
         for (const [key, value] of this) {
             if (predicate(value, key, this)) pass.set(key, value);
             else fail.set(key, value);
@@ -805,9 +826,7 @@ export class Collection<K, V> extends Map<K, V> {
     /** Returns a new Collection with entries sorted by comparator (non-mutating).
      * Defaults to insertion order if no comparator is provided.
      */
-    public sorted(
-        comparator?: (a: V, b: V, aKey: K, bKey: K) => number,
-    ): Collection<K, V> {
+    public sorted(comparator?: (a: V, b: V, aKey: K, bKey: K) => number): this {
         // Decorate with the original insertion index and use it as a tiebreaker so
         // equal elements keep their insertion order (a stable sort independent of
         // the engine's Array.prototype.sort stability guarantees).
@@ -825,7 +844,7 @@ export class Collection<K, V> extends Map<K, V> {
                 );
                 return comparison !== 0 ? comparison : x.index - y.index;
             });
-        const result = new Collection<K, V>();
+        const result = this.#derived();
         for (const { entry } of decorated) result.set(entry[0], entry[1]);
         return result;
     }

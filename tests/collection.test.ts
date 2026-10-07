@@ -139,3 +139,62 @@ describe("random and findLast", () => {
         expect(seen).toEqual(["d", "c", "b", "a"]);
     });
 });
+
+describe("Symbol.species", () => {
+    class Users extends Collection<string, number> {
+        label = "users";
+    }
+    class Plain extends Collection<string, number> {
+        static override get [Symbol.species]() {
+            return Collection;
+        }
+    }
+    const fill = <C extends Collection<string, number>>(col: C): C => {
+        col.set("a", 1).set("b", 2).set("c", 3);
+        return col;
+    };
+
+    test("derived collections keep the subclass", () => {
+        const users = fill(new Users());
+        const other = fill(new Users());
+        const derived = [
+            users.filter((value) => value > 1),
+            users.clone(),
+            users.sorted((x, y) => y - x),
+            users.union(other),
+            users.intersection(other),
+            users.difference(other),
+            ...users.partition((value) => value > 1),
+        ];
+        for (const result of derived) {
+            expect(result).toBeInstanceOf(Users);
+            expect(result.label).toBe("users");
+        }
+        expect([...users.sorted((x, y) => y - x).keys()]).toEqual([
+            "c",
+            "b",
+            "a",
+        ]);
+        expect(
+            users.partition((value) => value > 1).map((c) => c.size),
+        ).toEqual([2, 1]);
+    });
+
+    test("a subclass can opt out, and a plain Collection stays plain", () => {
+        const plain = fill(new Plain());
+        const filtered = plain.filter((value) => value > 1);
+        expect(filtered).toBeInstanceOf(Collection);
+        expect(filtered).not.toBeInstanceOf(Plain);
+        const base = fill(new Collection<string, number>());
+        expect(base.filter(() => true).constructor).toBe(Collection);
+        expect(base.clone().constructor).toBe(Collection);
+    });
+
+    test("a derived collection starts without a TTL or size bound", () => {
+        const bounded = new Collection<string, number>(null, { maxSize: 1 });
+        bounded.set("a", 1);
+        const copy = bounded.clone();
+        copy.set("b", 2);
+        expect(copy.size).toBe(2);
+    });
+});

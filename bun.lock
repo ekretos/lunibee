@@ -20,6 +20,7 @@
         "@lunibee/ws": "workspace:*",
       },
       "devDependencies": {
+        "@discordjs/collection": "^2.1.1",
         "@types/bun": "^1.4.1",
         "prettier": "^3.9.9",
         "typescript": "^7.0.2",
@@ -27,14 +28,14 @@
     },
     "packages/builders": {
       "name": "@lunibee/builders",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
     },
     "packages/cli": {
       "name": "@lunibee/cli",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "bin": {
         "lunibee": "./dist/index.js",
       },
@@ -44,11 +45,11 @@
     },
     "packages/collection": {
       "name": "@lunibee/collection",
-      "version": "0.2.3",
+      "version": "0.2.4",
     },
     "packages/core": {
       "name": "@lunibee/core",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lunibee/builders": "workspace:*",
         "@lunibee/collection": "workspace:*",
@@ -61,22 +62,22 @@
     },
     "packages/create": {
       "name": "@lunibee/create",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "bin": {
         "create-lunibee": "./dist/cli.js",
       },
     },
     "packages/formatters": {
       "name": "@lunibee/formatters",
-      "version": "0.2.3",
+      "version": "0.2.4",
     },
     "packages/handlers": {
       "name": "@lunibee/handlers",
-      "version": "0.2.3",
+      "version": "0.2.4",
     },
     "packages/managers": {
       "name": "@lunibee/managers",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lunibee/collection": "workspace:*",
         "@lunibee/rest": "workspace:*",
@@ -86,28 +87,28 @@
     },
     "packages/rest": {
       "name": "@lunibee/rest",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
     },
     "packages/sharding": {
       "name": "@lunibee/sharding",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lunibee/ws": "workspace:*",
       },
     },
     "packages/structures": {
       "name": "@lunibee/structures",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
     },
     "packages/testing": {
       "name": "@lunibee/testing",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lunibee/builders": "workspace:*",
         "@lunibee/collection": "workspace:*",
@@ -123,25 +124,27 @@
     },
     "packages/types": {
       "name": "@lunibee/types",
-      "version": "0.2.3",
+      "version": "0.2.4",
     },
     "packages/utils": {
       "name": "@lunibee/utils",
-      "version": "0.2.3",
+      "version": "0.2.4",
     },
     "packages/voice": {
       "name": "@lunibee/voice",
-      "version": "0.2.3",
+      "version": "0.2.4",
     },
     "packages/ws": {
       "name": "@lunibee/ws",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
     },
   },
   "packages": {
+    "@discordjs/collection": ["@discordjs/collection@2.1.1", "", {}, "sha512-LiSusze9Tc7qF03sLCujF5iZp7K+vRNEDBZ86FT9aQAv3vxMLihUvKvpsCWiQ2DJq1tVckopKm1rxomgNUc9hg=="],
+
     "@lunibee/builders": ["@lunibee/builders@workspace:packages/builders"],
 
     "@lunibee/cli": ["@lunibee/cli@workspace:packages/cli"],

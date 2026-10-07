@@ -362,6 +362,15 @@ const newest = client.users.cache
 </TabItem>
 </Tabs>
 
+## Subclassing
+
+`filter()`, `clone()`, `sorted()`, `partition()`, `union()`, `intersection()` and `difference()` return an instance of the same class (`Symbol.species`), built with no constructor arguments and without any `ttl` or `maxSize`. Override `static get [Symbol.species]()` to return `Collection` (or another class) instead.
+
+```ts
+class Users extends Collection<string, User> {}
+const bots = new Users().filter(u => u.bot); // Users
+```
+
 ## TTL, LRU and Persistent Entries (0.2.0)
 
 Without options a `Collection` behaves exactly like a `Map`. Pass options to
