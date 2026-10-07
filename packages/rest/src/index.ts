@@ -249,7 +249,7 @@ export class REST {
             });
         const store = options.store ?? new MemoryRateLimitStore();
         this.#concurrentBuckets =
-            (options.concurrentBuckets ?? false) &&
+            (options.concurrentBuckets ?? true) &&
             typeof store.reserve === "function";
         this.#limiter = new RateLimiter(store, {
             concurrent: this.#concurrentBuckets,

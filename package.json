@@ -99,6 +99,7 @@
     "ci:test": "bun test --coverage && bun test ./packages/testing/src",
     "ci": "bun run ci:deps && bun run audit:api && bun run format:check && bun run ci:typecheck && bun run ci:test",
     "bench": "bun benchmarks/parity.ts",
+    "bench:rest": "bun benchmarks/rest-buckets.ts",
     "build:all": "bun run build && bun run build:dts",
     "publish:all": "bun run scripts/publish.ts"
   },

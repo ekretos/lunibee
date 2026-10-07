@@ -25,6 +25,8 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 
 ### 🔧 Changed
 
+* **REST runs requests on a known bucket concurrently by default** (`concurrentBuckets` is now `true`). A bucket's allowance is used in parallel instead of one request at a time, about twice as fast in `benchmarks/rest-buckets.ts`, with no extra 429s in a 10,000-request soak test. Requests on one bucket may now finish out of order; pass `concurrentBuckets: false` if you rely on strict per-bucket ordering (for example, several messages to one channel that must arrive in sequence).
+
 * **Typed message options.** `MessageCreateOptions`, `MessageEditOptions`, `InteractionReplyOptions`, `InteractionUpdateOptions` and `FollowUpOptions` live in `@lunibee/types` and replace `Record<string, unknown>` on channel send/edit, message reply/edit and interaction replies. `embeds` take `CreateEmbed` builders or raw embeds, `files` need a `name` and `data`, `ephemeral` is a boolean. Unknown keys still pass through. A caller that passed a wrongly-shaped value (for example `embeds: unknown[]`) now gets a compile error. See [Sending Messages](/recipes/sending-messages/).
 
 * **Previous state on more update events.** `messageUpdate`, `voiceStateUpdate`, `presenceUpdate`, `stageInstanceUpdate`, `guildScheduledEventUpdate` and `autoModerationRuleUpdate` pass `previous` (or `null`) as a second argument. `messageUpdate`'s `previous` is now `Message | null` instead of `Message | undefined`. New option `cache: { presences: true }` keeps presences so `presenceUpdate` can report the previous one.

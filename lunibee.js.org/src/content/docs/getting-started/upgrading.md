@@ -18,6 +18,10 @@ Two parts. **Removed:** the APIs deprecated in 0.2.x are gone (see the changelog
 | `client.rest.get(Routes.guildMembers(g), { query })` | `bot.api.guilds(g).members.all()` |
 | `CreateSlashCommand` + `interactionCreate` + `getUser("user")` | `command({ options: { user: option.user() }, run })` |
 
+* **REST concurrency:** `concurrentBuckets` now defaults to `true`. Requests on one bucket can finish out of order; pass `concurrentBuckets: false` where order matters.
+* **Typed message options:** `embeds`, `components` and `files` are now checked. Fix compile errors by passing builders or Discord-shaped objects.
+* **Update events:** `messageUpdate`'s `previous` is `Message | null` (was `Message | undefined`); `voiceStateUpdate`, `presenceUpdate`, `stageInstanceUpdate`, `guildScheduledEventUpdate` and `autoModerationRuleUpdate` gained a `previous` argument.
+* **Sharding:** `ShardBus` in a forked cluster now uses IPC automatically. `ClusterManager` workers that call `process.send()` themselves are unaffected: bus frames are tagged.
 * `bot` is only a name: `new Client(...)` is unchanged.
 * `bot.person(id)` is a user by id; `bot.user` is still the bot's own account.
 * `lunibee create command` now writes `command()` files (`--slash`, `--prefix`, `--both`); run `lunibee sync commands` after adding files by hand.

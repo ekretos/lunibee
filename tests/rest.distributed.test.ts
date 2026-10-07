@@ -213,6 +213,8 @@ describe("REST-004: routes sharing one bucket hash", () => {
 
         const rest = new REST({
             token: "token",
+            // This test is about strict per-bucket ordering.
+            concurrentBuckets: false,
             store,
             transport: new HttpTransport({
                 fetch: async (url) => {

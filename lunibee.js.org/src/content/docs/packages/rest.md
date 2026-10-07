@@ -108,9 +108,9 @@ but they still share the event loop, so keep them cheap.
 
 ### Concurrent buckets
 
-`new REST({ token, concurrentBuckets: true })` runs requests on a known bucket in
-parallel, up to its remaining allowance. It's off by default so per-bucket order is
-kept. See [REST & Rate Limits](/core-concepts/rest/#concurrent-buckets-opt-in).
+Since 0.3.0 requests on a known bucket run in parallel, up to its remaining
+allowance. Pass `concurrentBuckets: false` when per-bucket order matters. See
+[REST & Rate Limits](/core-concepts/rest/#concurrent-buckets).
 
 ## Routes
 
