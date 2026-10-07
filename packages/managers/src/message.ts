@@ -9,22 +9,15 @@ export interface MessageCacheOptions {
     ttl?: number;
 }
 import { REST, Routes, type RESTFileAttachment } from "@lunibee/rest";
-import type { AllowedMentions } from "@lunibee/types";
+import type {
+    AllowedMentions,
+    MessageCreateOptions,
+    MessageEditOptions,
+    MessageFile,
+} from "@lunibee/types";
 import { Message, type ResourceContext } from "@lunibee/structures";
 
-/** A file to upload with a message. */
-export interface MessageFile {
-    name: string;
-    data: Blob | Uint8Array | ArrayBuffer | string;
-    contentType?: string;
-}
-
-export type MessageCreateOptions = Record<string, unknown> & {
-    content?: string;
-    /** Files to upload; the message is sent as multipart. */
-    files?: MessageFile[];
-};
-export type MessageEditOptions = MessageCreateOptions;
+export type { MessageCreateOptions, MessageEditOptions, MessageFile };
 
 /**
  * Splits `files` out of a message payload into a REST upload, encoding string

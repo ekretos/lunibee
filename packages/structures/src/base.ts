@@ -1,6 +1,8 @@
 import {
     channelKindOf,
     type ChannelKind,
+    type MessageCreateOptions,
+    type MessageEditOptions,
     type UnknownChannelKind,
 } from "@lunibee/types";
 import type { ChannelOfKind } from "./channels.js";
@@ -28,12 +30,12 @@ export class BaseStructure {
 export interface ResourceContext {
     sendMessage(
         channelId: string,
-        options: Record<string, unknown> & { content?: string },
+        options: MessageCreateOptions,
     ): Promise<import("./index.js").Message>;
     editMessage(
         channelId: string,
         messageId: string,
-        options: Record<string, unknown> & { content?: string },
+        options: MessageEditOptions,
     ): Promise<import("./index.js").Message>;
     deleteMessage(
         channelId: string,
@@ -260,7 +262,7 @@ export class Channel extends BaseStructure {
 
     /** Sends a message to this channel. @param options Message payload. @returns The created message. @throws {Error} If the channel is not attached to a client. */
     public send(
-        options: Record<string, unknown> & { content?: string },
+        options: MessageCreateOptions,
     ): Promise<import("./index.js").Message> {
         if (!this.#context)
             throw new Error("This channel is not attached to a client.");

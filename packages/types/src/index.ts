@@ -293,8 +293,65 @@ export interface MessagePayload {
     /** Discord message flags, e.g. `MessageFlags.SuppressEmbeds`. */
     flags?: number;
     tts?: boolean;
+    /** Attachment metadata for files sent with the message. */
+    attachments?: Array<{
+        id: number | string;
+        filename?: string;
+        description?: string;
+    }>;
     [key: string]: unknown;
 }
+
+/** A file to upload with a message. */
+export interface MessageFile {
+    name: string;
+    data: Blob | Uint8Array | ArrayBuffer | string;
+    contentType?: string;
+}
+
+/** A poll to send; Discord fills in `results` and `expiry` when it is read back. */
+export interface MessagePoll {
+    question: { text?: string; emoji?: APIPartialEmoji };
+    answers: Array<{ poll_media: { text?: string; emoji?: APIPartialEmoji } }>;
+    /** Hours the poll stays open (1-768). */
+    duration?: number;
+    allow_multiselect?: boolean;
+    layout_type?: number;
+}
+
+/** What `send()` takes. */
+export interface MessageCreateOptions extends MessagePayload {
+    /** Files to upload; the message is sent as multipart. */
+    files?: MessageFile[];
+    /** Reply to or forward another message. */
+    message_reference?: APIMessageReference;
+    poll?: MessagePoll;
+    sticker_ids?: Snowflake[];
+    /** Returned on the Gateway event so the client can match its own message. */
+    nonce?: string | number;
+    enforce_nonce?: boolean;
+}
+
+/** What `edit()` takes: the fields Discord lets you change after sending. */
+export interface MessageEditOptions extends MessagePayload {
+    files?: MessageFile[];
+}
+
+/** What a reply, edit-reply, follow-up or update to an interaction takes. */
+export interface InteractionReplyOptions extends MessagePayload {
+    /** Only the person who ran the command sees it. */
+    ephemeral?: boolean;
+    files?: MessageFile[];
+    poll?: MessagePoll;
+    /** On `reply()` / `update()`: return the created message (one request, no `fetchReply()`). */
+    withResponse?: boolean;
+}
+
+/** What `update()` on a component interaction takes. */
+export type InteractionUpdateOptions = InteractionReplyOptions;
+
+/** What `followUp()` takes. */
+export type FollowUpOptions = InteractionReplyOptions;
 
 // ─── Attachments ─────────────────────────────────────────────────────────────
 

@@ -1,4 +1,5 @@
 /** Resource structures for Discord messages and related entities. */
+import type { MessageCreateOptions, MessageEditOptions } from "@lunibee/types";
 import { BaseStructure, Channel, User } from "./base.js";
 import { GuildMember } from "./resources.js";
 import type { ComponentInteraction } from "./interactions.js";
@@ -138,18 +139,14 @@ export class Message extends BaseStructure {
     }
 
     /** Edits this message. @param options Message fields to change. @returns The updated message. @throws {Error} If the message is not attached to a client. */
-    public edit(
-        options: Record<string, unknown> & { content?: string },
-    ): Promise<Message> {
+    public edit(options: MessageEditOptions): Promise<Message> {
         if (!this.#context)
             throw new Error("This message is not attached to a client.");
         return this.#context.editMessage(this.channelId, this.id, options);
     }
 
     /** Updates this message using the same resource operation as edit. @param options Message fields to change. @returns The updated message. @throws {Error} If the message is not attached to a client. */
-    public update(
-        options: Record<string, unknown> & { content?: string },
-    ): Promise<Message> {
+    public update(options: MessageEditOptions): Promise<Message> {
         return this.edit(options);
     }
 
@@ -161,9 +158,7 @@ export class Message extends BaseStructure {
     }
 
     /** Replies to this message. @param options Message content or payload. @returns The created reply message. @throws {Error} If the message is not attached to a client. */
-    public reply(
-        options: string | (Record<string, unknown> & { content?: string }),
-    ): Promise<Message> {
+    public reply(options: string | MessageCreateOptions): Promise<Message> {
         if (!this.#context)
             throw new Error("This message is not attached to a client.");
         const payload =

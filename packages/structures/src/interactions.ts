@@ -1,4 +1,7 @@
-import { InteractionResponseEnum } from "@lunibee/types";
+import {
+    InteractionResponseEnum,
+    type InteractionReplyOptions,
+} from "@lunibee/types";
 import { User, type ResourceContext } from "./base.js";
 import { GuildMember } from "./resources.js";
 // A cycle with index.ts: Message is only used lazily (in a getter), after both modules loaded.
@@ -37,22 +40,7 @@ export interface InteractionData {
     data?: Record<string, unknown>;
     [key: string]: unknown;
 }
-/** Options for an interaction response message. */
-export interface InteractionReplyOptions {
-    /** Message content. */
-    content?: string;
-    /** Whether the response is ephemeral. */
-    ephemeral?: boolean;
-    /** Message components. */
-    components?: unknown[];
-    /** Message embeds. */
-    embeds?: unknown[];
-    /** Discord message flags. */
-    flags?: number;
-    /** On `reply()` / `update()`: return the created message (one request, no `fetchReply()`). */
-    withResponse?: boolean;
-    [key: string]: unknown;
-}
+export type { InteractionReplyOptions };
 /** Transport required by an interaction structure. */
 export interface InteractionClient {
     /** Sends the initial interaction callback. @param id Interaction identifier. @param token Interaction token. @param response Callback payload. @returns Discord response. @throws {Error} When REST fails. */

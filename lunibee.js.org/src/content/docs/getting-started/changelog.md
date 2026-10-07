@@ -17,6 +17,10 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 * **`parseDuration()`** turns `"90s"`, `"10m"`, `"1h30m"` into milliseconds.
 * **CLI: `create command --slash|--prefix|--both`** writes a `command()` file (slash by default, `--prefix` for prefix-only, `--both` for one file answering both) and **`lunibee sync commands`** regenerates `src/commands/index.ts` with `registerCommands(bot)`. `create command` now emits the `command()` form instead of `data` + `execute()`; existing command files keep working.
 
+### 🔧 Changed
+
+* **Typed message options.** `MessageCreateOptions`, `MessageEditOptions`, `InteractionReplyOptions`, `InteractionUpdateOptions` and `FollowUpOptions` live in `@lunibee/types` and replace `Record<string, unknown>` on channel send/edit, message reply/edit and interaction replies. `embeds` take `CreateEmbed` builders or raw embeds, `files` need a `name` and `data`, `ephemeral` is a boolean. Unknown keys still pass through. A caller that passed a wrongly-shaped value (for example `embeds: unknown[]`) now gets a compile error. See [Sending Messages](/recipes/sending-messages/).
+
 ### ⚠️ Removed
 
 Everything deprecated in 0.2.x is gone. `lunibee migrate --fix` renames the old names and lists the calls to change by hand.

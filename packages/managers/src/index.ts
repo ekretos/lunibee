@@ -3,7 +3,11 @@ export { Manager, ResourceManager } from "./base.js";
 /** Discord.js-familiar alias for {@link ResourceManager}. */
 export { ResourceManager as CachedManager } from "./base.js";
 import { REST, Routes } from "@lunibee/rest";
-import type { AllowedMentions } from "@lunibee/types";
+import type {
+    AllowedMentions,
+    MessageCreateOptions,
+    MessageEditOptions,
+} from "@lunibee/types";
 import {
     Channel,
     createChannel,
@@ -15,7 +19,6 @@ import {
     MessageManager,
     toRequest,
     type MessageCacheOptions,
-    type MessageCreateOptions as ManagerMessageCreateOptions,
 } from "./message.js";
 import { ThreadManager } from "./thread.js";
 
@@ -24,8 +27,7 @@ export { GuildManager } from "./guild.js";
 export type { AuditLogEntry, AuditLogResponse } from "./guild.js";
 export { AuditLogEvent } from "./guild.js";
 
-export type MessageCreateOptions = ManagerMessageCreateOptions;
-export type MessageEditOptions = Record<string, unknown> & { content?: string };
+export type { MessageCreateOptions, MessageEditOptions } from "./message.js";
 /** Discord only bulk-deletes messages younger than two weeks. */
 const BULK_DELETE_MAX_AGE_MS = 14 * 24 * 60 * 60_000;
 /** Creation time (ms) encoded in a snowflake. */
