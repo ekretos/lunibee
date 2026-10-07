@@ -1,6 +1,6 @@
 # Lunibee 0.3 workflow: design
 
-Status: **decided; steps 1 (handles), 2 (channel kinds), 3 (`command()`) and 4 (`bot.api`) are built.** Step 0b of `.roadmap/0.3.0.md`. Agree the names here,
+Status: **decided; steps 1 (handles), 2 (channel kinds), 3 (`command()`), 4 (`bot.api`) and 5 (CLI) are built.** Step 0b of `.roadmap/0.3.0.md`. Agree the names here,
 then build in the order at the end.
 
 ## Why

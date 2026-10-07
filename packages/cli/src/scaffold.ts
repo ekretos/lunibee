@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { syncCommands } from "./commands.js";
 import { CliError, paint, type IO } from "./io.js";
 
 /** Discord's chat-input command name rule. */
@@ -61,29 +62,39 @@ function category(value: string | undefined): string[] {
     return parts;
 }
 
-export function commandSource(name: string, description: string): string {
-    return `import { CreateSlashCommand, type Client, type CommandInteraction } from "lunibee";
+export type CommandMode = "slash" | "prefix" | "both";
 
-export const data = new CreateSlashCommand()
-  .setName(${JSON.stringify(name)})
-  .setDescription(${JSON.stringify(description)});
+/** Source of a `command()` file; `mode` picks slash (default), prefix-only or both. */
+export function commandSource(
+    name: string,
+    description: string,
+    mode: CommandMode = "slash",
+): string {
+    const lines = [
+        `  name: ${JSON.stringify(name)},`,
+        `  description: ${JSON.stringify(description)},`,
+    ];
+    if (mode === "prefix") lines.push("  slash: false,");
+    if (mode !== "slash") lines.push("  prefix: true,");
+    return `import { command } from "lunibee";
 
-/** Runs /${name}. */
-export async function execute(client: Client, interaction: CommandInteraction): Promise<void> {
-  void client;
-  await interaction.reply({ content: "/${name} works.", ephemeral: true });
-}
-
-export default data;
+/** Runs ${mode === "prefix" ? "!" : "/"}${name}. */
+export default command({
+${lines.join("\n")}
+  async run({ reply }) {
+    await reply(${JSON.stringify(`${name} works.`)});
+  },
+});
 `;
 }
 
 export interface CommandOptions extends ScaffoldOptions {
     description?: string;
     category?: string;
+    mode?: CommandMode;
 }
 
-/** `lunibee create command [name] [--description] [--category]`. */
+/** `lunibee create command [name] [--slash|--prefix|--both] [--description] [--category]`. */
 export async function createCommand(
     io: IO,
     root: string,
@@ -91,7 +102,7 @@ export async function createCommand(
     options: CommandOptions = {},
 ): Promise<number> {
     const usage =
-        "lunibee create command <name> [--description <text>] [--category <folder>]";
+        "lunibee create command <name> [--slash|--prefix|--both] [--description <text>] [--category <folder>]";
     const name = ask(io, input, "Command name:", usage);
     if (!name) return 0;
     if (!COMMAND_NAME.test(name))
@@ -108,13 +119,14 @@ export async function createCommand(
     if (description.length < 1 || description.length > 100)
         throw new CliError("The description must be 1-100 characters.");
     const folder = category(options.category);
-    return emit(
+    const code = await emit(
         io,
         root,
         ["commands", ...folder, `${name}.ts`].join("/"),
-        commandSource(name, description),
+        commandSource(name, description, options.mode),
         options,
     );
+    return options.dryRun ? code : syncCommands(io, root);
 }
 
 export type ComponentKind = "button" | "select" | "modal";

@@ -19,7 +19,8 @@ bunx lunibee help
 | `lunibee handler [--fix]` | Find handlers not in the current format. `--fix` adds a first `_client: Client` parameter (plus the `lunibee` import; `.js` files get `_client` only), renames event folders whose case is wrong (`messagecreate/` → `messageCreate/`), then regenerates `src/handlers/event.ts`. Handlers already taking the client (a first parameter named `client`/`bot` or typed as a `Client`) and parameterless ones are left alone; shapes it cannot rewrite are listed. Without `--fix` it only reports (exit 1 when something needs fixing). `--dry-run`, `--json`; `handlers` works too. |
 | `lunibee migrate [--fix]` | Find APIs removed in 0.3.0 under `src/`. `--fix` renames the pre-0.2.2 names (`ButtonBuilder` → `CreateButton`, `ChannelType` → `ChannelEnum`…) only in files that import them from `lunibee` or `@lunibee/*`, so discord.js names are never touched, and `Routes.channelPin` → `Routes.channelMessagesPin`. Calls it cannot prove are Lunibee's (`deleteRole`, `sendMessage`, `bulkDelete`, `setDMPermission`, `Routes.channelPins`, `withExpiration`…) are listed with their replacement. Exit 1 while anything is left. `--dry-run`, `--json`. |
 | `lunibee sync handlers` | Regenerate `src/handlers/event.ts` after adding, renaming or removing files under `src/events`. Writes only on change; warns about folders that are not events (typos) and files without a default export. `--check` exits 1 when out of date without writing (for pre-commit hooks); `--dry-run`. |
-| `lunibee create command [name]` | Create `src/commands/[category/]<name>.ts` exporting `data` (a `CreateSlashCommand`, also the default export) and `execute(client, interaction)`. The name is validated against Discord's rules. Options: `--description`/`-d`, `--category`/`-c` (folders, e.g. `admin/mod`), `--force`, `--dry-run`. |
+| `lunibee create command [name]` | Create `src/commands/[category/]<name>.ts` with a `command()` default export, then regenerate `src/commands/index.ts`. `--slash` (default) makes a slash command, `--prefix` a prefix-only one (`slash: false, prefix: true`), `--both` one file that answers both (exclusive). The name is validated against Discord's rules. Options: `--description`/`-d`, `--category`/`-c` (folders, e.g. `admin/mod`), `--force`, `--dry-run`. |
+| `lunibee sync commands` | Regenerate `src/commands/index.ts` (`registerCommands(bot)`) from the files under `src/commands`. Writes only on change; warns about files without a default export. `--check` exits 1 when out of date; `--dry-run`. |
 | `lunibee create component [button\|select\|modal] [name]` | Create `src/components/<name>.ts` with the builder (`row()` or `modal()`), its `customId` and a `handle(client, interaction)` stub. The name is the custom ID (1-100 of `a-z A-Z 0-9 _ - : .`). Options: `--force`, `--dry-run`. |
 | `lunibee list <handlers\|commands\|components\|events>` | List what is under `src/events`, `src/commands` (recursive), `src/components`, or every client event. `--json`. |
 | `lunibee check` | Project layout, handler binder in sync, typo folders, missing default exports, `.env` present with a token key and ignored by git. Exit code 1 on errors. `--json`. |
@@ -41,7 +42,7 @@ value are bound; several files may handle the same event.
 
 Upgrading from 0.2.1: generated handlers received only the event arguments. Run
 `lunibee handler --fix` to add the `client` first parameter to each handler and resync. The generated
-`src/handlers/event.ts` is unchanged. `create command` now also exports `data` and `execute`;
+`src/handlers/event.ts` is unchanged. `create command` emitted `data` and `execute` in 0.2.x;
 existing command files keep working.
 
 ## Handler layout

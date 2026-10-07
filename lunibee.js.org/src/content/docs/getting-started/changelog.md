@@ -15,6 +15,7 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 * **Channel kinds.** `channel.kind` is `"text"`, `"voice"`, `"thread"`, `"forum"`… in place of the numeric `type`; `channel.is(...kinds)` narrows the type and `channel.as(...kinds)` asserts it; `bot.channel(id).as("voice")` fetches and narrows. `channelKindOf()`, `channelTypesOf()` and `ChannelKinds` convert to and from Discord's numbers. See [Channel](/reference/channel/#kinds-030).
 * **`bot.guild(id).createChannel({ kind, … })`** creates text, announcement, voice, stage, category, forum and media channels with the options each kind accepts, and returns the right class.
 * **`parseDuration()`** turns `"90s"`, `"10m"`, `"1h30m"` into milliseconds.
+* **CLI: `create command --slash|--prefix|--both`** writes a `command()` file (slash by default, `--prefix` for prefix-only, `--both` for one file answering both) and **`lunibee sync commands`** regenerates `src/commands/index.ts` with `registerCommands(bot)`. `create command` now emits the `command()` form instead of `data` + `execute()`; existing command files keep working.
 
 ## v0.2.4
 

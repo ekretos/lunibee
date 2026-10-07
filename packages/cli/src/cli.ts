@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { assertFlags, flag, parseArgs, value, type Args } from "./args.js";
+import { syncCommands } from "./commands.js";
 import { createHandlers, resolveEvent, syncHandlers } from "./handlers.js";
 import {
     check,
@@ -14,7 +15,11 @@ import { publish, status } from "./maintainer.js";
 import { migrateDeprecations } from "./deprecations.js";
 import { fixHandlers } from "./migrate.js";
 import { findProjectRoot } from "./project.js";
-import { createCommand, createComponent } from "./scaffold.js";
+import {
+    createCommand,
+    createComponent,
+    type CommandMode,
+} from "./scaffold.js";
 
 export interface MainOptions {
     version: string;
@@ -38,6 +43,15 @@ interface Command {
     flags: string[];
     details?: string;
     run(ctx: Context): Promise<number>;
+}
+
+function commandMode(args: Args): CommandMode | undefined {
+    const modes = (["slash", "prefix", "both"] as const).filter((mode) =>
+        flag(args, mode),
+    );
+    if (modes.length > 1)
+        throw new CliError("Pass only one of --slash, --prefix and --both.");
+    return modes[0];
 }
 
 const COMMON = ["help", "cwd", "no-color"];
@@ -111,17 +125,40 @@ const COMMANDS: Command[] = [
     },
     {
         path: ["create", "command"],
-        usage: "lunibee create command [name] [--description <text>] [--category <folder>] [--force] [--dry-run]",
+        usage: "lunibee create command [name] [--slash|--prefix|--both] [--description <text>] [--category <folder>] [--force] [--dry-run]",
         summary:
-            "Create src/commands/[category/]<name>.ts with data and execute()",
-        flags: ["description", "category", "force", "dry-run"],
+            "Create src/commands/[category/]<name>.ts with a command() and update src/commands/index.ts",
+        flags: [
+            "slash",
+            "prefix",
+            "both",
+            "description",
+            "category",
+            "force",
+            "dry-run",
+        ],
         details:
-            "The name follows Discord's rules: 1-32 lowercase letters, digits, - or _.",
+            "The name follows Discord's rules: 1-32 lowercase letters, digits, - or _.\n--slash (default) makes a slash command, --prefix a prefix-only command, --both one file\nanswering both. Register everything with registerCommands(bot) from src/commands/index.ts.",
         run: ({ io, args, rest, root }) =>
             createCommand(io, root, rest[0], {
+                mode: commandMode(args),
                 description: value(args, "description"),
                 category: value(args, "category"),
                 force: flag(args, "force"),
+                dryRun: flag(args, "dry-run"),
+            }),
+    },
+    {
+        path: ["sync", "commands"],
+        usage: "lunibee sync commands [--check] [--dry-run]",
+        summary:
+            "Regenerate src/commands/index.ts from the command files under src/commands",
+        flags: ["check", "dry-run"],
+        details:
+            "Writes only when the content changes. --check exits 1 when the file is out of date.",
+        run: ({ io, args, root }) =>
+            syncCommands(io, root, {
+                check: flag(args, "check"),
                 dryRun: flag(args, "dry-run"),
             }),
     },

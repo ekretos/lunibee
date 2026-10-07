@@ -12,6 +12,7 @@ import {
     pickEvents,
     resolveEvent,
 } from "../packages/cli/src/handlers.ts";
+import { commandsBinderSource } from "../packages/cli/src/commands.ts";
 import { closest, paint, type IO } from "../packages/cli/src/io.ts";
 import {
     compareVersions,
@@ -313,14 +314,44 @@ describe("create command", () => {
     test("with flags", async () => {
         expect(await cli("create command ping -d Pong! -c util/fun")).toBe(0);
         const source = await read("src/commands/util/fun/ping.ts");
-        expect(source).toContain('.setName("ping")');
-        expect(source).toContain('.setDescription("Pong!")');
-        expect(source).toContain("export async function execute(");
-        expect(source).toContain("export default data;");
+        expect(source).toContain('name: "ping"');
+        expect(source).toContain('description: "Pong!"');
+        expect(source).toContain("export default command({");
+        expect(source).not.toContain("slash: false");
+        expect(await read("src/commands/index.ts")).toContain(
+            'import command_util_fun_ping from "./util/fun/ping";',
+        );
         expect(await cli("create command ping -c util/fun")).toBe(1);
         expect(errors()).toContain("--force");
         expect(await cli("create command ping --force --dry-run")).toBe(0);
         expect(text()).toContain("would create commands/ping.ts");
+    });
+
+    test("--prefix, --both and sync commands", async () => {
+        expect(await cli("create command pre --prefix")).toBe(0);
+        const prefixOnly = await read("src/commands/pre.ts");
+        expect(prefixOnly).toContain("slash: false");
+        expect(prefixOnly).toContain("prefix: true");
+        expect(await cli("create command both --both")).toBe(0);
+        const both = await read("src/commands/both.ts");
+        expect(both).toContain("prefix: true");
+        expect(both).not.toContain("slash: false");
+        expect(await cli("create command x --prefix --both")).toBe(1);
+        expect(errors()).toContain("only one of");
+        const index = await read("src/commands/index.ts");
+        expect(index).toContain("bot.commands.add(");
+        expect(index).toContain("command_both,");
+        expect(await cli("sync commands --check")).toBe(0);
+        await Bun.write(
+            join(dir, "src/commands/bare.ts"),
+            "export const a = 1;\n",
+        );
+        expect(await cli("sync commands --check")).toBe(1);
+        expect(await cli("sync commands --dry-run")).toBe(0);
+        expect(text()).toContain("would update");
+        expect(await cli("sync commands")).toBe(0);
+        expect(errors()).toContain("has no default export");
+        expect(commandsBinderSource([])).toContain("registerCommands");
     });
 
     test("validation", async () => {

@@ -27,8 +27,12 @@ async function sourceFiles(dir: string): Promise<string[]> {
             else if (
                 /\.[jt]s$/.test(entry.name) &&
                 !/\.d\.ts$/.test(entry.name)
-            )
-                found.push(relative(dir, path).split("\\").join("/"));
+            ) {
+                const name = relative(dir, path).split("\\").join("/");
+                // The generated binder is not a command.
+                if (!(dir.endsWith("commands") && /^index\.[jt]s$/.test(name)))
+                    found.push(name);
+            }
         }
     };
     await walk(dir);
