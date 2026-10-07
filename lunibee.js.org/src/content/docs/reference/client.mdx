@@ -259,7 +259,7 @@ await client.login();
 | Option | Description |
 |---|---|
 | `messageCache: { maxSize?, ttl? }` | Opt-in bounded per-channel message cache (`maxSize` defaults to 100). Without it messages are not cached. |
-| `cache: { users?, members?, roles?, emojis? }` | Turn off caching of a resource from Gateway events (all `true` by default). |
+| `cache: { users?, members?, roles?, emojis?, presences? }` | Turn off caching of a resource from Gateway events (all `true` by default), or turn on `presences` (off by default) to get `previous` on `presenceUpdate`. |
 | `allowedMentions` *(0.2.2)* | Default `allowed_mentions` for every message the client sends: channel send/edit, `message.reply()`, interaction replies, edits and follow-ups. A message's own `allowed_mentions` wins. Not applied to deferrals or modals. |
 
 #### Mentions safety

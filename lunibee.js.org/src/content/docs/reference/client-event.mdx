@@ -66,7 +66,7 @@ client.on("ready", (user) => { ... });
 | Event | String Key | Listener Args |
 |---|---|---|
 | `ClientEvent.MessageCreate` | `"messageCreate"` | `(message: Message)` |
-| `ClientEvent.MessageUpdate` | `"messageUpdate"` | `(message: Message, previous?: Message)` |
+| `ClientEvent.MessageUpdate` | `"messageUpdate"` | `(message: Message, previous: Message \| null)` |
 | `ClientEvent.MessageDelete` | `"messageDelete"` | `(data: APIMessageDeleteEvent, message?: Message)` |
 | `ClientEvent.MessageDeleteBulk` | `"messageDeleteBulk"` | `(data: APIMessageDeleteBulkEvent)` |
 
@@ -125,7 +125,7 @@ client.on("ready", (user) => { ... });
 
 | Event | String Key | Listener Args |
 |---|---|---|
-| `ClientEvent.VoiceStateUpdate` | `"voiceStateUpdate"` | `(data: APIVoiceState)` |
+| `ClientEvent.VoiceStateUpdate` | `"voiceStateUpdate"` | `(data: APIVoiceState, previous: APIVoiceState \| null)` |
 | `ClientEvent.VoiceServerUpdate` | `"voiceServerUpdate"` | `(data: APIVoiceServerUpdate)` |
 
 ### Threads
@@ -141,7 +141,7 @@ client.on("ready", (user) => { ... });
 
 | Event | String Key | Listener Args |
 |---|---|---|
-| `ClientEvent.PresenceUpdate` | `"presenceUpdate"` | `(data: APIPresenceUpdate)` |
+| `ClientEvent.PresenceUpdate` | `"presenceUpdate"` | `(data: APIPresenceUpdate, previous: APIPresenceUpdate \| null)` |
 | `ClientEvent.TypingStart` | `"typingStart"` | `(data: APITypingStart)` |
 
 ### Scheduled Events, AutoMod, Invites, Webhooks, Polls
@@ -251,10 +251,25 @@ client.on("guildRoleUpdate", ({ role }, previous) => {
 
 | Event | Arguments |
 |---|---|
-| `messageUpdate` | `(message, previous?)` — `previous` is the cached version when `messageCache` is enabled. |
+| `messageUpdate` | `(message, previous)` — `previous` is the cached version when `messageCache` is enabled, otherwise `null`. |
 | `messageDelete` | `(data, message?)` — the cached message that was deleted, if any. |
 | `messageDeleteBulk` | `(data, messages)` — the cached messages that were deleted (empty without `messageCache`). |
 | `entitlementCreate` / `entitlementUpdate` / `entitlementDelete` | `(entitlement)` |
 | `soundboardSoundCreate` / `soundboardSoundUpdate` | `(sound)` |
 | `soundboardSoundDelete` | `({ sound_id, guild_id })` |
 | `soundboardSoundsUpdate` | `({ guild_id, soundboard_sounds })` |
+
+## 0.3.0 Changes
+
+Update events carry the previous state, or `null` when Lunibee did not have it cached.
+
+| Event | Arguments |
+|---|---|
+| `messageUpdate` | `(message, previous \| null)` (was `previous?`) |
+| `voiceStateUpdate` | `(state, previous \| null)`: the user's last voice state in that guild |
+| `presenceUpdate` | `(presence, previous \| null)`: needs `cache: { presences: true }` |
+| `stageInstanceUpdate` | `(stage, previous \| null)` |
+| `guildScheduledEventUpdate` | `(event, previous \| null)` |
+| `autoModerationRuleUpdate` | `(rule, previous \| null)` |
+
+The previous value is the object Lunibee held before the event, replaced rather than edited, so it is never changed under you.

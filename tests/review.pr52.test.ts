@@ -30,7 +30,7 @@ describe("Gateway messages and messageCache", () => {
     test("cached messages expose the previous version on update and delete", () => {
         const { c, gw } = client({ messageCache: { maxSize: 10 } });
         let created: Message | undefined;
-        let updated: [Message, Message | undefined] | undefined;
+        let updated: [Message, Message | null] | undefined;
         let deleted: Message | undefined;
         c.on("messageCreate", (m) => (created = m));
         c.on("messageUpdate", (m, previous) => (updated = [m, previous]));
@@ -54,11 +54,11 @@ describe("Gateway messages and messageCache", () => {
         expect(removed.map((m) => m.id)).toEqual([M]);
 
         const plain = client();
-        let previous: Message | undefined = undefined;
+        let previous: Message | null | undefined = undefined;
         plain.c.on("messageUpdate", (_m, p) => (previous = p));
         plain.gw.emit("MESSAGE_CREATE", message("x"));
         plain.gw.emit("MESSAGE_UPDATE", message("y"));
-        expect(previous).toBeUndefined();
+        expect(previous).toBeNull();
         expect(plain.c.channels.cachedMessages(C)).toBeUndefined();
     });
 });

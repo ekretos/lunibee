@@ -21,6 +21,7 @@ import {
     type APIAutoModerationRule,
     type APIInviteCreate,
     type APIVoiceState,
+    type APIPresenceUpdate,
 } from "@lunibee/types";
 
 type GuildData = ConstructorParameters<typeof Guild>[0];
@@ -55,6 +56,7 @@ export class GuildManager extends ResourceManager<string, Guild> {
         string,
         Manager<string, APIAutoModerationRule>
     >();
+    readonly #presences = new Map<string, Manager<string, APIPresenceUpdate>>();
     readonly #invites = new Map<string, Manager<string, APIInviteCreate>>();
     #context?: ResourceContext;
 
@@ -164,6 +166,11 @@ export class GuildManager extends ResourceManager<string, Guild> {
         return this.#perGuild(this.#voiceStates, guildId, () => new Manager());
     }
 
+    /** Latest presence by user ID for a guild; filled only when `cache.presences` is on. */
+    public presences(guildId: string): Manager<string, APIPresenceUpdate> {
+        return this.#perGuild(this.#presences, guildId, () => new Manager());
+    }
+
     /** Auto-moderation rules by ID for a guild, kept in sync by `AUTO_MODERATION_RULE_*` events. */
     public autoModerationRules(
         guildId: string,
@@ -203,6 +210,7 @@ export class GuildManager extends ResourceManager<string, Guild> {
         this.#stickers.delete(id);
         this.#soundboard.delete(id);
         this.#voiceStates.delete(id);
+        this.#presences.delete(id);
         this.#autoModerationRules.delete(id);
         this.#invites.delete(id);
         return super.delete(id);

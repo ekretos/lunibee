@@ -378,6 +378,7 @@ export class Client
             members: true,
             roles: true,
             emojis: true,
+            presences: false,
             ...options.cache,
         };
         this.users = new UserManager(this.rest);
@@ -577,7 +578,7 @@ export class Client
             const messages = this.channels.cachedMessages(message.channelId);
             const previous = messages?.cache.peek(message.id);
             if (previous) messages!.cache.set(message.id, message);
-            this.emit(ClientEvent.MessageUpdate, message, previous);
+            this.emit(ClientEvent.MessageUpdate, message, previous ?? null);
         });
         this.#gateway.on("MESSAGE_DELETE", (data) => {
             const payload = data as APIMessageDeleteEvent;
@@ -876,8 +877,10 @@ export class Client
         });
         this.#gateway.on("GUILD_SCHEDULED_EVENT_UPDATE", (data) => {
             const event = data as APIGuildScheduledEvent;
-            this.guilds.scheduledEvents(event.guild_id).set(event.id, event);
-            this.emit(ClientEvent.GuildScheduledEventUpdate, event);
+            const events = this.guilds.scheduledEvents(event.guild_id);
+            const previous = events.get(event.id) ?? null;
+            events.set(event.id, event);
+            this.emit(ClientEvent.GuildScheduledEventUpdate, event, previous);
         });
         this.#gateway.on("GUILD_SCHEDULED_EVENT_DELETE", (data) => {
             const event = data as APIGuildScheduledEvent;
@@ -905,8 +908,10 @@ export class Client
         });
         this.#gateway.on("AUTO_MODERATION_RULE_UPDATE", (data) => {
             const rule = data as APIAutoModerationRule;
-            this.guilds.autoModerationRules(rule.guild_id).set(rule.id, rule);
-            this.emit(ClientEvent.AutoModerationRuleUpdate, rule);
+            const rules = this.guilds.autoModerationRules(rule.guild_id);
+            const previous = rules.get(rule.id) ?? null;
+            rules.set(rule.id, rule);
+            this.emit(ClientEvent.AutoModerationRuleUpdate, rule, previous);
         });
         this.#gateway.on("AUTO_MODERATION_RULE_DELETE", (data) => {
             const rule = data as APIAutoModerationRule;
@@ -989,8 +994,9 @@ export class Client
         });
         this.#gateway.on("STAGE_INSTANCE_UPDATE", (data) => {
             const stage = data as APIStageInstance;
+            const previous = this.stageInstances.get(stage.channel_id) ?? null;
             this.stageInstances.set(stage.channel_id, stage);
-            this.emit(ClientEvent.StageInstanceUpdate, stage);
+            this.emit(ClientEvent.StageInstanceUpdate, stage, previous);
         });
         this.#gateway.on("STAGE_INSTANCE_DELETE", (data) => {
             const stage = data as APIStageInstance;
@@ -1023,8 +1029,12 @@ export class Client
         // ── Voice ────────────────────────────────────────────────────────────────
         this.#gateway.on("VOICE_STATE_UPDATE", (data) => {
             const state = data as APIVoiceState;
+            const previous = state.guild_id
+                ? (this.guilds.voiceStates(state.guild_id).get(state.user_id) ??
+                  null)
+                : null;
             if (state.guild_id) this.#storeVoiceState(state.guild_id, state);
-            this.emit(ClientEvent.VoiceStateUpdate, state);
+            this.emit(ClientEvent.VoiceStateUpdate, state, previous);
         });
         this.#gateway.on("VOICE_SERVER_UPDATE", (data) =>
             this.emit(
@@ -1034,9 +1044,16 @@ export class Client
         );
 
         // ── Presence & Typing ────────────────────────────────────────────────────
-        this.#gateway.on("PRESENCE_UPDATE", (data) =>
-            this.emit(ClientEvent.PresenceUpdate, data as APIPresenceUpdate),
-        );
+        this.#gateway.on("PRESENCE_UPDATE", (data) => {
+            const presence = data as APIPresenceUpdate;
+            let previous: APIPresenceUpdate | null = null;
+            if (this.#cache.presences && presence.guild_id) {
+                const presences = this.guilds.presences(presence.guild_id);
+                previous = presences.get(presence.user.id) ?? null;
+                presences.set(presence.user.id, presence);
+            }
+            this.emit(ClientEvent.PresenceUpdate, presence, previous);
+        });
         this.#gateway.on("TYPING_START", (data) =>
             this.emit(ClientEvent.TypingStart, data as APITypingStart),
         );

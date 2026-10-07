@@ -166,8 +166,8 @@ export type ClientEvents = {
     close: [data: { code: number; action: string }];
     // ── Messages ───────────────────────────────────────────────────────────────
     messageCreate: [message: Message];
-    /** `previous` is the cached version, available when `messageCache` is enabled. */
-    messageUpdate: [message: Message, previous?: Message];
+    /** `previous` is the cached version, or `null` unless `messageCache` is enabled and the message was cached. */
+    messageUpdate: [message: Message, previous: Message | null];
     /** `message` is the cached message, available when `messageCache` is enabled. */
     messageDelete: [data: APIMessageDeleteEvent, message?: Message];
     /** `messages` are the cached messages that were deleted (empty without `messageCache`). */
@@ -228,13 +228,21 @@ export type ClientEvents = {
     guildIntegrationsUpdate: [data: { guild_id: string }];
     // ── Guild Scheduled Events ────────────────────────────────────────────────
     guildScheduledEventCreate: [data: APIGuildScheduledEvent];
-    guildScheduledEventUpdate: [data: APIGuildScheduledEvent];
+    /** `previous` is the cached event, or `null` if it was not cached. */
+    guildScheduledEventUpdate: [
+        data: APIGuildScheduledEvent,
+        previous: APIGuildScheduledEvent | null,
+    ];
     guildScheduledEventDelete: [data: APIGuildScheduledEvent];
     guildScheduledEventUserAdd: [data: APIGuildScheduledEventUserEvent];
     guildScheduledEventUserRemove: [data: APIGuildScheduledEventUserEvent];
     // ── AutoMod ───────────────────────────────────────────────────────────────
     autoModerationRuleCreate: [data: APIAutoModerationRule];
-    autoModerationRuleUpdate: [data: APIAutoModerationRule];
+    /** `previous` is the cached rule, or `null` if it was not cached. */
+    autoModerationRuleUpdate: [
+        data: APIAutoModerationRule,
+        previous: APIAutoModerationRule | null,
+    ];
     autoModerationRuleDelete: [data: APIAutoModerationRule];
     autoModerationActionExecution: [data: APIAutoModerationActionExecution];
     // ── Channels ──────────────────────────────────────────────────────────────
@@ -255,7 +263,11 @@ export type ClientEvents = {
     threadMemberUpdate: [data: APIThreadMember];
     // ── Stage Instances ───────────────────────────────────────────────────────
     stageInstanceCreate: [data: APIStageInstance];
-    stageInstanceUpdate: [data: APIStageInstance];
+    /** `previous` is the cached stage instance, or `null` if it was not cached. */
+    stageInstanceUpdate: [
+        data: APIStageInstance,
+        previous: APIStageInstance | null,
+    ];
     stageInstanceDelete: [data: APIStageInstance];
     // ── Invites ───────────────────────────────────────────────────────────────
     inviteCreate: [data: APIInviteCreate];
@@ -263,10 +275,15 @@ export type ClientEvents = {
     // ── Webhooks ──────────────────────────────────────────────────────────────
     webhooksUpdate: [data: APIWebhooksUpdate];
     // ── Voice ─────────────────────────────────────────────────────────────────
-    voiceStateUpdate: [data: APIVoiceState];
+    /** `previous` is the user's last known voice state in that guild, or `null` (first sighting, or not in a guild). */
+    voiceStateUpdate: [data: APIVoiceState, previous: APIVoiceState | null];
     voiceServerUpdate: [data: APIVoiceServerUpdate];
     // ── Presence & Typing ─────────────────────────────────────────────────────
-    presenceUpdate: [data: APIPresenceUpdate];
+    /** `previous` is the last presence seen, available with `cache: { presences: true }`; otherwise `null`. */
+    presenceUpdate: [
+        data: APIPresenceUpdate,
+        previous: APIPresenceUpdate | null,
+    ];
     typingStart: [data: APITypingStart];
     // ── Interactions ──────────────────────────────────────────────────────────
     interactionCreate: [interaction: Interaction];

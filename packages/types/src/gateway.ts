@@ -197,6 +197,8 @@ export interface ClientOptions {
         members?: boolean;
         roles?: boolean;
         emojis?: boolean;
+        /** Keep each member's latest presence (needs the `GuildPresences` intent). Off by default: it is a lot of data. */
+        presences?: boolean;
     };
     /**
      * Default `allowed_mentions` for every message the client sends (channel
