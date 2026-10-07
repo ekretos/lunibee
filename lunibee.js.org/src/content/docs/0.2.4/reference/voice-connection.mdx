@@ -1,0 +1,212 @@
+---
+title: VoiceConnection & AudioPlayer
+description: Discord voice session state, audio playback and receive
+  abstractions in @lunibee/voice.
+slug: 0.2.4/reference/voice-connection
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@lunibee/voice` models a voice session and its audio pipeline without owning the network:
+you supply a voice-gateway transport and a UDP transport, and Lunibee tracks lifecycle,
+speaking state and audio routing.
+
+> \[!NOTE]
+> Voice is lower-level than the main `Client`. `VoiceConnection` does not open sockets itself;
+> attach your transports with `attachTransports()`. `AudioPlayer` reads audio and hands each
+> chunk to `onChunk()`, which you override to send it to your UDP sink.
+
+## Import
+
+```ts
+import {
+  VoiceConnection,
+  VoiceConnectionState,
+  AudioPlayer,
+  AudioStream,
+  VoiceReceiver,
+  SpeakingFlags,
+  joinVoiceChannel,
+  getVoiceConnection,
+  createAudioPlayer,
+  createAudioResource,
+  entersState,
+} from "lunibee";
+```
+
+***
+
+## `VoiceConnection`
+
+Tracks one guild's voice session.
+
+### Constructor
+
+```ts
+new VoiceConnection(guildId: string)
+new VoiceConnection({ guildId, channelId?, selfMute?, selfDeaf? })
+```
+
+### Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `state` | `VoiceConnectionState` | Current lifecycle state. |
+| `guildId` | `string` | Guild of this session. |
+| `channelId` | `string \| undefined` | Current voice channel. |
+| `selfMute` / `selfDeaf` | `boolean` | Self mute / deaf flags. |
+| `gateway` / `udp` | transports | Attached transports, if any. |
+| `receiver` | `VoiceReceiver` | Incoming audio router. |
+
+### `VoiceConnectionState` values
+
+| State | Value | Description |
+|---|---|---|
+| `Disconnected` | `"disconnected"` | Not connected. |
+| `Connecting` | `"connecting"` | Connection starting. |
+| `Connected` | `"connected"` | Connected. |
+| `Destroyed` | `"destroyed"` | Permanently closed; the connection can't be reused. |
+
+`VoiceConnectionStatus` is an alias of `VoiceConnectionState`.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `connect()` | Moves through `Connecting` to `Connected`. |
+| `disconnect()` | Closes transports and moves to `Disconnected`. |
+| `destroy()` | Closes transports, clears listeners and moves to `Destroyed`. |
+| `attachTransports(gateway, udp)` | Attaches a `VoiceGatewayTransport` and `VoiceUdpTransport`, closing any previous pair. |
+| `setChannel(channelId)` | Changes the voice channel. |
+| `setSuppression({ selfMute?, selfDeaf? })` | Updates self mute / deaf. |
+| `setSpeaking(flags?)` | Sends a speaking update through the gateway transport (default `SpeakingFlags.Microphone`). |
+| `on(event, listener)` / `off(event, listener)` | Adds / removes a listener. |
+
+### Events
+
+| Event | Args | Description |
+|---|---|---|
+| `"stateChange"` | `(next, previous)` | State transition. Note the order: new state first. |
+| `"speaking"` | `(flags, 0)` | Speaking flags were sent (second argument is reserved, currently `0`). |
+| `"error"` | `(error: VoiceError)` | Transport cleanup or listener failure. |
+
+***
+
+## `AudioPlayer`
+
+Reads an `AudioStream` chunk by chunk. Subclass it and override `onChunk(chunk)` to send
+audio somewhere.
+
+```ts
+class UdpAudioPlayer extends AudioPlayer {
+  protected override onChunk(chunk: Uint8Array): void {
+    udp.send(chunk, host, port);
+  }
+}
+```
+
+### Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `state` | `"idle" \| "playing" \| "paused" \| "stopped"` | Current player state. |
+| `current` | `AudioStream \| undefined` | The loaded stream. |
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `play(stream)` | Stops any current stream, then plays `stream`. Returns a promise. |
+| `pause()` / `resume()` | Pauses / resumes playback. |
+| `stop()` | Stops and discards the stream (`"stopped"`). Returns a promise. |
+| `on(event, listener)` / `off(event, listener)` | Adds / removes a listener. |
+
+### Events
+
+| Event | Args | Description |
+|---|---|---|
+| `"stateChange"` | `(from, to)` | State transition. Note the order: old state first. |
+| `"finish"` | `()` | The stream ended naturally (player returns to `"idle"`). |
+| `"error"` | `(error)` | Reading the stream failed. |
+
+***
+
+## `AudioStream`
+
+Wraps a `ReadableStream<Uint8Array>` with optional metadata.
+
+```ts
+import { Readable } from "node:stream";
+import { createReadStream } from "node:fs";
+
+const audio = new AudioStream(
+  Readable.toWeb(createReadStream("./music.opus")) as ReadableStream<Uint8Array>,
+  { title: "Music", duration: 180 },
+);
+```
+
+***
+
+## `VoiceReceiver`
+
+Available as `connection.receiver`. Routes incoming UDP packets to per-user streams.
+
+| Method | Description |
+|---|---|
+| `mapSsrc(ssrc, userId)` | Associates an SSRC with a user (from speaking events). |
+| `subscribe(userId)` | Returns an `AudioStream` of that user's audio. |
+| `onPacket(packet)` | Feeds one incoming UDP packet. |
+
+***
+
+## `@discordjs/voice`-style helpers
+
+| Helper | Description |
+|---|---|
+| `joinVoiceChannel({ guildId, channelId, selfMute?, selfDeaf? })` | Creates the guild's connection, or reuses and moves the existing one, then connects. |
+| `getVoiceConnection(guildId)` | The connection tracked by `joinVoiceChannel`, if any. It's removed when destroyed. |
+| `createAudioPlayer()` | `new AudioPlayer()`. |
+| `createAudioResource(stream, metadata?)` | `new AudioStream(stream, metadata)`. |
+| `entersState(target, state, timeoutMs)` | Resolves when a connection or player reaches `state`; rejects with `VoiceError` on timeout. |
+
+## Example
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const connection = joinVoiceChannel({ guildId, channelId, selfDeaf: true });
+    connection.attachTransports(myVoiceGateway, myUdp);
+    await entersState(connection, VoiceConnectionState.Connected, 5_000);
+
+    const player = new UdpAudioPlayer();
+    connection.setSpeaking(SpeakingFlags.Microphone);
+    await player.play(createAudioResource(opusStream));
+    player.on("finish", () => {
+      connection.setSpeaking(0);
+      connection.destroy();
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const connection = joinVoiceChannel({ guildId, channelId, selfDeaf: true });
+    connection.attachTransports(myVoiceGateway, myUdp);
+    await entersState(connection, VoiceConnectionState.Connected, 5_000);
+
+    const player = new UdpAudioPlayer();
+    connection.setSpeaking(SpeakingFlags.Microphone);
+    await player.play(createAudioResource(opusStream));
+    player.on("finish", () => {
+      connection.setSpeaking(0);
+      connection.destroy();
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+## Receiver Cleanup (0.2.0)
+
+`disconnect()` and `destroy()` end every stream from `receiver.subscribe()`
+and clear SSRC mappings (`receiver.close()` does the same manually).
+`receiver.subscribe()` throws a `VoiceError` once the connection is destroyed.

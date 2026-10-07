@@ -40,6 +40,7 @@ export default defineConfig({
         starlightVersions({
           current: { label: `v${version} (latest)` },
           versions: [
+            { slug: "0.2.4", label: "v0.2.4" },
             { slug: "0.2.3", label: "v0.2.3" },
             { slug: "0.2.2", label: "v0.2.2" },
             { slug: "0.2.1", label: "v0.2.1" },
@@ -87,6 +88,7 @@ export default defineConfig({
             { label: "Interactions & Commands", link: "/core-concepts/interactions" },
             { label: "Component & Embed Builders", link: "/core-concepts/builders" },
             { label: "Sharding", link: "/core-concepts/sharding" },
+            { label: "Benchmarks", link: "/core-concepts/benchmarks" },
             { label: "Voice", link: "/core-concepts/voice" },
           ],
         },

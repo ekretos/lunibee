@@ -1,0 +1,158 @@
+---
+title: Component & Embed Builders
+description: Compile-time-safe and runtime-validated Discord UI payload builders.
+slug: 0.2.4/core-concepts/builders
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`lunibee` (builders) provides strict builders that validate Discord constraints before network dispatch.
+
+## Embed Builder
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { CreateEmbed } from "lunibee";
+    const embed = new CreateEmbed()
+      .setTitle("Lunibee Status 🐝")
+      .setDescription("All systems fully operational.")
+      .setColor(0xf59e0b)
+      .setThumbnail("https://example.com/icon.png")
+      .addFields(
+        { name: "Ping", value: "24ms", inline: true },
+        { name: "Uptime", value: "99.99%", inline: true }
+      )
+      .setFooter({ text: "Powered by Bun & Lunibee" })
+      .setTimestamp();
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { CreateEmbed } from "lunibee";
+    const embed = new CreateEmbed()
+      .setTitle("Lunibee Status 🐝")
+      .setDescription("All systems fully operational.")
+      .setColor(0xf59e0b)
+      .setThumbnail("https://example.com/icon.png")
+      .addFields(
+        { name: "Ping", value: "24ms", inline: true },
+        { name: "Uptime", value: "99.99%", inline: true }
+      )
+      .setFooter({ text: "Powered by Bun & Lunibee" })
+      .setTimestamp();
+    ```
+  </TabItem>
+</Tabs>
+
+## Button & Action Row Builders
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
+    const primaryBtn = new CreateButton()
+      .setCustomId("primary_action")
+      .setLabel("Click Me!")
+      .setStyle(ButtonType.Primary)
+      .setEmoji("🚀");
+    const linkBtn = new CreateButton()
+      .setLabel("Documentation")
+      .setStyle(ButtonType.Link)
+      .setURL("https://github.com/Ekretos/lunibee");
+    const row = new CreateActionRow().addComponents(primaryBtn, linkBtn);
+    await channel.send({
+      content: "Choose an option:",
+      components: [row],
+    });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
+    const primaryBtn = new CreateButton()
+      .setCustomId("primary_action")
+      .setLabel("Click Me!")
+      .setStyle(ButtonType.Primary)
+      .setEmoji("🚀");
+    const linkBtn = new CreateButton()
+      .setLabel("Documentation")
+      .setStyle(ButtonType.Link)
+      .setURL("https://github.com/Ekretos/lunibee");
+    const row = new CreateActionRow().addComponents(primaryBtn, linkBtn);
+    await channel.send({
+      content: "Choose an option:",
+      components: [row],
+    });
+    ```
+  </TabItem>
+</Tabs>
+
+## Select Menu Builders
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { CreateActionRow, CreateStringSelect } from "lunibee";
+    const select = new CreateStringSelect()
+      .setCustomId("select_role")
+      .setPlaceholder("Select a role...")
+      .addOptions(
+        { label: "Developer", value: "dev", emoji: "💻" },
+        { label: "Designer", value: "designer", emoji: "🎨" }
+      );
+    const row = new CreateActionRow().addComponents(select);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { CreateActionRow, CreateStringSelect } from "lunibee";
+    const select = new CreateStringSelect()
+      .setCustomId("select_role")
+      .setPlaceholder("Select a role...")
+      .addOptions(
+        { label: "Developer", value: "dev", emoji: "💻" },
+        { label: "Designer", value: "designer", emoji: "🎨" }
+      );
+    const row = new CreateActionRow().addComponents(select);
+    ```
+  </TabItem>
+</Tabs>
+
+## Entity Select Menus
+
+For user, role, mentionable and channel pickers, use the fixed-type builders (or
+`CreateEntitySelect` with a component type). `CreateStringSelectMenu` is an alias of
+`CreateStringSelect`.
+
+```ts
+import {
+  CreateUserSelectMenu,
+  CreateRoleSelectMenu,
+  CreateChannelSelectMenu,
+  CreateMentionableSelectMenu,
+} from "lunibee";
+
+const pickUser = new CreateUserSelectMenu().setCustomId("pick_user");
+```
+
+## Context Menu Commands
+
+```ts
+import { CreateContextMenuCommand, CreateUserCommand, CreateMessageCommand } from "lunibee";
+
+new CreateContextMenuCommand().setName("Report").setType(3); // 2 = USER, 3 = MESSAGE
+new CreateUserCommand().setName("View Profile");             // type 2
+new CreateMessageCommand().setName("Quote");                  // type 3
+```
+
+## Validation on Serialization
+
+`toJSON()` checks a component as a whole, so mistakes fail locally instead of
+as a Discord 400: buttons need a custom ID (a URL for links, a SKU for premium
+buttons via `setSKUId()`) and a label or emoji; selects need a custom ID and
+`min_values <= max_values`; a select or text input must be alone in its action
+row; modals need a custom ID, title and at least one component.

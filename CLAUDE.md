@@ -19,11 +19,23 @@ future sessions should pick up.
   examples use the new names only. `PermissionFlagsBits`, `GatewayIntentBits`, `Routes`,
   `MessageFlags` and the Gateway code sets keep their names.
 
-## Next release: 0.2.4 (security)
+## Next release: 0.3.0
 
-Fixes for the 0.2.3 security review (H1-H3, M1-M5, L1-L3, L5, L7); status of
-every finding in `docs/audits/security-0.2.3.md`. Non-breaking except the
-behaviour changes listed in the changelog.
+The workflow release: handles (`bot.guild(id)`, `peek` / `get` / `fetch`), `bot.api`, channel
+`kind`, `command()` with `option.*`, the CLI's `create command --slash|--prefix|--both` and
+`sync commands`; typed message payloads; previous state on update events; IPC `ShardBus`,
+`ShardSupervisor`, IDENTIFY buckets; Gateway health and storm backoff; concurrent REST buckets by
+default; the REST coverage audit and its gaps; structure polish. The 0.2.x deprecations are
+removed. Everything is in `.roadmap/0.3.0.md` (the unticked items there are not done: Bun 1.4 as
+the minimum and the pass-through event profiling) and the changelog's "v0.3.0 (unreleased)".
+Left for the maintainer: the final smoke test (`examples/basic` sharded across two forked
+clusters), the `0.2.4` and `0.3.0` tags, `publish:all`, and removing "(unreleased)" from the
+changelog heading. Versions are already 0.3.0 and the 0.2.4 docs are archived in the version picker.
+
+## 0.2.4 (shipped)
+
+Security fixes for the 0.2.3 review (H1-H3, M1-M5, L1-L3, L5, L7); status of every finding in
+`docs/audits/security-0.2.3.md`.
 
 ## 0.2.3 (shipped)
 

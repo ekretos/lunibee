@@ -1,6 +1,6 @@
 {
   "name": "@lunibee/cli",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Lunibee workspace and developer CLI.",
   "type": "module",
   "bin": {

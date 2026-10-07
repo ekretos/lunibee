@@ -96,6 +96,18 @@ export type {
     APIGuildMembersChunk,
     APIGuildScheduledEventUserEvent,
     APIMessagePollVoteEvent,
+    APIRoleColors,
+    APIWelcomeScreen,
+    APIWelcomeScreenChannel,
+    APIGuildOnboarding,
+    APIOnboardingPrompt,
+    APIOnboardingOption,
+    ChannelKind,
+    ForumTagInput,
+    FollowUpOptions,
+    InteractionUpdateOptions,
+    MessagePoll,
+    UnknownChannelKind,
 } from "@lunibee/types";
 
 // Non-conflicting value exports from @lunibee/types
@@ -114,6 +126,9 @@ export {
     ActivityEnum,
     VerificationLevel,
     PremiumTier,
+    ChannelKinds,
+    channelKindOf,
+    channelTypesOf,
 } from "@lunibee/types";
 
 // ── Builders (takes priority over types for component enums) ──────────────────

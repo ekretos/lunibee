@@ -1,0 +1,450 @@
+---
+title: Collection
+description: Extended Map with functional utilities like filter, map, find,
+  reduce, and more.
+slug: 0.2.4/reference/collection
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`Collection<K, V>` extends JavaScript's built-in `Map` with higher-order functional methods for querying and transforming data. All resource caches in Lunibee use `Collection`.
+
+## Import
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { Collection } from "lunibee";
+    // or from the sub-package:
+    import { Collection } from "@lunibee/collection";
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { Collection } from "lunibee";
+    // or from the sub-package:
+    import { Collection } from "@lunibee/collection";
+    ```
+  </TabItem>
+</Tabs>
+
+## Constructor
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const col = new Collection<string, User>();
+    // From entries:
+    const col = new Collection([["id1", user1], ["id2", user2]]);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const col = new Collection<string, User>();
+    // From entries:
+    const col = new Collection([["id1", user1], ["id2", user2]]);
+    ```
+  </TabItem>
+</Tabs>
+
+## Inherited `Map` Methods
+
+All standard `Map` methods are available: `get`, `set`, `delete`, `has`, `clear`, `size`, `forEach`, `keys`, `values`, `entries`.
+
+## Additional Methods
+
+### `find(predicate)`
+
+Returns the **first value** matching the predicate, or `undefined`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const admin = client.users.cache.find(u => u.username === "admin");
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const admin = client.users.cache.find(u => u.username === "admin");
+    ```
+  </TabItem>
+</Tabs>
+
+### `findKey(predicate)`
+
+Returns the **first key** matching the predicate, or `undefined`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const adminId = client.users.cache.findKey(u => u.username === "admin");
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const adminId = client.users.cache.findKey(u => u.username === "admin");
+    ```
+  </TabItem>
+</Tabs>
+
+### `findLast(predicate)` and `findLastKey(predicate)`
+
+Like `find()` and `findKey()`, but search from the **last** entry (insertion order) backwards.
+
+```ts
+const newestBot = client.users.cache.findLast(u => u.bot);
+const newestBotId = client.users.cache.findLastKey(u => u.bot);
+```
+
+### `filter(predicate)`
+
+Returns a **new Collection** containing only entries where the predicate returns `true`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const bots = client.users.cache.filter(u => u.bot);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const bots = client.users.cache.filter(u => u.bot);
+    ```
+  </TabItem>
+</Tabs>
+
+### `map(fn)`
+
+Returns an **array** of the results of calling `fn` on every value.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const usernames = client.users.cache.map(u => u.username);
+    // → ["alice", "bob", "lunibee_bot", ...]
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const usernames = client.users.cache.map(u => u.username);
+    // → ["alice", "bob", "lunibee_bot", ...]
+    ```
+  </TabItem>
+</Tabs>
+
+### `flatMap(fn)`
+
+Returns a flat array from a function that returns arrays.
+
+### `reduce(fn, initialValue)`
+
+Reduces the collection to a single value.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const totalBoosters = client.guilds.cache.reduce(
+      (acc, guild) => acc + guild.premiumSubscriptionCount,
+      0,
+    );
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const totalBoosters = client.guilds.cache.reduce(
+      (acc, guild) => acc + guild.premiumSubscriptionCount,
+      0,
+    );
+    ```
+  </TabItem>
+</Tabs>
+
+### `some(predicate)`
+
+Returns `true` if **any** entry matches the predicate.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const hasBot = client.users.cache.some(u => u.bot);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const hasBot = client.users.cache.some(u => u.bot);
+    ```
+  </TabItem>
+</Tabs>
+
+### `every(predicate)`
+
+Returns `true` if **all** entries match the predicate.
+
+### `first()`
+
+Returns the first value, or the first `n` values as an array.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const firstUser = client.users.cache.first();
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const firstUser = client.users.cache.first();
+    ```
+  </TabItem>
+</Tabs>
+
+### `last()`
+
+Returns the last value, or the last `n` values as an array.
+
+### `firstKey()` / `lastKey()`
+
+Returns the first or last key(s).
+
+### `at(index)`
+
+Returns the value at a numeric index (supports negative for reverse).
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const lastUser = client.users.cache.at(-1);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const lastUser = client.users.cache.at(-1);
+    ```
+  </TabItem>
+</Tabs>
+
+### `keyAt(index)`
+
+Returns the key at a numeric index.
+
+### `random(amount?)`
+
+Returns one random value (or `undefined` when empty). With `amount`, returns that many **different** values as an array; asking for more than the size returns all of them, shuffled, and `0` returns `[]`. Throws a `RangeError` for a negative or fractional `amount`. Uses `Math.random()`, so do not use it for tokens or secrets.
+
+```ts
+const winner = guild.members.cache.random();
+const winners = guild.members.cache.random(3);
+```
+
+### `randomKey(amount?)`
+
+Same as `random()`, for keys.
+
+### `sweep(predicate)`
+
+Removes all entries where the predicate returns `true`. Returns the number removed.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const removed = collection.sweep(u => u.bot);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const removed = collection.sweep(u => u.bot);
+    ```
+  </TabItem>
+</Tabs>
+
+### `partition(predicate)`
+
+Splits the collection into two: `[matching, notMatching]`.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const [bots, humans] = client.users.cache.partition(u => u.bot);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const [bots, humans] = client.users.cache.partition(u => u.bot);
+    ```
+  </TabItem>
+</Tabs>
+
+### `sorted(compareFn?)`
+
+Returns a **new Collection** sorted by the comparator.
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const byName = client.guilds.cache.sorted((a, b) => a.name.localeCompare(b.name));
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const byName = client.guilds.cache.sorted((a, b) => a.name.localeCompare(b.name));
+    ```
+  </TabItem>
+</Tabs>
+
+### `union(other)`
+
+Returns a new Collection with the entries of both collections (`other` wins on key clashes).
+
+### `intersection(other)`
+
+Returns entries whose keys are in both collections.
+
+### `difference(other)`
+
+Returns entries that are in this collection but not in `other`.
+
+### `hasAll(...keys)` / `hasAny(...keys)`
+
+Whether every / at least one of the keys is present.
+
+### `clone()`
+
+Returns a shallow copy.
+
+### `tap(fn)`
+
+Calls `fn(collection)` and returns the collection unchanged, for side effects in a chain.
+
+### `toJSON()`
+
+Returns the entries as `[key, value]` pairs.
+
+## Example
+
+**Filter and display online guild members**
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const onlineMembers = client.guilds.cache
+      .filter(g => g.isCommunity)
+      .map(g => g.name);
+
+    console.log("Community guilds:", onlineMembers.join(", "));
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const onlineMembers = client.guilds.cache
+      .filter(g => g.isCommunity)
+      .map(g => g.name);
+
+    console.log("Community guilds:", onlineMembers.join(", "));
+    ```
+  </TabItem>
+</Tabs>
+
+**Get the 5 most recently joined users**
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const newest = client.users.cache
+      .sorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .array()
+      .slice(0, 5);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const newest = client.users.cache
+      .sorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .array()
+      .slice(0, 5);
+    ```
+  </TabItem>
+</Tabs>
+
+## Combining and transforming
+
+None of these change the collection they are called on; each returns a new one (of the same class, see below) unless noted. `other` may be a `Collection`, any `Map`, or a `ReadonlyCollection`.
+
+| Method | Returns |
+|---|---|
+| `concat(...collections)` | This collection's entries, then each collection's; a later one wins a shared key. |
+| `symmetricDifference(other)` | The entries whose key is in only one of the two. |
+| `merge(other, whenInSelf, whenInOther, whenInBoth)` | A collection of the entries the callbacks keep. Each callback returns `{ keep: true, value }` or `{ keep: false }`. |
+| `mapValues(fn)` | The same keys with each value passed through `fn(value, key, collection)`. |
+| `toReversed()` | The entries in reverse order. |
+| `toSorted(comparator?)` | The entries sorted, stable; same as `sorted()`. |
+| `reduceRight(fn, initial)` | Folds from the last entry to the first, like `reduce()` from the first. |
+| `equals(other)` | `true` when both have the same keys and `===` equal values. Does not touch either side's TTL, recency or `stats`. |
+| `Collection.groupBy(items, keySelector)` | A collection from each key to the array of items with that key. |
+| `Collection.combineEntries(entries, combine)` | A collection from `[key, value]` pairs; `combine(first, second, key)` merges pairs that share a key. |
+
+```ts
+const byBot = Collection.groupBy(users.values(), u => (u.bot ? "bots" : "people"));
+const names = users.mapValues(u => u.username);
+const changes = before.merge(
+  after,
+  () => ({ keep: true, value: "removed" }),
+  () => ({ keep: true, value: "added" }),
+  (a, b) => (a === b ? { keep: false } : { keep: true, value: "changed" }),
+);
+```
+
+`ReadonlyCollection<K, V>` is a `Collection` without `set`, `delete`, `clear`, `get`, `ensure`, `sweep` and the other methods that change it. Accept it in functions that only read.
+
+There is no in-place `sort()` or `reverse()`: reordering a collection that tracks recency and TTL in place would break its bookkeeping. Use `toSorted()` and `toReversed()`.
+
+## Subclassing
+
+`filter()`, `clone()`, `sorted()`, `partition()`, `union()`, `intersection()` and `difference()` return an instance of the same class (`Symbol.species`), built with no constructor arguments and without any `ttl` or `maxSize`. Override `static get [Symbol.species]()` to return `Collection` (or another class) instead.
+
+```ts
+class Users extends Collection<string, User> {}
+const bots = new Users().filter(u => u.bot); // Users
+```
+
+## TTL, LRU and Persistent Entries (0.2.0)
+
+Without options a `Collection` behaves exactly like a `Map`. Pass options to
+bound it:
+
+```ts
+const cache = new Collection<string, number>(null, {
+  ttl: 60_000,       // default sliding TTL for set()
+  maxSize: 1_000,    // LRU cap for set() entries
+  slide: true,       // false: a read promotes but does not extend the TTL
+  onEvict: (key, value, reason) => {}, // reason: "expired" | "evicted"
+});
+```
+
+| Method | Description |
+|---|---|
+| `set(key, value, ttl?)` | Stores a TTL/LRU entry; `ttl` overrides the default for this entry. |
+| `setWithoutTTL(key, value)` | Stores an entry that never expires and is never evicted by `maxSize`. Managers store Discord resources this way. |
+| `get(key)` | Reads a value; restarts a TTL entry's window and marks it recently used. |
+| `peek(key)` | Reads without restarting the TTL or promoting. |
+| `ensure(key, factory, ttl?)` | Returns the stored value, or stores and returns what `factory(key, collection)` makes. Reading counts as `get()`; creating uses `set()`. If `factory` throws, nothing is stored. |
+| `ttlRemaining(key)` | Milliseconds until the entry expires, or `undefined` if it never does. |
+| `purge()` | Removes expired entries now; returns how many. |
+| `stats` | `{ hits, misses, expired, evicted }` counters. |
+
+A later `set()` turns a `setWithoutTTL()` entry back into a TTL entry.
+Expired entries are removed by a single unref'd timer and are never visible to
+reads or iteration.

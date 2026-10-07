@@ -18,4 +18,13 @@ bun benchmarks/collection.ts
 
 It reports the median of nine runs for `set`, `get`, `filter`, `find`, `random` and `at`, plus the shallow size of an empty instance. Figures vary by up to about 20% between runs on a busy machine, so compare ratios, not absolute times.
 
+Other harnesses:
+
+```sh
+bun run bench:rest                 # REST scheduling: sequential vs concurrent buckets, fake Discord
+bun benchmarks/gateway-events.ts   # per-event cost of Gateway dispatches, cache included
+bun benchmarks/cache-memory.ts     # heap kept per guild for small, medium and large guilds
+bun run bench:compare              # runtime benchmark vs the committed baseline (build first)
+```
+
 Network and Gateway load tests should use controlled fakes or dedicated integration environments rather than making CI depend on Discord availability.

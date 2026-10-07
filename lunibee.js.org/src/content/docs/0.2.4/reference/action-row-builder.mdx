@@ -1,0 +1,219 @@
+---
+title: CreateActionRow
+description: Container builder that holds up to 5 interactive components in a
+  single Discord message row.
+slug: 0.2.4/reference/action-row-builder
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`CreateActionRow` is a generic container that holds interactive components (buttons, select menus, or text inputs in modals). Each message can have up to 5 action rows.
+
+## Import
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { CreateActionRow } from "lunibee";
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { CreateActionRow } from "lunibee";
+    ```
+  </TabItem>
+</Tabs>
+
+## Generic Type Parameter
+
+`CreateActionRow<T>` is typed to the component it will hold. This provides type-safe `addComponents()` calls:
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { CreateActionRow, CreateButton, CreateStringSelect } from "lunibee";
+
+    const buttonRow = new CreateActionRow<CreateButton>();
+    const selectRow = new CreateActionRow<CreateStringSelect>();
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { CreateActionRow, CreateButton, CreateStringSelect } from "lunibee";
+
+    const buttonRow = new CreateActionRow();
+    const selectRow = new CreateActionRow();
+    ```
+  </TabItem>
+</Tabs>
+
+## Methods
+
+### `addComponents(...components)`
+
+Adds one or more components to the row (max 5 buttons or 1 select menu per row).
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    const row = new CreateActionRow<CreateButton>().addComponents(
+      new CreateButton().setCustomId("a").setLabel("A").setStyle(1),
+      new CreateButton().setCustomId("b").setLabel("B").setStyle(2),
+    );
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    const row = new CreateActionRow().addComponents(
+      new CreateButton().setCustomId("a").setLabel("A").setStyle(1),
+      new CreateButton().setCustomId("b").setLabel("B").setStyle(2),
+    );
+    ```
+  </TabItem>
+</Tabs>
+
+### `toJSON()`
+
+Serializes to a raw Discord API-compatible action row object.
+
+## Examples
+
+**Three-button row**
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
+
+    const row = new CreateActionRow<CreateButton>().addComponents(
+      new CreateButton().setCustomId("prev").setLabel("◀ Previous").setStyle(ButtonType.Secondary),
+      new CreateButton().setCustomId("stop").setLabel("⏹ Stop").setStyle(ButtonType.Danger),
+      new CreateButton().setCustomId("next").setLabel("Next ▶").setStyle(ButtonType.Secondary),
+    );
+    await channel.send({ content: "Page 1 of 5", components: [row] });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { CreateActionRow, CreateButton, ButtonType } from "lunibee";
+
+    const row = new CreateActionRow().addComponents(
+      new CreateButton().setCustomId("prev").setLabel("◀ Previous").setStyle(ButtonType.Secondary),
+      new CreateButton().setCustomId("stop").setLabel("⏹ Stop").setStyle(ButtonType.Danger),
+      new CreateButton().setCustomId("next").setLabel("Next ▶").setStyle(ButtonType.Secondary),
+    );
+    await channel.send({ content: "Page 1 of 5", components: [row] });
+    ```
+  </TabItem>
+</Tabs>
+
+**Select menu row**
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { CreateActionRow, CreateStringSelect } from "lunibee";
+
+    const row = new CreateActionRow<CreateStringSelect>().addComponents(
+      new CreateStringSelect()
+        .setCustomId("pick_role")
+        .setPlaceholder("Pick a role…")
+        .addOptions(
+          { label: "Developer", value: "dev", emoji: "💻" },
+          { label: "Designer", value: "design", emoji: "🎨" },
+        ),
+    );
+    await channel.send({ content: "Choose your role:", components: [row] });
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { CreateActionRow, CreateStringSelect } from "lunibee";
+
+    const row = new CreateActionRow().addComponents(
+      new CreateStringSelect()
+        .setCustomId("pick_role")
+        .setPlaceholder("Pick a role…")
+        .addOptions(
+          { label: "Developer", value: "dev", emoji: "💻" },
+          { label: "Designer", value: "design", emoji: "🎨" },
+        ),
+    );
+    await channel.send({ content: "Choose your role:", components: [row] });
+    ```
+  </TabItem>
+</Tabs>
+
+**Modal with text input (using CreateActionRow)**
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import { CreateActionRow, CreateTextInput, TextInputType, CreateModal } from "lunibee";
+
+    const modal = new CreateModal()
+      .setCustomId("feedback")
+      .setTitle("Send Feedback")
+      .addComponents(
+        new CreateActionRow<CreateTextInput>().addComponents(
+          new CreateTextInput()
+            .setCustomId("message")
+            .setLabel("Your feedback")
+            .setStyle(TextInputType.Paragraph),
+        ),
+      );
+    await interaction.showModal(modal);
+    ```
+  </TabItem>
+
+  <TabItem label="JavaScript">
+    ```js
+    import { CreateActionRow, CreateTextInput, TextInputType, CreateModal } from "lunibee";
+
+    const modal = new CreateModal()
+      .setCustomId("feedback")
+      .setTitle("Send Feedback")
+      .addComponents(
+        new CreateActionRow().addComponents(
+          new CreateTextInput()
+            .setCustomId("message")
+            .setLabel("Your feedback")
+            .setStyle(TextInputType.Paragraph),
+        ),
+      );
+    await interaction.showModal(modal);
+    ```
+  </TabItem>
+</Tabs>
+
+## Payload types
+
+The shapes `toJSON()` returns are exported from `lunibee`, so helpers that build or accept raw
+component payloads need no `ReturnType<...>` tricks:
+
+```ts
+import type {
+  APIComponent,
+  APIActionRowChild,
+  APIActionRowPayload,
+  APIButtonPayload,
+  APITextInputPayload,
+  APIStringSelectComponent,
+  APIEntitySelectComponent,
+  APISelectOption,
+  APIContainerComponent,
+  APITextDisplayComponent,
+  APIModalComponent,
+} from "lunibee";
+
+const rows: APIActionRowPayload[] = [new CreateActionRow().addComponents(button).toJSON()];
+```
+
+`APIActionRowComponent`, `APIButtonComponent` and `APITextInputComponent` keep naming the shapes
+Discord **sends** (for example on `message.components`); the builder output for those three is
+exported as `APIActionRowPayload`, `APIButtonPayload` and `APITextInputPayload`.
