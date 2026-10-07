@@ -122,6 +122,7 @@ export default defineConfig({
                 { label: "Collector", link: "/reference/collector" },
                 { label: "Handles", link: "/reference/handles" },
                 { label: "Commands", link: "/reference/commands" },
+                { label: "bot.api", link: "/reference/api" },
                 { label: "PermissionSet", link: "/reference/permission-set" },
               ],
             },

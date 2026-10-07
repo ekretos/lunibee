@@ -22,6 +22,24 @@ export {
 } from "./events.js";
 export { Collector, type CollectorOptions } from "./collector.js";
 export {
+    createApi,
+    type Api,
+    type ApplicationNode,
+    type ChannelNode,
+    type GuildNode,
+    type ListRoute,
+    type MemberNode,
+    type MembersRoute,
+    type MessageNode,
+    type MessagesRoute,
+    type PageOptions,
+    type Route,
+    type RouteId,
+    type RouteOptions,
+    type UserNode,
+    type WebhookNode,
+} from "./api.js";
+export {
     command,
     option,
     CommandRegistry,
@@ -133,6 +151,7 @@ import type {
 import { ClientEvent, type ClientEvents } from "./events.js";
 import { Collector, type CollectorOptions } from "./collector.js";
 import { computePermissions, PermissionSet } from "./permissions.js";
+import { createApi, type Api } from "./api.js";
 import { CommandRegistry } from "./commands.js";
 import {
     ChannelHandle,
@@ -286,6 +305,14 @@ export class Client
     /** Stage instances, cached by stage channel ID. */
     public readonly stageInstances: StageInstanceManager;
     public readonly application: { commands: ApplicationCommandManager };
+    #api?: Api;
+    /**
+     * Discord's REST API as a chained path: `bot.api.guilds(id).members(userId).patch({ nick })`.
+     * Uses this client's rate limiting and retries; `bot.rest` and `Routes` stay available.
+     */
+    public get api(): Api {
+        return (this.#api ??= createApi(this.rest));
+    }
     /** Slash and prefix commands made with `command()`: `add`, `deploy` and `listen`. */
     public readonly commands: CommandRegistry = new CommandRegistry(this);
     /** SKUs, entitlements and subscriptions; available after READY (application ID known). */

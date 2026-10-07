@@ -1,0 +1,73 @@
+---
+title: bot.api
+description: Discord's REST API as a path you build by chaining, with paging built in.
+---
+
+`bot.api` is the REST API as a path. A name goes one level down, a call with an id goes into that item, and a method sends the request. It uses the client's REST (rate limits, retries, cancellation), so it mixes freely with `bot.rest` and `Routes`.
+
+```ts
+await bot.api.guilds(guildId).members(userId).patch({ nick: "Ann" }, { reason: "rename" });
+await bot.api.channels(channelId).messages.post({ content: "hello" });
+await bot.api.channels(channelId).messages(messageId).reactions("👍")("@me").put();
+await bot.api.guilds(guildId).members(userId).roles(roleId).delete({ reason: "demoted" });
+
+const member = await bot.api.guilds(guildId).members(userId).get();   // typed: APIGuildMember
+```
+
+## Reading a path
+
+| You write | The path |
+|---|---|
+| `api.guilds(id)` | `/guilds/{id}` |
+| `.members` | `/guilds/{id}/members` |
+| `.members(userId)` | `/guilds/{id}/members/{userId}` |
+| `.auditLogs` | `/guilds/{id}/audit-logs` |
+| `.messages.bulkDelete` | `/channels/{id}/messages/bulk-delete` |
+| `api.users("@me")` | `/users/@me` |
+
+Names are the route's words in camelCase (`auditLogs` is `audit-logs`). Ids can be strings, numbers or bigints; they are URL-encoded, except `@me`. A call needs exactly one id, and a bad id throws before any request. `route.path` is the path as text.
+
+## Methods
+
+Every route has `get(options?)`, `post(body?, options?)`, `put(body?, options?)`, `patch(body?, options?)` and `delete(options?)`. Discord decides which of them a route accepts. `options`:
+
+| | |
+|---|---|
+| `query` | URL parameters: `{ limit: 50 }`. |
+| `reason` | The audit-log reason. |
+| `signal` | An `AbortSignal` that cancels the request and any wait for a rate limit. |
+| `files` | Files to upload; the body goes as multipart. |
+
+The result is typed for the routes the tree lists (members, messages, roles, channels, and so on); pass your own type for the rest: `await bot.api.to("x").get<Thing>()`.
+
+## Routes that are not in the tree
+
+```ts
+await bot.api.to("guilds", guildId, "stage-instances").get();
+await bot.api.to("channels", channelId, "pins", messageId).put();
+```
+
+`to(...segments)` takes any path words and ids.
+
+## Paging
+
+List routes also have `pages()` and `all()`. Discord pages with a cursor (the id of the last item you got); these follow it for you.
+
+```ts
+for await (const page of bot.api.guilds(guildId).members.pages()) {
+  for (const member of page) { /* up to 1000 at a time */ }
+}
+
+const bans = await bot.api.guilds(guildId).bans.all({ max: 5_000 });
+const older = await bot.api.channels(channelId).messages.all({ max: 300, start: someMessageId });
+```
+
+| Route | Page size | Goes |
+|---|---|---|
+| `members` | 1000 | after the last user id |
+| `bans` | 1000 | after the last user id |
+| `messages` | 100 | before the oldest message id |
+| `users("@me").guilds` | 200 | after the last guild id |
+| anything else | 100 | after the last `id` |
+
+`pages()` yields one array per request and stops at a short or empty page. `all()` collects them and stops after `max` items (10,000 by default), shrinking the last request so it never asks for more than it will keep. Settings for both: `limit` (per request), `cursor` (`"after"` or `"before"`), `start` (an id to begin from), `query` (sent with every request), `signal`, and `idOf(item)` for items whose id is not `id` or `user.id`.

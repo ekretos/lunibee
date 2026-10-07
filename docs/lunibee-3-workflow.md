@@ -1,6 +1,6 @@
 # Lunibee 0.3 workflow: design
 
-Status: **decided; steps 1 (handles), 2 (channel kinds) and 3 (`command()`) are built.** Step 0b of `.roadmap/0.3.0.md`. Agree the names here,
+Status: **decided; steps 1 (handles), 2 (channel kinds), 3 (`command()`) and 4 (`bot.api`) are built.** Step 0b of `.roadmap/0.3.0.md`. Agree the names here,
 then build in the order at the end.
 
 ## Why
@@ -63,7 +63,7 @@ await client.rest.patch(Routes.guildMember(guildId, userId), { nick: "x" }, { re
 // after
 await bot.api.guilds(guildId).members(userId).patch({ nick: "x" }, { reason: "r" });
 await bot.api.channels(channelId).messages.post({ content: "hi" });
-for await (const member of bot.api.guilds(guildId).members.pages({ limit: 1000 })) { /* … */ }
+for await (const page of bot.api.guilds(guildId).members.pages({ limit: 1000 })) { /* … */ }
 const all = await bot.api.guilds(guildId).members.all({ max: 5_000 });
 ```
 
