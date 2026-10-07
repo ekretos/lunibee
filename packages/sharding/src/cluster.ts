@@ -1,4 +1,4 @@
-import packageJson from "../package.json" with { type: "json" };
+import { fetchGatewayBot } from "./gateway-bot.js";
 import { fork, type ChildProcess } from "node:child_process";
 import { cpus } from "node:os";
 import { ShardSupervisor, type SupervisorOptions } from "./supervisor.js";
@@ -111,31 +111,7 @@ export class ClusterManager {
 
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
     public async fetchRecommendedShardCount(): Promise<number> {
-        const response = await fetch(
-            "https://discord.com/api/v10/gateway/bot",
-            {
-                headers: {
-                    Authorization: `Bot ${this.#options.token}`,
-                    "User-Agent": `Lunibee/${packageJson.version}`,
-                },
-            },
-        );
-        if (!response.ok) {
-            throw new Error(
-                `Gateway discovery failed with status ${response.status}`,
-            );
-        }
-        const data = (await response.json()) as { shards?: unknown };
-        if (
-            typeof data.shards !== "number" ||
-            !Number.isInteger(data.shards) ||
-            data.shards < 1
-        ) {
-            throw new Error(
-                "Gateway discovery returned an invalid shard count.",
-            );
-        }
-        return data.shards;
+        return (await fetchGatewayBot(this.#options.token)).shards;
     }
 
     /** Spawns all clusters. @returns A promise fulfilled after clusters have launched. */

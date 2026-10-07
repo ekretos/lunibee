@@ -184,6 +184,12 @@ export interface ClientOptions {
     token: string;
     intents: GatewayIntentResolvable;
     gateway?: GatewayOptions;
+    /**
+     * zlib-stream transport compression for the Gateway connection, about a
+     * tenth of the inbound bandwidth. Shorthand for `gateway: { compress }`,
+     * which wins when both are set. Off by default.
+     */
+    compress?: boolean;
     rest?: RESTOptions;
     /** Opt-in bounded per-channel message cache. Messages are not cached by default. */
     messageCache?: { maxSize?: number; ttl?: number };

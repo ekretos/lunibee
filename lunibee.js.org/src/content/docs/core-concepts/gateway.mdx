@@ -21,6 +21,14 @@ stateDiagram-v2
     Reconnecting --> Connecting: Exponential Backoff
 ```
 
+## Health and reconnect storms
+
+`gateway.health()` returns `{ state, latency, silentFor, reconnects }`: the connection state, the last heartbeat round trip in milliseconds (`-1` before the first), how long Discord has been silent, and how many reconnects were scheduled. `ShardManager.health()` reports the state and latency of every shard.
+
+A link that connects and drops again resets the usual backoff every time, which would loop at the base delay. Lunibee also counts reconnects over a window (`reconnectStormLimit`, default 5 per `reconnectStormWindow`, default 60 s): beyond it the wait doubles for each further reconnect, up to `reconnectMaxDelay`, and the Gateway emits `unstable` with `{ reconnects, delay }`. A `ShardManager` re-emits it as `shardUnstable`.
+
+Set `compress: true` on the client (or `gateway: { compress: true }`) to receive zlib-stream compressed frames, which cuts inbound bandwidth considerably.
+
 ## Gateway Intents
 
 Lunibee exposes both camelCase and Discord-standard PascalCase intent constants:

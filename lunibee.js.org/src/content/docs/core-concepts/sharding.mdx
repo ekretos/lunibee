@@ -91,6 +91,17 @@ const total = all.reduce((sum, r) => sum + (r.result ?? 0), 0);
 
 `ShardingManager` is an alias of `ShardManager`.
 
+## Events, buckets and the start limit (0.3.0)
+
+`ShardManager` re-emits what its shards do, each with the shard id first: `shardReady`, `shardDisconnect` (with `{ code, action }`), `shardResume`, `shardError` and `shardUnstable`.
+
+```ts
+manager.on("shardReady", (id) => console.log(`shard ${id} ready`));
+manager.on("shardDisconnect", (id, { code }) => console.warn(`shard ${id} closed: ${code}`));
+```
+
+Discord rate-limits IDENTIFY per `shard_id % max_concurrency`. Lunibee groups the shards that need a connection by that key and starts the next shard of every bucket together, then waits `spawnDelay` (5 s) before the next round. It refuses to start, with a clear error, when `/gateway/bot` reports fewer remaining session starts than shards to connect. `getShardIdForGuild()` keeps using the shard count of the current set while a reshard has no shards, and `fetchGatewayBot(token)` is the one helper both managers use to read `/gateway/bot`.
+
 ## Startup Pacing and Health
 
 With `shardCount: "auto"`, the manager reads `/gateway/bot` and starts shards

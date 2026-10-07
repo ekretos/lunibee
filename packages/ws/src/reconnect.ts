@@ -74,7 +74,13 @@ export type ScheduleRefusal =
 
 /** Outcome of asking for a reconnect. */
 export type ScheduleResult =
-    | { scheduled: true; delayMs: number; attempt: number }
+    | {
+          scheduled: true;
+          delayMs: number;
+          attempt: number;
+          /** Set when reconnects are coming too fast: the delay was raised. */
+          unstable?: { reconnects: number };
+      }
     | { scheduled: false; reason: ScheduleRefusal };
 
 /** Configuration for {@link GatewayReconnect}. */
@@ -89,6 +95,12 @@ export interface ReconnectOptions {
     maxDelay: number;
     /** Randomness source for jitter; injected in tests. */
     random?: () => number;
+    /** Reconnects inside `stormWindow` before the link counts as unstable (default 5). */
+    stormLimit?: number;
+    /** The span over which reconnects are counted, in ms (default 60,000). */
+    stormWindow?: number;
+    /** Clock in ms; injected in tests. */
+    now?: () => number;
 }
 
 /** Reconnect scheduling, backoff and attempt coordination. */
@@ -96,6 +108,8 @@ export class GatewayReconnect {
     readonly #options: ReconnectOptions;
     readonly #random: () => number;
     #attempt = 0;
+    /** When recent reconnects were scheduled. A successful connection does not clear it, so a link that connects and drops again keeps backing off. */
+    readonly #recent: number[] = [];
     #timer?: ReturnType<typeof setTimeout>;
     #promise?: Promise<void>;
     #resolve?: () => void;
@@ -160,10 +174,25 @@ export class GatewayReconnect {
         if (this.exhausted) return { scheduled: false, reason: "exhausted" };
 
         const attempt = this.#attempt;
-        const delay = Math.min(
+        const now = (this.#options.now ?? Date.now)();
+        const window = this.#options.stormWindow ?? 60_000;
+        const limit = this.#options.stormLimit ?? 5;
+        while (this.#recent.length && now - this.#recent[0]! >= window)
+            this.#recent.shift();
+        const over = this.#recent.length - limit;
+        this.#recent.push(now);
+        let delay = Math.min(
             this.#options.maxDelay,
             this.#options.baseDelay * 2 ** this.#attempt++,
         );
+        const unstable = over >= 0;
+        // Past the limit, every further reconnect in the window doubles the
+        // wait, even when each connection succeeded and reset the attempt count.
+        if (unstable)
+            delay = Math.min(
+                this.#options.maxDelay,
+                Math.max(delay, this.#options.baseDelay * 2 ** (over + 1)),
+            );
         // Jitter must scale with the delay: a fixed ceiling would reconnect
         // every shard inside the same narrow window after a gateway-wide
         // restart, which is exactly when decorrelation matters.
@@ -173,7 +202,14 @@ export class GatewayReconnect {
             this.#timer = undefined;
             run();
         }, delayMs);
-        return { scheduled: true, delayMs, attempt };
+        return {
+            scheduled: true,
+            delayMs,
+            attempt,
+            ...(unstable
+                ? { unstable: { reconnects: this.#recent.length } }
+                : {}),
+        };
     }
 
     /** Cancels an armed reconnect. Safe to call when none is armed. */

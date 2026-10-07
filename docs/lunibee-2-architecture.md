@@ -42,8 +42,8 @@ optimization, **State** is authoritative runtime state, **Snapshot** is serializ
 |---|---|---|
 | 1 | REST pipeline seams behind today's public API | **Landed** |
 | 1A | REST distributed correctness: reservation, shared bucket mapping | **Landed** |
-| 1B | Gateway architecture: Session, Heartbeat, Reconnect, Transport+Decoder, Protocol **landed**; Dispatcher next | **In progress** |
-| 1C | `ShardSupervisor` lifted out of `ClusterManager` | Planned |
+| 1B | Gateway architecture: Session, Heartbeat, Reconnect, Transport+Decoder, Protocol, Dispatcher, SendLimiter | **Landed (0.3.0)** |
+| 1C | `ShardSupervisor` lifted out of `ClusterManager` | **Landed (0.3.0)** |
 | 2 | Store architecture (`Store`, `LocalState` / `SharedState` / `PersistentState`) | Planned |
 | 3 | Resource/Service architecture (`GuildResource`, `GuildService`) alongside the old | Planned |
 | 4 | New public naming; old names deprecated with aliases and a migration guide | Planned |
@@ -321,12 +321,9 @@ Found because `IdentifyOptions.intents` is typed `number`: the compiler rejected
 resolvable at the seam that had been silently forwarding it.
 
 ## Stage 1B — remaining, in priority order
-2. **`GatewayDispatcher`** — the listener map and emission, leaving `Gateway` as
-   orchestration rather than event infrastructure.
-3. **`GatewaySendLimiter`** (P2) — `#sendTimestamps` and the 115/60s budget as its
-   own primitive. Deliberately after the correctness-critical seams.
-4. **`ShardSupervisor`** (Stage 1C) — the restart/backoff policy currently inlined in
-   `ClusterManager`, lifted out so `Fleet` can reuse it per `FleetNode`.
+2. ✅ **`GatewayDispatcher`** (0.3.0, `packages/ws/src/dispatcher.ts`) — the listener map and emission.
+3. ✅ **`GatewaySendLimiter`** (0.3.0, `send-budget.ts`, formerly `SendBudget`, still exported under that name) — the 115/60s budget with privileged heartbeats, IDENTIFY and RESUME.
+4. ✅ **`ShardSupervisor`** (0.3.0, `packages/sharding/src/supervisor.ts`) — the restart/backoff policy lifted out of `ClusterManager`, so `Fleet` can reuse it per `FleetNode`.
 
 ## Open architectural debts this direction should absorb
 

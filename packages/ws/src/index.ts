@@ -71,13 +71,16 @@ export {
     type InvalidationReason,
 } from "./session.js";
 
+export { GatewayDispatcher, type GatewayListener } from "./dispatcher.js";
+export { GatewaySendLimiter, SendBudget } from "./send-budget.js";
 export { GatewayOpcodes } from "./opcodes.js";
 
 export { GatewayCloseCodes } from "./close-codes.js";
 
 export { GatewayState, Status, GatewayError } from "./state.js";
 import { GatewayState, GatewayError } from "./state.js";
-import { SendBudget } from "./send-budget.js";
+import { GatewayDispatcher, type GatewayListener } from "./dispatcher.js";
+import { GatewaySendLimiter } from "./send-budget.js";
 /** Gateway connection configuration. */
 export interface GatewayOptions {
     /** Authentication token. */
@@ -100,6 +103,10 @@ export interface GatewayOptions {
     heartbeatAckTimeout?: number;
     /** Zombie connection timeout. */
     zombieTimeout?: number;
+    /** Reconnects inside `reconnectStormWindow` after which the link counts as unstable: `unstable` is emitted and the delay keeps doubling. Default 5. */
+    reconnectStormLimit?: number;
+    /** The span over which reconnects are counted for storm detection, in ms. Default 60,000. */
+    reconnectStormWindow?: number;
     /** Identification properties. */
     properties?: GatewayProperties;
     /** Presence data. */
@@ -126,8 +133,17 @@ export interface GatewayOptions {
 const RESUMABLE_CLOSE_CODE = 4900;
 const DEFAULT_GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
 
-/** Gateway event listener. */
-type GatewayListener = (data: unknown) => unknown;
+/** What {@link Gateway.health} reports. */
+export interface GatewayHealth {
+    /** Connection lifecycle state. */
+    state: GatewayState;
+    /** Round trip of the last acknowledged heartbeat in ms, or -1 before the first. */
+    latency: number;
+    /** Milliseconds since the last message from Discord, or 0 before any. */
+    silentFor: number;
+    /** Reconnects scheduled since this Gateway was created. */
+    reconnects: number;
+}
 /** Manages a Discord Gateway connection. */
 export class Gateway {
     /** Current Gateway lifecycle state. */
@@ -135,7 +151,13 @@ export class Gateway {
     #options: Required<
         Omit<
             GatewayOptions,
-            "properties" | "presence" | "compress" | "createSocket" | "intents"
+            | "properties"
+            | "presence"
+            | "compress"
+            | "createSocket"
+            | "intents"
+            | "reconnectStormLimit"
+            | "reconnectStormWindow"
         >
     > & {
         /** Resolved intent bitfield, never the resolvable form. */
@@ -173,9 +195,12 @@ export class Gateway {
      * keeps at most one logical connection attempt in flight.
      */
     readonly #reconnect: GatewayReconnect;
-    readonly #listeners = new Map<string, Set<GatewayListener>>();
+    /** Listener registry and emission. */
+    readonly #events = new GatewayDispatcher((error) => this.#emitError(error));
     /** Application send budget under Discord's 120-per-60s limit. */
-    readonly #sendBudget = new SendBudget();
+    readonly #sendBudget = new GatewaySendLimiter();
+    /** How many reconnects were scheduled over this Gateway's life. */
+    #reconnects = 0;
     public ping: number = -1;
     /** Creates a Gateway connection manager. @param options Gateway configuration. @throws {TypeError|RangeError} If configuration is invalid. */
     public constructor(options: GatewayOptions) {
@@ -250,6 +275,8 @@ export class Gateway {
             maxAttempts: this.#options.maxReconnectAttempts,
             baseDelay: this.#options.reconnectBaseDelay,
             maxDelay: this.#options.reconnectMaxDelay,
+            stormLimit: options.reconnectStormLimit,
+            stormWindow: options.reconnectStormWindow,
         });
         this.#heartbeat = new GatewayHeartbeat({
             ackTimeout: this.#options.heartbeatAckTimeout,
@@ -343,15 +370,26 @@ export class Gateway {
     public on(event: string, listener: GatewayListener): this {
         if (!event || typeof listener !== "function")
             throw new TypeError("Gateway event and listener are required.");
-        let listeners = this.#listeners.get(event);
-        if (!listeners) this.#listeners.set(event, (listeners = new Set()));
-        listeners.add(listener);
+        this.#events.on(event, listener);
         return this;
     }
     /** Removes a Gateway event listener. @param event Event name. @param listener Event callback. @returns This Gateway. */
     public off(event: string, listener: GatewayListener): this {
-        this.#listeners.get(event)?.delete(listener);
+        this.#events.off(event, listener);
         return this;
+    }
+    /**
+     * A snapshot for dashboards and health checks: connection state, last
+     * heartbeat round trip, how long the link has been silent, and how many
+     * times it has reconnected.
+     */
+    public health(): GatewayHealth {
+        return {
+            state: this.state,
+            latency: this.#heartbeat.latency,
+            silentFor: this.#heartbeat.silentFor,
+            reconnects: this.#reconnects,
+        };
     }
     /** Sends a Gateway payload. @param payload Gateway payload. @returns Whether it was sent. */
     public send(payload: GatewayPayload): boolean {
@@ -626,7 +664,16 @@ export class Gateway {
         const result = this.#reconnect.schedule(() =>
             this.#open(this.#session.connectURL(DEFAULT_GATEWAY_URL)),
         );
-        if (result.scheduled || result.reason !== "exhausted") return;
+        if (result.scheduled) {
+            this.#reconnects++;
+            if (result.unstable)
+                this.#emit("unstable", {
+                    reconnects: result.unstable.reconnects,
+                    delay: result.delayMs,
+                });
+            return;
+        }
+        if (result.reason !== "exhausted") return;
         this.#reconnect.settle(
             new GatewayError("Gateway reconnect attempts exhausted."),
         );
@@ -653,20 +700,7 @@ export class Gateway {
         );
     }
     #emit(event: string, data: unknown): void {
-        for (const listener of this.#listeners.get(event) ?? []) {
-            try {
-                const result = listener(data);
-                if (
-                    result &&
-                    typeof (result as PromiseLike<unknown>).then === "function"
-                )
-                    void Promise.resolve(result).catch((error) => {
-                        if (event !== "error") this.#emitError(error);
-                    });
-            } catch (error) {
-                if (event !== "error") this.#emitError(error);
-            }
-        }
+        this.#events.emit(event, data);
     }
     /** Changes the Gateway lifecycle state. @param next Next lifecycle state. */
     #setState(next: GatewayState): void {

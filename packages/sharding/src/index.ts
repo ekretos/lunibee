@@ -1,10 +1,11 @@
-import packageJson from "../package.json" with { type: "json" };
+import { fetchGatewayBot, type GatewayBotInfo } from "./gateway-bot.js";
 import { Gateway, GatewayState } from "@lunibee/ws";
 
 /** Runtime-agnostic delay used between shard starts (works under Node and Bun). @param ms Milliseconds to wait. */
 const sleep = (ms: number): Promise<void> =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+export { fetchGatewayBot, type GatewayBotInfo } from "./gateway-bot.js";
 export { ShardBus } from "./bus.js";
 export {
     BroadcastChannelTransport,
@@ -89,19 +90,6 @@ export interface ShardManagerOptions {
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */
     onAutoScaleError?: (error: unknown) => void;
 }
-/** `/gateway/bot` information used to pace shard startup. */
-export interface GatewayBotInfo {
-    /** Recommended shard count. */
-    shards: number;
-    /** IDENTIFY budget, when Discord reported it. */
-    sessionStartLimit?: {
-        total: number;
-        remaining: number;
-        /** Milliseconds until `remaining` resets. */
-        resetAfter: number;
-        maxConcurrency: number;
-    };
-}
 /** Health snapshot for one shard. */
 export interface ShardHealth {
     id: number;
@@ -110,6 +98,23 @@ export interface ShardHealth {
     /** Last heartbeat round-trip in ms, or -1 before the first ACK. */
     ping: number;
 }
+/** What `ShardManager` emits about its shards. */
+export interface ShardManagerEvents {
+    /** A shard finished its handshake and is receiving events. */
+    shardReady: [shardId: number];
+    /** A shard's connection closed (it may reconnect by itself). */
+    shardDisconnect: [shardId: number, close: { code: number; action: string }];
+    /** A shard resumed its session after a reconnect. */
+    shardResume: [shardId: number];
+    /** A shard reported an error. */
+    shardError: [shardId: number, error: Error];
+    /** A shard reconnected too often too fast and is backing off (see `Gateway` `unstable`). */
+    shardUnstable: [
+        shardId: number,
+        info: { reconnects: number; delay: number },
+    ];
+}
+
 /** Runtime state for a managed shard. */
 export interface ShardInfo {
     /** Shard identifier. */
@@ -136,6 +141,12 @@ export class ShardManager {
     /** Whether the manager was created in auto shard-count mode. Preserved across reshards so auto-scaling keeps running. */
     readonly #auto: boolean;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
+    /** The shard count of the current shard set; kept while a reshard has no shards so `getShardIdForGuild` stays right. */
+    #total: number;
+    readonly #listeners = new Map<
+        keyof ShardManagerEvents,
+        Set<(...args: unknown[]) => void>
+    >();
     /** Last `/gateway/bot` answer, used for concurrency and the start limit. */
     #gatewayInfo?: GatewayBotInfo;
     /** Creates a shard manager. @param options Sharding configuration. @throws {TypeError} If token or intents are invalid. @throws {RangeError} If shard count is invalid. */
@@ -181,6 +192,7 @@ export class ShardManager {
             throw new RangeError(
                 "handshakeTimeout must be a non-negative number of milliseconds.",
             );
+        this.#total = count;
         this.#auto = options.shardCount === "auto";
         // Discord allows one IDENTIFY per 5s per rate-limit key. Spawning
         // shards back-to-back trips that limit and the gateway answers with
@@ -198,51 +210,7 @@ export class ShardManager {
     }
     /** Retrieves `/gateway/bot`: recommended shards and the IDENTIFY budget. Remembered for pacing the next connect. @throws {Error} If discovery fails or returns invalid data. */
     public async fetchGatewayInfo(): Promise<GatewayBotInfo> {
-        const response = await fetch(
-            "https://discord.com/api/v10/gateway/bot",
-            {
-                headers: {
-                    Authorization: `Bot ${this.#options.token}`,
-                    "User-Agent": `Lunibee/${packageJson.version}`,
-                },
-            },
-        );
-        if (!response.ok)
-            throw new Error(
-                `Gateway discovery failed with status ${response.status}`,
-            );
-        const data = (await response.json()) as {
-            shards?: unknown;
-            session_start_limit?: {
-                total?: unknown;
-                remaining?: unknown;
-                reset_after?: unknown;
-                max_concurrency?: unknown;
-            };
-        };
-        if (
-            typeof data.shards !== "number" ||
-            !Number.isInteger(data.shards) ||
-            data.shards < 1
-        )
-            throw new Error(
-                "Gateway discovery returned an invalid shard count.",
-            );
-        const limit = data.session_start_limit;
-        const info: GatewayBotInfo = { shards: data.shards };
-        if (
-            limit &&
-            typeof limit.total === "number" &&
-            typeof limit.remaining === "number" &&
-            typeof limit.reset_after === "number" &&
-            typeof limit.max_concurrency === "number"
-        )
-            info.sessionStartLimit = {
-                total: limit.total,
-                remaining: limit.remaining,
-                resetAfter: limit.reset_after,
-                maxConcurrency: Math.max(1, limit.max_concurrency),
-            };
+        const info = await fetchGatewayBot(this.#options.token);
         this.#gatewayInfo = info;
         return info;
     }
@@ -273,8 +241,24 @@ export class ShardManager {
             this.#options.maxConcurrency ?? limit?.maxConcurrency ?? 1,
             limit?.maxConcurrency ?? Infinity,
         );
-        for (let start = 0; start < ids.length; start += concurrency) {
-            const round = ids.slice(start, start + concurrency);
+        // Discord's IDENTIFY rate-limit key is `shard_id % max_concurrency`: one
+        // IDENTIFY per key per 5 seconds. Each round starts the next shard of
+        // every bucket, so a round never puts two shards on one key.
+        const buckets = new Map<number, number[]>();
+        for (const id of ids) {
+            const key = id % concurrency;
+            const bucket = buckets.get(key);
+            if (bucket) bucket.push(id);
+            else buckets.set(key, [id]);
+        }
+        const rounds = Math.max(
+            0,
+            ...[...buckets.values()].map((bucket) => bucket.length),
+        );
+        for (let index = 0; index < rounds; index++) {
+            const round = [...buckets.values()]
+                .map((bucket) => bucket[index])
+                .filter((id): id is number => id !== undefined);
             const results = await Promise.allSettled(
                 round.map((id) => this.shards.get(id)!.connect()),
             );
@@ -288,7 +272,7 @@ export class ShardManager {
                 });
             }
             if (
-                start + concurrency < ids.length &&
+                index + 1 < rounds &&
                 this.#options.spawnDelay &&
                 this.#options.spawnDelay > 0
             ) {
@@ -343,10 +327,41 @@ export class ShardManager {
             this.#autoScaleTimer = undefined;
         }
     }
+    /** Listens for an aggregated shard event. @returns This manager. */
+    public on<E extends keyof ShardManagerEvents>(
+        event: E,
+        listener: (...args: ShardManagerEvents[E]) => void,
+    ): this {
+        let set = this.#listeners.get(event);
+        if (!set) this.#listeners.set(event, (set = new Set()));
+        set.add(listener as unknown as (...args: unknown[]) => void);
+        return this;
+    }
+    /** Stops listening for a shard event. @returns This manager. */
+    public off<E extends keyof ShardManagerEvents>(
+        event: E,
+        listener: (...args: ShardManagerEvents[E]) => void,
+    ): this {
+        this.#listeners
+            .get(event)
+            ?.delete(listener as unknown as (...args: unknown[]) => void);
+        return this;
+    }
+    #emit<E extends keyof ShardManagerEvents>(
+        event: E,
+        ...args: ShardManagerEvents[E]
+    ): void {
+        for (const listener of this.#listeners.get(event) ?? [])
+            try {
+                listener(...args);
+            } catch {
+                // A faulty listener must not disturb the shard.
+            }
+    }
     /** Calculates the target shard ID for a Discord guild snowflake. @param guildId Guild snowflake. @returns Shard identifier. */
     public getShardIdForGuild(guildId: string): number {
         const id = BigInt(guildId);
-        return Number((id >> 22n) % BigInt(this.shardCount || 1));
+        return Number((id >> 22n) % BigInt(this.#total));
     }
     /** Gets a shard by ID. @param id Shard identifier. @returns Gateway instance or undefined. */
     public get(id: number): Gateway | undefined {
@@ -377,19 +392,40 @@ export class ShardManager {
     /** Creates every shard for a resolved shard count. @param count Number of shards. @returns Nothing. */
     #initialize(count: number): void {
         if (this.#resolved) return;
+        this.#total = count;
         for (let id = 0; id < count; id++)
             this.shards.set(id, this.#createShard(id, count));
         this.#resolved = true;
     }
     /** Creates one Gateway instance with its shard identity. @param id Shard identifier. @param count Total shard count. @returns Configured Gateway. */
     #createShard(id: number, count: number): Gateway {
-        return new Gateway({
+        const gateway = new Gateway({
             token: this.#options.token,
             intents: this.#options.intents,
             shardId: id,
             shardCount: count,
             reconnect: this.#options.reconnect ?? true,
         });
+        gateway.on("ready", () => this.#emit("shardReady", id));
+        gateway.on("resumed", () => this.#emit("shardResume", id));
+        gateway.on("close", (close) =>
+            this.#emit(
+                "shardDisconnect",
+                id,
+                close as { code: number; action: string },
+            ),
+        );
+        gateway.on("error", (error) =>
+            this.#emit("shardError", id, error as Error),
+        );
+        gateway.on("unstable", (info) =>
+            this.#emit(
+                "shardUnstable",
+                id,
+                info as { reconnects: number; delay: number },
+            ),
+        );
+        return gateway;
     }
 }
 

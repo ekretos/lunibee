@@ -1,11 +1,13 @@
 /**
- * Sliding-window budget for outgoing Gateway payloads.
+ * Sliding-window budget for outgoing Gateway payloads. Heartbeats, IDENTIFY and
+ * RESUME are privileged: they always go out (and are still counted), so
+ * application traffic can never starve them.
  *
  * Discord allows 120 sends per 60 seconds. Application traffic is capped at
  * 115 so the remaining headroom is reserved for privileged sends (heartbeats),
  * which are still recorded so the true total stays under Discord's limit.
  */
-export class SendBudget {
+export class GatewaySendLimiter {
     readonly #timestamps: number[] = [];
     readonly #limit: number;
     readonly #windowMs: number;
@@ -35,3 +37,6 @@ export class SendBudget {
         this.#timestamps.push(now);
     }
 }
+
+/** The limiter's name before 0.3.0. */
+export const SendBudget = GatewaySendLimiter;

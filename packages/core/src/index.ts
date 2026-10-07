@@ -398,6 +398,9 @@ export class Client
         this.#gateway = new Gateway({
             token: options.token,
             intents: options.intents,
+            ...(options.compress === undefined
+                ? {}
+                : { compress: options.compress }),
             ...options.gateway,
         });
 
