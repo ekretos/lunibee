@@ -72,6 +72,19 @@ function newPolicy<K>(): Policy<K> {
     };
 }
 
+/** Picks `amount` different items at random (a partial Fisher-Yates shuffle of `items`). */
+function sample<T>(items: T[], amount: number): T[] {
+    if (!Number.isInteger(amount) || amount < 0)
+        throw new RangeError("amount must be a non-negative integer.");
+    const count = Math.min(amount, items.length);
+    for (let i = 0; i < count; i++) {
+        const j = i + Math.floor(Math.random() * (items.length - i));
+        [items[i], items[j]] = [items[j]!, items[i]!];
+    }
+    items.length = count;
+    return items;
+}
+
 function assertTTL(ttl: number | undefined): void {
     if (ttl !== undefined && (!Number.isFinite(ttl) || ttl <= 0))
         throw new RangeError("TTL must be a positive number, or omitted.");
@@ -592,6 +605,28 @@ export class Collection<K, V> extends Map<K, V> {
         }
         return undefined;
     }
+    /** Finds the last value (in insertion order) matching a predicate. */
+    public findLast(
+        predicate: (value: V, key: K, collection: this) => boolean,
+    ): V | undefined {
+        const entries = [...this];
+        for (let i = entries.length - 1; i >= 0; i--) {
+            const [key, value] = entries[i]!;
+            if (predicate(value, key, this)) return value;
+        }
+        return undefined;
+    }
+    /** Finds the key of the last entry (in insertion order) matching a predicate. */
+    public findLastKey(
+        predicate: (value: V, key: K, collection: this) => boolean,
+    ): K | undefined {
+        const entries = [...this];
+        for (let i = entries.length - 1; i >= 0; i--) {
+            const [key, value] = entries[i]!;
+            if (predicate(value, key, this)) return key;
+        }
+        return undefined;
+    }
     /** Returns all values matching a predicate. */
     public filter(
         predicate: (value: V, key: K, collection: this) => boolean,
@@ -794,21 +829,39 @@ export class Collection<K, V> extends Map<K, V> {
         for (const { entry } of decorated) result.set(entry[0], entry[1]);
         return result;
     }
-    /** Returns a random value from the collection, or `undefined` if empty.
-     * Uses `Math.random()` (fast, non-cryptographic) — do not use for security-sensitive
-     * selection such as tokens or secrets. */
-    public random(): V | undefined {
-        const arr = [...this.values()];
-        if (!arr.length) return undefined;
-        return arr[Math.floor(Math.random() * arr.length)];
+    /**
+     * Returns a random value, or `undefined` if empty. With `amount`, returns
+     * that many different values (all of them, shuffled, when `amount` is at
+     * least the size).
+     * Uses `Math.random()` (fast, non-cryptographic): do not use it for
+     * security-sensitive selection such as tokens or secrets.
+     * @param amount How many values to pick.
+     * @throws {RangeError} If `amount` is not a non-negative integer.
+     */
+    public random(): V | undefined;
+    public random(amount: number): V[];
+    public random(amount?: number): V | V[] | undefined {
+        if (amount !== undefined) return sample([...this.values()], amount);
+        const size = this.size;
+        if (size === 0) return undefined;
+        let index = Math.floor(Math.random() * size);
+        for (const value of this.values()) if (index-- === 0) return value;
+        return undefined;
     }
-    /** Returns a random key from the collection, or `undefined` if empty.
-     * Uses `Math.random()` (fast, non-cryptographic) — do not use for security-sensitive
-     * selection such as tokens or secrets. */
-    public randomKey(): K | undefined {
-        const arr = [...this.keys()];
-        if (!arr.length) return undefined;
-        return arr[Math.floor(Math.random() * arr.length)];
+    /**
+     * Returns a random key, or `undefined` if empty. With `amount`, returns
+     * that many different keys. Same randomness and errors as {@link random}.
+     * @param amount How many keys to pick.
+     */
+    public randomKey(): K | undefined;
+    public randomKey(amount: number): K[];
+    public randomKey(amount?: number): K | K[] | undefined {
+        if (amount !== undefined) return sample([...this.keys()], amount);
+        const size = this.size;
+        if (size === 0) return undefined;
+        let index = Math.floor(Math.random() * size);
+        for (const key of this.keys()) if (index-- === 0) return key;
+        return undefined;
     }
     /** Returns the value at a given insertion-order index (supports negative indices). */
     public at(index: number): V | undefined {

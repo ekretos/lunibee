@@ -37,6 +37,7 @@ Security release. Fixes the findings of the 0.2.3 security review; the status of
 
 ### ✨ Added
 
+* **`collection.random(amount)` and `randomKey(amount)`** return that many different values or keys (the reference page already said so, but only one could be picked). **`findLast()` and `findLastKey()`** search from the end. `random()` without an amount no longer copies the collection.
 * **`collection.ensure(key, factory, ttl?)`** returns the stored value or stores and returns what `factory(key, collection)` makes (a get-or-create, as in discord.js).
 * **`slide: false`** on `Collection`: a read still marks an entry recently used but no longer extends its TTL.
 

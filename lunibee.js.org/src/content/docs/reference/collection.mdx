@@ -85,6 +85,15 @@ const adminId = client.users.cache.findKey(u => u.username === "admin");
 </TabItem>
 </Tabs>
 
+### `findLast(predicate)` and `findLastKey(predicate)`
+
+Like `find()` and `findKey()`, but search from the **last** entry (insertion order) backwards.
+
+```ts
+const newestBot = client.users.cache.findLast(u => u.bot);
+const newestBotId = client.users.cache.findLastKey(u => u.bot);
+```
+
 ### `filter(predicate)`
 
 Returns a **new Collection** containing only entries where the predicate returns `true`.
@@ -215,13 +224,18 @@ const lastUser = client.users.cache.at(-1);
 
 Returns the key at a numeric index.
 
-### `random()`
+### `random(amount?)`
 
-Returns a random value, or `n` random values as an array.
+Returns one random value (or `undefined` when empty). With `amount`, returns that many **different** values as an array; asking for more than the size returns all of them, shuffled, and `0` returns `[]`. Throws a `RangeError` for a negative or fractional `amount`. Uses `Math.random()`, so do not use it for tokens or secrets.
 
-### `randomKey()`
+```ts
+const winner = guild.members.cache.random();
+const winners = guild.members.cache.random(3);
+```
 
-Returns a random key.
+### `randomKey(amount?)`
+
+Same as `random()`, for keys.
 
 ### `sweep(predicate)`
 

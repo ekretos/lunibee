@@ -73,3 +73,69 @@ describe("Collection Full Coverage", () => {
         expect(difference.has("x")).toBe(true);
     });
 });
+
+describe("random and findLast", () => {
+    const make = () =>
+        new Collection<string, number>([
+            ["a", 1],
+            ["b", 2],
+            ["c", 3],
+            ["d", 4],
+        ]);
+
+    test("random() with an amount returns that many different values", () => {
+        const col = make();
+        for (let round = 0; round < 50; round++) {
+            const picked = col.random(3);
+            expect(picked).toHaveLength(3);
+            expect(new Set(picked).size).toBe(3);
+            for (const value of picked) expect([1, 2, 3, 4]).toContain(value);
+        }
+        expect(col.randomKey(2).every((key) => col.has(key))).toBe(true);
+        expect(new Set(col.randomKey(2)).size).toBe(2);
+    });
+
+    test("random(amount) clamps to the size, accepts 0, and rejects bad amounts", () => {
+        const col = make();
+        expect(col.random(10).sort()).toEqual([1, 2, 3, 4]);
+        expect(col.random(0)).toEqual([]);
+        expect(new Collection<string, number>().random(3)).toEqual([]);
+        expect(() => col.random(-1)).toThrow(RangeError);
+        expect(() => col.random(1.5)).toThrow(RangeError);
+        expect(() => col.randomKey(NaN)).toThrow(RangeError);
+        expect(col.size).toBe(4);
+    });
+
+    test("random() without an amount picks every entry in turn and is empty-safe", () => {
+        const col = make();
+        const seen = new Set<number | undefined>();
+        const original = Math.random;
+        try {
+            for (const r of [0, 0.3, 0.6, 0.99]) {
+                Math.random = () => r;
+                seen.add(col.random());
+            }
+            Math.random = () => 0.99;
+            expect(col.randomKey()).toBe("d");
+        } finally {
+            Math.random = original;
+        }
+        expect([...seen].sort()).toEqual([1, 2, 3, 4]);
+        expect(new Collection<string, number>().random()).toBeUndefined();
+        expect(new Collection<string, number>().randomKey()).toBeUndefined();
+    });
+
+    test("findLast and findLastKey search from the end", () => {
+        const col = make();
+        expect(col.findLast((value) => value % 2 === 1)).toBe(3);
+        expect(col.findLastKey((value) => value % 2 === 1)).toBe("c");
+        expect(col.findLast((value) => value > 10)).toBeUndefined();
+        expect(col.findLastKey((value) => value > 10)).toBeUndefined();
+        const seen: string[] = [];
+        col.findLast((_value, key, collection) => {
+            seen.push(key);
+            return collection !== col;
+        });
+        expect(seen).toEqual(["d", "c", "b", "a"]);
+    });
+});
