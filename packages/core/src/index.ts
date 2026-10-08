@@ -85,6 +85,7 @@ export {
     type GatewayIntentResolvable,
 } from "@lunibee/types";
 
+import { ActivityEnum } from "@lunibee/types";
 import {
     ApplicationCommandManager,
     ChannelManager,
@@ -357,6 +358,42 @@ export class Client
         data: import("@lunibee/types").GatewayPresence,
     ): boolean {
         return this.#gateway.setPresence(data);
+    }
+    /**
+     * Sets what the bot is doing: "Playing chess", "Watching the logs". Pass
+     * `null` to clear it. For a custom status (type `ActivityEnum.Custom`) the
+     * text shown is `state`, so it is set to `name` unless you give one.
+     * @example bot.setActivity("the logs", { type: ActivityEnum.Watching, status: "idle" });
+     * @returns Whether the update was sent (false while the Gateway is not connected).
+     */
+    public setActivity(
+        name: string | null,
+        options: {
+            type?: import("@lunibee/types").ActivityEnum;
+            url?: string;
+            state?: string;
+            status?: import("@lunibee/types").GatewayPresence["status"];
+        } = {},
+    ): boolean {
+        const type = options.type ?? ActivityEnum.Playing;
+        return this.setPresence({
+            status: options.status ?? "online",
+            activities:
+                name === null
+                    ? []
+                    : [
+                          {
+                              name,
+                              type,
+                              url: options.url,
+                              state:
+                                  options.state ??
+                                  (type === ActivityEnum.Custom
+                                      ? name
+                                      : undefined),
+                          },
+                      ],
+        });
     }
     /** Sends a voice state update. @param data Voice state payload. @returns Whether it was sent. */
     public setVoiceState(data: Record<string, unknown>): boolean {

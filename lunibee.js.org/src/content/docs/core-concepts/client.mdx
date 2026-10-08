@@ -129,6 +129,8 @@ const client = new Client({ token: process.env.DISCORD_TOKEN!, intents });
 
 `ActivityEnum` holds Discord's activity types: `Playing`, `Streaming`, `Listening`, `Watching`, `Custom` and `Competing`.
 
+The short way (0.3.0) is `bot.setActivity("the logs", { type: ActivityEnum.Watching, status: "idle" })`; `bot.setActivity(null)` clears it. See [Presence & Activity](/recipes/presence-and-activity/). `setPresence()` below takes the full presence object.
+
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
