@@ -8,7 +8,7 @@ Lunibee is designed to be used with the [Bun](https://bun.sh/) runtime.
 
 ## Prerequisites
 
-Ensure you have Bun installed on your machine (`v1.2.0` or later):
+Ensure you have Bun installed on your machine (`v1.4.0` or later):
 
 ```bash
 bun --version

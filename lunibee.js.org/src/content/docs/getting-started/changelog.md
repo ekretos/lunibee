@@ -7,6 +7,10 @@ description: Lunibee version history and release notes.
 
 A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3-workflow.md`](https://github.com/ekretos/lunibee/blob/0.3.0/docs/lunibee-3-workflow.md).
 
+### ⚠️ Changed
+
+* **Bun 1.4 is the minimum** (`engines.bun` is `>=1.4.0`); CI and the docs build run on Bun 1.4.2. Node 22 keeps working but is unsupported.
+
 ### ✨ Added
 
 * **Stable voice interface.** `voiceStateUpdate` / `voiceServerUpdate` (full raw payloads, no cache needed) and the new `Client#sendVoiceState(guildId, channelId | null, { selfMute?, selfDeaf? })` (also `Gateway#sendVoiceState`, `Gateway#ownsGuild`, `ShardManager#sendVoiceState`, which routes to the guild's shard) are the documented public API for voice clients. `raw` and `ws.send()` are unchanged. See [Voice integration](/core-concepts/voice-integration/).

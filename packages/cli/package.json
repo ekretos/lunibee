@@ -20,7 +20,7 @@
     "@lunibee/core": "workspace:*"
   },
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.4.0"
   },
   "license": "MIT"
 }

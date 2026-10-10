@@ -6,7 +6,7 @@ examples in `examples/` and tests in `tests/`.
 
 ## GitHub Actions (`.github/workflows/ci.yml`)
 
-Runs on pushes and pull requests to `main`, `master` and `dev`, on Bun 1.3.11,
+Runs on pushes and pull requests to `main`, `master` and `dev`, on Bun 1.4.2,
 installing with `bun install --frozen-lockfile` (`bun.lock` is committed; internal
 packages depend on each other via `workspace:*`):
 

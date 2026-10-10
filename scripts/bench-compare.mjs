@@ -2,7 +2,7 @@
  * Runs the runtime benchmark and compares it with a committed baseline.
  *
  *   bun scripts/bench-compare.mjs [--baseline docs/perf/runtime-2026-09-30.json]
- *                                 [--column bun13] [--threshold 0.15]
+ *                                 [--column bun14] [--threshold 0.15]
  *                                 [--rounds 3] [--fail]
  *
  * Needs `bun run build` first (the benchmark loads dist/). Absolute times
@@ -39,7 +39,7 @@ if (import.meta.main) {
         "baseline",
         "docs/perf/runtime-2026-09-30.json",
     );
-    const column = option("column", "bun13");
+    const column = option("column", "bun14");
     const threshold = Number(option("threshold", "0.15"));
     const rounds = Number(option("rounds", "3"));
     const baseline = JSON.parse(readFileSync(baselinePath, "utf8")).results;
