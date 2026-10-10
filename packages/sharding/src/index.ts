@@ -363,6 +363,18 @@ export class ShardManager {
         const id = BigInt(guildId);
         return Number((id >> 22n) % BigInt(this.#total));
     }
+    /** Sends a voice state update (op 4) on the shard that owns the guild. @returns Whether it was sent; `false` if that shard is absent or disconnected. */
+    public sendVoiceState(
+        guildId: string,
+        channelId: string | null,
+        options: { selfMute?: boolean; selfDeaf?: boolean } = {},
+    ): boolean {
+        return (
+            this.shards
+                .get(this.getShardIdForGuild(guildId))
+                ?.sendVoiceState(guildId, channelId, options) ?? false
+        );
+    }
     /** Gets a shard by ID. @param id Shard identifier. @returns Gateway instance or undefined. */
     public get(id: number): Gateway | undefined {
         return this.shards.get(id);

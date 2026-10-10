@@ -89,6 +89,7 @@ export default defineConfig({
             { label: "Component & Embed Builders", link: "/core-concepts/builders" },
             { label: "Sharding", link: "/core-concepts/sharding" },
             { label: "Voice", link: "/core-concepts/voice" },
+            { label: "Voice integration", link: "/core-concepts/voice-integration" },
           ],
         },
         {

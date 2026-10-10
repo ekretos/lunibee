@@ -444,6 +444,34 @@ export class Gateway {
             t: null,
         });
     }
+    /**
+     * Joins, moves or leaves a voice channel (op 4). Returns `false` without
+     * sending when the guild belongs to another shard, or when disconnected.
+     * @param guildId Guild snowflake. @param channelId Channel to join, or `null` to leave.
+     * @param options `selfMute` and `selfDeaf`, both default `false`. @returns Whether it was sent.
+     */
+    public sendVoiceState(
+        guildId: string,
+        channelId: string | null,
+        options: { selfMute?: boolean; selfDeaf?: boolean } = {},
+    ): boolean {
+        if (!this.ownsGuild(guildId)) return false;
+        return this.setVoiceState({
+            guild_id: guildId,
+            channel_id: channelId,
+            self_mute: options.selfMute ?? false,
+            self_deaf: options.selfDeaf ?? false,
+        });
+    }
+    /** Whether `guildId` maps to this Gateway's shard (`(id >> 22) % shardCount === shardId`). */
+    public ownsGuild(guildId: string): boolean {
+        const count = this.#options.shardCount;
+        if (count <= 1) return true;
+        return (
+            Number((BigInt(guildId) >> 22n) % BigInt(count)) ===
+            this.#options.shardId
+        );
+    }
     /** Requests guild members. @param data Guild member request payload. @returns Whether it was sent. */
     public requestGuildMembers(data: Record<string, unknown>): boolean {
         return this.send({

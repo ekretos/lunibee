@@ -7,6 +7,8 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 
 Two parts. **Removed:** the APIs deprecated in 0.2.x are gone (see the changelog's Removed list); run `bunx lunibee migrate --fix` to rename the old names, then `bunx lunibee migrate` lists the calls to change by hand (`deleteRole` → `roles.remove`, `sendMessage` → `send`, `edit(id, options, reason)` → `edit(id, { ...options, reason })`…). **New workflow:** it sits beside the manager API, so move at your own pace.
 
+**Voice clients:** `voiceStateUpdate`, `voiceServerUpdate` and `bot.sendVoiceState()` are a stable public API; prefer them over `raw` and `ws.send()` (both still work). See [Voice integration](/core-concepts/voice-integration/).
+
 | Before | After |
 | --- | --- |
 | `client.guilds.cache.get(id)` | `bot.guild(id).peek()` |

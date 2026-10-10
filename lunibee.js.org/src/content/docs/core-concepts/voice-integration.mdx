@@ -1,0 +1,45 @@
+---
+title: Voice integration
+description: The stable public API for external voice clients such as Lavalink connectors.
+---
+
+A voice client (a Lavalink connector, your own voice stack) needs two things from the
+Gateway: the voice dispatches coming in, and a way to send a voice state update out.
+These are a **stable public API** from 0.3.0.
+
+## Incoming: typed events
+
+```ts
+bot.on("voiceStateUpdate", (state, previous) => {
+  // state: guild_id, channel_id, session_id, user_id (+ mute/deaf flags, member)
+});
+bot.on("voiceServerUpdate", ({ token, guild_id, endpoint }) => {
+  // endpoint may be null/undefined
+});
+```
+
+- `voiceStateUpdate` delivers the raw Discord voice state for every user, **including the bot**.
+  When the bot is moved the new `channel_id` arrives; when it is disconnected `channel_id` is `null`.
+  `session_id` is always present on the bot's own state.
+- `voiceServerUpdate` data is `{ token, guild_id, endpoint?: string | null }`. Discord sends a
+  null or missing `endpoint` when the voice server is being reallocated: **consumers must
+  handle it** (wait for the next update; do not connect).
+- Both fire for every guild, whether or not it is cached, and no cache or structure option is required.
+- The untyped `raw` event (`{ event, data }`) keeps working and sees the same dispatches.
+
+## Outgoing: `sendVoiceState`
+
+```ts
+bot.sendVoiceState(guildId, channelId, { selfMute: false, selfDeaf: true }); // join / move
+bot.sendVoiceState(guildId, null); // leave
+```
+
+Sends opcode 4 `{ guild_id, channel_id, self_mute, self_deaf }` and returns whether it was
+sent. It never throws: it returns `false` when the Gateway is disconnected or the send budget
+is spent, or when the guild belongs to another shard (a `Client` owns one shard).
+
+In a single-process sharded setup use `ShardManager#sendVoiceState(guildId, channelId, options)`,
+which sends on the shard that owns the guild (`getShardIdForGuild`). `Gateway#sendVoiceState`
+is the same call on one shard.
+
+`bot.ws.send(payload)` and `bot.ws.setVoiceState(data)` keep working.

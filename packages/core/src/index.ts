@@ -399,6 +399,20 @@ export class Client
     public setVoiceState(data: Record<string, unknown>): boolean {
         return this.#gateway.setVoiceState(data);
     }
+    /**
+     * Joins, moves or leaves a voice channel (op 4). Stable public voice API.
+     * Returns `false` (never throws) when disconnected, rate limited, or when
+     * the guild belongs to another shard of a sharded setup.
+     * @param guildId Guild snowflake. @param channelId Channel to join or move to; `null` leaves.
+     * @param options `selfMute` and `selfDeaf`. @returns Whether it was sent.
+     */
+    public sendVoiceState(
+        guildId: string,
+        channelId: string | null,
+        options: { selfMute?: boolean; selfDeaf?: boolean } = {},
+    ): boolean {
+        return this.#gateway.sendVoiceState(guildId, channelId, options);
+    }
     /** Requests guild members. @param data Guild member request payload. @returns Whether it was sent. */
     public requestGuildMembers(data: Record<string, unknown>): boolean {
         return this.#gateway.requestGuildMembers(data);
