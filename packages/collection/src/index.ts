@@ -215,11 +215,9 @@ export class Collection<K, V> extends Map<K, V> {
             return super.set(key, value);
         assertTTL(ttl);
         let window = ttl ?? this.#policy?.ttl;
-        if (window !== undefined && this.#policy!.jitter > 0)
-            window = Math.max(
-                1,
-                window * (1 - this.#policy!.jitter * Math.random()),
-            );
+        const jitter = this.#policy?.jitter ?? 0;
+        if (window !== undefined && jitter > 0)
+            window = Math.max(1, window * (1 - jitter * Math.random()));
         if (window !== undefined) this.#policy ??= newPolicy();
         if (!this.#policy) return super.set(key, value);
         // A key that was not stored before has no policy entry.
