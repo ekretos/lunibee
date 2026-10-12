@@ -411,6 +411,7 @@ bound it:
 ```ts
 const cache = new Collection<string, number>(null, {
   ttl: 60_000,       // default sliding TTL for set()
+  jitter: 0.2,       // each TTL is 80-100% of ttl, so entries set together expire staggered
   maxSize: 1_000,    // LRU cap for set() entries
   slide: true,       // false: a read promotes but does not extend the TTL
   onEvict: (key, value, reason) => {}, // reason: "expired" | "evicted"

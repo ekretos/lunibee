@@ -45,6 +45,7 @@ new Cache<K, V>(options?: CacheOptions)
 |---|---|---|---|
 | `maxSize` | `number` | `Infinity` | Maximum number of live entries. Evicts the least recently used when exceeded. |
 | `ttl` | `number` | `0` (disabled) | Entry lifetime in milliseconds. |
+| `jitter` | `number` | `0` | Fraction (0-1) of `ttl` randomly shaved off each entry's lifetime when it is set, so entries stored together do not expire together. `0.2` gives each entry 80-100% of `ttl`; it never lives longer than `ttl`. Values outside 0-1 throw a `RangeError`. |
 | `sweepInterval` | `number` | `min(ttl, 60_000)` | Kept for compatibility; no longer needed. Expired entries are dropped at their deadline. |
 
 <Tabs>
