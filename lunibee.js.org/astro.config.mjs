@@ -149,6 +149,7 @@ export default defineConfig({
                 { label: "User", link: "/reference/user" },
                 { label: "GuildMember", link: "/reference/guild-member" },
                 { label: "Role", link: "/reference/role" },
+                { label: "Onboarding & Welcome Screen", link: "/reference/guild-onboarding" },
                 { label: "Interactions", link: "/reference/interactions" },
               ],
             },
@@ -168,6 +169,7 @@ export default defineConfig({
             {
               label: "REST & Gateway",
               items: [
+                { label: "Managers", link: "/reference/managers" },
                 { label: "REST & Routes", link: "/reference/rest" },
                 { label: "Gateway", link: "/reference/gateway" },
               ],

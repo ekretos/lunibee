@@ -342,6 +342,17 @@ try {
 </TabItem>
 </Tabs>
 
+`DiscordAPIError` is an alias of `RESTError`, exported so Discord.js-shaped `catch (err) { if (err instanceof DiscordAPIError) … }` code works unchanged.
+
+| Property | Type | Description |
+|---|---|---|
+| `kind` | `RESTErrorKind` | Failure category (`"aborted"`, timeout, API rejection, and so on). |
+| `status` | `number` | HTTP status returned by Discord. |
+| `code` | `number \| undefined` | Discord error code, when provided. |
+| `errors` | `unknown` | Raw Discord validation payload. |
+| `method` / `path` | `string \| undefined` | The failed request. |
+| `hint` | `string \| undefined` | What to check next for common causes (missing access or permissions). |
+
 ## Full Example
 
 **Fetch a user and send a DM**

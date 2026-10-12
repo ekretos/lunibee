@@ -1,0 +1,91 @@
+---
+title: Managers
+description: RoleManager, ThreadManager, GuildStickerManager, GuildSoundboardManager and ApplicationEmojiManager.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Managers wrap one family of REST routes. The guild-scoped ones are created on first use, one per guild, and kept in sync by the Gateway. Each takes a `reason` where Discord records one in the audit log.
+
+| Manager | Reached through |
+|---|---|
+| `RoleManager` | `client.guilds.roles(guildId)` |
+| `ThreadManager` | `client.channels.threads(channelId)` |
+| `GuildStickerManager` | `client.guilds.stickers(guildId)` |
+| `GuildSoundboardManager` | `client.guilds.soundboard(guildId)` |
+| `ApplicationEmojiManager` | `client.applicationEmojis` (set once the application is known) |
+
+## RoleManager
+
+| Method | Description |
+|---|---|
+| `fetchAll()` | Fetches every role in the guild. |
+| `create({ name, permissions?, color?, colors?, hoist?, mentionable?, icon?, reason? })` | Creates a role. `colors` takes `{ primary, secondary?, tertiary? }`: two make a gradient, three the holographic style. |
+| `edit(roleId, options)` | Edits a role. Same options as `create`, plus `position`. |
+| `remove(roleId, reason?)` | Deletes a role. |
+| `setPositions(positions, reason?)` | Moves roles in the hierarchy (`[{ id, position }]`). Returns every role in its new order. |
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+const roles = client.guilds.roles(guildId);
+const role = await roles.create({ name: "Mod", color: 0x5865f2, hoist: true });
+await roles.setPositions([{ id: role.id, position: 3 }]);
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+const roles = client.guilds.roles(guildId);
+const role = await roles.create({ name: "Mod", color: 0x5865f2, hoist: true });
+await roles.setPositions([{ id: role.id, position: 3 }]);
+```
+</TabItem>
+</Tabs>
+
+## ThreadManager
+
+| Method | Description |
+|---|---|
+| `createFromMessage(messageId, { name, autoArchiveDuration?, rateLimitPerUser? })` | Starts a thread from a message. |
+| `create({ name, type?, invitable?, ... })` | Starts a thread with no message. `type` is `12` (private, default), `11` (public) or `10` (announcement). |
+| `createForumPost({ name, message, appliedTags? })` | Posts to a forum or media channel: one request creates the thread and its first message. `message` takes everything `send()` does, files included. |
+| `fetchArchived(scope, { before?, limit? })` | Lists archived threads: `"public"`, `"private"` or the private ones the bot has joined. |
+| `join(threadId)` / `leave(threadId)` | The bot joins or leaves a thread. |
+| `addMember(threadId, userId)` / `removeMember(threadId, userId)` | Adds or removes a member. |
+| `fetchMember(threadId, userId, { withMember? })` | Fetches one member; rejects with a 404 when they have not joined. |
+| `fetchMembers(threadId, { withMember?, after?, limit? })` | Lists members, one page at a time (`limit` 1-100). Needs the Guild Members intent. |
+
+## GuildStickerManager
+
+A cache keyed by sticker ID.
+
+| Method | Description |
+|---|---|
+| `fetchAll()` / `fetch(stickerId)` | Fetches stickers from Discord and caches them. |
+| `create({ name, description, tags, file, reason? })` | Uploads a sticker. `file` is a `Blob`: PNG, APNG, GIF or Lottie JSON, up to 512 KiB. |
+| `edit(stickerId, options)` | Edits a sticker. |
+| `remove(stickerId, reason?)` | Deletes a sticker. |
+| `sync(stickers)` | Replaces the cache with the list from a `GUILD_STICKERS_UPDATE` event. |
+
+## GuildSoundboardManager
+
+A cache keyed by sound ID.
+
+| Method | Description |
+|---|---|
+| `fetchAll()` / `fetch(soundId)` | Fetches sounds from Discord and caches them. |
+| `create({ name, sound, volume?, emojiId?, emojiName?, reason? })` | Creates a sound. `sound` is a data URI of an MP3 or OGG (up to 512 KiB, 5.2 s). `volume` is 0 to 1 (default 1); other values throw a `RangeError`. |
+| `edit(soundId, options)` | Edits a sound. |
+| `remove(soundId, reason?)` | Deletes a sound. |
+
+## ApplicationEmojiManager
+
+The application's own emojis belong to the bot, not to a guild, so any server can show them. Cached by emoji ID.
+
+| Method | Description |
+|---|---|
+| `fetchAll()` | Fetches every application emoji, replacing the cache. |
+| `fetch(emojiId)` | Fetches one. |
+| `create({ name, image })` | Uploads an emoji. `name` is 2-32 letters, digits or underscores; `image` is a data URI (PNG, JPEG, GIF or WebP, up to 256 KB). |
+| `edit(emojiId, options)` | Renames an emoji. |
+| `remove(emojiId)` | Deletes an emoji. |
