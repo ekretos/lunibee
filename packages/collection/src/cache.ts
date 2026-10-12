@@ -7,6 +7,11 @@ export interface CacheOptions {
     /** Time-to-live in milliseconds. Omit to disable expiration. */
     ttl?: number;
     /**
+     * Fraction (0-1) of `ttl` to randomly shave off each entry's lifetime, so
+     * entries stored together do not all expire together. Default `0`.
+     */
+    ttlJitter?: number;
+    /**
      * Accepted for compatibility and still validated. Expired entries are now
      * dropped at their deadline, so no periodic sweep is needed.
      */
@@ -20,6 +25,8 @@ export interface CacheOptions {
  */
 export class Cache<K, V> {
     readonly #entries: Collection<K, V>;
+    readonly #ttl: number;
+    readonly #jitter: number;
 
     /** Creates a cache using the supplied retention policy. */
     public constructor(options: CacheOptions = {}) {
@@ -31,6 +38,11 @@ export class Cache<K, V> {
             throw new RangeError(
                 "Cache ttl must be a non-negative finite number.",
             );
+        const jitter = options.ttlJitter ?? 0;
+        if (!(jitter >= 0 && jitter <= 1))
+            throw new RangeError("Cache ttlJitter must be between 0 and 1.");
+        this.#ttl = ttl;
+        this.#jitter = jitter;
         if (ttl > 0) {
             const interval = options.sweepInterval ?? Math.min(ttl, 60_000);
             if (!Number.isFinite(interval) || interval < 1)
@@ -57,7 +69,13 @@ export class Cache<K, V> {
     }
     /** Stores an entry and evicts the least recently used ones when the bound is exceeded. */
     public set(key: K, value: V): this {
-        this.#entries.set(key, value);
+        this.#entries.set(
+            key,
+            value,
+            this.#ttl > 0 && this.#jitter > 0
+                ? Math.max(1, this.#ttl * (1 - this.#jitter * Math.random()))
+                : undefined,
+        );
         return this;
     }
     /** Invalidates one key. */

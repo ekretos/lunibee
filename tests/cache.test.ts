@@ -10,6 +10,15 @@ afterEach(() => {
 });
 
 describe("Cache", () => {
+    test("ttlJitter validates and shortens entry lifetimes", () => {
+        expect(() => new Cache({ ttl: 100, ttlJitter: 2 })).toThrow();
+        expect(() => new Cache({ ttl: 100, ttlJitter: -1 })).toThrow();
+        const cache = new Cache<number, number>({ ttl: 1000, ttlJitter: 1 });
+        caches.push(cache as Cache<unknown, unknown>);
+        for (let i = 0; i < 50; i++) cache.set(i, i);
+        setSystemTime(new Date(Date.now() + 1001));
+        expect(cache.size).toBe(0);
+    });
     test("validates constructor options", () => {
         expect(() => new Cache({ maxSize: 0 })).toThrow();
         expect(() => new Cache({ maxSize: 1.5 })).toThrow();
