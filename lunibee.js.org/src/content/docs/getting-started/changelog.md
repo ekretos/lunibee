@@ -9,6 +9,7 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 
 ### ⚠️ Changed
 
+* **`intents` must be an array.** `new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] })`. An OR-ed bitfield (`GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages`), a single number, a single name or an `IntentsBitField` throws a `TypeError` from `Client`, `Gateway`, `ShardManager` and `resolveGatewayIntents()`. `IntentsBitField` itself still takes one intent or an array in `add`, `remove`, `has`, `any` and `equals`; pass `bits.toArray()` to a client.
 * **Bun 1.4 is the minimum** (`engines.bun` is `>=1.4.0`); CI and the docs build run on Bun 1.4.2. Node 22 keeps working but is unsupported.
 
 ### ✨ Added

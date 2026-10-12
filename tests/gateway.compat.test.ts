@@ -24,7 +24,7 @@ const DEFAULT_GATEWAY = "wss://gateway.discord.gg/?v=10&encoding=json";
 async function connectReady(options: Record<string, unknown> = {}) {
     const gateway = new Gateway({
         token: "token",
-        intents: 1,
+        intents: [1],
         reconnectBaseDelay: 1,
         reconnectMaxDelay: 1,
         ...options,

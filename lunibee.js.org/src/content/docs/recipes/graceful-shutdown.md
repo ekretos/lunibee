@@ -12,7 +12,7 @@ It is best practice to cleanly destroy the client:
 import { Client, IntentBits } from "lunibee";
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents: IntentBits.guilds,
+  intents: [IntentBits.guilds],
 });
 await client.login();
 async function handleShutdown(signal: string) {

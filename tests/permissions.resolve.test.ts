@@ -97,7 +97,7 @@ describe("computePermissions", () => {
 
 describe("Client.permissionsFor", () => {
     test("uses cached guild, roles, member and channel overwrites", () => {
-        const client = new Client({ token: "a.b", intents: 0 });
+        const client = new Client({ token: "a.b", intents: [] });
         const gw = client.gateway as unknown as {
             emit(event: string, data: unknown): void;
         };
@@ -139,7 +139,7 @@ describe("ClientOptions.cache", () => {
     test("disabled resources are not cached but events still fire", () => {
         const client = new Client({
             token: "a.b",
-            intents: 0,
+            intents: [],
             cache: {
                 users: false,
                 members: false,

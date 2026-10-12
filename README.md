@@ -39,7 +39,7 @@ import { Client, GatewayIntentBits } from "lunibee";
 
 const client = new Client({
     token: process.env.DISCORD_TOKEN!,
-    intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
 
 client.on("ready", user => {
@@ -99,7 +99,7 @@ import { Gateway } from "@lunibee/ws";
 
 const gateway = new Gateway({
     token: process.env.DISCORD_TOKEN!,
-    intents: 513
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
 
 await gateway.connect();
@@ -180,7 +180,7 @@ import { ShardManager } from "@lunibee/sharding";
 
 const shards = new ShardManager({
     token: process.env.DISCORD_TOKEN!,
-    intents: 513,
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
     shardCount: "auto"
 });
 

@@ -3,7 +3,7 @@ import { Client, GatewayIntentBits, PermissionFlagsBits, command } from "lunibee
 const token = process.env.DISCORD_TOKEN;
 if (!token) throw new Error("DISCORD_TOKEN is required");
 
-const bot = new Client({ token, intents: GatewayIntentBits.Guilds });
+const bot = new Client({ token, intents: [GatewayIntentBits.Guilds] });
 
 bot.commands.add(
     command({

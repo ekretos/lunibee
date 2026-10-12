@@ -44,7 +44,7 @@ new ShardManager(options )
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `token` | `string` | Required | Discord bot token. |
-| `intents` | `GatewayIntentResolvable` | Required | Gateway intents for all shards. |
+| `intents` | `GatewayIntentResolvable` (array) | Required | Gateway intents for all shards. |
 | `shardCount` | `number \| "auto"` | `1` | Number of shards. `"auto"` fetches Discord's recommendation. |
 | `reconnect` | `boolean` | `true` | Automatic reconnect for every shard. |
 | `spawnDelay` | `number` | `5000` | Milliseconds between shard starts. See below. |
@@ -68,7 +68,7 @@ already paces your handshakes, such as an external scheduler or a bucketed
 ```ts
 const manager = new ShardManager({
   token: process.env.DISCORD_TOKEN!,
-  intents: IntentBits.guilds,
+  intents: [IntentBits.guilds],
   shardCount: 4,
   // Default: ShardManager.IDENTIFY_INTERVAL (5000).
   spawnDelay: ShardManager.IDENTIFY_INTERVAL,
@@ -79,7 +79,7 @@ const manager = new ShardManager({
 ```js
 const manager = new ShardManager({
   token: process.env.DISCORD_TOKEN,
-  intents: IntentBits.guilds,
+  intents: [IntentBits.guilds],
   shardCount: 4,
   spawnDelay: ShardManager.IDENTIFY_INTERVAL,
 });

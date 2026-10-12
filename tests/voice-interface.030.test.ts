@@ -41,7 +41,7 @@ describe("voice integration interface", () => {
     });
 
     test("typed events carry the full payload without a cached guild", async () => {
-        const client = new Client({ token: "a.b", intents: 0 });
+        const client = new Client({ token: "a.b", intents: [] });
         const states: unknown[] = [];
         const servers: unknown[] = [];
         const raw: string[] = [];
@@ -78,7 +78,7 @@ describe("voice integration interface", () => {
     });
 
     test("Client#sendVoiceState sends op 4 and ws.send keeps working", async () => {
-        const client = new Client({ token: "a.b", intents: 0 });
+        const client = new Client({ token: "a.b", intents: [] });
         const socket = await ready(client.gateway);
         expect(client.sendVoiceState(G0, "9", { selfDeaf: true })).toBe(true);
         expect(client.sendVoiceState(G0, null)).toBe(true);
@@ -114,12 +114,12 @@ describe("voice integration interface", () => {
     });
 
     test("sending while disconnected returns false and does not throw", () => {
-        const client = new Client({ token: "a.b", intents: 0 });
+        const client = new Client({ token: "a.b", intents: [] });
         expect(client.sendVoiceState(G0, "9")).toBe(false);
         expect(
             new ShardManager({
                 token: "a.b",
-                intents: 0,
+                intents: [],
                 shardCount: 2,
             }).sendVoiceState(G0, "9"),
         ).toBe(false);
@@ -128,14 +128,14 @@ describe("voice integration interface", () => {
     test("sharded: ShardManager routes to the owning shard, Gateway refuses foreign guilds", async () => {
         const manager = new ShardManager({
             token: "a.b",
-            intents: 0,
+            intents: [],
             shardCount: 2,
         });
         const sockets: FakeWebSocket[] = [];
         for (const shardId of [0, 1]) {
             const gateway = new Gateway({
                 token: "a.b",
-                intents: 0,
+                intents: [],
                 shardId,
                 shardCount: 2,
             });

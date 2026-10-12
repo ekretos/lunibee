@@ -6,7 +6,7 @@ const U = "300000000000000000";
 const C = "100000000000000000";
 
 function client(options: Record<string, unknown> = {}) {
-    const c = new Client({ token: "a.b", intents: 0, ...options });
+    const c = new Client({ token: "a.b", intents: [], ...options });
     const gw = c.gateway as unknown as {
         emit(event: string, data: unknown): void;
     };

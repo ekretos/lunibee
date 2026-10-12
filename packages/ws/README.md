@@ -18,7 +18,7 @@ import { GatewayIntentBits } from "@lunibee/types";
 
 const gateway = new Gateway({
     token: process.env.TOKEN!,
-    intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages,
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
 });
 
 gateway.on("ready", (data) => console.log("Ready", data));

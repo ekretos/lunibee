@@ -36,7 +36,7 @@ describe("ShardManager startup pacing", () => {
         };
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: "auto",
             spawnDelay: 5,
             handshakeTimeout: 1,
@@ -61,7 +61,7 @@ describe("ShardManager startup pacing", () => {
         });
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: "auto",
         });
         await expect(manager.connect()).rejects.toThrow(
@@ -77,7 +77,7 @@ describe("ShardManager startup pacing", () => {
         };
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: 2,
             maxConcurrency: 2,
         });
@@ -89,12 +89,16 @@ describe("ShardManager startup pacing", () => {
     test("validates maxConcurrency and tolerates a missing start limit", async () => {
         expect(
             () =>
-                new ShardManager({ token: "t", intents: 0, maxConcurrency: 0 }),
+                new ShardManager({
+                    token: "t",
+                    intents: [],
+                    maxConcurrency: 0,
+                }),
         ).toThrow(RangeError);
         gatewayBot({ shards: 1 });
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: "auto",
         });
         expect(await manager.fetchGatewayInfo()).toEqual({ shards: 1 });
@@ -121,7 +125,7 @@ describe("ShardManager review fixes", () => {
         };
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: "auto",
             maxConcurrency: 3,
             spawnDelay: 1,
@@ -148,7 +152,7 @@ describe("ShardManager review fixes", () => {
         };
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: "auto",
             spawnDelay: 0,
         });
@@ -178,7 +182,7 @@ describe("ShardManager review fixes", () => {
         };
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: 2,
             spawnDelay: 1,
             handshakeTimeout: 1_000,
@@ -193,7 +197,7 @@ describe("ShardManager review fixes", () => {
             () =>
                 new ShardManager({
                     token: "t",
-                    intents: 0,
+                    intents: [],
                     handshakeTimeout: -1,
                 }),
         ).toThrow(RangeError);

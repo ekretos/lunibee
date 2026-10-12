@@ -22,7 +22,7 @@ describe("Gateway integration lifecycle", () => {
     test("settles connect only after the socket opens", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         let settled = false;
@@ -42,7 +42,7 @@ describe("Gateway integration lifecycle", () => {
     test("responds to HELLO with IDENTIFY and schedules heartbeats", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 513,
+            intents: [513],
             reconnect: false,
         });
         const promise = gateway.connect();
@@ -64,7 +64,7 @@ describe("Gateway integration lifecycle", () => {
     test("marks heartbeat acknowledgements as healthy", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         const promise = gateway.connect();
@@ -84,7 +84,7 @@ describe("Gateway integration lifecycle", () => {
     test("reconnects after a recoverable close", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnectBaseDelay: 1,
             reconnectMaxDelay: 1,
         });
@@ -101,7 +101,7 @@ describe("Gateway integration lifecycle", () => {
     test("clears session state after INVALID_SESSION", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         const promise = gateway.connect();
@@ -125,7 +125,7 @@ describe("Gateway integration lifecycle", () => {
     test("reports and closes a zombie connection", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
             heartbeatAckTimeout: 10,
             zombieTimeout: 25,
@@ -165,7 +165,7 @@ describe("Gateway integration lifecycle", () => {
     test("inbound traffic keeps a healthy connection alive past the zombie timeout", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
             heartbeatAckTimeout: 10,
             zombieTimeout: 30,
@@ -193,7 +193,7 @@ describe("Gateway integration lifecycle", () => {
     test("dispatches without heartbeat ACKs still trip the ACK timeout", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
             heartbeatAckTimeout: 10,
             zombieTimeout: 1_000,
@@ -216,7 +216,7 @@ describe("Gateway integration lifecycle", () => {
     test("frames from a superseded socket do not keep the current one alive", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             heartbeatAckTimeout: 10,
             zombieTimeout: 30,
             reconnectBaseDelay: 1,
@@ -244,7 +244,7 @@ describe("Gateway integration lifecycle", () => {
     test("after a reconnect the new socket's traffic keeps it alive", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             heartbeatAckTimeout: 10,
             zombieTimeout: 30,
             reconnectBaseDelay: 1,
@@ -271,7 +271,7 @@ describe("Gateway integration lifecycle", () => {
     test("closes connection when heartbeat acknowledgement times out", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             heartbeatAckTimeout: 10,
             reconnect: false,
         });
@@ -289,7 +289,7 @@ describe("Gateway integration lifecycle", () => {
 
         const gwCloseErr = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             heartbeatAckTimeout: 10,
             reconnect: false,
         });
@@ -313,7 +313,7 @@ describe("Gateway integration lifecycle", () => {
     test("normalizes connection error", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         installWebSocket(
@@ -328,7 +328,7 @@ describe("Gateway integration lifecycle", () => {
 
         const gw2 = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         installWebSocket(
@@ -345,7 +345,7 @@ describe("Gateway integration lifecycle", () => {
     test("emits error on websocket error event", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         let error: Error | undefined;
@@ -364,7 +364,7 @@ describe("Gateway integration lifecycle", () => {
     test("sends presence, voice state, member requests and handles rate limits", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         const promise = gateway.connect();
@@ -397,7 +397,7 @@ describe("Gateway integration lifecycle", () => {
 
         const failingGw = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         const p2 = failingGw.connect();
@@ -416,7 +416,7 @@ describe("Gateway integration lifecycle", () => {
     test("reconnects with fresh identity on 4007", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
         });
@@ -434,7 +434,7 @@ describe("Gateway integration lifecycle", () => {
     test("stops reconnecting on fatal close code 4004", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
         });
         const promise = gateway.connect();
@@ -449,7 +449,7 @@ describe("Gateway integration lifecycle", () => {
     test("exhausts max reconnect attempts", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             maxReconnectAttempts: 1,
             reconnectBaseDelay: 5,
@@ -470,7 +470,7 @@ describe("Gateway integration lifecycle", () => {
     });
 
     test("emits and removes custom event listeners with emit and off", async () => {
-        const gateway = new Gateway({ token: "token", intents: 0 });
+        const gateway = new Gateway({ token: "token", intents: [] });
         let val: number | undefined;
         const fn: Parameters<Gateway["on"]>[1] = (v) => {
             if (typeof v === "number") val = v;
@@ -514,7 +514,7 @@ describe("Gateway integration lifecycle", () => {
     test("resumes session when sessionId and sequence are available", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 1,
             reconnectMaxDelay: 1,
@@ -558,7 +558,7 @@ describe("Gateway integration lifecycle", () => {
     test("handles zlib-stream compression", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             compress: true,
             reconnect: false,
         });
@@ -579,7 +579,7 @@ describe("resumable client closes", () => {
     test("a server reconnect request closes with 4900, not 1000/1001", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         const promise = gateway.connect();

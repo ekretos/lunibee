@@ -23,7 +23,7 @@ describe("Gateway connect idempotency (P1: duplicate sockets)", () => {
     test("connecting an already-live Gateway does not open a second socket", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         const connecting = gateway.connect("wss://example.test");
@@ -38,7 +38,7 @@ describe("Gateway connect idempotency (P1: duplicate sockets)", () => {
     test("a superseded socket is closed and its dispatches are ignored", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         const connecting = gateway.connect("wss://example.test");
@@ -64,7 +64,7 @@ describe("Gateway connect idempotency (P1: duplicate sockets)", () => {
     test("a manual connect cancels a pending reconnect instead of racing it", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 10,
             reconnectMaxDelay: 10,

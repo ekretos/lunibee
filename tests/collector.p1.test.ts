@@ -59,7 +59,7 @@ describe("Collector", () => {
 
 describe("Client.createCollector", () => {
     test("collects client events and unsubscribes on end", async () => {
-        const client = new Client({ token: "a.b", intents: 0 });
+        const client = new Client({ token: "a.b", intents: [] });
         const collector = client.createCollector("guildDelete", {
             max: 2,
             filter: (guild) => guild.id !== "skip",
@@ -74,7 +74,7 @@ describe("Client.createCollector", () => {
     });
 
     test("keys by option or order, and reports filter errors", async () => {
-        const client = new Client({ token: "a.b", intents: 0 });
+        const client = new Client({ token: "a.b", intents: [] });
         const errors: Error[] = [];
         client.on("error", (error) => errors.push(error));
         const byKey = client.createCollector("resumed", {

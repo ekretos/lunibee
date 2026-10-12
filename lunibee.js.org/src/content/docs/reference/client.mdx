@@ -31,7 +31,7 @@ new Client(options: ClientOptions)
 | Parameter | Type | Description |
 |---|---|---|
 | `options.token` | `string` | **Required.** Discord bot token. |
-| `options.intents` | `GatewayIntentResolvable` | **Required.** Gateway intents to subscribe to. |
+| `options.intents` | `GatewayIntentResolvable` (array) | **Required.** Gateway intents to subscribe to, as an array: `[GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]`. An OR-ed number throws a `TypeError`. |
 | `options.rest` | `RESTOptions` | Optional REST client configuration. |
 | `options.gateway` | `GatewayOptions` | Optional Gateway configuration. |
 
@@ -269,7 +269,7 @@ Text that comes from users (AFK reasons, tags, echoed input) can contain `@every
 ```ts
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents: GatewayIntentBits.Guilds,
+  intents: [GatewayIntentBits.Guilds],
   allowedMentions: { parse: [] },          // nothing pings by default
 });
 

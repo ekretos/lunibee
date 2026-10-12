@@ -19,7 +19,7 @@ import { IntentBits } from "@lunibee/types";
 
 const manager = new ShardManager({
   token: process.env.DISCORD_TOKEN!,
-  intents: IntentBits.guilds | IntentBits.guildMessages,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
   shardCount: "auto",
 });
 

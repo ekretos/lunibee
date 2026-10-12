@@ -3,7 +3,7 @@ import * as lunibee from "../packages/lunibee/src/index.ts";
 
 describe("the lunibee entry point", () => {
     test("exports the 0.3.0 workflow", () => {
-        const bot = new lunibee.Client({ token: "a.b", intents: 0 });
+        const bot = new lunibee.Client({ token: "a.b", intents: [] });
         expect(typeof bot.guild("1").peek).toBe("function");
         expect(typeof bot.api.guilds).toBe("function");
         expect(typeof lunibee.command).toBe("function");

@@ -16,7 +16,7 @@ function setup(
     answer: (call: Call) => unknown = () => undefined,
     options: Partial<ConstructorParameters<typeof Client>[0]> = {},
 ) {
-    const bot = new Client({ token: "a.b", intents: 0, ...options });
+    const bot = new Client({ token: "a.b", intents: [], ...options });
     const calls: Call[] = [];
     for (const method of ["get", "post", "put", "patch", "delete"] as const)
         (bot.rest as unknown as Record<string, unknown>)[method] = async (

@@ -244,7 +244,7 @@ describe("Gateway reconnect wiring", () => {
     test("8: connecting while an attempt is in flight does not open a second socket", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         const first = gateway.connect("wss://main.test");
@@ -263,7 +263,7 @@ describe("Gateway reconnect wiring", () => {
     test("6: a resumable close reconnects to the resume host", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
@@ -280,7 +280,7 @@ describe("Gateway reconnect wiring", () => {
     test("5: a session-destroying close reconnects to the main host and identifies", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
@@ -313,7 +313,7 @@ describe("Gateway reconnect wiring", () => {
     test("2: repeated closes on the same Gateway produce one reconnect", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 15,
             reconnectMaxDelay: 15,
@@ -331,7 +331,7 @@ describe("Gateway reconnect wiring", () => {
     test("13-14: shutdown cancels a pending reconnect — no resurrection", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 25,
             reconnectMaxDelay: 25,
@@ -349,7 +349,7 @@ describe("Gateway reconnect wiring", () => {
     test("14-15: WS-003 — a fatal close leaves the Gateway CLOSED", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
@@ -375,7 +375,7 @@ describe("Gateway reconnect wiring", () => {
     test("10: a successful reconnect clears the attempt state", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             maxReconnectAttempts: 2,
             reconnectBaseDelay: 5,
@@ -411,7 +411,7 @@ describe("Gateway reconnect wiring", () => {
     test("12: exhausting the budget stops reconnecting without going CLOSED", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             maxReconnectAttempts: 1,
             reconnectBaseDelay: 5,

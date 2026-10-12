@@ -5,7 +5,7 @@ describe("Client Events & Dispatch Full Coverage", () => {
     test("Client handles Gateway lifecycle and dispatch events", async () => {
         const client = new Client({
             token: "test_token",
-            intents: 513,
+            intents: [513],
         });
 
         const received: string[] = [];

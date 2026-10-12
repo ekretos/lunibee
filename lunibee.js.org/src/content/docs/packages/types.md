@@ -25,7 +25,7 @@ import {
   InteractionEnum,
 } from "@lunibee/types";
 
-const intents = IntentBits.guilds | IntentBits.guildMessages;
+const intents = [IntentBits.guilds, IntentBits.guildMessages];
 const channelType = ChannelEnum.GuildText;
 const flags = MessageFlags.Ephemeral;
 ```
@@ -40,7 +40,7 @@ import { IntentBits } from "@lunibee/types";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents: IntentBits.guilds | IntentBits.guildMessages,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
 });
 ```
 

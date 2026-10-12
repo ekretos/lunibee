@@ -15,7 +15,7 @@ import { Client, GatewayIntentBits, CreateEmbed } from "lunibee";
 
 const client = new Client({
     token: process.env.DISCORD_TOKEN!,
-    intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages,
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
 });
 
 client.on("messageCreate", async (message) => {

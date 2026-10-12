@@ -14,7 +14,7 @@ describe("Sharding integration", () => {
     test("connect() waits spawnDelay between shards (runtime-agnostic sleep)", async () => {
         const mgr = new ShardManager({
             token: "test_token",
-            intents: 0,
+            intents: [],
             shardCount: 2,
             spawnDelay: 20,
             // The stubbed connect never sends IDENTIFY; don't wait for it.
@@ -36,7 +36,7 @@ describe("Sharding integration", () => {
     test("auto-scale keeps running after a reshard (sentinel not clobbered)", async () => {
         const mgr = new ShardManager({
             token: "test_token",
-            intents: 0,
+            intents: [],
             shardCount: "auto",
         });
         // Avoid network in reshard()->connect().
@@ -70,7 +70,7 @@ describe("Sharding integration", () => {
     test("checkAutoScale is a no-op for a fixed shard count", async () => {
         const mgr = new ShardManager({
             token: "test_token",
-            intents: 0,
+            intents: [],
             shardCount: 2,
         });
         let called = false;
@@ -90,7 +90,7 @@ describe("Sharding integration", () => {
     test("getShardIdForGuild is deterministic and within range", () => {
         const mgr = new ShardManager({
             token: "test_token",
-            intents: 0,
+            intents: [],
             shardCount: 4,
         });
         const guild = "852892297661906993";
@@ -105,7 +105,7 @@ describe("Sharding integration", () => {
     test("destroy() is idempotent and connect() (re)initializes the shard set", async () => {
         const mgr = new ShardManager({
             token: "test_token",
-            intents: 0,
+            intents: [],
             shardCount: 2,
         });
         mgr.destroy();
@@ -114,7 +114,7 @@ describe("Sharding integration", () => {
 
         const fresh = new ShardManager({
             token: "test_token",
-            intents: 0,
+            intents: [],
             shardCount: 2,
             spawnDelay: 0,
         });

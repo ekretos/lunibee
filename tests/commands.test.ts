@@ -23,7 +23,10 @@ type Call = { method: string; path: string; body?: unknown };
 
 /** A client that records and answers REST calls, and can be fed gateway events. */
 function setup(intents: number | string[] = 0) {
-    const bot = new Client({ token: "a.b", intents: intents as number });
+    const bot = new Client({
+        token: "a.b",
+        intents: typeof intents === "number" ? [intents] : intents,
+    });
     const calls: Call[] = [];
     for (const method of ["get", "post", "put", "patch", "delete"] as const)
         (bot.rest as unknown as Record<string, unknown>)[method] = async (

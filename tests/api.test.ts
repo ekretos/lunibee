@@ -14,7 +14,7 @@ type Sent = {
 
 /** A client whose REST requests are recorded and answered by `answer`. */
 function setup(answer: (sent: Sent) => unknown = () => undefined) {
-    const bot = new Client({ token: "a.b", intents: 0 });
+    const bot = new Client({ token: "a.b", intents: [] });
     const sent: Sent[] = [];
     (bot.rest as unknown as { request: unknown }).request = async (
         method: string,

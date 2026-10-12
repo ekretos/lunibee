@@ -202,7 +202,7 @@ describe("Gateway session wiring", () => {
     test("5: a dropped connection reconnects to the resume host and RESUMEs", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
@@ -231,7 +231,7 @@ describe("Gateway session wiring", () => {
     test("7: op 9 resumable keeps the session for the next connection", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
@@ -264,7 +264,7 @@ describe("Gateway session wiring", () => {
     test("8: op 9 non-resumable forces a fresh IDENTIFY on the main host", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
@@ -296,7 +296,7 @@ describe("Gateway session wiring", () => {
     test("8: a session-invalidating close code forces IDENTIFY", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
@@ -325,7 +325,7 @@ describe("Gateway session wiring", () => {
         // the token the frame carries can still refuse it.
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
@@ -397,7 +397,7 @@ describe("Gateway session wiring", () => {
     test("12: a dispatch on a superseded socket cannot corrupt the RESUME", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,

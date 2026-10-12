@@ -11,6 +11,7 @@ Two parts. **Removed:** the APIs deprecated in 0.2.x are gone (see the changelog
 
 | Before | After |
 | --- | --- |
+| `intents: GatewayIntentBits.Guilds \| GatewayIntentBits.GuildMessages` (or a number) | `intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]`; the old forms throw a `TypeError` |
 | `client.guilds.cache.get(id)` | `bot.guild(id).peek()` |
 | `await client.guilds.fetch(id)` | `await bot.guild(id).get()` (cache first) or `.fetch()` (Discord) |
 | `await client.guilds.members(g).fetch(u)` | `await bot.member(g, u).get()` |

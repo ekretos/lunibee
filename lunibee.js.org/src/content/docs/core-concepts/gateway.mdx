@@ -55,10 +55,11 @@ const client = new Client({
 
 const client2 = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents:
-    GatewayIntentBits.Guilds |
-    GatewayIntentBits.GuildMessages |
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+  ],
 });
 ```
 </TabItem>
@@ -77,10 +78,11 @@ const client = new Client({
 
 const client2 = new Client({
   token: process.env.DISCORD_TOKEN,
-  intents:
-    GatewayIntentBits.Guilds |
-    GatewayIntentBits.GuildMessages |
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+  ],
 });
 ```
 </TabItem>

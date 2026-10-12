@@ -16,7 +16,7 @@ type Call = {
 function client(allowedMentions?: {
     parse?: ("users" | "roles" | "everyone")[];
 }) {
-    const bot = new Client({ token: "a.b", intents: 0, allowedMentions });
+    const bot = new Client({ token: "a.b", intents: [], allowedMentions });
     const calls: Call[] = [];
     const reply =
         (method: string) => async (path: string, body: Call["body"]) => {

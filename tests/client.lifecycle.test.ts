@@ -8,7 +8,7 @@ import {
 
 describe("Client lifecycle & Intents", () => {
     test("starts idle and exposes readiness state", () => {
-        const client = new Client({ token: "test-token", intents: 1 });
+        const client = new Client({ token: "test-token", intents: [1] });
         expect(client.state).toBe("idle");
         expect(client.isReady()).toBe(false);
         client.destroy();
@@ -19,7 +19,7 @@ describe("Client lifecycle & Intents", () => {
     });
 
     test("rejects login after destruction", async () => {
-        const client = new Client({ token: "test-token", intents: 1 });
+        const client = new Client({ token: "test-token", intents: [1] });
         client.destroy();
         await expect(client.login()).rejects.toThrow("destroyed client");
     });

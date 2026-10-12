@@ -13,7 +13,7 @@ import { GatewayIntentBits } from "@lunibee/types";
 
 const manager = new ShardManager({
     token: process.env.DISCORD_TOKEN!,
-    intents: GatewayIntentBits.Guilds,
+    intents: [GatewayIntentBits.Guilds],
     shardCount: "auto", // Discord's recommended count
 });
 await manager.connect(); // starts shards 5 s apart (spawnDelay)

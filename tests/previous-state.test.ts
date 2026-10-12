@@ -6,7 +6,7 @@ const GUILD = "500";
 const user = { id: "400", username: "User" };
 
 function setup() {
-    const client = new Client({ token: "a.b", intents: 513 });
+    const client = new Client({ token: "a.b", intents: [513] });
     const gw = client.ws;
     gw.emit("GUILD_CREATE", {
         id: GUILD,
@@ -174,7 +174,7 @@ describe("delete events pass the removed structure", () => {
     test("emoji list is null without the emoji cache", () => {
         const client = new Client({
             token: "a.b",
-            intents: 513,
+            intents: [513],
             cache: { emojis: false },
         });
         let previous: Emoji[] | null | undefined;

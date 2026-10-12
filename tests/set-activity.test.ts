@@ -3,7 +3,7 @@ import { Client } from "../packages/core/src/index.ts";
 import { ActivityEnum } from "../packages/types/src/index.ts";
 
 function setup() {
-    const bot = new Client({ token: "a.b", intents: 0 });
+    const bot = new Client({ token: "a.b", intents: [] });
     const sent: unknown[] = [];
     bot.setPresence = ((data: unknown) => {
         sent.push(data);

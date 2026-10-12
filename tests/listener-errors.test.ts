@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 function client() {
-    return new TestClient({ token: "t", intents: 0 });
+    return new TestClient({ token: "t", intents: [] });
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));

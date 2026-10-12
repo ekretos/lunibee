@@ -5,7 +5,7 @@ describe("Sharding Full Coverage", () => {
     test("ShardManager creates and calculates shards", () => {
         const mgr = new ShardManager({
             token: "test_token",
-            intents: 513,
+            intents: [513],
             shardCount: 2,
         });
 

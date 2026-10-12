@@ -70,10 +70,11 @@ import { Client, GatewayIntentBits } from "lunibee";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents:
-    GatewayIntentBits.Guilds |
-    GatewayIntentBits.GuildMessages |
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+  ],
 });
 ```
 </TabItem>
@@ -83,10 +84,11 @@ import { Client, GatewayIntentBits } from "lunibee";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN,
-  intents:
-    GatewayIntentBits.Guilds |
-    GatewayIntentBits.GuildMessages |
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+  ],
 });
 ```
 </TabItem>
@@ -126,7 +128,7 @@ const client = new Client({
 
 ## `resolveGatewayIntents`
 
-A utility function that converts any `GatewayIntentResolvable` to a raw integer bitfield:
+A utility function that converts a `GatewayIntentResolvable` array to a raw integer bitfield:
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -147,7 +149,8 @@ const bits = resolveGatewayIntents([IntentBits.guilds, IntentBits.guildMessages]
 </TabItem>
 </Tabs>
 
-Accepts:
-- A number: returned as-is.
+Accepts an array whose items are:
+- A number (an intent bit).
 - A string key from either intent object (e.g. `"Guilds"`, `"guilds"`).
-- An array of any of the above.
+
+Anything that is not an array throws a `TypeError`: a single number, a single name or an OR-ed bitfield (`GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages`) is no longer accepted by `Client`, `Gateway`, `ShardManager` or `resolveGatewayIntents`.

@@ -65,8 +65,8 @@ function handshakeSent(gateway: Gateway, timeout: number): Promise<void> {
 export interface ShardManagerOptions {
     /** Bot token. */
     token: string;
-    /** Gateway intents. */
-    intents: number;
+    /** Gateway intents as an array, e.g. `[GatewayIntentBits.Guilds]`. */
+    intents: ConstructorParameters<typeof Gateway>[0]["intents"];
     /** Number of shards. Use `"auto"` to request Discord's recommended count. */
     shardCount?: number | "auto";
     /** Gateway reconnect behavior. */
@@ -153,9 +153,9 @@ export class ShardManager {
     public constructor(options: ShardManagerOptions) {
         if (!options.token?.trim())
             throw new TypeError("A Discord bot token is required.");
-        if (!Number.isInteger(options.intents) || options.intents < 0)
+        if (!Array.isArray(options.intents))
             throw new TypeError(
-                "Gateway intents must be a non-negative integer.",
+                "Gateway intents must be an array, e.g. [GatewayIntentBits.Guilds].",
             );
         const count =
             options.shardCount === "auto" || options.shardCount === undefined

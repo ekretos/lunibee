@@ -58,30 +58,26 @@ export const IntentBits = {
 /** Alias for IntentBits. */
 export const Intents = IntentBits;
 
-/** Gateway intent resolvable value (single bitfield, enum key, or array of bitfields/strings). */
-export type GatewayIntentResolvable =
-    | number
-    | keyof typeof GatewayIntentBits
-    | keyof typeof IntentBits
-    | (
-          | number
-          | keyof typeof GatewayIntentBits
-          | keyof typeof IntentBits
-          | string
-      )[]
-    | { readonly bitfield: number };
+/** Gateway intents: an array of intent bits or names, e.g. `[GatewayIntentBits.Guilds, "GuildMessages"]`. A single number, name or OR-ed bitfield is not accepted. */
+export type GatewayIntentResolvable = readonly (
+    number | keyof typeof GatewayIntentBits | keyof typeof IntentBits | string
+)[];
 
-/** Resolves any GatewayIntentResolvable into a raw bitfield integer. */
+/**
+ * Resolves an array of intents into a raw bitfield integer.
+ * @throws {TypeError} If `intents` is not an array (an OR-ed number, a single name or a bitfield object).
+ */
 export function resolveGatewayIntents(
     intents: GatewayIntentResolvable,
 ): number {
-    if (Array.isArray(intents))
-        return intents.reduce<number>(
-            (acc, intent) => acc | resolveIntent(intent),
-            0,
+    if (!Array.isArray(intents))
+        throw new TypeError(
+            "Gateway intents must be an array, e.g. [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages].",
         );
-    if (typeof intents === "object") return intents.bitfield;
-    return resolveIntent(intents);
+    return intents.reduce<number>(
+        (acc, intent) => acc | resolveIntent(intent),
+        0,
+    );
 }
 
 /** Resolves one intent: a bitfield, an intent name in either casing, or a numeric string. */
@@ -98,6 +94,13 @@ function resolveIntent(intent: number | string): number {
     return Number.isNaN(num) ? 0 : num;
 }
 
+/** What `IntentsBitField` methods take: one intent or an array of them. Clients and gateways take only arrays. */
+type IntentsInput = GatewayIntentResolvable[number] | GatewayIntentResolvable;
+
+function resolveInput(bits: IntentsInput): number {
+    return resolveGatewayIntents(Array.isArray(bits) ? bits : [bits as number]);
+}
+
 /**
  * Discord.js-familiar intent bitfield.
  * @example new IntentsBitField([IntentsBitField.Flags.Guilds, "GuildMessages"])
@@ -108,30 +111,30 @@ export class IntentsBitField {
     /** Raw intent bitfield. */
     public bitfield: number;
 
-    public constructor(bits: GatewayIntentResolvable = 0) {
-        this.bitfield = resolveGatewayIntents(bits);
+    public constructor(bits: IntentsInput = []) {
+        this.bitfield = resolveInput(bits);
     }
 
     /** Whether every given intent is set. */
-    public has(bits: GatewayIntentResolvable): boolean {
-        const resolved = resolveGatewayIntents(bits);
+    public has(bits: IntentsInput): boolean {
+        const resolved = resolveInput(bits);
         return (this.bitfield & resolved) === resolved;
     }
 
     /** Whether any given intent is set. */
-    public any(bits: GatewayIntentResolvable): boolean {
-        return (this.bitfield & resolveGatewayIntents(bits)) !== 0;
+    public any(bits: IntentsInput): boolean {
+        return (this.bitfield & resolveInput(bits)) !== 0;
     }
 
     /** Adds intents in place. @returns This bitfield. */
-    public add(...bits: GatewayIntentResolvable[]): this {
-        for (const bit of bits) this.bitfield |= resolveGatewayIntents(bit);
+    public add(...bits: IntentsInput[]): this {
+        for (const bit of bits) this.bitfield |= resolveInput(bit);
         return this;
     }
 
     /** Removes intents in place. @returns This bitfield. */
-    public remove(...bits: GatewayIntentResolvable[]): this {
-        for (const bit of bits) this.bitfield &= ~resolveGatewayIntents(bit);
+    public remove(...bits: IntentsInput[]): this {
+        for (const bit of bits) this.bitfield &= ~resolveInput(bit);
         return this;
     }
 
@@ -143,8 +146,8 @@ export class IntentsBitField {
     }
 
     /** Whether this equals another bitfield. */
-    public equals(bits: GatewayIntentResolvable): boolean {
-        return this.bitfield === resolveGatewayIntents(bits);
+    public equals(bits: IntentsInput): boolean {
+        return this.bitfield === resolveInput(bits);
     }
 
     public valueOf(): number {

@@ -18,10 +18,11 @@ import { Client, GatewayIntentBits } from "lunibee";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents:
-    GatewayIntentBits.Guilds |
-    GatewayIntentBits.GuildMessages |
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+  ],
 });
 
 client.on("ready", (user) => {
@@ -44,7 +45,7 @@ await client.login();
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `token` | `string` | Required | Discord bot token. |
-| `intents` | `number[] \| number \| string[]` | Required | Gateway intents to subscribe to. |
+| `intents` | `(number \| string)[]` | Required | Gateway intents to subscribe to. |
 | `rest` | `RESTOptions` | `{}` | REST configuration. |
 | `ws` | `GatewayOptions` | `{}` | Gateway configuration. |
 

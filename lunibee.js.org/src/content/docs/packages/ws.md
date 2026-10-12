@@ -21,7 +21,7 @@ import { IntentBits } from "@lunibee/types";
 
 const gateway = new Gateway({
   token: process.env.DISCORD_TOKEN!,
-  intents: IntentBits.guilds | IntentBits.guildMessages,
+  intents: [IntentBits.guilds, IntentBits.guildMessages],
   shardId: 0,
   shardCount: 1,
   reconnect: true,
@@ -43,7 +43,7 @@ await gateway.connect();
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `token` | `string` | Required | Discord Bot Authentication Token. |
-| `intents` | `GatewayIntentResolvable` | Required | Gateway intent bitfield or resolvable. |
+| `intents` | `GatewayIntentResolvable` | Required | Array of intent bits or names, e.g. `[IntentBits.guilds]`. A single number or OR-ed bitfield throws. |
 | `shardId` | `number` | `0` | Zero-based shard ID. |
 | `shardCount` | `number` | `1` | Total number of shards. |
 | `reconnect` | `boolean` | `true` | Automatically reconnect on network drops. |
@@ -67,7 +67,7 @@ order.
 ```ts
 const gateway = new Gateway({
   token: process.env.DISCORD_TOKEN!,
-  intents: IntentBits.guilds,
+  intents: [IntentBits.guilds],
   compress: true,
 });
 ```

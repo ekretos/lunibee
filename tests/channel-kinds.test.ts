@@ -98,7 +98,7 @@ type Call = {
 };
 
 function setup(answer: (call: Call) => unknown) {
-    const bot = new Client({ token: "a.b", intents: 0 });
+    const bot = new Client({ token: "a.b", intents: [] });
     const calls: Call[] = [];
     for (const method of ["get", "post"] as const)
         (bot.rest as unknown as Record<string, unknown>)[method] = async (

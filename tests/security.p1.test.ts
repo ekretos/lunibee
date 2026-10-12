@@ -62,7 +62,7 @@ describe("H1: a path cannot be rewritten into another route", () => {
                 "../../../../channels/5",
             ),
         ).rejects.toThrow(TypeError);
-        const client = new Client({ token: "t", intents: 0 });
+        const client = new Client({ token: "t", intents: [] });
         (client as unknown as { rest: REST }).rest = rest;
         await expect(client.fetchGuildPreview("../x")).rejects.toThrow(
             TypeError,
@@ -77,7 +77,7 @@ describe("H1: a path cannot be rewritten into another route", () => {
             "/webhooks/1/a%2F..%2F..%2Fb",
         );
         const { rest, urls } = recordingRest();
-        const client = new Client({ token: "t", intents: 0 });
+        const client = new Client({ token: "t", intents: [] });
         (client as unknown as { rest: REST }).rest = rest;
         await client.fetchWebhook("1", "tok/en");
         expect(urls[0]).toEndWith("/webhooks/1/tok%2Fen");

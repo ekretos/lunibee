@@ -59,7 +59,7 @@ describe("Client — Discord.js-familiar event names", () => {
     });
 
     test("client.on() accepts the familiar event names and dispatches them", () => {
-        const client = new Client({ token: "test-token", intents: 513 });
+        const client = new Client({ token: "test-token", intents: [513] });
         const seen: string[] = [];
         client.on(ClientEvent.Ready, () => seen.push("ready"));
         client.on("messageCreate", () => seen.push("messageCreate"));
@@ -89,7 +89,7 @@ describe("Client — Discord.js-familiar event names", () => {
 
 describe("Client — guildCreate vs. guildAvailable", () => {
     test("first sighting emits guildCreate, re-availability emits guildAvailable", () => {
-        const client = new Client({ token: "test-token", intents: 1 });
+        const client = new Client({ token: "test-token", intents: [1] });
         const events: string[] = [];
         client.on("guildCreate", () => events.push("guildCreate"));
         client.on("guildAvailable", () => events.push("guildAvailable"));
@@ -106,14 +106,14 @@ describe("Client — guildCreate vs. guildAvailable", () => {
 
 describe("Client — Discord.js-familiar accessors & emitter aliases", () => {
     test("exposes client.token and nulls it after destroy", () => {
-        const client = new Client({ token: "secret-token", intents: 1 });
+        const client = new Client({ token: "secret-token", intents: [1] });
         expect(client.token).toBe("secret-token");
         client.destroy();
         expect(client.token).toBeNull();
     });
 
     test("removeListener is an alias of off", () => {
-        const client = new Client({ token: "test-token", intents: 1 });
+        const client = new Client({ token: "test-token", intents: [1] });
         let count = 0;
         const listener = () => {
             count++;
@@ -158,7 +158,7 @@ describe("Collector — Discord.js-familiar collection primitive", () => {
 
 describe("Interaction — Discord.js acknowledgement methods", () => {
     test("interactionCreate yields an interaction exposing reply/defer/etc.", () => {
-        const client = new Client({ token: "test-token", intents: 1 });
+        const client = new Client({ token: "test-token", intents: [1] });
         let interaction: ClientEvents["interactionCreate"][0] | undefined;
         client.on("interactionCreate", (i) => {
             interaction = i;

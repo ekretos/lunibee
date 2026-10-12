@@ -70,7 +70,7 @@ describe("ShardManager buckets, events and shard ids", () => {
         });
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: "auto",
             spawnDelay: 20,
             handshakeTimeout: 1,
@@ -96,7 +96,7 @@ describe("ShardManager buckets, events and shard ids", () => {
         const started: number[] = [];
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: "auto",
             spawnDelay: 1,
             handshakeTimeout: 1,
@@ -116,7 +116,7 @@ describe("ShardManager buckets, events and shard ids", () => {
     test("aggregates shard events and keeps the shard count while resharding", () => {
         const manager = new ShardManager({
             token: "t",
-            intents: 0,
+            intents: [],
             shardCount: 4,
         });
         const log: string[] = [];
@@ -169,7 +169,7 @@ describe("Client compress option", () => {
     const urlFor = async (options: Record<string, unknown>) => {
         FakeWebSocket.instances = [];
         installWebSocket(FakeWebSocket);
-        const client = new Client({ token: "a.b", intents: 0, ...options });
+        const client = new Client({ token: "a.b", intents: [], ...options });
         const promise = client.gateway.connect();
         FakeWebSocket.instances[0]!.open();
         await promise;

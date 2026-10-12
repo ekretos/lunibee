@@ -142,7 +142,7 @@ describe("Interaction lifecycle", () => {
 
 describe("Client.interactionWebhookMessage", () => {
     test("routes original and follow-up messages", async () => {
-        const client = new Client({ token: "a.b", intents: 0 });
+        const client = new Client({ token: "a.b", intents: [] });
         const seen: string[] = [];
         const rest = client.rest as unknown as Record<string, unknown>;
         for (const method of ["get", "patch", "delete"])

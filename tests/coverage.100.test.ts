@@ -360,7 +360,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
         await registry.emit("test", "second");
         expect(onceCalled).toBe(1);
 
-        const client = new TestClient({ token: "test.token", intents: 0 });
+        const client = new TestClient({ token: "test.token", intents: [] });
         let onceCount = 0;
         const onceFn = () => {
             onceCount++;
@@ -398,7 +398,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
     });
 
     test("Client properties, getters, and mock interactions", async () => {
-        const client = new Client({ token: "bot.token", intents: 0 });
+        const client = new Client({ token: "bot.token", intents: [] });
         expect(client.ws).toBeDefined();
         expect(client.gateway).toBeDefined();
         expect(client.uptime).toBeNull();
@@ -425,7 +425,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
     });
 
     test("Client Gateway event dispatchers coverage", async () => {
-        const client = new Client({ token: "bot.token", intents: 0 });
+        const client = new Client({ token: "bot.token", intents: [] });
 
         let threadCreated: EventArg<"threadCreate"> | undefined;
         let threadUpdated: EventArg<"threadUpdate"> | undefined;
@@ -835,7 +835,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
 
         const mgr = new ShardManager({
             token: "bot.token",
-            intents: 513,
+            intents: [513],
             shardCount: "auto",
             spawnDelay: 1,
             handshakeTimeout: 1,
@@ -1210,7 +1210,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
     });
 
     test("WS Gateway full methods and edge cases", () => {
-        const gw = new Gateway({ token: "bot.token", intents: 0 });
+        const gw = new Gateway({ token: "bot.token", intents: [] });
         let emittedData: Parameters<Parameters<Gateway["on"]>[1]>[0];
         const listener: Parameters<Gateway["on"]>[1] = (d) => {
             emittedData = d;

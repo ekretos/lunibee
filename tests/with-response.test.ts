@@ -14,7 +14,7 @@ const USER = "200000000000000003";
 type SentBody = { type: number; data: Record<string, string | number> };
 
 function setup() {
-    const bot = new Client({ token: "a.b", intents: 0 });
+    const bot = new Client({ token: "a.b", intents: [] });
     const calls: { path: string; body: SentBody }[] = [];
     bot.rest.post = (async (path: string, body: SentBody) => {
         calls.push({ path, body });
@@ -110,7 +110,7 @@ describe("reply({ withResponse: true })", () => {
     });
 
     test("a callback without a message resolves to null", async () => {
-        const bot = new Client({ token: "a.b", intents: 0 });
+        const bot = new Client({ token: "a.b", intents: [] });
         (bot.rest as unknown as Record<string, unknown>).post = async () => ({
             interaction: { id: "1" },
         });

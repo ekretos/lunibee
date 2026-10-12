@@ -12,7 +12,7 @@ import { Client, GatewayIntentBits, parsePrefixArgs } from "lunibee";
 
 const client = new Client({
   token: process.env.DISCORD_TOKEN!,
-  intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages | GatewayIntentBits.MessageContent,
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 const PREFIX = "!";
 

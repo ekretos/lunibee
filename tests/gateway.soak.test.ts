@@ -28,7 +28,7 @@ async function tick(ms: number): Promise<void> {
 }
 
 async function connected(options: Record<string, unknown> = {}) {
-    const gateway = new Gateway({ token: "token", intents: 1, ...options });
+    const gateway = new Gateway({ token: "token", intents: [1], ...options });
     gateway.on("error", () => undefined);
     const promise = gateway.connect();
     const socket = FakeWebSocket.instances[0]!;

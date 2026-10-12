@@ -295,7 +295,7 @@ describe("Gateway applies protocol actions", () => {
     ): Promise<{ gateway: Gateway; socket: FakeWebSocket }> {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
             ...options,
         });

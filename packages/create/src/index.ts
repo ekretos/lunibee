@@ -23,6 +23,6 @@ export function createProject(
                 2,
             ) + "\n",
         "src/index.ts":
-            'import { Client, GatewayIntentBits } from "lunibee";\n\nconst client = new Client({ token: process.env.DISCORD_TOKEN!, intents: GatewayIntentBits.Guilds });\n\nclient.on("ready", () => console.log("Ready!"));\n\nawait client.login();\n',
+            'import { Client, GatewayIntentBits } from "lunibee";\n\nconst client = new Client({ token: process.env.DISCORD_TOKEN!, intents: [GatewayIntentBits.Guilds] });\n\nclient.on("ready", () => console.log("Ready!"));\n\nawait client.login();\n',
     };
 }

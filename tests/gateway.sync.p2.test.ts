@@ -8,7 +8,7 @@ const U = "300000000000000000";
 const V = "100000000000000000";
 
 function setup() {
-    const client = new Client({ token: "a.b", intents: 0 });
+    const client = new Client({ token: "a.b", intents: [] });
     const gw = client.gateway as unknown as {
         emit(e: string, d: unknown): void;
     };

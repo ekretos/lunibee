@@ -543,7 +543,7 @@ import { Client } from "../packages/core/src/index.ts";
 
 describe("Client utilities", () => {
     const makeClient = () => {
-        const client = new Client({ token: "t", intents: 0 });
+        const client = new Client({ token: "t", intents: [] });
         const paths: string[] = [];
         (client.rest as unknown as { get: unknown }).get = async (
             path: string,

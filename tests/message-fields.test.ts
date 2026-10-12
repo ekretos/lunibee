@@ -72,7 +72,7 @@ test("missing fields default to empty, legacy stickers fall back", () => {
 });
 
 test("MESSAGE_UPDATE carries the new fields", () => {
-    const client = new Client({ token: "a.b", intents: 513 });
+    const client = new Client({ token: "a.b", intents: [513] });
     const updates: Message[] = [];
     client.on("messageUpdate", (message) => updates.push(message));
     client.ws.emit("MESSAGE_CREATE", {

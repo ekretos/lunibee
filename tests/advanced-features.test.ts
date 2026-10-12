@@ -202,7 +202,7 @@ describe("ChannelManager polls and soundboard", () => {
 
 describe("Client wiring", () => {
     test("keeps stickers, soundboard and entitlements in sync", async () => {
-        const client = new Client({ token: "a.b", intents: 0 });
+        const client = new Client({ token: "a.b", intents: [] });
         const gw = client.gateway as unknown as {
             emit(e: string, d: unknown): void;
         };

@@ -79,7 +79,7 @@ test("L5: an unhandled listener error never prints the bot token", async () => {
                 );
             }
         }
-        const bot = new TestClient({ token, intents: 0 });
+        const bot = new TestClient({ token, intents: [] });
         bot.on(ClientEvent.Raw, () => {
             throw new Error(`request failed for Bot ${token}`);
         });

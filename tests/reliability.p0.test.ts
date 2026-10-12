@@ -119,7 +119,7 @@ describe("Gateway zlib-stream (P0: compressed payloads)", () => {
     test("decodes compressed dispatches in arrival order", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
             compress: true,
         });
@@ -183,7 +183,7 @@ describe("Gateway zlib-stream (P0: compressed payloads)", () => {
     test("waits for the Z_SYNC_FLUSH boundary before parsing a split payload", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
             compress: true,
         });
@@ -237,7 +237,7 @@ describe("Gateway handshake budget (P1: starved IDENTIFY)", () => {
     test("IDENTIFY is sent even when the application send budget is spent", async () => {
         const gateway = new Gateway({
             token: "token",
-            intents: 1,
+            intents: [1],
             reconnect: false,
         });
         // Take the socket this connect() creates (synchronously), not index 0:
@@ -274,7 +274,7 @@ describe("ShardManager IDENTIFY pacing (P1)", () => {
     test("defaults to Discord's 5s IDENTIFY interval and validates overrides", () => {
         const manager = new ShardManager({
             token: "token",
-            intents: 0,
+            intents: [],
             shardCount: 2,
         });
         // The resolved delay is private; assert the documented constant and
@@ -286,7 +286,7 @@ describe("ShardManager IDENTIFY pacing (P1)", () => {
             () =>
                 new ShardManager({
                     token: "token",
-                    intents: 0,
+                    intents: [],
                     shardCount: 1,
                     spawnDelay: -1,
                 }),
@@ -296,7 +296,7 @@ describe("ShardManager IDENTIFY pacing (P1)", () => {
     test("paces shard starts by the default interval", async () => {
         const manager = new ShardManager({
             token: "token",
-            intents: 0,
+            intents: [],
             shardCount: 2,
         });
         for (const shard of manager.shards.values())

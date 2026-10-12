@@ -38,9 +38,12 @@ describe("IntentsBitField", () => {
 
     test("is accepted wherever intents are", () => {
         const intents = new IntentsBitField(["Guilds"]);
-        expect(resolveGatewayIntents(intents)).toBe(GatewayIntentBits.Guilds);
-        expect(() => new Gateway({ token: "t", intents })).not.toThrow();
-        expect(() => new Client({ token: "t", intents })).not.toThrow();
+        const array = intents.toArray();
+        expect(resolveGatewayIntents(array)).toBe(GatewayIntentBits.Guilds);
+        expect(() => new Gateway({ token: "t", intents: array })).not.toThrow();
+        expect(() => new Client({ token: "t", intents: array })).not.toThrow();
+        // @ts-expect-error the bitfield object itself is not accepted
+        expect(() => new Client({ token: "t", intents })).toThrow(TypeError);
     });
 });
 
@@ -119,7 +122,7 @@ describe("guild resource managers", () => {
     test("StageInstanceManager", async () => {
         const stage = { id: "3", guild_id: "1", channel_id: "7", topic: "t" };
         const { rest, calls } = recordingRest(() => stage);
-        const stages = new Client({ token: "t", intents: 0 }).stageInstances;
+        const stages = new Client({ token: "t", intents: [] }).stageInstances;
         expect(stages).toBeInstanceOf(StageInstanceManager);
         const manager = new StageInstanceManager(rest);
         await manager.create("7", { topic: "t", privacyLevel: 2 });

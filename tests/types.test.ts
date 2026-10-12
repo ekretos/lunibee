@@ -10,13 +10,9 @@ import {
 } from "../packages/types/src/index.ts";
 
 describe("Types & Intent Resolvers", () => {
-    test("resolveGatewayIntents resolves numbers, strings, enums, and arrays", () => {
-        expect(resolveGatewayIntents(GatewayIntentBits.Guilds)).toBe(1);
-        expect(resolveGatewayIntents("Guilds")).toBe(1);
-        expect(resolveGatewayIntents("guilds")).toBe(1);
-        expect(resolveGatewayIntents("guildMembers")).toBe(2);
-        // @ts-expect-error numeric strings are accepted at runtime only
-        expect(resolveGatewayIntents("513")).toBe(513);
+    test("resolveGatewayIntents resolves arrays and rejects everything else", () => {
+        expect(resolveGatewayIntents([GatewayIntentBits.Guilds])).toBe(1);
+        expect(resolveGatewayIntents(["Guilds", "guildMembers"])).toBe(3);
         expect(resolveGatewayIntents(["Guilds", "GuildMessages"])).toBe(
             1 | 512,
         );
@@ -26,8 +22,16 @@ describe("Types & Intent Resolvers", () => {
                 GatewayIntentBits.MessageContent,
             ]),
         ).toBe(1 | 32768);
-        // @ts-expect-error unknown names resolve to 0 at runtime
-        expect(resolveGatewayIntents("unknown_intent_string")).toBe(0);
+        expect(resolveGatewayIntents([])).toBe(0);
+        expect(resolveGatewayIntents(["unknown_intent_string"])).toBe(0);
+        // @ts-expect-error a single number is not accepted
+        expect(() => resolveGatewayIntents(GatewayIntentBits.Guilds)).toThrow(
+            TypeError,
+        );
+        // @ts-expect-error an OR-ed bitfield is not accepted
+        expect(() => resolveGatewayIntents(1 | 512)).toThrow(TypeError);
+        // @ts-expect-error a single name is not accepted
+        expect(() => resolveGatewayIntents("Guilds")).toThrow(TypeError);
     });
 
     test("ChannelEnum enum constants", () => {
