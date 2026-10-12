@@ -24,7 +24,7 @@ future sessions should pick up.
 The workflow release: handles (`bot.guild(id)`, `peek` / `get` / `fetch`), `bot.api`, channel
 `kind`, `command()` with `option.*`, the CLI's `create command --slash|--prefix|--both` and
 `sync commands`; typed message payloads; previous state on update events; IPC `ShardBus`,
-`ShardSupervisor`, IDENTIFY buckets; Gateway health and storm backoff; concurrent REST buckets by
+`ShardSupervisor`, IDENTIFY buckets; `ShardManager` + `ClusterManager` as one system (worker contract, cross-cluster IDENTIFY coordination, readiness, routing, health, recovery); Gateway health and storm backoff; concurrent REST buckets by
 default; the REST coverage audit and its gaps; structure polish. The 0.2.x deprecations are
 removed. Everything is in `.roadmap/0.3.0.md` (the unticked items there are not done: Bun 1.4 as
 the minimum and the pass-through event profiling) and the changelog's "v0.3.0 (unreleased)".

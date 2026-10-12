@@ -191,6 +191,7 @@ export default defineConfig({
               label: "Sharding",
               items: [
                 { label: "ShardManager", link: "/reference/shard-manager" },
+                { label: "ClusterManager", link: "/reference/cluster-manager" },
               ],
             },
             {

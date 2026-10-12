@@ -33,10 +33,13 @@ console.log(replies.reduce((sum, reply) => sum + (reply.result ?? 0), 0));
 
 - **`ShardManager`** (alias `ShardingManager`): one `Gateway` per shard, IDENTIFY pacing,
   optional auto-scaling (`autoScaleInterval`), `getShardIdForGuild()`, `destroy()`.
-- **`ClusterManager`**: forks a worker script per cluster with `SHARD_LIST`,
-  `SHARD_COUNT` and `CLUSTER_ID` env vars, restarts crashed clusters (`restartOnExit`,
-  `restartDelay`, `onClusterExit`), and shuts down gracefully. Runs under **Node.js**
-  (it relies on `child_process.fork`).
+- **`ClusterManager`**: orchestrates cluster processes (`child_process.fork`, Node and Bun). It
+  assigns shards deterministically (`SHARD_LIST`, `SHARD_COUNT`, `CLUSTER_ID`, `CLUSTER_COUNT` env
+  vars; a worker cannot start the fleet again), hands out IDENTIFY slots across all clusters,
+  waits for readiness (`ready()`, `waitForReady`, `startTimeout`), restarts crashed clusters with
+  backoff, routes `request()` / `broadcast()` / `requestCluster()` to the owning cluster, reports
+  `health()`, and can move a failed cluster's shards to another cluster (`reassignOnGiveUp`).
+  Inside a worker, `ShardManager` owns only the cluster's shards and uses the parent for IDENTIFY.
 - **`ShardBus`**: `send`, `broadcast`, `on`/`off`, `onError`, and request/reply with
   `respond`, `request` and `broadcastRequest`. This replaces discord.js's
   `broadcastEval` without evaluating received code.
@@ -46,3 +49,9 @@ console.log(replies.reduce((sum, reply) => sum + (reply.result ?? 0), 0));
 Startup in rounds of `max_concurrency` paced by sent IDENTIFYs (`maxConcurrency`, `handshakeTimeout`), a session-start-limit check that keeps live shards, `fetchGatewayInfo()` and `health()`.
 
 Docs: https://lunibee.js.org/core-concepts/sharding/
+
+## What's new in 0.3.0
+
+`ShardManager` and `ClusterManager` work as one system: one worker contract, one IPC channel, one
+IDENTIFY authority, typed events, requests with timeouts, health and recovery. See
+https://lunibee.js.org/core-concepts/sharding/ and `examples/cluster`.

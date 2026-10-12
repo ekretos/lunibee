@@ -25,9 +25,13 @@ export interface ShardReply<R = unknown> {
     error?: string;
 }
 /** Internal reply envelope type. */
-const REPLY_TYPE = "__lunibee:reply";
+export const REPLY_TYPE = "__lunibee:reply";
 /** Payload carried by a reply envelope. */
-type ReplyPayload = { requestId: string; result?: unknown; error?: string };
+export type ReplyPayload = {
+    requestId: string;
+    result?: unknown;
+    error?: string;
+};
 /** Handler invoked for shard messages. @typeParam T Message payload type. */
 export type ShardMessageHandler<T = unknown> = (
     message: ShardMessage<T>,

@@ -1,12 +1,34 @@
-import { fetchGatewayBot } from "./gateway-bot.js";
+import { fetchGatewayBot, type GatewayBotInfo } from "./gateway-bot.js";
 import { fork, type ChildProcess } from "node:child_process";
 import { cpus } from "node:os";
+import { REPLY_TYPE, type ReplyPayload, type ShardReply } from "./bus.js";
+import {
+    allocateShards,
+    assertCompleteAllocation,
+    isClusterWorker,
+    validateShardIds,
+    WORKER_MARKER,
+} from "./context.js";
+import type {
+    ClusterHealth,
+    ClusterManagerHealth,
+    ClusterState,
+    ShardHealth,
+    WorkerMetrics,
+    WorkerReport,
+} from "./health.js";
+import { IdentifyCoordinator, type IdentifyBudget } from "./identify.js";
+import {
+    CLUSTER_FRAME,
+    PARENT_ID,
+    REQUEST_ASSIGN,
+    REQUEST_HEALTH,
+    parseChildFrame,
+    type ChildFrame,
+} from "./protocol.js";
+import { RequestTracker } from "./requests.js";
 import { ShardSupervisor, type SupervisorOptions } from "./supervisor.js";
 import { BUS_FRAME, PEER_DOWN_FRAME } from "./transport.js";
-
-/** Runtime-agnostic delay used to stagger cluster spawns (works under Node and Bun). @param ms Milliseconds to wait. */
-const sleep = (ms: number): Promise<void> =>
-    new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Configuration for managing multiple shard clusters. */
 export interface ClusterManagerOptions {
@@ -14,10 +36,59 @@ export interface ClusterManagerOptions {
     token: string;
     /** Path to the worker script to execute for each cluster. */
     script: string;
-    /** Number of shards. Use "auto" to request Discord's recommended count. */
+    /** Total number of shards. Use "auto" to request Discord's recommended count. */
     shardCount?: number | "auto";
-    /** Number of clusters to spawn. Defaults to the number of logical CPUs. */
+    /**
+     * The shards this deployment runs, out of `shardCount`. Use it to split one
+     * bot across hosts: each host runs a `ClusterManager` with its own range.
+     * Defaults to every shard.
+     */
+    shardIds?: number[];
+    /** Number of clusters to spawn. Defaults to the number of logical CPUs. Not combinable with `shardsPerCluster`. */
     clusterCount?: number;
+    /** Shards per cluster; the cluster count follows. Not combinable with `clusterCount`. */
+    shardsPerCluster?: number;
+    /**
+     * Discord's `max_concurrency` for IDENTIFY pacing. Fetched from `/gateway/bot`
+     * when `shardCount` is "auto" (this value may only lower it); otherwise defaults to 1.
+     */
+    maxConcurrency?: number;
+    /** Ask `/gateway/bot` for `max_concurrency` and the session budget even with a fixed `shardCount`. */
+    fetchLimits?: boolean;
+    /** IDENTIFY coordination across clusters. On by default. */
+    identify?: {
+        /** Set `false` to let every cluster pace its own IDENTIFYs. */
+        coordinate?: boolean;
+        /** Milliseconds between IDENTIFYs on one key. Default 5000. */
+        interval?: number;
+        /** A slot a worker never releases is released after this many ms. Default 60,000. */
+        holdTimeout?: number;
+    };
+    /** Milliseconds between forking two clusters, to spread the CPU cost of starting. Default 500. IDENTIFY pacing does not depend on it. */
+    spawnInterval?: number;
+    /**
+     * A cluster that has not reported ready this many ms after it was forked is
+     * killed and restarted like a crash. Off by default, because a worker that
+     * never reports ready (no `ShardManager`, no `ClusterWorker`) would be killed.
+     */
+    startTimeout?: number;
+    /** Make `spawn()` wait until every cluster reported ready. Default false. */
+    waitForReady?: boolean;
+    /**
+     * When a cluster crashes more often than `supervisor.maxRestarts` allows,
+     * move its shards to the healthiest ready cluster instead of leaving them
+     * offline. Default false.
+     */
+    reassignOnGiveUp?: boolean;
+    /** Default timeout for `request()`, `requestCluster()` and `broadcast()`. Default 5000. */
+    requestTimeout?: number;
+    /** Most requests waiting for answers at once. Default 10,000. */
+    maxPendingRequests?: number;
+    /** Starts a worker process. Defaults to `child_process.fork()`; replace it for tests or custom launchers. */
+    fork?: (
+        script: string,
+        env: Record<string, string | undefined>,
+    ) => ChildProcess;
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. */
     autoScaleInterval?: number;
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */
@@ -50,42 +121,139 @@ export interface ClusterManagerOptions {
     ): void;
 }
 
-/** Information about a running cluster. */
+/** Information about a cluster. The object is live: it is updated as the cluster changes. */
 export interface ClusterInfo {
     /** Cluster identifier. */
     id: number;
-    /** The child process running the cluster. */
+    /** The current child process (the last one while a restart is pending). */
     process: ChildProcess;
     /** The shard IDs managed by this cluster. */
     shards: number[];
+    /** Where the cluster is in its life. */
+    state: ClusterState;
+    /** How many times it was restarted after a crash. */
+    restarts: number;
+    /** When the current process was forked (epoch ms). */
+    startedAt: number;
+    /** When the current process reported ready. */
+    readyAt?: number;
+    /** When any process of this cluster last reported ready. */
+    lastReadyAt?: number;
+    /** The worker's last health report. */
+    report?: WorkerReport;
 }
 
+/** What `ClusterManager` emits. */
+export interface ClusterManagerEvents {
+    /** A cluster process was forked. */
+    clusterSpawn: [cluster: ClusterInfo];
+    /** A cluster's shards all finished their handshake. */
+    clusterReady: [cluster: ClusterInfo];
+    /** Every cluster is ready. Emitted again after a recovery. */
+    ready: [];
+    /** A cluster process exited. `expected` is true for a deliberate shutdown. */
+    clusterExit: [
+        cluster: ClusterInfo,
+        code: number | null,
+        signal: NodeJS.Signals | null,
+        expected: boolean,
+    ];
+    /** A restart was scheduled after a crash. */
+    clusterRestart: [
+        cluster: ClusterInfo,
+        info: { delay: number; attempt: number },
+    ];
+    /** A cluster keeps crashing: three or more restarts are pending or recent. */
+    clusterUnstable: [
+        cluster: ClusterInfo,
+        info: { attempt: number; delay: number },
+    ];
+    /** A cluster did not report ready within `startTimeout` and was killed. */
+    clusterStartTimeout: [cluster: ClusterInfo];
+    /** A cluster crashed too often and will not be restarted. */
+    clusterGiveUp: [cluster: ClusterInfo];
+    /** A failed cluster's shards were moved to another cluster. */
+    shardsReassigned: [info: { shardIds: number[]; from: number; to: number }];
+    /** An IDENTIFY is waiting for the session-start budget to reset. */
+    identifyWait: [info: { shardId: number; waitMs: number }];
+    /** Something went wrong that did not stop the deployment (a bad frame, a failed recovery). */
+    error: [error: Error];
+}
+
+/** Options for a request to a shard or cluster. */
+export interface RequestOptions {
+    /** Milliseconds to wait. Defaults to `requestTimeout`. */
+    timeoutMs?: number;
+    /** Cancels the wait. */
+    signal?: AbortSignal;
+}
+
+/** What a broadcast collected. It never rejects for a slow or failed shard. */
+export interface BroadcastResult<R = unknown> {
+    /** One reply per answering shard: its result, or the error its handler threw. */
+    replies: ShardReply<R>[];
+    /** Shards that did not answer: down, restarting, or too slow. */
+    missing: number[];
+}
+
+type LiveState = "starting" | "ready";
+
+const isLive = (state: ClusterState): state is LiveState =>
+    state === "starting" || state === "ready";
+
 /**
- * Manages multiple clusters of shards, distributing shards across child processes.
+ * Orchestrates cluster processes: forks one worker per cluster, gives each a
+ * fixed set of shards, restarts crashed clusters with backoff, hands out
+ * IDENTIFY slots across all of them, routes shard-bus messages to the cluster
+ * that owns the target shard, and answers requests, broadcasts and health
+ * queries for the whole deployment.
  *
- * **Runtime requirement:** clustering relies on Node.js `child_process.fork()`
- * and IPC. `fork()` is not fully supported under Bun, so run the cluster
- * manager under the Node.js runtime; `spawn()` will fail on a runtime whose
- * `fork()` is unavailable.
+ * Ownership: the `ClusterManager` decides which cluster owns which shard and
+ * keeps processes alive; the `ShardManager` inside each worker runs those
+ * shards' Gateways. A shard is never owned by two clusters at once.
+ *
+ * Works under Node.js and Bun (`child_process.fork()` with IPC).
  */
 export class ClusterManager {
-    /** Active clusters indexed by cluster ID. */
+    /** Live clusters (starting or ready) indexed by cluster ID. A crashed cluster leaves this map until it is restarted. */
     public readonly clusters = new Map<number, ClusterInfo>();
-    /** Total number of shards across all clusters. */
+    /** Total number of shards in the deployment. */
     public shardCount = 0;
 
     readonly #options: ClusterManagerOptions;
     /** Whether the manager was created in auto shard-count mode. Preserved across respawns so auto-scaling keeps running. */
     readonly #auto: boolean;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
-    #spawned = false;
+    /** Every cluster this deployment knows, whatever its state. */
+    readonly #infos = new Map<number, ClusterInfo>();
+    /** Which cluster owns each shard. */
+    readonly #owner = new Map<number, number>();
+    #startPromise?: Promise<void>;
+    #stopPromise?: Promise<void>;
+    #wasStarted = false;
     /** Set while a deliberate shutdown is in progress so exits are not restarted. */
     #stopping = false;
     /** Pending restart timers, kept so shutdown can cancel them. */
     readonly #restartTimers = new Set<ReturnType<typeof setTimeout>>();
+    readonly #startTimers = new Map<number, ReturnType<typeof setTimeout>>();
+    readonly #pauses = new Set<() => void>();
+    readonly #readyWaiters = new Set<{
+        resolve: () => void;
+        reject: (error: Error) => void;
+        timer?: ReturnType<typeof setTimeout>;
+    }>();
     readonly #supervisor: ShardSupervisor;
+    readonly #tracker: RequestTracker;
+    #coordinator?: IdentifyCoordinator;
+    #allReady = false;
+    #clusterCount = 0;
+    #lastWait = "";
+    readonly #listeners = new Map<
+        keyof ClusterManagerEvents,
+        Set<(...args: never[]) => void>
+    >();
 
-    /** Creates a cluster manager. @param options Clustering configuration. @throws {TypeError} If token or script is missing. */
+    /** Creates a cluster manager. @param options Clustering configuration. @throws {TypeError} If token or script is missing. @throws {RangeError} If a numeric option is invalid. */
     public constructor(options: ClusterManagerOptions) {
         if (!options.token?.trim())
             throw new TypeError("A Discord bot token is required.");
@@ -100,6 +268,29 @@ export class ClusterManager {
                 "autoScaleInterval must be an integer of at least 1000 milliseconds.",
             );
         }
+        if (
+            options.clusterCount !== undefined &&
+            options.shardsPerCluster !== undefined
+        )
+            throw new RangeError(
+                "Set either clusterCount or shardsPerCluster, not both.",
+            );
+        for (const [name, value] of [
+            ["clusterCount", options.clusterCount],
+            ["shardsPerCluster", options.shardsPerCluster],
+            ["maxConcurrency", options.maxConcurrency],
+        ] as const)
+            if (value !== undefined && (!Number.isInteger(value) || value < 1))
+                throw new RangeError(`${name} must be a positive integer.`);
+        for (const [name, value] of [
+            ["spawnInterval", options.spawnInterval],
+            ["startTimeout", options.startTimeout],
+            ["requestTimeout", options.requestTimeout],
+        ] as const)
+            if (value !== undefined && !(value >= 0))
+                throw new RangeError(`${name} cannot be negative.`);
+        if (options.shardIds && typeof options.shardCount === "number")
+            validateShardIds(options.shardIds, options.shardCount);
 
         this.#auto = options.shardCount === "auto";
         this.#options = { ...options };
@@ -107,6 +298,42 @@ export class ClusterManager {
             restartDelay: options.restartDelay,
             ...options.supervisor,
         });
+        this.#tracker = new RequestTracker(
+            "parent",
+            options.maxPendingRequests,
+        );
+    }
+
+    /** Listens for a deployment event. @returns This manager. */
+    public on<E extends keyof ClusterManagerEvents>(
+        event: E,
+        listener: (...args: ClusterManagerEvents[E]) => void,
+    ): this {
+        let set = this.#listeners.get(event);
+        if (!set) this.#listeners.set(event, (set = new Set()));
+        set.add(listener as never);
+        return this;
+    }
+
+    /** Stops listening for a deployment event. @returns This manager. */
+    public off<E extends keyof ClusterManagerEvents>(
+        event: E,
+        listener: (...args: ClusterManagerEvents[E]) => void,
+    ): this {
+        this.#listeners.get(event)?.delete(listener as never);
+        return this;
+    }
+
+    #emit<E extends keyof ClusterManagerEvents>(
+        event: E,
+        ...args: ClusterManagerEvents[E]
+    ): void {
+        for (const listener of this.#listeners.get(event) ?? [])
+            try {
+                (listener as (...a: ClusterManagerEvents[E]) => void)(...args);
+            } catch {
+                // A faulty listener must not break supervision.
+            }
     }
 
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
@@ -114,41 +341,135 @@ export class ClusterManager {
         return (await fetchGatewayBot(this.#options.token)).shards;
     }
 
-    /** Spawns all clusters. @returns A promise fulfilled after clusters have launched. */
-    public async spawn(): Promise<void> {
-        if (this.#spawned) return;
-        if (typeof process?.versions?.bun === "string") {
-            throw new Error(
-                "ClusterManager requires the Node.js runtime; Bun does not support child_process.fork() for this clustering mode.",
-            );
-        }
-        this.#spawned = true;
+    /** The cluster that owns a shard, or `undefined` when the shard is not part of this deployment. */
+    public clusterForShard(shardId: number): ClusterInfo | undefined {
+        const id = this.#owner.get(shardId);
+        return id === undefined ? undefined : this.#infos.get(id);
+    }
 
-        const count =
-            this.#options.shardCount === "auto" ||
-            this.#options.shardCount === undefined
-                ? await this.fetchRecommendedShardCount()
-                : this.#options.shardCount;
+    /** Which cluster owns each shard. A copy: change ownership through recovery, not by writing to it. */
+    public assignments(): ReadonlyMap<number, number> {
+        return new Map(this.#owner);
+    }
+
+    /**
+     * Spawns all clusters. Calling it again while clusters run, or while the
+     * first call is still starting them, returns the same promise.
+     * @throws {Error} If called from a cluster worker (a worker must not start the fleet again).
+     */
+    public spawn(): Promise<void> {
+        if (isClusterWorker())
+            return Promise.reject(
+                new Error(
+                    "A cluster worker cannot start a ClusterManager: it would fork the whole fleet again.",
+                ),
+            );
+        if (this.#stopPromise)
+            return this.#stopPromise.then(() => this.spawn());
+        if (!this.#startPromise) {
+            const attempt = this.#start();
+            this.#startPromise = attempt;
+            attempt.catch(() => {
+                if (this.#startPromise === attempt)
+                    this.#startPromise = undefined;
+            });
+        }
+        return this.#startPromise;
+    }
+
+    async #resolveGateway(): Promise<{
+        count: number;
+        maxConcurrency: number;
+        budget?: IdentifyBudget;
+    }> {
+        const { shardCount, maxConcurrency, fetchLimits } = this.#options;
+        let info: GatewayBotInfo | undefined;
+        if (shardCount === "auto" || shardCount === undefined)
+            info = await fetchGatewayBot(this.#options.token);
+        else if (fetchLimits)
+            try {
+                info = await fetchGatewayBot(this.#options.token);
+            } catch (error) {
+                this.#emit(
+                    "error",
+                    error instanceof Error ? error : new Error(String(error)),
+                );
+            }
+        const limit = info?.sessionStartLimit;
+        return {
+            count:
+                shardCount === "auto" || shardCount === undefined
+                    ? info!.shards
+                    : shardCount,
+            maxConcurrency: Math.min(
+                maxConcurrency ?? limit?.maxConcurrency ?? 1,
+                limit?.maxConcurrency ?? Number.POSITIVE_INFINITY,
+            ),
+            ...(limit
+                ? {
+                      budget: {
+                          total: limit.total,
+                          remaining: limit.remaining,
+                          resetAfter: limit.resetAfter,
+                      },
+                  }
+                : {}),
+        };
+    }
+
+    async #start(): Promise<void> {
+        const { count, maxConcurrency, budget } = await this.#resolveGateway();
+        if (this.#stopping) return;
+
+        const ids =
+            this.#options.shardIds ??
+            Array.from({ length: count }, (_, i) => i);
+        validateShardIds(ids, count);
+        const clusterCount =
+            this.#options.clusterCount ??
+            (this.#options.shardsPerCluster
+                ? Math.ceil(ids.length / this.#options.shardsPerCluster)
+                : cpus().length);
+        const chunks = allocateShards(ids, clusterCount);
+        assertCompleteAllocation(chunks, ids);
 
         this.shardCount = count;
-        const clusterCount = this.#options.clusterCount ?? cpus().length;
+        this.#wasStarted = true;
+        this.#owner.clear();
+        this.#infos.clear();
+        const identify = this.#options.identify;
+        this.#coordinator =
+            identify?.coordinate === false
+                ? undefined
+                : new IdentifyCoordinator({
+                      maxConcurrency,
+                      interval: identify?.interval,
+                      holdTimeout: identify?.holdTimeout,
+                      budget,
+                      onBudgetWait: (wait) => {
+                          const key = `${wait.shardId}:${Math.round(wait.waitMs / 1000)}`;
+                          if (key === this.#lastWait) return;
+                          this.#lastWait = key;
+                          this.#emit("identifyWait", wait);
+                      },
+                  });
 
-        // Chunk shards across clusters evenly
-        const chunks = Array.from(
-            { length: clusterCount },
-            () => [] as number[],
-        );
-        for (let i = 0; i < count; i++) {
-            chunks[i % clusterCount]?.push(i);
+        const active = chunks
+            .map((shards, id) => ({ id, shards }))
+            .filter((chunk) => chunk.shards.length > 0);
+        this.#clusterCount = active.length;
+        for (const [index, chunk] of active.entries()) {
+            if (this.#stopping) return;
+            for (const shard of chunk.shards) this.#owner.set(shard, chunk.id);
+            this.#launch(chunk.id, chunk.shards);
+            // Spread the CPU cost of starting processes. IDENTIFY pacing is
+            // the coordinator's job and does not depend on this.
+            const gap = this.#options.spawnInterval ?? 500;
+            if (index < active.length - 1 && gap > 0) await this.#pause(gap);
         }
+        if (this.#stopping) return;
 
-        for (const [i, chunk] of chunks.entries()) {
-            if (chunk.length === 0) continue;
-            this.#launch(i, chunk, count);
-            // Stagger cluster creation
-            await sleep(500);
-        }
-
+        if (this.#options.waitForReady) await this.ready();
         if (
             this.#options.autoScaleInterval &&
             this.#options.autoScaleInterval > 0
@@ -159,65 +480,217 @@ export class ClusterManager {
         }
     }
 
+    /** Waits `ms`, or less when a shutdown starts. */
+    #pause(ms: number): Promise<void> {
+        return new Promise((resolve) => {
+            const wake = (): void => {
+                clearTimeout(timer);
+                this.#pauses.delete(wake);
+                resolve();
+            };
+            const timer = setTimeout(wake, ms);
+            this.#pauses.add(wake);
+        });
+    }
+
     /**
      * Forks one cluster child and supervises its exit.
      *
      * A child that dies (crash, OOM kill, uncaught rejection) takes its shards
      * offline for good, so unless the exit came from a deliberate shutdown the
-     * same shard assignment is re-forked after `restartDelay`.
+     * same shard assignment is re-forked after the supervisor's delay.
      */
-    #launch(id: number, shards: number[], shardCount: number): ClusterInfo {
-        const child = fork(this.#options.script, [], {
-            env: {
-                ...process.env,
-                SHARD_LIST: shards.join(","),
-                SHARD_COUNT: shardCount.toString(),
-                CLUSTER_ID: id.toString(),
-                LUNIBEE_SHARD_BUS: "ipc",
-            },
-        });
-        const info: ClusterInfo = { id, process: child, shards };
+    #launch(id: number, shards: number[]): ClusterInfo {
+        const env: Record<string, string | undefined> = {
+            ...process.env,
+            SHARD_LIST: shards.join(","),
+            SHARD_COUNT: this.shardCount.toString(),
+            CLUSTER_ID: id.toString(),
+            CLUSTER_COUNT: this.#clusterCount.toString(),
+            LUNIBEE_SHARD_BUS: "ipc",
+            [WORKER_MARKER]: "1",
+            LUNIBEE_IDENTIFY: this.#coordinator ? "coordinated" : "local",
+        };
+        const child = this.#options.fork
+            ? this.#options.fork(this.#options.script, env)
+            : fork(this.#options.script, [], {
+                  env: env as NodeJS.ProcessEnv,
+              });
+        const known = this.#infos.get(id);
+        const info: ClusterInfo = known ?? {
+            id,
+            process: child,
+            shards,
+            state: "starting",
+            restarts: 0,
+            startedAt: Date.now(),
+        };
+        info.process = child;
+        info.state = "starting";
+        info.startedAt = Date.now();
+        info.readyAt = undefined;
+        this.#infos.set(id, info);
         this.clusters.set(id, info);
-        child.on("message", (frame) => this.#relay(id, frame));
-        child.once("exit", (code, signal) => {
-            // Only act on the process still registered as this cluster: a
-            // restart or respawn may already have replaced it.
-            if (this.clusters.get(id)?.process !== child) return;
-            try {
-                this.#options.onClusterExit?.(info, code, signal);
-            } catch {
-                // A faulty consumer callback must not break supervision.
-            }
-            if (!this.#stopping) this.#announceDown(id, shards);
-            if (this.#stopping || this.#options.restartOnExit === false) return;
-            this.clusters.delete(id);
-            const delay = this.#supervisor.next(id);
-            if (delay === null) {
-                try {
-                    this.#options.onGiveUp?.(info);
-                } catch {
-                    // A faulty consumer callback must not break supervision.
-                }
-                return;
-            }
+        this.#allReady = false;
+
+        child.on("message", (frame) => this.#onFrame(info, child, frame));
+        child.once("exit", (code, signal) =>
+            this.#onExit(info, child, code, signal),
+        );
+        const timeout = this.#options.startTimeout;
+        if (timeout) {
             const timer = setTimeout(() => {
-                this.#restartTimers.delete(timer);
-                if (this.#stopping || !this.#spawned) return;
-                this.#launch(id, shards, shardCount);
-            }, delay);
-            // Do not hold the event loop open purely for a pending restart.
+                this.#startTimers.delete(id);
+                if (info.process !== child || info.state !== "starting") return;
+                this.#emit("clusterStartTimeout", info);
+                try {
+                    child.kill("SIGKILL");
+                } catch {
+                    // Already gone; the exit handler takes over.
+                }
+            }, timeout);
             (timer as { unref?: () => void }).unref?.();
-            this.#restartTimers.add(timer);
-        });
+            this.#startTimers.set(id, timer);
+        }
+        this.#emit("clusterSpawn", info);
         return info;
     }
 
-    /** Passes a shard-bus frame from one cluster to every other cluster. */
-    #relay(from: number, frame: unknown): void {
-        if (!frame || typeof frame !== "object" || !(BUS_FRAME in frame))
+    #onExit(
+        info: ClusterInfo,
+        child: ChildProcess,
+        code: number | null,
+        signal: NodeJS.Signals | null,
+    ): void {
+        // Only act on the process still registered as this cluster: a
+        // restart or respawn may already have replaced it.
+        if (info.process !== child) return;
+        child.removeAllListeners("message");
+        this.#clearStartTimer(info.id);
+        this.#coordinator?.drop(info.id, `Cluster ${info.id} exited.`);
+        this.#tracker.failOwner(info.id, `Cluster ${info.id} exited.`);
+        this.clusters.delete(info.id);
+        this.#allReady = false;
+        try {
+            this.#options.onClusterExit?.(info, code, signal);
+        } catch {
+            // A faulty consumer callback must not break supervision.
+        }
+        // A deliberate shutdown (graceful or `killAll()`) is never restarted.
+        const expected =
+            this.#stopping ||
+            info.state === "stopping" ||
+            info.state === "stopped";
+        this.#emit("clusterExit", info, code, signal, expected);
+        if (expected) {
+            info.state = "stopped";
             return;
-        for (const [id, cluster] of this.clusters)
-            if (id !== from) this.#sendFrame(cluster, frame);
+        }
+        this.#announceDown(info.id, info.shards);
+        if (this.#options.restartOnExit === false) {
+            info.state = "failed";
+            this.#checkReady();
+            return;
+        }
+        const delay = this.#supervisor.next(info.id);
+        if (delay === null) {
+            info.state = "failed";
+            try {
+                this.#options.onGiveUp?.(info);
+            } catch {
+                // A faulty consumer callback must not break supervision.
+            }
+            this.#emit("clusterGiveUp", info);
+            this.#checkReady();
+            if (this.#options.reassignOnGiveUp) void this.#reassign(info);
+            return;
+        }
+        info.state = "restarting";
+        info.restarts++;
+        this.#emit("clusterRestart", info, { delay, attempt: info.restarts });
+        if (info.restarts >= 3)
+            this.#emit("clusterUnstable", info, {
+                attempt: info.restarts,
+                delay,
+            });
+        const timer = setTimeout(() => {
+            this.#restartTimers.delete(timer);
+            if (this.#stopping || info.state !== "restarting") return;
+            this.#launch(info.id, info.shards);
+        }, delay);
+        // Do not hold the event loop open purely for a pending restart.
+        (timer as { unref?: () => void }).unref?.();
+        this.#restartTimers.add(timer);
+    }
+
+    /**
+     * Moves a failed cluster's shards to the ready cluster that owns the
+     * fewest. Ownership changes only after that worker confirmed it started
+     * them, and the failed cluster's process is already dead, so no shard
+     * ever has two owners.
+     */
+    async #reassign(failed: ClusterInfo): Promise<void> {
+        const shardIds = [...failed.shards];
+        const target = [...this.#infos.values()]
+            .filter((cluster) => cluster.state === "ready")
+            .sort((a, b) => a.shards.length - b.shards.length)[0];
+        if (!target) {
+            this.#emit(
+                "error",
+                new Error(
+                    `No ready cluster can take over shards [${shardIds}] of cluster ${failed.id}.`,
+                ),
+            );
+            return;
+        }
+        try {
+            await this.requestCluster(
+                target.id,
+                REQUEST_ASSIGN,
+                { shardIds },
+                { timeoutMs: this.#options.startTimeout ?? 120_000 },
+            );
+        } catch (error) {
+            this.#emit(
+                "error",
+                new Error(
+                    `Cluster ${target.id} could not take over shards [${shardIds}]: ${error instanceof Error ? error.message : String(error)}`,
+                ),
+            );
+            return;
+        }
+        if (this.#stopping || failed.state !== "failed") return;
+        for (const shard of shardIds) this.#owner.set(shard, target.id);
+        target.shards.push(...shardIds);
+        failed.shards = [];
+        this.#emit("shardsReassigned", {
+            shardIds,
+            from: failed.id,
+            to: target.id,
+        });
+    }
+
+    #clearStartTimer(id: number): void {
+        const timer = this.#startTimers.get(id);
+        if (timer) clearTimeout(timer);
+        this.#startTimers.delete(id);
+    }
+
+    #sendFrame(cluster: ClusterInfo, frame: unknown): boolean {
+        const child = cluster.process;
+        if (
+            !isLive(cluster.state) ||
+            typeof child.send !== "function" ||
+            !child.connected
+        )
+            return false;
+        try {
+            child.send(frame as never);
+            return true;
+        } catch {
+            // The child is exiting; its own exit handler takes over.
+            return false;
+        }
     }
 
     /** Tells the surviving clusters that these shards are gone, so requests to them fail now instead of timing out. */
@@ -227,14 +700,424 @@ export class ClusterManager {
                 this.#sendFrame(cluster, { [PEER_DOWN_FRAME]: shards });
     }
 
-    #sendFrame(cluster: ClusterInfo, frame: unknown): void {
-        const child = cluster.process;
-        if (typeof child.send !== "function" || !child.connected) return;
-        try {
-            child.send(frame as never);
-        } catch {
-            // The child is exiting; its own exit handler takes over.
+    #onFrame(info: ClusterInfo, child: ChildProcess, frame: unknown): void {
+        if (info.process !== child) return;
+        if (!frame || typeof frame !== "object") return;
+        if (BUS_FRAME in frame) {
+            this.#onBus(info, (frame as Record<string, unknown>)[BUS_FRAME]);
+            return;
         }
+        if (CLUSTER_FRAME in frame) {
+            const body = parseChildFrame(
+                (frame as Record<string, unknown>)[CLUSTER_FRAME],
+            );
+            if (body) this.#onControl(info, child, body);
+            else
+                this.#emit(
+                    "error",
+                    new Error(
+                        `Cluster ${info.id} sent a malformed control frame.`,
+                    ),
+                );
+        }
+        // Anything else is the bot's own process.send() traffic.
+    }
+
+    #onControl(
+        info: ClusterInfo,
+        child: ChildProcess,
+        frame: ChildFrame,
+    ): void {
+        switch (frame.kind) {
+            case "ready": {
+                if (!frame.shardIds.every((id) => info.shards.includes(id))) {
+                    this.#emit(
+                        "error",
+                        new Error(
+                            `Cluster ${info.id} reported shards it does not own: [${frame.shardIds}].`,
+                        ),
+                    );
+                    return;
+                }
+                this.#clearStartTimer(info.id);
+                info.state = "ready";
+                info.readyAt = info.lastReadyAt = Date.now();
+                this.#emit("clusterReady", info);
+                this.#checkReady();
+                return;
+            }
+            case "identify": {
+                const reply = (body: Record<string, unknown>): void => {
+                    if (info.process === child)
+                        this.#sendFrame(info, { [CLUSTER_FRAME]: body });
+                };
+                if (!this.#coordinator) {
+                    reply({
+                        kind: "identify-deny",
+                        id: frame.id,
+                        error: "IDENTIFY coordination is off.",
+                    });
+                    return;
+                }
+                if (!info.shards.includes(frame.shardId)) {
+                    reply({
+                        kind: "identify-deny",
+                        id: frame.id,
+                        error: `Shard ${frame.shardId} does not belong to cluster ${info.id}.`,
+                    });
+                    return;
+                }
+                this.#coordinator.acquire(info.id, frame.shardId).then(
+                    () => reply({ kind: "identify-grant", id: frame.id }),
+                    (error: unknown) =>
+                        reply({
+                            kind: "identify-deny",
+                            id: frame.id,
+                            error:
+                                error instanceof Error
+                                    ? error.message
+                                    : String(error),
+                        }),
+                );
+                return;
+            }
+            case "identify-done":
+                this.#coordinator?.release(info.id, frame.shardId);
+                return;
+            case "reply":
+                this.#tracker.answer(frame.id, `c:${info.id}`, info.id, {
+                    ...(frame.error !== undefined
+                        ? { error: frame.error }
+                        : { result: frame.result }),
+                });
+                return;
+            case "health":
+                info.report = frame.report;
+                return;
+        }
+    }
+
+    /** Routes one shard-bus message: replies for the parent are consumed, shard-targeted messages go to the owning cluster only, broadcasts to every other cluster. */
+    #onBus(from: ClusterInfo, raw: unknown): void {
+        const message = raw as {
+            source?: unknown;
+            target?: unknown;
+            type?: unknown;
+            data?: unknown;
+        } | null;
+        if (
+            !message ||
+            typeof message !== "object" ||
+            typeof message.type !== "string" ||
+            typeof message.source !== "number" ||
+            (message.target !== null && !Number.isInteger(message.target))
+        )
+            return;
+        const frame = { [BUS_FRAME]: message };
+        if (message.target === PARENT_ID) {
+            const reply = message.data as ReplyPayload | undefined;
+            if (
+                message.type === REPLY_TYPE &&
+                reply &&
+                typeof reply.requestId === "string"
+            )
+                this.#tracker.answer(
+                    reply.requestId,
+                    `s:${message.source}`,
+                    from.id,
+                    reply.error !== undefined
+                        ? { error: String(reply.error) }
+                        : { result: reply.result },
+                );
+            return;
+        }
+        if (message.target === null) {
+            for (const [id, cluster] of this.clusters)
+                if (id !== from.id) this.#sendFrame(cluster, frame);
+            return;
+        }
+        const owner = this.clusterForShard(message.target as number);
+        if (!owner || owner.id === from.id) return;
+        // Fail fast: a request to a shard whose cluster is down rejects now.
+        if (!this.#sendFrame(owner, frame))
+            this.#sendFrame(from, {
+                [PEER_DOWN_FRAME]: [message.target as number],
+            });
+    }
+
+    /**
+     * Sends a request to one shard and resolves with its handler's result.
+     * @throws {RangeError} If the shard is not part of this deployment.
+     * @throws {Error} If its cluster is down, the handler failed, or no answer arrives in time.
+     */
+    public async request<R = unknown, T = unknown>(
+        shardId: number,
+        type: string,
+        data: T,
+        options: RequestOptions = {},
+    ): Promise<R> {
+        const owner = this.clusterForShard(shardId);
+        if (!owner)
+            throw new RangeError(
+                `Shard ${shardId} is not part of this deployment.`,
+            );
+        const { id, done } = this.#tracker.begin<R>({
+            keys: new Map([[`s:${shardId}`, owner.id]]),
+            timeoutMs:
+                options.timeoutMs ?? this.#options.requestTimeout ?? 5000,
+            signal: options.signal,
+        });
+        const sent = this.#sendFrame(owner, {
+            [BUS_FRAME]: {
+                source: PARENT_ID,
+                target: shardId,
+                type,
+                data,
+                id,
+                expectsReply: true,
+            },
+        });
+        if (!sent) {
+            this.#tracker.failOwner(
+                owner.id,
+                `Shard ${shardId} is down: cluster ${owner.id} is ${owner.state}.`,
+            );
+        }
+        const { replies } = await done;
+        const reply = replies[0];
+        if (!reply)
+            throw new Error(
+                `Shard ${shardId} did not reply to "${type}" in time.`,
+            );
+        if (reply.error !== undefined) throw new Error(reply.error);
+        return reply.result as R;
+    }
+
+    /**
+     * Asks every shard of every live cluster and collects the answers. Shards
+     * whose cluster is down, or that do not answer in time, are listed in
+     * `missing`; it does not reject for them.
+     */
+    public async broadcast<R = unknown, T = unknown>(
+        type: string,
+        data: T,
+        options: RequestOptions = {},
+    ): Promise<BroadcastResult<R>> {
+        const keys = new Map<string, number>();
+        const down: number[] = [];
+        for (const [shard, clusterId] of this.#owner) {
+            const cluster = this.#infos.get(clusterId);
+            if (cluster && isLive(cluster.state))
+                keys.set(`s:${shard}`, clusterId);
+            else down.push(shard);
+        }
+        const { id, done } = this.#tracker.begin<R>({
+            keys,
+            timeoutMs:
+                options.timeoutMs ?? this.#options.requestTimeout ?? 5000,
+            signal: options.signal,
+        });
+        const frame = {
+            [BUS_FRAME]: {
+                source: PARENT_ID,
+                target: null,
+                type,
+                data,
+                id,
+                expectsReply: true,
+            },
+        };
+        for (const cluster of this.clusters.values())
+            if (!this.#sendFrame(cluster, frame))
+                this.#tracker.failOwner(
+                    cluster.id,
+                    `Cluster ${cluster.id} is ${cluster.state}.`,
+                );
+        const { replies, missing } = await done;
+        return {
+            replies: replies.map((reply) => ({
+                shardId: Number(reply.key.slice(2)),
+                ...(reply.error !== undefined
+                    ? { error: reply.error }
+                    : { result: reply.result as R }),
+            })),
+            missing: [
+                ...down,
+                ...missing.map((key) => Number(key.slice(2))),
+            ].sort((a, b) => a - b),
+        };
+    }
+
+    /**
+     * Sends a request to a cluster's worker (see `ClusterWorker.onRequest()`).
+     * @throws {Error} If the cluster is unknown or down, the handler failed, or no answer arrives in time.
+     */
+    public async requestCluster<R = unknown, T = unknown>(
+        clusterId: number,
+        type: string,
+        data: T,
+        options: RequestOptions = {},
+    ): Promise<R> {
+        const cluster = this.#infos.get(clusterId);
+        if (!cluster)
+            throw new RangeError(`Cluster ${clusterId} does not exist.`);
+        const { id, done } = this.#tracker.begin<R>({
+            keys: new Map([[`c:${clusterId}`, clusterId]]),
+            timeoutMs:
+                options.timeoutMs ?? this.#options.requestTimeout ?? 5000,
+            signal: options.signal,
+        });
+        if (
+            !this.#sendFrame(cluster, {
+                [CLUSTER_FRAME]: { kind: "request", id, type, data },
+            })
+        )
+            this.#tracker.failOwner(
+                clusterId,
+                `Cluster ${clusterId} is ${cluster.state}.`,
+            );
+        const { replies } = await done;
+        const reply = replies[0];
+        if (!reply)
+            throw new Error(
+                `Cluster ${clusterId} did not reply to "${type}" in time.`,
+            );
+        if (reply.error !== undefined) throw new Error(reply.error);
+        return reply.result as R;
+    }
+
+    /** Resolves when every cluster is ready. @throws {Error} On timeout, or if the manager stops first. */
+    public ready(timeoutMs?: number): Promise<void> {
+        if (this.#isReady()) return Promise.resolve();
+        return new Promise<void>((resolve, reject) => {
+            const waiter: {
+                resolve: () => void;
+                reject: (error: Error) => void;
+                timer?: ReturnType<typeof setTimeout>;
+            } = {
+                resolve: () => {
+                    if (waiter.timer) clearTimeout(waiter.timer);
+                    this.#readyWaiters.delete(waiter);
+                    resolve();
+                },
+                reject: (error) => {
+                    if (waiter.timer) clearTimeout(waiter.timer);
+                    this.#readyWaiters.delete(waiter);
+                    reject(error);
+                },
+            };
+            if (timeoutMs !== undefined)
+                waiter.timer = setTimeout(
+                    () =>
+                        waiter.reject(
+                            new Error(
+                                `Clusters were not all ready within ${timeoutMs}ms.`,
+                            ),
+                        ),
+                    timeoutMs,
+                );
+            this.#readyWaiters.add(waiter);
+        });
+    }
+
+    #isReady(): boolean {
+        if (this.#infos.size === 0) return false;
+        for (const cluster of this.#infos.values())
+            if (cluster.state !== "ready") return false;
+        return true;
+    }
+
+    #checkReady(): void {
+        if (!this.#isReady()) return;
+        for (const waiter of [...this.#readyWaiters]) waiter.resolve();
+        if (!this.#allReady) {
+            this.#allReady = true;
+            this.#emit("ready");
+        }
+    }
+
+    /**
+     * The last known health of every cluster and shard. Reads what the
+     * workers last reported; nothing is sent. Use {@link refreshHealth} for fresh numbers.
+     */
+    public health(): ClusterManagerHealth {
+        const now = Date.now();
+        const clusters: ClusterHealth[] = [...this.#infos.values()]
+            .sort((a, b) => a.id - b.id)
+            .map((cluster) => ({
+                id: cluster.id,
+                state: cluster.state,
+                ...(cluster.process.pid !== undefined && isLive(cluster.state)
+                    ? { pid: cluster.process.pid }
+                    : {}),
+                shardIds: [...cluster.shards],
+                uptimeMs: isLive(cluster.state) ? now - cluster.startedAt : 0,
+                restarts: cluster.restarts,
+                startedAt: cluster.startedAt,
+                ...(cluster.readyAt !== undefined
+                    ? { readyAt: cluster.readyAt }
+                    : {}),
+                ...(cluster.lastReadyAt !== undefined
+                    ? { lastReadyAt: cluster.lastReadyAt }
+                    : {}),
+                shards: cluster.report?.shards ?? ([] as ShardHealth[]),
+                ...(cluster.report?.metrics
+                    ? { metrics: cluster.report.metrics as WorkerMetrics }
+                    : {}),
+                ...(cluster.report
+                    ? { reportedAt: cluster.report.reportedAt }
+                    : {}),
+            }));
+        const missingShards = [...this.#owner]
+            .filter(([, id]) => this.#infos.get(id)?.state !== "ready")
+            .map(([shard]) => shard)
+            .sort((a, b) => a - b);
+        const states = clusters.map((cluster) => cluster.state);
+        const state: ClusterManagerHealth["state"] = this.#stopping
+            ? "stopping"
+            : clusters.length === 0
+              ? this.#wasStarted
+                  ? "stopped"
+                  : "idle"
+              : states.every((s) => s === "stopped")
+                ? "stopped"
+                : states.every((s) => s === "ready")
+                  ? "ready"
+                  : states.some((s) => s === "restarting" || s === "failed")
+                    ? "degraded"
+                    : "starting";
+        return {
+            state,
+            totalShards: this.shardCount,
+            clusters,
+            readyClusters: states.filter((s) => s === "ready").length,
+            missingShards,
+        };
+    }
+
+    /**
+     * Asks every live cluster for a fresh report, then returns {@link health}.
+     * A cluster that does not answer in time keeps its last report; it is not
+     * treated as failed (only its process exiting does that).
+     */
+    public async refreshHealth(
+        options: { metrics?: boolean; timeoutMs?: number } = {},
+    ): Promise<ClusterManagerHealth> {
+        await Promise.all(
+            [...this.clusters.values()].map(async (cluster) => {
+                try {
+                    cluster.report = await this.requestCluster<WorkerReport>(
+                        cluster.id,
+                        REQUEST_HEALTH,
+                        { metrics: options.metrics === true },
+                        { timeoutMs: options.timeoutMs ?? 2000 },
+                    );
+                } catch {
+                    // Keep the previous report.
+                }
+            }),
+        );
+        return this.health();
     }
 
     /** Checks if the recommended shard count has changed and respawns if so. */
@@ -258,7 +1141,6 @@ export class ClusterManager {
     public async respawn(newShardCount: number): Promise<void> {
         this.#options.shardCount = newShardCount;
         await this.shutdownAll();
-        this.#spawned = false;
         this.#supervisor.reset();
         await this.spawn();
     }
@@ -266,32 +1148,51 @@ export class ClusterManager {
     /**
      * Gracefully stops all active clusters: sends SIGTERM, awaits each child's
      * clean exit, and force-kills (SIGKILL) only children that outlast the
-     * shutdown timeout. Clears the auto-scale timer and cluster map.
+     * shutdown timeout. Safe to call twice or concurrently; cancels restarts,
+     * timers and pending requests.
      * @param timeoutMs Grace period per child before force-kill. Defaults to the configured `shutdownTimeout` (5000 ms).
      */
-    public async shutdownAll(
+    public shutdownAll(
         timeoutMs = this.#options.shutdownTimeout ?? 5000,
     ): Promise<void> {
+        this.#stopPromise ??= this.#shutdown(timeoutMs).finally(() => {
+            this.#stopPromise = undefined;
+        });
+        return this.#stopPromise;
+    }
+
+    async #shutdown(timeoutMs: number): Promise<void> {
         this.#stopping = true;
-        this.#clearRestartTimers();
-        if (this.#autoScaleTimer) {
-            clearInterval(this.#autoScaleTimer);
-            this.#autoScaleTimer = undefined;
-        }
+        this.#halt();
+        // A spawn that is still forking sees `#stopping` and stops on its own.
+        await this.#startPromise?.catch(() => undefined);
         await Promise.all(
             [...this.clusters.values()].map((cluster) =>
                 this.#shutdownCluster(cluster, timeoutMs),
             ),
         );
+        for (const cluster of this.#infos.values()) cluster.state = "stopped";
         this.clusters.clear();
-        this.#spawned = false;
+        this.#startPromise = undefined;
         this.#stopping = false;
     }
 
-    /** Cancels any pending crash-restart timers. */
-    #clearRestartTimers(): void {
+    /** Cancels everything that could start work or keep the loop alive. */
+    #halt(): void {
         for (const timer of this.#restartTimers) clearTimeout(timer);
         this.#restartTimers.clear();
+        for (const id of [...this.#startTimers.keys()])
+            this.#clearStartTimer(id);
+        for (const wake of [...this.#pauses]) wake();
+        if (this.#autoScaleTimer) {
+            clearInterval(this.#autoScaleTimer);
+            this.#autoScaleTimer = undefined;
+        }
+        this.#coordinator?.close();
+        this.#coordinator = undefined;
+        this.#tracker.close();
+        for (const waiter of [...this.#readyWaiters])
+            waiter.reject(new Error("The cluster manager is stopping."));
     }
 
     /** Gracefully terminates a single cluster child, escalating to SIGKILL after the timeout. */
@@ -300,6 +1201,7 @@ export class ClusterManager {
         timeoutMs: number,
     ): Promise<void> {
         const child = cluster.process;
+        cluster.state = "stopping";
         if (child.exitCode !== null || child.signalCode !== null) return;
         await new Promise<void>((resolve) => {
             let timer: ReturnType<typeof setTimeout> | undefined;
@@ -328,12 +1230,9 @@ export class ClusterManager {
     /** Immediately force-kills all active cluster processes and clears the cluster map. Prefer {@link shutdownAll} for a graceful stop. */
     public killAll(): void {
         this.#stopping = true;
-        this.#clearRestartTimers();
-        if (this.#autoScaleTimer) {
-            clearInterval(this.#autoScaleTimer);
-            this.#autoScaleTimer = undefined;
-        }
-        for (const cluster of this.clusters.values()) {
+        this.#halt();
+        for (const cluster of this.#infos.values()) {
+            cluster.state = "stopped";
             try {
                 cluster.process.kill();
             } catch {
@@ -341,7 +1240,7 @@ export class ClusterManager {
             }
         }
         this.clusters.clear();
-        this.#spawned = false;
+        this.#startPromise = undefined;
         this.#stopping = false;
     }
 }

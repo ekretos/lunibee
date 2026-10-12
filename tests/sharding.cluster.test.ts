@@ -61,15 +61,18 @@ const gatewayBot = (shards: unknown, status = 200) => {
 };
 
 describe("ClusterManager (mocked fork)", () => {
-    test("refuses to spawn under Bun", async () => {
-        setBun("1.3.11");
-        const manager = new ClusterManager({
-            token: "t",
-            script: "w.js",
-            shardCount: 1,
-        });
-        await expect(manager.spawn()).rejects.toThrow(/Node.js runtime/);
-        setBun(undefined);
+    test("a cluster worker cannot start the fleet again", async () => {
+        process.env.LUNIBEE_CLUSTER_WORKER = "1";
+        try {
+            const manager = new ClusterManager({
+                token: "t",
+                script: "w.js",
+                shardCount: 1,
+            });
+            await expect(manager.spawn()).rejects.toThrow(/cluster worker/);
+        } finally {
+            delete process.env.LUNIBEE_CLUSTER_WORKER;
+        }
     });
 
     test("distributes shards across clusters and shuts down gracefully", async () => {

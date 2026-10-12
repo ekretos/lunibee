@@ -1,5 +1,18 @@
 import { fetchGatewayBot, type GatewayBotInfo } from "./gateway-bot.js";
 import { Gateway, GatewayState } from "@lunibee/ws";
+import {
+    readClusterContext,
+    validateShardIds,
+    type ClusterContext,
+} from "./context.js";
+import type {
+    ShardHealth,
+    ShardStatus,
+    WorkerMetrics,
+    WorkerReport,
+} from "./health.js";
+import { REQUEST_ASSIGN, REQUEST_HEALTH } from "./protocol.js";
+import { ClusterWorker, type IdentifyGate } from "./worker.js";
 
 /** Runtime-agnostic delay used between shard starts (works under Node and Bun). @param ms Milliseconds to wait. */
 const sleep = (ms: number): Promise<void> =>
@@ -23,7 +36,38 @@ export type {
 } from "./bus.js";
 
 export { ClusterManager } from "./cluster.js";
-export type { ClusterManagerOptions, ClusterInfo } from "./cluster.js";
+export type {
+    ClusterManagerOptions,
+    ClusterManagerEvents,
+    ClusterInfo,
+    BroadcastResult,
+    RequestOptions,
+} from "./cluster.js";
+export {
+    allocateShards,
+    assertCompleteAllocation,
+    isClusterWorker,
+    readClusterContext,
+    validateShardIds,
+    type ClusterContext,
+} from "./context.js";
+export { ClusterWorker, type IdentifyGate } from "./worker.js";
+export {
+    IdentifyCoordinator,
+    IDENTIFY_INTERVAL,
+    type IdentifyBudget,
+    type IdentifyCoordinatorOptions,
+} from "./identify.js";
+export { RequestTracker } from "./requests.js";
+export type {
+    ClusterHealth,
+    ClusterManagerHealth,
+    ClusterState,
+    ShardHealth,
+    ShardStatus,
+    WorkerMetrics,
+    WorkerReport,
+} from "./health.js";
 
 /** Whether a shard has no live socket, so connecting it costs an IDENTIFY. */
 function needsConnection(gateway: Gateway): boolean {
@@ -89,14 +133,25 @@ export interface ShardManagerOptions {
     autoScaleInterval?: number;
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */
     onAutoScaleError?: (error: unknown) => void;
-}
-/** Health snapshot for one shard. */
-export interface ShardHealth {
-    id: number;
-    /** Gateway connection state. */
-    state: Gateway["state"];
-    /** Last heartbeat round-trip in ms, or -1 before the first ACK. */
-    ping: number;
+    /**
+     * The shards this manager runs, out of `shardCount`. Defaults to all of
+     * them, or to the cluster's own list inside a worker forked by
+     * `ClusterManager`. Must be unique integers in `[0, shardCount)`.
+     */
+    shardIds?: number[];
+    /**
+     * The worker contract. Read from the environment inside a worker forked by
+     * `ClusterManager`; pass `false` to ignore it, or a context to override it.
+     */
+    cluster?: ClusterContext | false;
+    /**
+     * Where to get IDENTIFY slots. Inside a coordinated cluster this is the
+     * parent, so the limit holds across all clusters. Pass `false` to pace
+     * locally with `spawnDelay` instead.
+     */
+    identify?: IdentifyGate | false;
+    /** The worker to report to. Defaults to this process's `ClusterWorker` inside a cluster. */
+    worker?: ClusterWorker | false;
 }
 /** What `ShardManager` emits about its shards. */
 export interface ShardManagerEvents {
@@ -108,6 +163,8 @@ export interface ShardManagerEvents {
     shardResume: [shardId: number];
     /** A shard reported an error. */
     shardError: [shardId: number, error: Error];
+    /** Every shard this manager owns is ready. Emitted again after a shard drops and recovers. */
+    ready: [];
     /** A shard reconnected too often too fast and is backing off (see `Gateway` `unstable`). */
     shardUnstable: [
         shardId: number,
@@ -129,11 +186,25 @@ export class ShardManager {
     public static readonly IDENTIFY_INTERVAL = 5000;
     /** Active Gateway shards indexed by shard identifier. */
     public readonly shards = new Map<number, Gateway>();
-    /** Number of shards managed by this instance after initialization. */
+    /** Total shards in the deployment once initialized, 0 before and after `destroy()`. */
     public get shardCount(): number {
-        return this.shards.size;
+        return this.#resolved ? this.#total : 0;
+    }
+    /** IDs of the shards this manager owns. */
+    public get shardIds(): number[] {
+        return [...this.shards.keys()].sort((a, b) => a - b);
     }
     readonly #options: ShardManagerOptions;
+    /** Shards this manager was asked to own; every shard when `undefined`. */
+    #ids: number[] | undefined;
+    readonly #gate: IdentifyGate | undefined;
+    readonly #worker: ClusterWorker | undefined;
+    readonly #lifecycle = new Map<
+        number,
+        { status: ShardStatus; readyAt?: number; disconnectedAt?: number }
+    >();
+    /** Whether `ready` was announced since the last shard dropped. */
+    #announced = false;
     /** Whether the shard set has been initialized. */
     #resolved = false;
     /** Whether this manager is currently destroyed. */
@@ -157,12 +228,58 @@ export class ShardManager {
             throw new TypeError(
                 "Gateway intents must be an array, e.g. [GatewayIntentBits.Guilds].",
             );
-        const count =
-            options.shardCount === "auto" || options.shardCount === undefined
-                ? 1
-                : options.shardCount;
+        const context =
+            options.cluster === false
+                ? null
+                : (options.cluster ?? readClusterContext());
+        if (context) {
+            if (options.shardCount === "auto")
+                throw new RangeError(
+                    'shardCount "auto" is the ClusterManager\'s decision inside a cluster worker.',
+                );
+            if (
+                options.shardCount !== undefined &&
+                options.shardCount !== context.shardCount
+            )
+                throw new RangeError(
+                    `shardCount ${options.shardCount} differs from the cluster's ${context.shardCount}.`,
+                );
+            if (options.autoScaleInterval !== undefined)
+                throw new TypeError(
+                    "autoScaleInterval belongs to ClusterManager inside a cluster worker.",
+                );
+            if (
+                options.shardIds &&
+                !options.shardIds.every((id) => context.shardIds.includes(id))
+            )
+                throw new RangeError(
+                    "shardIds must be a subset of the cluster's own shards.",
+                );
+        }
+        const count = context
+            ? context.shardCount
+            : options.shardCount === "auto" || options.shardCount === undefined
+              ? 1
+              : options.shardCount;
         if (!Number.isInteger(count) || count < 1)
             throw new RangeError("Shard count must be a positive integer.");
+        this.#ids = options.shardIds ?? context?.shardIds;
+        if (this.#ids && options.shardCount !== "auto")
+            validateShardIds(this.#ids, count);
+        this.#worker =
+            options.worker === false
+                ? undefined
+                : (options.worker ??
+                  (context && options.cluster === undefined
+                      ? ClusterWorker.current()
+                      : undefined));
+        this.#gate =
+            options.identify === false
+                ? undefined
+                : (options.identify ??
+                  (context?.coordinatedIdentify
+                      ? this.#worker?.identifyGate
+                      : undefined));
         if (
             options.autoScaleInterval !== undefined &&
             (!Number.isInteger(options.autoScaleInterval) ||
@@ -202,6 +319,19 @@ export class ShardManager {
             spawnDelay: ShardManager.IDENTIFY_INTERVAL,
             ...options,
         };
+        this.#worker?.onRequest(REQUEST_HEALTH, (data) =>
+            this.report(
+                (data as { metrics?: boolean } | null | undefined)?.metrics ===
+                    true,
+            ),
+        );
+        this.#worker?.onRequest(REQUEST_ASSIGN, async (data) => {
+            const ids = (data as { shardIds?: unknown } | null)?.shardIds;
+            if (!Array.isArray(ids))
+                throw new TypeError("shardIds must be an array.");
+            await this.addShards(ids as number[]);
+            return { shardIds: ids };
+        });
         if (options.shardCount !== "auto") this.#initialize(count);
     }
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
@@ -222,12 +352,79 @@ export class ShardManager {
             this.#autoScaleTimer = undefined;
         }
         await this.#ensureInitialized();
-        const limit = this.#gatewayInfo?.sessionStartLimit;
         // Only shards without a live socket spend an IDENTIFY; connect() is a
         // no-op for the rest, so they are neither counted nor paced.
-        const ids = [...this.shards]
-            .filter(([, gateway]) => needsConnection(gateway))
-            .map(([id]) => id);
+        await this.#start(
+            [...this.shards]
+                .filter(([, gateway]) => needsConnection(gateway))
+                .map(([id]) => id),
+        );
+        if (this.#options.autoScaleInterval && !this.#autoScaleTimer) {
+            this.#autoScaleTimer = setInterval(() => {
+                void this.checkAutoScale();
+            }, this.#options.autoScaleInterval);
+        }
+    }
+    /**
+     * Takes over more shards of the same deployment (recovery after another
+     * cluster gave up) and connects them through the same IDENTIFY path.
+     * @throws {RangeError} If an ID is invalid, already owned, or the manager is not initialized.
+     */
+    public async addShards(shardIds: readonly number[]): Promise<void> {
+        await this.#ensureInitialized();
+        validateShardIds(shardIds, this.#total);
+        for (const id of shardIds)
+            if (this.shards.has(id))
+                throw new RangeError(`Shard ${id} is already owned.`);
+        for (const id of shardIds)
+            this.shards.set(id, this.#createShard(id, this.#total));
+        if (this.#ids) this.#ids = [...this.#ids, ...shardIds];
+        this.#announced = false;
+        try {
+            // Only the new shards are torn down on failure: the ones that were
+            // already running keep their sessions.
+            await this.#start([...shardIds], false);
+        } catch (error) {
+            for (const id of shardIds) {
+                this.shards.get(id)?.close();
+                this.shards.delete(id);
+                this.#lifecycle.delete(id);
+            }
+            if (this.#ids)
+                this.#ids = this.#ids.filter((id) => !shardIds.includes(id));
+            throw error;
+        }
+    }
+    /** Starts the given shards: through the coordinated IDENTIFY gate when there is one, else in paced rounds. */
+    async #start(ids: number[], destroyOnFailure = true): Promise<void> {
+        const gate = this.#gate;
+        if (gate) {
+            const timeout = this.#options.handshakeTimeout ?? 15_000;
+            const results = await Promise.allSettled(
+                ids.map(async (id) => {
+                    const gateway = this.shards.get(id)!;
+                    this.#setStatus(id, "connecting");
+                    await gate.acquire(id);
+                    try {
+                        await gateway.connect();
+                        await handshakeSent(gateway, timeout);
+                    } finally {
+                        gate.release(id);
+                    }
+                }),
+            );
+            const failed = results.findIndex(
+                (result) => result.status === "rejected",
+            );
+            if (failed !== -1) {
+                if (destroyOnFailure) this.destroy();
+                throw new Error(`Failed to connect shard ${ids[failed]}.`, {
+                    cause: (results[failed] as PromiseRejectedResult).reason,
+                });
+            }
+            return;
+        }
+        const limit = this.#gatewayInfo?.sessionStartLimit;
         if (limit && limit.remaining < ids.length)
             // Live shards are left running: the budget only blocks new ones.
             throw new Error(
@@ -259,6 +456,7 @@ export class ShardManager {
             const round = [...buckets.values()]
                 .map((bucket) => bucket[index])
                 .filter((id): id is number => id !== undefined);
+            for (const id of round) this.#setStatus(id, "connecting");
             const results = await Promise.allSettled(
                 round.map((id) => this.shards.get(id)!.connect()),
             );
@@ -266,7 +464,7 @@ export class ShardManager {
                 (result) => result.status === "rejected",
             );
             if (failed !== -1) {
-                this.destroy();
+                if (destroyOnFailure) this.destroy();
                 throw new Error(`Failed to connect shard ${round[failed]}.`, {
                     cause: (results[failed] as PromiseRejectedResult).reason,
                 });
@@ -289,11 +487,6 @@ export class ShardManager {
                 );
                 await sleep(this.#options.spawnDelay);
             }
-        }
-        if (this.#options.autoScaleInterval && !this.#autoScaleTimer) {
-            this.#autoScaleTimer = setInterval(() => {
-                void this.checkAutoScale();
-            }, this.#options.autoScaleInterval);
         }
     }
     /** Checks if the recommended shard count has changed and reconnects if so. */
@@ -319,7 +512,10 @@ export class ShardManager {
     /** Permanently closes the current shard set and releases Gateway resources. The next connect recreates them. @returns Nothing. */
     public destroy(): void {
         for (const shard of this.shards.values()) shard.close();
+        for (const id of this.shards.keys()) this.#setStatus(id, "destroyed");
         this.shards.clear();
+        this.#lifecycle.clear();
+        this.#announced = false;
         this.#resolved = false;
         this.#destroyed = true;
         if (this.#autoScaleTimer) {
@@ -379,13 +575,62 @@ export class ShardManager {
     public get(id: number): Gateway | undefined {
         return this.shards.get(id);
     }
-    /** Returns each shard's connection state and heartbeat latency. */
+    /** Returns each shard's connection state, lifecycle status and heartbeat latency. */
     public health(): ShardHealth[] {
-        return [...this.shards].map(([id, gateway]) => ({
-            id,
-            state: gateway.state,
-            ping: gateway.ping,
-        }));
+        return [...this.shards].map(([id, gateway]) => {
+            const life = this.#lifecycle.get(id);
+            return {
+                id,
+                state: gateway.state,
+                ping: gateway.ping,
+                status: life?.status ?? "idle",
+                ...(life?.readyAt !== undefined
+                    ? { readyAt: life.readyAt }
+                    : {}),
+                ...(life?.disconnectedAt !== undefined
+                    ? { disconnectedAt: life.disconnectedAt }
+                    : {}),
+            };
+        });
+    }
+    /** A health report for the parent: shard health and, on request, process metrics. */
+    public report(metrics = false): WorkerReport {
+        let numbers: WorkerMetrics | undefined;
+        if (metrics) {
+            const memory = process.memoryUsage();
+            const cpu = process.cpuUsage();
+            numbers = {
+                rssBytes: memory.rss,
+                heapUsedBytes: memory.heapUsed,
+                cpuUserMicros: cpu.user,
+                cpuSystemMicros: cpu.system,
+            };
+        }
+        return {
+            shards: this.health(),
+            ...(numbers ? { metrics: numbers } : {}),
+            reportedAt: Date.now(),
+        };
+    }
+    #setStatus(id: number, status: ShardStatus): void {
+        const life = this.#lifecycle.get(id) ?? { status };
+        life.status = status;
+        const now = Date.now();
+        if (status === "ready") life.readyAt = now;
+        if (status === "disconnected") life.disconnectedAt = now;
+        this.#lifecycle.set(id, life);
+        if (status !== "ready") this.#announced = false;
+        else this.#maybeAnnounce();
+    }
+    /** Emits `ready` and tells the parent once every owned shard is ready. */
+    #maybeAnnounce(): void {
+        if (this.#announced || this.shards.size === 0) return;
+        for (const id of this.shards.keys())
+            if (this.#lifecycle.get(id)?.status !== "ready") return;
+        this.#announced = true;
+        this.#emit("ready");
+        this.#worker?.ready(this.shardIds);
+        this.#worker?.reportHealth(this.report());
     }
     /** Returns information for all managed shards. @returns Shard information snapshots. */
     public values(): ShardInfo[] {
@@ -405,8 +650,9 @@ export class ShardManager {
     #initialize(count: number): void {
         if (this.#resolved) return;
         this.#total = count;
-        for (let id = 0; id < count; id++)
-            this.shards.set(id, this.#createShard(id, count));
+        const ids = this.#ids ?? Array.from({ length: count }, (_, i) => i);
+        validateShardIds(ids, count);
+        for (const id of ids) this.shards.set(id, this.#createShard(id, count));
         this.#resolved = true;
     }
     /** Creates one Gateway instance with its shard identity. @param id Shard identifier. @param count Total shard count. @returns Configured Gateway. */
@@ -418,25 +664,33 @@ export class ShardManager {
             shardCount: count,
             reconnect: this.#options.reconnect ?? true,
         });
-        gateway.on("ready", () => this.#emit("shardReady", id));
-        gateway.on("resumed", () => this.#emit("shardResume", id));
-        gateway.on("close", (close) =>
+        gateway.on("ready", () => {
+            this.#setStatus(id, "ready");
+            this.#emit("shardReady", id);
+        });
+        gateway.on("resumed", () => {
+            this.#setStatus(id, "ready");
+            this.#emit("shardResume", id);
+        });
+        gateway.on("close", (close) => {
+            this.#setStatus(id, "disconnected");
             this.#emit(
                 "shardDisconnect",
                 id,
                 close as { code: number; action: string },
-            ),
-        );
+            );
+        });
         gateway.on("error", (error) =>
             this.#emit("shardError", id, error as Error),
         );
-        gateway.on("unstable", (info) =>
+        gateway.on("unstable", (info) => {
+            this.#setStatus(id, "unstable");
             this.#emit(
                 "shardUnstable",
                 id,
                 info as { reconnects: number; delay: number },
-            ),
-        );
+            );
+        });
         return gateway;
     }
 }
