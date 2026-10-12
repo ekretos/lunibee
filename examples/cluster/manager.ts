@@ -15,12 +15,26 @@ const clusters = new ClusterManager({
     startTimeout: 180_000,
     supervisor: { restartDelay: 1000, backoff: 2, jitter: 0.2, maxRestarts: 5 },
     reassignOnGiveUp: true,
+    // To spread clusters over other machines, set CLUSTER_SECRET and start
+    // host.ts there; otherwise everything runs on this machine.
+    ...(process.env.CLUSTER_SECRET
+        ? {
+              remote: {
+                  port: 7070,
+                  secret: process.env.CLUSTER_SECRET,
+                  hosts: (process.env.CLUSTER_HOSTS ?? "host-1").split(","),
+                  local: true,
+              },
+          }
+        : {}),
 });
 
 clusters.on("clusterReady", cluster => console.log(`cluster ${cluster.id} ready (shards ${cluster.shards})`));
 clusters.on("clusterRestart", (cluster, { delay, attempt }) => console.warn(`cluster ${cluster.id} restarts in ${delay}ms (#${attempt})`));
 clusters.on("clusterGiveUp", cluster => console.error(`cluster ${cluster.id} keeps crashing`));
 clusters.on("identifyWait", ({ shardId, waitMs }) => console.warn(`shard ${shardId} waits ${Math.ceil(waitMs / 1000)}s for the session budget`));
+clusters.on("hostJoin", id => console.log(`host ${id} joined`));
+clusters.on("hostLeave", (id, reason) => console.warn(`host ${id} left: ${reason}`));
 clusters.on("error", error => console.error(error));
 
 await clusters.spawn();

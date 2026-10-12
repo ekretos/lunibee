@@ -69,6 +69,8 @@ export interface ClusterHealth {
     id: number;
     state: ClusterState;
     pid?: number;
+    /** Where it runs: `"local"` or the ID of a host. */
+    host: string;
     /** Shards this cluster owns right now. */
     shardIds: number[];
     /** Milliseconds since this process was forked; 0 when it is not running. */

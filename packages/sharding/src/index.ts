@@ -53,6 +53,13 @@ export {
 } from "./context.js";
 export { ClusterWorker, type IdentifyGate } from "./worker.js";
 export {
+    ClusterHost,
+    type ClusterHostEvents,
+    type ClusterHostOptions,
+} from "./host.js";
+export type { HostStatus, RemoteOptions } from "./remote.js";
+export { RemoteClose, REMOTE_PROTOCOL_VERSION } from "./remote-protocol.js";
+export {
     IdentifyCoordinator,
     IDENTIFY_INTERVAL,
     type IdentifyBudget,

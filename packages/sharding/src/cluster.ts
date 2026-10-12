@@ -26,6 +26,7 @@ import {
     parseChildFrame,
     type ChildFrame,
 } from "./protocol.js";
+import { RemoteHosts, type HostStatus, type RemoteOptions } from "./remote.js";
 import { RequestTracker } from "./requests.js";
 import { ShardSupervisor, type SupervisorOptions } from "./supervisor.js";
 import { BUS_FRAME, PEER_DOWN_FRAME } from "./transport.js";
@@ -84,6 +85,12 @@ export interface ClusterManagerOptions {
     requestTimeout?: number;
     /** Most requests waiting for answers at once. Default 10,000. */
     maxPendingRequests?: number;
+    /**
+     * Accept hosts on other machines. The coordinator listens for
+     * `ClusterHost` agents, places clusters on them and supervises those
+     * workers like local ones. See {@link RemoteOptions}.
+     */
+    remote?: RemoteOptions;
     /** Starts a worker process. Defaults to `child_process.fork()`; replace it for tests or custom launchers. */
     fork?: (
         script: string,
@@ -125,8 +132,10 @@ export interface ClusterManagerOptions {
 export interface ClusterInfo {
     /** Cluster identifier. */
     id: number;
-    /** The current child process (the last one while a restart is pending). */
+    /** The current child process (the last one while a restart is pending). For a cluster on another host this is a proxy; `pid` is the pid on that host. */
     process: ChildProcess;
+    /** Where it runs: `"local"` or a host ID. */
+    host: string;
     /** The shard IDs managed by this cluster. */
     shards: number[];
     /** Where the cluster is in its life. */
@@ -174,6 +183,10 @@ export interface ClusterManagerEvents {
     clusterGiveUp: [cluster: ClusterInfo];
     /** A failed cluster's shards were moved to another cluster. */
     shardsReassigned: [info: { shardIds: number[]; from: number; to: number }];
+    /** A host joined the deployment. */
+    hostJoin: [hostId: string];
+    /** A host left or was lost. Its clusters are treated as crashed. */
+    hostLeave: [hostId: string, reason: string];
     /** An IDENTIFY is waiting for the session-start budget to reset. */
     identifyWait: [info: { shardId: number; waitMs: number }];
     /** Something went wrong that did not stop the deployment (a bad frame, a failed recovery). */
@@ -247,6 +260,9 @@ export class ClusterManager {
     #coordinator?: IdentifyCoordinator;
     #allReady = false;
     #clusterCount = 0;
+    readonly #remote?: RemoteHosts;
+    /** Which host runs each cluster. Fixed for the life of a spawn, so a cluster returns to its host. */
+    readonly #hostOf = new Map<number, string>();
     #lastWait = "";
     readonly #listeners = new Map<
         keyof ClusterManagerEvents,
@@ -302,6 +318,12 @@ export class ClusterManager {
             "parent",
             options.maxPendingRequests,
         );
+        if (options.remote)
+            this.#remote = new RemoteHosts(options.remote, {
+                join: (id) => this.#emit("hostJoin", id),
+                leave: (id, reason) => this.#emit("hostLeave", id, reason),
+                error: (error) => this.#emit("error", error),
+            });
     }
 
     /** Listens for a deployment event. @returns This manager. */
@@ -433,6 +455,13 @@ export class ClusterManager {
         const chunks = allocateShards(ids, clusterCount);
         assertCompleteAllocation(chunks, ids);
 
+        const placement = await this.#placeHosts().catch((error: unknown) => {
+            // A shutdown that interrupts the wait is not a failure of the start.
+            if (this.#stopping) return undefined;
+            throw error;
+        });
+        if (!placement || this.#stopping) return;
+
         this.shardCount = count;
         this.#wasStarted = true;
         this.#owner.clear();
@@ -458,6 +487,9 @@ export class ClusterManager {
             .map((shards, id) => ({ id, shards }))
             .filter((chunk) => chunk.shards.length > 0);
         this.#clusterCount = active.length;
+        this.#hostOf.clear();
+        for (const chunk of active)
+            this.#hostOf.set(chunk.id, placement[chunk.id % placement.length]!);
         for (const [index, chunk] of active.entries()) {
             if (this.#stopping) return;
             for (const shard of chunk.shards) this.#owner.set(shard, chunk.id);
@@ -478,6 +510,36 @@ export class ClusterManager {
                 void this.checkAutoScale();
             }, this.#options.autoScaleInterval);
         }
+    }
+
+    /** Opens the listener for hosts and waits for them. @returns The places clusters run, in placement order. */
+    async #placeHosts(): Promise<string[]> {
+        const remote = this.#remote;
+        const options = this.#options.remote;
+        if (!remote || !options) return ["local"];
+        remote.start();
+        try {
+            await remote.waitFor(
+                options.hosts,
+                options.minHosts ?? 1,
+                options.joinTimeout ?? 60_000,
+            );
+        } catch (error) {
+            remote.stop();
+            throw error;
+        }
+        const ids = options.hosts ?? remote.connected();
+        return options.local ? ["local", ...ids] : ids;
+    }
+
+    /** The port hosts connect to, once the listener is open (useful with `remote.port: 0`). */
+    public get remotePort(): number | undefined {
+        return this.#remote?.port;
+    }
+
+    /** The hosts of this deployment: connected or not, and the clusters on each. Empty without `remote`. */
+    public hosts(): HostStatus[] {
+        return this.#remote?.status(this.#options.remote?.hosts) ?? [];
     }
 
     /** Waits `ms`, or less when a shutdown starts. */
@@ -501,8 +563,8 @@ export class ClusterManager {
      * same shard assignment is re-forked after the supervisor's delay.
      */
     #launch(id: number, shards: number[]): ClusterInfo {
-        const env: Record<string, string | undefined> = {
-            ...process.env,
+        // Only these cross to a remote host; the rest of a worker's environment is the host's own.
+        const contract: Record<string, string> = {
             SHARD_LIST: shards.join(","),
             SHARD_COUNT: this.shardCount.toString(),
             CLUSTER_ID: id.toString(),
@@ -511,14 +573,23 @@ export class ClusterManager {
             [WORKER_MARKER]: "1",
             LUNIBEE_IDENTIFY: this.#coordinator ? "coordinated" : "local",
         };
-        const child = this.#options.fork
-            ? this.#options.fork(this.#options.script, env)
-            : fork(this.#options.script, [], {
-                  env: env as NodeJS.ProcessEnv,
-              });
+        const host = this.#hostOf.get(id) ?? "local";
+        const env: Record<string, string | undefined> = {
+            ...process.env,
+            ...contract,
+        };
+        const child =
+            host !== "local" && this.#remote
+                ? this.#remote.createChild(host, id, contract)
+                : this.#options.fork
+                  ? this.#options.fork(this.#options.script, env)
+                  : fork(this.#options.script, [], {
+                        env: env as NodeJS.ProcessEnv,
+                    });
         const known = this.#infos.get(id);
         const info: ClusterInfo = known ?? {
             id,
+            host,
             process: child,
             shards,
             state: "starting",
@@ -1050,6 +1121,7 @@ export class ClusterManager {
                 ...(cluster.process.pid !== undefined && isLive(cluster.state)
                     ? { pid: cluster.process.pid }
                     : {}),
+                host: cluster.host,
                 shardIds: [...cluster.shards],
                 uptimeMs: isLive(cluster.state) ? now - cluster.startedAt : 0,
                 restarts: cluster.restarts,
@@ -1140,7 +1212,8 @@ export class ClusterManager {
     /** Gracefully shuts the existing clusters down and respawns them with the new shard count. @param newShardCount The new total shard count. */
     public async respawn(newShardCount: number): Promise<void> {
         this.#options.shardCount = newShardCount;
-        await this.shutdownAll();
+        // Hosts stay connected across a respawn, so they need not rejoin.
+        await this.#stop(this.#options.shutdownTimeout ?? 5000, true);
         this.#supervisor.reset();
         await this.spawn();
     }
@@ -1155,13 +1228,19 @@ export class ClusterManager {
     public shutdownAll(
         timeoutMs = this.#options.shutdownTimeout ?? 5000,
     ): Promise<void> {
-        this.#stopPromise ??= this.#shutdown(timeoutMs).finally(() => {
-            this.#stopPromise = undefined;
-        });
+        return this.#stop(timeoutMs, false);
+    }
+
+    #stop(timeoutMs: number, keepRemote: boolean): Promise<void> {
+        this.#stopPromise ??= this.#shutdown(timeoutMs, keepRemote).finally(
+            () => {
+                this.#stopPromise = undefined;
+            },
+        );
         return this.#stopPromise;
     }
 
-    async #shutdown(timeoutMs: number): Promise<void> {
+    async #shutdown(timeoutMs: number, keepRemote: boolean): Promise<void> {
         this.#stopping = true;
         this.#halt();
         // A spawn that is still forking sees `#stopping` and stops on its own.
@@ -1174,6 +1253,7 @@ export class ClusterManager {
         for (const cluster of this.#infos.values()) cluster.state = "stopped";
         this.clusters.clear();
         this.#startPromise = undefined;
+        if (!keepRemote) this.#remote?.stop();
         this.#stopping = false;
     }
 
@@ -1190,6 +1270,7 @@ export class ClusterManager {
         }
         this.#coordinator?.close();
         this.#coordinator = undefined;
+        this.#remote?.abortWaits();
         this.#tracker.close();
         for (const waiter of [...this.#readyWaiters])
             waiter.reject(new Error("The cluster manager is stopping."));
@@ -1241,6 +1322,7 @@ export class ClusterManager {
         }
         this.clusters.clear();
         this.#startPromise = undefined;
+        this.#remote?.stop();
         this.#stopping = false;
     }
 }

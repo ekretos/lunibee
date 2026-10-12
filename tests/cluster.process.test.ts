@@ -79,4 +79,68 @@ describe("ClusterManager over real forked processes", () => {
         expect(results.events).toContain("restart0");
         expect(results.final).toBe("stopped");
     }, 60_000);
+
+    test("hosts: two host agents run real workers; a killed worker and a lost host both recover", async () => {
+        const fixture = new URL("./fixtures/cluster-remote.ts", import.meta.url)
+            .pathname;
+        const child = Bun.spawn([process.execPath, fixture], {
+            stdout: "pipe",
+            stderr: "pipe",
+            env: { ...process.env, BUN_OPTIONS: "" },
+        });
+        const timer = setTimeout(() => child.kill("SIGKILL"), 50_000);
+        const [stdout, stderr, code] = await Promise.all([
+            new Response(child.stdout).text(),
+            new Response(child.stderr).text(),
+            child.exited,
+        ]);
+        clearTimeout(timer);
+        expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
+        const results = Object.fromEntries(
+            stdout
+                .trim()
+                .split("\n")
+                .map((line) => {
+                    const { key, value } = JSON.parse(line) as {
+                        key: string;
+                        value: unknown;
+                    };
+                    return [key, value];
+                }),
+        ) as Record<string, any>;
+
+        expect(results.health.state).toBe("ready");
+        expect(results.health.clusters.map((c: any) => c.host)).toEqual([
+            "east",
+            "west",
+        ]);
+        expect(
+            results.hosts.map((h: any) => [h.id, h.connected, h.clusters]),
+        ).toEqual([
+            ["east", true, [0]],
+            ["west", true, [1]],
+        ]);
+        expect(results.broadcast.missing).toEqual([]);
+        expect(results.broadcast.replies).toHaveLength(4);
+        // Workers on different hosts are different processes.
+        const pids = new Set(
+            results.broadcast.replies.map((r: any) => r.result.pid),
+        );
+        expect(pids.size).toBe(2);
+        expect(results.one.shard ?? results.one.result?.shard).toBe(3);
+        expect(results.restart.before).not.toBe(results.restart.after);
+        expect(results.restart.host).toBe("west");
+        // The host went away: its worker was killed right away.
+        expect(results.fenced.eastAlive).toBe(false);
+        expect(results.rejoined).toBe(4);
+        expect(results.alive).toEqual([]);
+        expect(results.events).toEqual(
+            expect.arrayContaining([
+                "join:east",
+                "join:west",
+                "restart1@west",
+                "leave:east",
+            ]),
+        );
+    }, 70_000);
 });

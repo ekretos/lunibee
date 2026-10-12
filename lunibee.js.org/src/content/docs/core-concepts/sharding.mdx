@@ -291,8 +291,90 @@ A shard's lifecycle `status` (`connecting`, `ready`, `disconnected`, `unstable`)
 
 By default a cluster that exceeds `supervisor.maxRestarts` stays down (`clusterGiveUp`, `onGiveUp`). With `reassignOnGiveUp: true` the parent asks the ready cluster that owns the fewest shards to start them; ownership moves only after that worker confirms, and the failed process is already dead, so no shard has two owners. If no cluster is ready or the worker refuses, an `error` event says so and the shards stay down.
 
+### Multiple hosts
+
+One **coordinator** (a `ClusterManager`) and one **host agent** (`ClusterHost`) per extra machine. The coordinator keeps everything above: the shard-to-cluster map, IDENTIFY slots, routing, health and recovery. A host only starts the worker script for the clusters placed on it and relays their IPC frames over a WebSocket, so a cluster on another machine behaves like a local one, and IDENTIFY pacing holds for the whole bot.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+// coordinator.ts
+import { ClusterManager } from "lunibee";
+
+const clusters = new ClusterManager({
+  token: process.env.DISCORD_TOKEN!,
+  script: "./worker.ts",          // only used for clusters on this machine (remote.local)
+  shardCount: "auto",
+  clusterCount: 6,
+  waitForReady: true,
+  remote: {
+    port: 7070,
+    secret: process.env.CLUSTER_SECRET!,   // 16+ characters, shared with every host
+    hosts: ["eu-1", "eu-2", "us-1"],       // clusters are placed on these, in this order
+    lease: 15_000,
+  },
+});
+await clusters.spawn();   // waits for the hosts to join, then places clusters on them
+
+// host.ts, on each machine
+import { ClusterHost } from "lunibee";
+
+const host = new ClusterHost({
+  url: "wss://coordinator.example.com:7070",
+  secret: process.env.CLUSTER_SECRET!,
+  id: "eu-1",
+  script: "./worker.ts",           // the host decides what runs; the coordinator cannot
+});
+await host.connect();              // rejects if the secret or ID is refused; reconnects by itself later
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// coordinator.js
+import { ClusterManager } from "lunibee";
+
+const clusters = new ClusterManager({
+  token: process.env.DISCORD_TOKEN,
+  script: "./worker.js",
+  shardCount: "auto",
+  clusterCount: 6,
+  waitForReady: true,
+  remote: {
+    port: 7070,
+    secret: process.env.CLUSTER_SECRET,
+    hosts: ["eu-1", "eu-2", "us-1"],
+    lease: 15_000,
+  },
+});
+await clusters.spawn();
+
+// host.js, on each machine
+import { ClusterHost } from "lunibee";
+
+const host = new ClusterHost({
+  url: "wss://coordinator.example.com:7070",
+  secret: process.env.CLUSTER_SECRET,
+  id: "eu-1",
+  script: "./worker.js",
+});
+await host.connect();
+```
+</TabItem>
+</Tabs>
+
+**Placement.** Cluster `n` goes to host `n % hosts.length`, in the order of `remote.hosts` (or, without it, the hosts that had joined at `spawn()`, sorted by ID; `minHosts` says how many to wait for). `remote.local: true` adds the coordinator's own machine as the first place. A cluster stays on its host for the life of the spawn: when it crashes it restarts there, and while the host is away it is `restarting`. With `reassignOnGiveUp`, its shards move to a ready cluster on any host after `supervisor.maxRestarts`.
+
+**Security.**
+- A host proves it knows `remote.secret` by answering a random challenge with an HMAC (the secret never travels), and the coordinator checks it in constant time. Unknown IDs (when `hosts` is set), duplicates, protocol mismatches, malformed or binary frames and a missing hello are closed with codes `4401`, `4410`, `4409`, `4426`, `4400` and `4408` (`RemoteClose`).
+- A coordinator can only set the worker contract variables (`SHARD_LIST`, `SHARD_COUNT`, `CLUSTER_ID`, `CLUSTER_COUNT`, `LUNIBEE_SHARD_BUS`, `LUNIBEE_CLUSTER_WORKER`, `LUNIBEE_IDENTIFY`) in a remote worker and can only send `SIGTERM`, `SIGKILL` or `SIGINT`; the script is the host's own, and the bot token is read from the host's environment, never sent.
+- The HMAC does not encrypt or sign the frames. Across a network you do not control, terminate TLS (`remote.tls` gives `wss://`, or put a TLS proxy in front) and restrict the port.
+
+**Failure and fencing.** A shard must never run in two places. A host kills all its workers the moment its connection closes, and also after one `lease` without hearing from the coordinator. The coordinator pings every third of a lease and treats a host as lost only after two leases of silence, so the host has already fenced itself; only then are its clusters restarted (`hostLeave` event). When a host reconnects with the same ID (it retries with backoff), its clusters start again on it (`hostJoin`). `hosts()` lists every host with its clusters, and `health().clusters[].host` says where each cluster runs.
+
 ### Limits
 
-- Clusters are local child processes. The design leaves room for workers on other hosts (`shardIds` splits a deployment across hosts, and each host runs its own `ClusterManager`), but IDENTIFY coordination, routing and health do **not** cross hosts yet: run one coordinator per bot, or pace across hosts yourself.
+- The coordinator is a single process and a single point of failure for the deployment: if it stops, hosts fence their workers. Run it under a supervisor.
+- `remote` needs Bun on the coordinator (it listens with `Bun.serve`); a `ClusterHost` needs a global `WebSocket` and `child_process.fork` (Bun or Node 22).
+- Hosts do not take over for a lost coordinator, and a lost host's clusters are not moved to other hosts unless `reassignOnGiveUp` is on.
 - Messages between shards of the *same* worker process do not go through the parent: the parent relays only between clusters.
 - Gateways you create yourself (a plain `Client` with `gateway: { shardId }`) are not paced by the parent; use `ShardManager` or `ClusterWorker.current()?.identifyGate`.

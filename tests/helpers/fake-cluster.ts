@@ -34,6 +34,8 @@ export class FakeChild extends EventEmitter {
     public readonly kills: (string | undefined)[] = [];
     /** Every frame the parent sent, in order. */
     public readonly sent: Frame[] = [];
+    /** When each frame was sent (epoch ms), parallel to `sent`. */
+    public readonly sentAt: number[] = [];
     public ignoreTerm = false;
     public behavior: WorkerBehavior = {};
 
@@ -55,6 +57,7 @@ export class FakeChild extends EventEmitter {
 
     public send(frame: Frame): boolean {
         this.sent.push(frame);
+        this.sentAt.push(Date.now());
         queueMicrotask(() => this.#answer(frame));
         return true;
     }

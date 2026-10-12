@@ -39,6 +39,7 @@ console.log(replies.reduce((sum, reply) => sum + (reply.result ?? 0), 0));
   waits for readiness (`ready()`, `waitForReady`, `startTimeout`), restarts crashed clusters with
   backoff, routes `request()` / `broadcast()` / `requestCluster()` to the owning cluster, reports
   `health()`, and can move a failed cluster's shards to another cluster (`reassignOnGiveUp`).
+  With `remote`, it is a coordinator for `ClusterHost` agents on other machines (authenticated WebSocket, fenced workers).
   Inside a worker, `ShardManager` owns only the cluster's shards and uses the parent for IDENTIFY.
 - **`ShardBus`**: `send`, `broadcast`, `on`/`off`, `onError`, and request/reply with
   `respond`, `request` and `broadcastRequest`. This replaces discord.js's
