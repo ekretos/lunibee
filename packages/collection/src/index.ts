@@ -2,6 +2,8 @@
 export interface CollectionOptions<K = unknown, V = unknown> {
     /** Default sliding TTL in ms for `set()`. Omit for no expiry. */
     ttl?: number;
+    /** Fraction (0-1) of each entry's TTL randomly shaved off when it is set, so entries stored together do not expire together. Default `0`. */
+    jitter?: number;
     /** Maximum entries stored with `set()`; least-recently-used are evicted past it. `setWithoutTTL()` entries are never counted or evicted. */
     maxSize?: number;
     /** Whether a read restarts a TTL entry's window. Default `true`; with `false` an entry lapses a fixed time after it was set, and reads only mark it recently used. */
@@ -63,6 +65,7 @@ type Policy<K, V> = {
     armedFor: number;
     /** The options, kept here so a plain collection carries none of them. */
     ttl: number | undefined;
+    jitter: number;
     maxSize: number | undefined;
     slide: boolean;
     /** Stored loosely typed so the callback does not make Collection invariant in K and V. */
@@ -76,6 +79,7 @@ type Policy<K, V> = {
 function newPolicy<K, V>(options: CollectionOptions<K, V> = {}): Policy<K, V> {
     return {
         ttl: options.ttl,
+        jitter: options.jitter ?? 0,
         maxSize: options.maxSize,
         slide: options.slide ?? true,
         onEvict: options.onEvict as Policy<K, V>["onEvict"],
@@ -181,12 +185,18 @@ export class Collection<K, V> extends Map<K, V> {
         super();
         assertTTL(options.ttl);
         if (
+            options.jitter !== undefined &&
+            !(options.jitter >= 0 && options.jitter <= 1)
+        )
+            throw new RangeError("jitter must be between 0 and 1.");
+        if (
             options.maxSize !== undefined &&
             (!Number.isInteger(options.maxSize) || options.maxSize <= 0)
         )
             throw new RangeError("maxSize must be a positive integer.");
         if (
             options.ttl !== undefined ||
+            options.jitter !== undefined ||
             options.maxSize !== undefined ||
             options.slide !== undefined ||
             options.onEvict !== undefined
@@ -204,7 +214,12 @@ export class Collection<K, V> extends Map<K, V> {
         if (ttl === undefined && this.#policy === undefined)
             return super.set(key, value);
         assertTTL(ttl);
-        const window = ttl ?? this.#policy?.ttl;
+        let window = ttl ?? this.#policy?.ttl;
+        if (window !== undefined && this.#policy!.jitter > 0)
+            window = Math.max(
+                1,
+                window * (1 - this.#policy!.jitter * Math.random()),
+            );
         if (window !== undefined) this.#policy ??= newPolicy();
         if (!this.#policy) return super.set(key, value);
         // A key that was not stored before has no policy entry.
