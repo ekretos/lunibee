@@ -198,8 +198,23 @@ export class CreateEmbed {
     public get data(): APIEmbed {
         return this.toJSON();
     }
+    /** Returns a deep-cloned Discord API payload. @returns Strict embed payload. @throws {RangeError} If the text in the embed adds up to more than Discord's 6000-character limit. */
     public toJSON(): APIEmbed {
-        return structuredClone(this.#data);
+        const data = this.#data;
+        const total =
+            (data.title?.length ?? 0) +
+            (data.description?.length ?? 0) +
+            (data.footer?.text.length ?? 0) +
+            (data.author?.name.length ?? 0) +
+            (data.fields ?? []).reduce(
+                (sum, field) => sum + field.name.length + field.value.length,
+                0,
+            );
+        if (total > 6000)
+            throw new RangeError(
+                `An embed cannot contain more than 6000 characters in total (this one has ${total}).`,
+            );
+        return structuredClone(data);
     }
 }
 /** Validates a bounded Discord string field. @param value Field value. @param max Maximum length. @param field Human-readable field name. @returns Validated value. @throws {RangeError} If length is invalid. */

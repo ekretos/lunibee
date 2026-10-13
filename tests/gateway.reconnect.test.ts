@@ -343,7 +343,7 @@ describe("Gateway reconnect wiring", () => {
         expect(gateway.state).toBe(GatewayState.Closed);
         await wait(80);
         expect(FakeWebSocket.instances).toHaveLength(1);
-        expect(() => gateway.connect()).toThrow(/permanently closed/);
+        await expect(gateway.connect()).rejects.toThrow(/permanently closed/);
     });
 
     test("14-15: WS-003 — a fatal close leaves the Gateway CLOSED", async () => {
@@ -369,7 +369,7 @@ describe("Gateway reconnect wiring", () => {
         // than as though an attempt were imminent.
         expect(FakeWebSocket.instances).toHaveLength(1);
         expect(gateway.state).toBe(GatewayState.Closed);
-        expect(() => gateway.connect()).toThrow(/permanently closed/);
+        await expect(gateway.connect()).rejects.toThrow(/permanently closed/);
     });
 
     test("10: a successful reconnect clears the attempt state", async () => {

@@ -324,10 +324,12 @@ export class Gateway {
         );
     }
 
-    /** Opens the Gateway connection. @param url Gateway WebSocket URL. @returns Promise fulfilled when the socket opens. @throws {GatewayError} If permanently closed or unable to connect. */
+    /** Opens the Gateway connection. @param url Gateway WebSocket URL. @returns Promise fulfilled when the socket opens; it rejects with a GatewayError if the Gateway was permanently closed or cannot connect. */
     public connect(url = DEFAULT_GATEWAY_URL): Promise<void> {
         if (this.state === GatewayState.Closed)
-            throw new GatewayError("Gateway has been permanently closed.");
+            return Promise.reject(
+                new GatewayError("Gateway has been permanently closed."),
+            );
         // At most one logical connection attempt is active: concurrent callers
         // join the in-flight attempt rather than opening competing sockets.
         const inFlight = this.#reconnect.attemptPromise;
