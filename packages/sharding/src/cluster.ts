@@ -1,4 +1,9 @@
-import { fetchGatewayBot, type GatewayBotInfo } from "./gateway-bot.js";
+import {
+    assertGuildsPerShard,
+    fetchGatewayBot,
+    resolveShardCount,
+    type GatewayBotInfo,
+} from "./gateway-bot.js";
 import { fork, type ChildProcess } from "node:child_process";
 import { cpus } from "node:os";
 import { REPLY_TYPE, type ReplyPayload, type ShardReply } from "./bus.js";
@@ -39,6 +44,16 @@ export interface ClusterManagerOptions {
     script: string;
     /** Total number of shards. Use "auto" to request Discord's recommended count. */
     shardCount?: number | "auto";
+    /**
+     * With `shardCount: "auto"`, size the deployment by guilds instead of
+     * Discord's recommendation: `ceil(guilds / guildsPerShard)` shards, at
+     * least one. 1 to 2500 (Discord's limit); Discord recommends about 1000.
+     * Guilds are assigned to shards by their ID, so this sets the average,
+     * not an exact split.
+     */
+    guildsPerShard?: number;
+    /** The bot's guild count for `guildsPerShard`, instead of asking Discord for it. */
+    guildCount?: number;
     /**
      * The shards this deployment runs, out of `shardCount`. Use it to split one
      * bot across hosts: each host runs a `ClusterManager` with its own range.
@@ -305,6 +320,13 @@ export class ClusterManager {
         ] as const)
             if (value !== undefined && !(value >= 0))
                 throw new RangeError(`${name} cannot be negative.`);
+        if (options.guildsPerShard !== undefined) {
+            assertGuildsPerShard(options.guildsPerShard);
+            if (typeof options.shardCount === "number")
+                throw new RangeError(
+                    'guildsPerShard needs shardCount: "auto".',
+                );
+        }
         if (options.shardIds && typeof options.shardCount === "number")
             validateShardIds(options.shardIds, options.shardCount);
 
@@ -360,7 +382,11 @@ export class ClusterManager {
 
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
     public async fetchRecommendedShardCount(): Promise<number> {
-        return (await fetchGatewayBot(this.#options.token)).shards;
+        return resolveShardCount(
+            this.#options.token,
+            await fetchGatewayBot(this.#options.token),
+            this.#options,
+        );
     }
 
     /** The cluster that owns a shard, or `undefined` when the shard is not part of this deployment. */
@@ -406,9 +432,15 @@ export class ClusterManager {
     }> {
         const { shardCount, maxConcurrency, fetchLimits } = this.#options;
         let info: GatewayBotInfo | undefined;
-        if (shardCount === "auto" || shardCount === undefined)
+        let count: number | undefined;
+        if (shardCount === "auto" || shardCount === undefined) {
             info = await fetchGatewayBot(this.#options.token);
-        else if (fetchLimits)
+            count = await resolveShardCount(
+                this.#options.token,
+                info,
+                this.#options,
+            );
+        } else if (fetchLimits)
             try {
                 info = await fetchGatewayBot(this.#options.token);
             } catch (error) {
@@ -419,10 +451,7 @@ export class ClusterManager {
             }
         const limit = info?.sessionStartLimit;
         return {
-            count:
-                shardCount === "auto" || shardCount === undefined
-                    ? info!.shards
-                    : shardCount,
+            count: count ?? (shardCount as number),
             maxConcurrency: Math.min(
                 maxConcurrency ?? limit?.maxConcurrency ?? 1,
                 limit?.maxConcurrency ?? Number.POSITIVE_INFINITY,

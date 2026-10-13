@@ -1,4 +1,9 @@
-import { fetchGatewayBot, type GatewayBotInfo } from "./gateway-bot.js";
+import {
+    assertGuildsPerShard,
+    fetchGatewayBot,
+    resolveShardCount,
+    type GatewayBotInfo,
+} from "./gateway-bot.js";
 import { Gateway, GatewayState } from "@lunibee/ws";
 import {
     readClusterContext,
@@ -18,7 +23,13 @@ import { ClusterWorker, type IdentifyGate } from "./worker.js";
 const sleep = (ms: number): Promise<void> =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export { fetchGatewayBot, type GatewayBotInfo } from "./gateway-bot.js";
+export {
+    MAX_GUILDS_PER_SHARD,
+    fetchGatewayBot,
+    fetchGuildCount,
+    shardsForGuilds,
+    type GatewayBotInfo,
+} from "./gateway-bot.js";
 export { ShardBus } from "./bus.js";
 export {
     BroadcastChannelTransport,
@@ -120,6 +131,16 @@ export interface ShardManagerOptions {
     intents: ConstructorParameters<typeof Gateway>[0]["intents"];
     /** Number of shards. Use `"auto"` to request Discord's recommended count. */
     shardCount?: number | "auto";
+    /**
+     * With `shardCount: "auto"`, size the deployment by guilds instead of
+     * Discord's recommendation: `ceil(guilds / guildsPerShard)` shards, at
+     * least one. 1 to 2500 (Discord's limit); Discord recommends about 1000.
+     * Guilds are assigned to shards by their ID, so this sets the average,
+     * not an exact split.
+     */
+    guildsPerShard?: number;
+    /** The bot's guild count for `guildsPerShard`, instead of asking Discord for it. */
+    guildCount?: number;
     /** Gateway reconnect behavior. */
     reconnect?: boolean;
     /**
@@ -270,6 +291,13 @@ export class ShardManager {
               : options.shardCount;
         if (!Number.isInteger(count) || count < 1)
             throw new RangeError("Shard count must be a positive integer.");
+        if (options.guildsPerShard !== undefined) {
+            assertGuildsPerShard(options.guildsPerShard);
+            if (options.shardCount !== "auto")
+                throw new RangeError(
+                    'guildsPerShard needs shardCount: "auto".',
+                );
+        }
         this.#ids = options.shardIds ?? context?.shardIds;
         if (this.#ids && options.shardCount !== "auto")
             validateShardIds(this.#ids, count);
@@ -343,7 +371,11 @@ export class ShardManager {
     }
     /** Retrieves Discord's recommended shard count. @returns Recommended shard count. @throws {Error} If discovery fails or returns invalid data. */
     public async fetchRecommendedShardCount(): Promise<number> {
-        return (await this.fetchGatewayInfo()).shards;
+        return resolveShardCount(
+            this.#options.token,
+            await this.fetchGatewayInfo(),
+            this.#options,
+        );
     }
     /** Retrieves `/gateway/bot`: recommended shards and the IDENTIFY budget. Remembered for pacing the next connect. @throws {Error} If discovery fails or returns invalid data. */
     public async fetchGatewayInfo(): Promise<GatewayBotInfo> {

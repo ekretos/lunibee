@@ -20,6 +20,8 @@ import { ClusterManager, ClusterWorker, readClusterContext } from "lunibee";
 | `token` | `string` | Required | Bot token. |
 | `script` | `string` | Required | Worker script, run once per cluster. |
 | `shardCount` | `number \| "auto"` | `"auto"` | Total shards. |
+| `guildsPerShard` | `number` | none | With `"auto"`, size by guilds: `ceil(guilds / guildsPerShard)` shards, 1 to 2500. Discord recommends about 1000. |
+| `guildCount` | `number` | asked from Discord | The guild count for `guildsPerShard`, to skip the request. |
 | `shardIds` | `number[]` | all | The slice of `shardCount` this deployment runs (several hosts). |
 | `clusterCount` | `number` | logical CPUs | Clusters to start. Clusters without shards are not forked. |
 | `shardsPerCluster` | `number` | none | Alternative to `clusterCount`; setting both throws. |

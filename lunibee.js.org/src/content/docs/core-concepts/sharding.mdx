@@ -232,6 +232,18 @@ await shards.connect();
 </TabItem>
 </Tabs>
 
+### How many shards, how many per cluster
+
+Two numbers decide the layout, and you can set either:
+
+- **Guilds per shard.** Discord assigns a guild to a shard by its ID, so you cannot place guilds one by one; you choose the **shard count**. With `shardCount: "auto"`, `guildsPerShard: 1000` gives `ceil(guilds / 1000)` shards (at least one), using the guild count Discord reports for your application, or `guildCount` if you pass it. Without `guildsPerShard`, `"auto"` uses Discord's own recommendation. The value is capped at 2500, Discord's limit per shard, and the count is re-checked by `autoScaleInterval`. Guild IDs spread evenly, so a shard holds about that many guilds, not exactly.
+- **Shards per cluster.** `shardsPerCluster: 4` starts `ceil(shards / 4)` clusters; or set `clusterCount` instead (not both).
+
+```ts
+new ClusterManager({ token, script: "./worker.ts", shardCount: "auto", guildsPerShard: 1000, shardsPerCluster: 4 });
+// 12,000 guilds → 12 shards → 3 clusters of 4 shards
+```
+
 ### The worker contract
 
 `ClusterManager` sets these variables in every worker. `readClusterContext()` parses them; `isClusterWorker()` tells a worker it is one.

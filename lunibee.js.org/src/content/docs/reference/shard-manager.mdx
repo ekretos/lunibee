@@ -46,6 +46,7 @@ new ShardManager(options )
 | `token` | `string` | Required | Discord bot token. |
 | `intents` | `GatewayIntentResolvable` (array) | Required | Gateway intents for all shards. |
 | `shardCount` | `number \| "auto"` | `1` | Number of shards. `"auto"` fetches Discord's recommendation. |
+| `guildsPerShard` / `guildCount` | `number` | none | With `"auto"`, `ceil(guilds / guildsPerShard)` shards (1 to 2500) instead of Discord's recommendation; `guildCount` skips asking Discord. |
 | `shardIds` | `number[]` | all (or the cluster's list) | The shards this manager runs, out of `shardCount`. |
 | `cluster` | `ClusterContext \| false` | read from the environment | The worker contract. `false` ignores it. |
 | `identify` | `IdentifyGate \| false` | the parent inside a coordinated cluster | Where IDENTIFY slots come from. `false` paces locally with `spawnDelay`. |
