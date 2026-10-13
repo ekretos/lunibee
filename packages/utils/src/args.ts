@@ -212,7 +212,8 @@ export function parsePrefixArgs(
     specs: readonly PrefixArgSpec[],
 ): PrefixArgsResult {
     const args = typeof input === "string" ? tokenizeArgs(input) : [...input];
-    const values: Record<string, PrefixArgValue | undefined> = {};
+    const values: Record<string, PrefixArgValue | undefined> =
+        Object.create(null);
     let position = 0;
     for (const [index, spec] of specs.entries()) {
         if (spec.type === "rest" && index !== specs.length - 1)

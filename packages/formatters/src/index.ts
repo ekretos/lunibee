@@ -97,7 +97,7 @@ export function link(label: string, url: string, title?: string): string {
         (c) =>
             `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
     );
-    const titlePart = title ? ` "${title.replace(/["\n]/g, "")}"` : "";
+    const titlePart = title ? ` "${title.replace(/["\n)]/g, "")}"` : "";
     return `[${text}](${target}${titlePart})`;
 }
 
@@ -131,7 +131,11 @@ export function bulletList(...items: string[]): string {
 
 // ─── Utilities ─────────────────────────────────────────────────────────────────
 
-/** Escapes Discord markdown control characters in a string. */
+/**
+ * Escapes the inline Discord markdown characters `\ * _ ` ~ | >`. It does not
+ * neutralise headings, lists or `[label](url)` links: pair it with
+ * `allowedMentions` and never rely on it to sanitise untrusted text.
+ */
 export function escapeMarkdown(value: string): string {
     return value.replace(/[\\*_`~|>]/g, "\\$&");
 }

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { CreateEmbed } from "../packages/builders/src/index.ts";
+import { link } from "../packages/formatters/src/index.ts";
+import { parsePrefixArgs } from "../packages/utils/src/index.ts";
 
 describe("embed size", () => {
     test("the text of an embed adds up to at most 6000 characters", () => {
@@ -50,5 +52,31 @@ describe("embed size", () => {
             .setDescription("world")
             .toJSON();
         expect(json).toEqual({ title: "hello", description: "world" });
+    });
+});
+
+describe("audit F-E/F-F", () => {
+    test("spliceFields validates like addFields", () => {
+        const embed = new CreateEmbed();
+        expect(() =>
+            embed.spliceFields(0, 0, { name: "x".repeat(300), value: "v" }),
+        ).toThrow();
+        expect(() =>
+            embed.spliceFields(0, 0, { name: "", value: "v" }),
+        ).toThrow();
+    });
+
+    test("link() title cannot close the link", () => {
+        expect(
+            link("a", "https://x.test", 'T") [evil](https://e.test'),
+        ).not.toContain(") [evil]");
+    });
+
+    test("a prefix option named __proto__ is kept as a plain value", () => {
+        const r = parsePrefixArgs("hello", [
+            { name: "__proto__", type: "string", required: true },
+        ] as never);
+        expect(r.ok && Object.keys(r.values)).toEqual(["__proto__"]);
+        expect(r.ok && r.values["__proto__"]).toBe("hello");
     });
 });

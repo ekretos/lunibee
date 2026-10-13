@@ -171,7 +171,11 @@ export class CreateEmbed {
             throw new RangeError(
                 "Field index and delete count must be non-negative integers.",
             );
-        current.splice(index, deleteCount, ...fields);
+        for (const field of fields) {
+            validate(field.name, 256, "Embed field name");
+            validate(field.value, 1024, "Embed field value");
+        }
+        current.splice(index, deleteCount, ...fields.map((f) => ({ ...f })));
         if (current.length > 25)
             throw new RangeError(
                 "An embed cannot contain more than 25 fields.",
