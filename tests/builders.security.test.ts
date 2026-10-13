@@ -142,3 +142,24 @@ describe("attachment root", () => {
         ).rejects.toThrow(/outside/);
     });
 });
+
+describe("URL schemes (F-E4)", () => {
+    test("embeds, link buttons and link() refuse javascript:, file: and data:", async () => {
+        const { CreateButton } =
+            await import("../packages/builders/src/index.ts");
+        for (const bad of [
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+            "data:text/html,x",
+        ]) {
+            expect(() => new CreateEmbed().setURL(bad)).toThrow(TypeError);
+            expect(() => new CreateButton().setURL(bad)).toThrow(TypeError);
+            expect(() => link("x", bad)).toThrow(TypeError);
+        }
+        expect(() =>
+            new CreateEmbed().setImage("attachment://a.png"),
+        ).not.toThrow();
+        expect(() => new CreateButton().setURL("discord://x")).not.toThrow();
+        expect(link("x", "https://a.test")).toBe("[x](https://a.test)");
+    });
+});

@@ -208,6 +208,8 @@ export interface ClientOptions {
         emojis?: boolean;
         /** Keep each member's latest presence (needs the `GuildPresences` intent). Off by default: it is a lot of data. */
         presences?: boolean;
+        /** Most members kept per guild (least recently used leave first). Default: unbounded, so a big guild's member list stays whole. */
+        maxMembers?: number;
     };
     /**
      * Default `allowed_mentions` for every message the client sends (channel

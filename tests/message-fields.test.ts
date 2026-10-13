@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { Client } from "../packages/core/src/index.ts";
 import { Message } from "../packages/structures/src/index.ts";
 
@@ -98,4 +98,38 @@ test("MESSAGE_UPDATE carries the new fields", () => {
     });
     expect(updates[0]!.poll?.results?.is_finalized).toBe(true);
     expect(updates[0]!.stickers[0]!.name).toBe("wave");
+});
+
+describe("allowed_mentions validation (F-E8)", () => {
+    test("combinations Discord rejects fail before sending", async () => {
+        const { toRequest } =
+            await import("../packages/managers/src/message.ts");
+        expect(() =>
+            toRequest({
+                content: "x",
+                allowed_mentions: { parse: ["users"], users: ["1"] },
+            } as never),
+        ).toThrow(TypeError);
+        expect(() =>
+            toRequest({
+                content: "x",
+                allowed_mentions: { users: [1] },
+            } as never),
+        ).toThrow(TypeError);
+        expect(() =>
+            toRequest({
+                content: "x",
+                allowed_mentions: { parse: ["bots"] },
+            } as never),
+        ).toThrow(TypeError);
+        expect(() =>
+            toRequest({
+                content: "x",
+                allowed_mentions: { parse: ["everyone"], users: ["1"] },
+            } as never),
+        ).not.toThrow();
+        expect(() =>
+            toRequest({ content: "x" } as never, { parse: [] }),
+        ).not.toThrow();
+    });
 });

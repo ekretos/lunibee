@@ -30,6 +30,7 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
         guildId: string,
         rest: REST,
         context: () => ResourceContext | undefined = () => undefined,
+        maxSize?: number,
     ) {
         super(
             (id: string) =>
@@ -43,6 +44,7 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
                             ),
                     ),
             (member: GuildMember) => member.user.id,
+            maxSize,
         );
         this.guildId = guildId;
         this.#rest = rest;

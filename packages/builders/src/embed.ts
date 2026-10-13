@@ -229,9 +229,14 @@ function validate(value: string, max: number, field: string): string {
 }
 /** Validates and normalizes an absolute URL. @param value URL value. @param field Human-readable field name. @returns Normalized URL. @throws {TypeError} If URL is invalid. */
 function url(value: string, field: string): string {
+    let parsed: URL;
     try {
-        return new URL(value).toString();
+        parsed = new URL(value);
     } catch (error) {
         throw new TypeError(`${field} must be a valid URL.`, { cause: error });
     }
+    // `attachment://` points an image at an uploaded file.
+    if (!["http:", "https:", "attachment:"].includes(parsed.protocol))
+        throw new TypeError(`${field} must use http, https or attachment.`);
+    return parsed.toString();
 }

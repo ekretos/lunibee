@@ -77,13 +77,15 @@ export class GuildManager extends ResourceManager<string, Guild> {
         if (!manager) map.set(guildId, (manager = create()));
         return manager;
     }
-    public constructor(rest: REST) {
+    readonly #maxMembers?: number;
+    public constructor(rest: REST, options: { maxMembers?: number } = {}) {
         super(
             async (id) =>
                 new Guild(await rest.get<GuildData>(Routes.guild(id))),
             (guild) => guild.id,
         );
         this.#rest = rest;
+        this.#maxMembers = options.maxMembers;
     }
 
     /** Ban manager for a guild (one instance per guild). */
@@ -118,6 +120,7 @@ export class GuildManager extends ResourceManager<string, Guild> {
                     guildId,
                     this.#rest,
                     () => this.#context,
+                    this.#maxMembers,
                 )),
             );
         return manager;

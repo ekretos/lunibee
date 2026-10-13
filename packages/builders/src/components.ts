@@ -302,6 +302,8 @@ export class CreateButton {
                 cause: error,
             });
         }
+        if (!["http:", "https:", "discord:"].includes(url.protocol))
+            throw new TypeError("Button URL must use http, https or discord.");
         this.setStyle(ButtonType.Link);
         this.#data.url = url.toString();
         return this;

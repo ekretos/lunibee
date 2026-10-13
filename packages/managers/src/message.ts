@@ -38,6 +38,38 @@ export function toAttachments(
  * data as UTF-8. `allowedMentions` is the client's default, applied only when
  * the payload has no `allowed_mentions` of its own.
  */
+/**
+ * Refuses an `allowed_mentions` object Discord would answer with 400: a kind
+ * both in `parse` and listed by id, an unknown `parse` value, or non-string ids.
+ * @throws {TypeError} If the object is invalid.
+ */
+export function assertAllowedMentions(mentions: AllowedMentions): void {
+    const parse = mentions.parse ?? [];
+    for (const kind of parse)
+        if (!["roles", "users", "everyone"].includes(kind))
+            throw new TypeError(
+                `allowed_mentions.parse has unknown value "${String(kind)}".`,
+            );
+    for (const [kind, list] of [
+        ["users", mentions.users],
+        ["roles", mentions.roles],
+    ] as const) {
+        if (list === undefined) continue;
+        if (!Array.isArray(list) || list.some((id) => typeof id !== "string"))
+            throw new TypeError(
+                `allowed_mentions.${kind} must be an array of ID strings.`,
+            );
+        if (list.length > 100)
+            throw new RangeError(
+                `allowed_mentions.${kind} holds at most 100 IDs.`,
+            );
+        if (list.length > 0 && parse.includes(kind))
+            throw new TypeError(
+                `allowed_mentions cannot list ${kind} by ID and also parse "${kind}".`,
+            );
+    }
+}
+
 export function toRequest(
     options: MessageCreateOptions,
     allowedMentions?: AllowedMentions,
@@ -50,6 +82,7 @@ export function toRequest(
     const { files, ...body } = options;
     if (allowedMentions !== undefined && body.allowed_mentions === undefined)
         body.allowed_mentions = allowedMentions;
+    if (body.allowed_mentions) assertAllowedMentions(body.allowed_mentions);
     if (!files?.length) return body;
     return {
         body,

@@ -93,6 +93,8 @@ export function codeBlock(text: string, language = ""): string {
 export function link(label: string, url: string, title?: string): string {
     // Brackets in the label and parentheses, quotes or spaces in the URL would
     // otherwise end the link early and let the rest render as a second link.
+    if (!/^(?:https?|discord):\/\//i.test(url))
+        throw new TypeError("link() only accepts http, https or discord URLs.");
     const text = label.replace(/[[\]\\]/g, "\\$&").replace(/\n/g, " ");
     const target = url.replace(
         /[()\s"]/g,

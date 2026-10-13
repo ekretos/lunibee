@@ -11,7 +11,14 @@ export function splitReason<T extends { reason?: string }>(
 /** Generic cache manager. @typeParam K Cache key type. @typeParam V Cached value type. */
 export class Manager<K, V> {
     /** Authoritative resource state. Entries never expire: see {@link Manager.set}. */
-    public readonly cache = new Collection<K, V>();
+    public readonly cache: Collection<K, V>;
+    readonly #bounded: boolean;
+
+    /** @param maxSize Most entries kept; the least recently used go first. Default: unbounded. */
+    public constructor(maxSize?: number) {
+        this.#bounded = maxSize !== undefined;
+        this.cache = new Collection<K, V>(null, { maxSize });
+    }
     /** Gets a cached value. @param id Cache key. @returns Cached value. */
     public get(id: K): V | undefined {
         return this.cache.get(id);
@@ -67,7 +74,9 @@ export class Manager<K, V> {
     /** Stores a resource with `setWithoutTTL()`, so it leaves only on an explicit delete (e.g. a Gateway `*_DELETE`), never through TTL. @param id Cache key. @param value Value. @returns This manager. */
     public set(id: K, value: V): this {
         this.#markDirty(id);
-        this.cache.setWithoutTTL(id, value);
+        // A bounded manager must count its entries, which `setWithoutTTL` does not.
+        if (this.#bounded) this.cache.set(id, value);
+        else this.cache.setWithoutTTL(id, value);
         return this;
     }
     /** Deletes a cached value. @param id Cache key. @returns True when deleted. */
@@ -106,8 +115,12 @@ export class ResourceManager<K, V> extends Manager<K, V> {
     readonly #fetcher: (id: K) => Promise<V>;
     readonly #key: (value: V) => K;
 
-    public constructor(fetcher: (id: K) => Promise<V>, key: (value: V) => K) {
-        super();
+    public constructor(
+        fetcher: (id: K) => Promise<V>,
+        key: (value: V) => K,
+        maxSize?: number,
+    ) {
+        super(maxSize);
         if (typeof fetcher !== "function" || typeof key !== "function")
             throw new TypeError(
                 "ResourceManager requires fetcher and key functions.",

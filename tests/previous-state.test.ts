@@ -242,3 +242,21 @@ describe("destroy (F-D4)", () => {
         expect(client.guilds.size).toBe(0);
     });
 });
+
+describe("cache.maxMembers (F-D3)", () => {
+    test("bounds the members kept per guild", () => {
+        const client = new Client({
+            token: "a.b",
+            intents: [513],
+            cache: { maxMembers: 2 },
+        });
+        for (const id of ["1", "2", "3"])
+            client.ws.emit("GUILD_MEMBER_ADD", {
+                guild_id: GUILD,
+                user: { id, username: id },
+                roles: [],
+            });
+        expect(client.guilds.members(GUILD).cache.size).toBe(2);
+        expect(client.guilds.members(GUILD).get("1")).toBeUndefined();
+    });
+});

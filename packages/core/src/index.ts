@@ -420,7 +420,9 @@ export class Client
     readonly #gateway: Gateway;
     /** Which resources Gateway events are allowed to cache. */
     readonly #collectors = new Set<{ stop(reason?: string): void }>();
-    readonly #cache: Required<NonNullable<ClientOptions["cache"]>>;
+    readonly #cache: Required<
+        Omit<NonNullable<ClientOptions["cache"]>, "maxMembers">
+    >;
     readonly #resourceContext: ResourceContext;
 
     public constructor(public readonly options: ClientOptions) {
@@ -437,7 +439,9 @@ export class Client
             ...options.cache,
         };
         this.users = new UserManager(this.rest);
-        this.guilds = new GuildManager(this.rest);
+        this.guilds = new GuildManager(this.rest, {
+            maxMembers: options.cache?.maxMembers,
+        });
         this.channels = new ChannelManager(this.rest, {
             messageCache: options.messageCache,
             allowedMentions: options.allowedMentions,
