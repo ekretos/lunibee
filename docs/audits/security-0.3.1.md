@@ -234,3 +234,25 @@ Every claim was checked against the code first; each fix has a regression test t
 | Remaining P3 (F-A5, A6, B4–B7, C3, C4, D*, E4+, H3 …)       | P3  | **Open — hardening backlog**                                                                  |
 
 GitHub repository settings (branch protection, secret scanning) remain unverified.
+
+## Reported after release candidate — builder payload bugs
+
+### B-01 — `CreateThumbnail` emits a payload Discord rejects
+
+- **Severity:** P1 (breaks a common production path: any message with a Thumbnail component fails)
+- **Location:** `packages/builders/src/components.ts`, `CreateThumbnail.toJSON()` and `APIThumbnailComponent`
+- **Problem:** the builder outputs `{ type: 11, url }`; Discord requires `{ type: 11, media: { url } }`.
+- **Impact:** the whole message is rejected with `Invalid Form Body` (50035). Reported by a downstream bot whose now-playing card (song artwork) failed on every send; it works around it with its own helper.
+- **Fix:** emit `media: { url }`, with `description` and `spoiler` beside `media` as Discord documents; align `APIThumbnailComponent`.
+- **Regression test:** assert the exact `toJSON()` shape.
+- **Status:** Open
+
+### B-02 — `CreateMediaGallery` puts `description` inside `media`
+
+- **Severity:** P2
+- **Location:** `packages/builders/src/components.ts`, `CreateMediaGallery.addItems()` / `APIMediaGalleryComponent`
+- **Problem:** items are `{ media: { url, description } }`; Discord expects `{ media: { url }, description }`.
+- **Impact:** descriptions (alt text) are likely dropped silently rather than rejected (reported, not yet confirmed against the API).
+- **Fix:** move `description` (and `spoiler`) beside `media`; align the type.
+- **Regression test:** assert the exact `toJSON()` shape.
+- **Status:** Open
