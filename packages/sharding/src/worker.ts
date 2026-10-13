@@ -62,6 +62,17 @@ export class ClusterWorker {
     public constructor(
         context: ClusterContext,
         endpoint: WorkerEndpoint = process as unknown as WorkerEndpoint,
+        options: {
+            /**
+             * Exit when the parent's IPC channel closes. Without a parent
+             * nothing coordinates IDENTIFY or fences this process, and its
+             * Gateway sessions would keep running beside a replacement.
+             * Default: true for the real process, false for an injected endpoint.
+             */
+            exitOnParentLoss?: boolean;
+            /** Replaces `process.exit`; for tests. */
+            exit?: (code: number) => void;
+        } = {},
     ) {
         if (typeof endpoint.send !== "function")
             throw new Error(
@@ -70,7 +81,14 @@ export class ClusterWorker {
         this.context = context;
         this.#endpoint = endpoint;
         this.#onMessage = (frame) => this.#handle(frame);
-        this.#onDisconnect = () => this.#failAll("The parent went away.");
+        const exitOnLoss =
+            options.exitOnParentLoss ??
+            endpoint === (process as unknown as WorkerEndpoint);
+        const exit = options.exit ?? ((code: number) => process.exit(code));
+        this.#onDisconnect = () => {
+            this.#failAll("The parent went away.");
+            if (exitOnLoss && !this.#closed) exit(1);
+        };
         endpoint.on("message", this.#onMessage);
         endpoint.on("disconnect", this.#onDisconnect);
     }

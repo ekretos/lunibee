@@ -106,6 +106,8 @@ const REQUEST_DATA_KEYS = new Set([
 /**
  * Detects a Discord.js-style `RequestData` wrapper so verb helpers can accept both
  * `post(path, rawBody)` (Lunibee-canonical) and `post(path, { body })` (Discord.js-familiar).
+ * A raw body whose keys are all option names (e.g. `{ reason: "x" }`) is read as a wrapper:
+ * pass it as `{ body: { reason: "x" } }` to send it as a body.
  * Conservative by design: only a plain object whose every own key is a known `RequestData`
  * key counts — a raw Discord payload (which always carries entity keys like `content`/`name`)
  * never matches, so existing positional callers are unaffected.

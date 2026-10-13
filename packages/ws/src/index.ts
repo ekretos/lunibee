@@ -95,6 +95,8 @@ export interface GatewayOptions {
     reconnect?: boolean;
     /** Maximum reconnect attempts. */
     maxReconnectAttempts?: number;
+    /** How long a socket may stay connecting before it is closed and retried, in ms. Default 30000. */
+    connectTimeout?: number;
     /** Initial reconnect delay. */
     reconnectBaseDelay?: number;
     /** Maximum reconnect delay. */
@@ -206,7 +208,11 @@ export class Gateway {
     public constructor(options: GatewayOptions) {
         if (!options.token?.trim())
             throw new TypeError("A Gateway token is required.");
-        for (const key of ["reconnectBaseDelay", "reconnectMaxDelay"] as const)
+        for (const key of [
+            "reconnectBaseDelay",
+            "reconnectMaxDelay",
+            "connectTimeout",
+        ] as const)
             if (options[key] !== undefined && !(options[key]! > 0))
                 throw new RangeError(`Gateway ${key} must be greater than 0.`);
         const resolvedIntents = resolveGatewayIntents(options.intents);
@@ -219,6 +225,7 @@ export class Gateway {
             shardCount: 1,
             reconnect: true,
             maxReconnectAttempts: Infinity,
+            connectTimeout: 30000,
             reconnectBaseDelay: 1000,
             reconnectMaxDelay: 30000,
             heartbeatAckTimeout: 10000,
@@ -498,7 +505,17 @@ export class Gateway {
         if (this.#closed) return;
         this.#token = this.#session.beginConnection();
         const result = this.#transport.connect(url);
-        if (result.ok) return;
+        if (result.ok) {
+            // A black-holed TLS handshake never opens or closes on its own.
+            const token = this.#token;
+            clearTimeout(this.#connectTimer);
+            this.#connectTimer = setTimeout(() => {
+                if (token === this.#token && !this.#closed)
+                    this.#transport.close(4000, "connect timeout");
+            }, this.#options.connectTimeout);
+            this.#connectTimer.unref?.();
+            return;
+        }
         // The socket could not be constructed. The caller's attempt fails with
         // the underlying reason, so a thrown GatewayError keeps its message.
         const failure = this.#normalizeError(result.error);
@@ -510,7 +527,9 @@ export class Gateway {
             this.#settleConnect(failure);
         }
     }
+    #connectTimer?: ReturnType<typeof setTimeout>;
     #onOpen(): void {
+        clearTimeout(this.#connectTimer);
         // Watch for silence from the moment the socket opens: a connection
         // that never reaches HELLO must still be detected as dead.
         this.#heartbeat.watch();
@@ -720,6 +739,7 @@ export class Gateway {
         this.#reconnect.settle(error);
     }
     #clearTimers(): void {
+        clearTimeout(this.#connectTimer);
         this.#reconnect.cancel();
         this.#heartbeat.stop();
     }

@@ -266,3 +266,23 @@ describe("audit F-B4/F-B5", () => {
         expect(g.ownsGuild("abc")).toBe(false);
     });
 });
+
+describe("audit F-B7", () => {
+    test("a socket stuck connecting is closed after connectTimeout", async () => {
+        const g = gateway({ connectTimeout: 20, reconnect: false });
+        const connecting = g.connect("wss://main.test").catch(() => undefined);
+        const socket = FakeWebSocket.instances.at(-1)!;
+        await wait(60);
+        expect(socket.closeCode).toBe(4000);
+        g.close();
+        await connecting;
+    });
+
+    test("a socket that opens in time is left alone", async () => {
+        const g = gateway({ connectTimeout: 30 });
+        const socket = await ready(g);
+        await wait(60);
+        expect(socket.closeCode).toBeUndefined();
+        g.close();
+    });
+});

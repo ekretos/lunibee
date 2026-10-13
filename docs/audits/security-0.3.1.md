@@ -231,7 +231,19 @@ Every claim was checked against the code first; each fix has a regression test t
 | F-G3 `publish.bat`                                          | P3  | **Fixed** (removed)                                                                           |
 | F-G4, F-G5, F-G6 scanner coverage                           | P3  | **Fixed**                                                                                     |
 | F-G10 `@types/bun` `latest`                                 | P3  | **Fixed**                                                                                     |
-| Remaining P3 (F-A5, A6, B4–B7, C3, C4, D*, E4+, H3 …)       | P3  | **Open — hardening backlog**                                                                  |
+| F-A5 unbounded rate-limit store | P3 | **Fixed** (10,000 entries per map, oldest dropped) |
+| F-B4 spoofed lifecycle event names, F-B5 `ownsGuild` throw | P3 | **Fixed** |
+| F-C3 relay validation | P3 | **Fixed** (type/id/source checked, only the documented envelope relayed) |
+| F-D7 handler isolation, F-E6 `timestamp(1e21)`, F-F2 `__proto__` kind, F-F3 binder path escaping | P3 | **Fixed** |
+| F-H3 RTP version check, F-H6 `entersState(Infinity)` | P3 | **Fixed** |
+| F-G7 `.gitignore` / `bench:rest` | P3 | **Fixed** |
+| F-A6 encoded separators in paths, F-E9 attachment root edges, F-B6 zlib cap test, F-B7 connect deadline (`connectTimeout`) | P3 | **Fixed** |
+| F-C4 orphaned workers | P3 | **Fixed** (a forked worker exits when the parent's IPC channel closes) |
+| F-D1 partial member erases timeout, F-D6 partial `MESSAGE_UPDATE`, F-D3 `cache.maxMembers`, F-D4 `destroy()` | P3 | **Fixed** |
+| F-D2 interaction permissions, F-D5 `isRequestData` heuristics | P3 | **Accepted risk**, documented |
+| F-E4 URL schemes, F-E7 option payloads, F-E8 `allowed_mentions` | P3 | **Fixed** |
+| F-H2 re-attach, F-H4 subscriber backlog (50 packets), F-H5 registry lifetime | P3 | **Fixed** / documented |
+| F-G8 unsigned tags, F-G9 no CI release workflow | P3 | **Accepted risk**: releases are published from the maintainer's workstation |
 
 GitHub repository settings (branch protection, secret scanning) remain unverified.
 

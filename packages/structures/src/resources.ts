@@ -90,6 +90,9 @@ export class GuildMember {
      * resolved for the channel); anywhere else they are computed at guild
      * level from the cached roles each time they are read, so they follow role
      * changes. Empty when the guild's roles are not cached.
+     *
+     * Interaction permissions are used as Discord sent them: Discord computes
+     * them, so the local timeout mask is not applied on top.
      */
     public get permissions(): PermissionsBitField {
         if (this.#suppliedPermissions) return this.#suppliedPermissions;

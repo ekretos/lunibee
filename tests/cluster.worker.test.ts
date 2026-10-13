@@ -513,3 +513,33 @@ describe("ShardManager inside a cluster", () => {
         expect(manager.shardCount).toBe(0);
     });
 });
+
+describe("parent loss (F-C4)", () => {
+    test("a worker exits when its parent's channel closes, if asked to", () => {
+        const codes: number[] = [];
+        const endpoint = new FakeEndpoint();
+        new ClusterWorker(context(), endpoint as never, {
+            exitOnParentLoss: true,
+            exit: (c) => codes.push(c),
+        });
+        endpoint.emit("disconnect");
+        expect(codes).toEqual([1]);
+    });
+
+    test("an injected endpoint does not exit by default, and a closed worker never does", () => {
+        const codes: number[] = [];
+        const a = new FakeEndpoint();
+        new ClusterWorker(context(), a as never, {
+            exit: (c) => codes.push(c),
+        });
+        a.emit("disconnect");
+        const b = new FakeEndpoint();
+        const worker = new ClusterWorker(context(), b as never, {
+            exitOnParentLoss: true,
+            exit: (c) => codes.push(c),
+        });
+        worker.close();
+        b.emit("disconnect");
+        expect(codes).toEqual([]);
+    });
+});
