@@ -150,12 +150,18 @@ export function abortError(path: string, reason: unknown): RESTError {
 }
 
 /** Waits for a delay, rejecting early if the signal aborts. */
+/** The longest delay `setTimeout` honours. */
+const MAX_TIMER_MS = 2_147_483_647;
+
 export async function sleep(
     delay: number,
     signal: AbortSignal | undefined,
     path: string,
 ): Promise<void> {
     if (delay <= 0) return;
+    // setTimeout runs a delay beyond 2^31 - 1 ms at once; that would turn a
+    // long wait into none.
+    delay = Math.min(delay, MAX_TIMER_MS);
     await new Promise<void>((resolve, reject) => {
         // Every way out clears the timer and removes the listener, so a signal
         // shared by many requests does not collect one listener per wait.

@@ -5,7 +5,7 @@ const LIBRARY_URL = "https://github.com/Ekretos/lunibee";
 const USER_AGENT = `DiscordBot (${LIBRARY_URL}, ${LIBRARY_VERSION})`;
 
 import { MemoryRateLimitStore, type RateLimitStore } from "./store.js";
-import { RESTError, abortError, redactPath, sleep } from "./errors.js";
+import { RESTError, abortError, redactPath, sanitizeCause, sleep } from "./errors.js";
 import {
     createRouteKey,
     serializeQuery,
@@ -238,6 +238,14 @@ export class REST {
              * of order (e.g. messages to one channel). Defaults to `false`.
              */
             concurrentBuckets?: boolean;
+            /**
+             * The longest, in ms, that a rate-limit header from the server may
+             * make this client wait. A `Retry-After` beyond it fails the request
+             * with the 429 instead of sleeping, and stored limits are capped to it,
+             * so a proxy or an attacker cannot stall every request for hours.
+             * Default 600,000 (ten minutes).
+             */
+            maxBackoff?: number;
         } = {},
     ) {
         this.#token = options.token;
@@ -256,6 +264,7 @@ export class REST {
             typeof store.reserve === "function";
         this.#limiter = new RateLimiter(store, {
             concurrent: this.#concurrentBuckets,
+            maxBackoff: options.maxBackoff,
         });
         if (options.hooks) this.#hooks = options.hooks;
     }
@@ -373,7 +382,7 @@ export class REST {
                         : new TransportError(
                               "Discord REST request failed",
                               false,
-                              error,
+                              sanitizeCause(error),
                           );
                 if (
                     !failure.timedOut &&
@@ -436,6 +445,14 @@ export class REST {
                 this.#retryPolicy.shouldRetry(method, response.status)
             ) {
                 const delay = this.#retryPolicy.getDelay(attempt, retryAfter);
+                if (delay > this.#limiter.maxBackoff)
+                    throw new RESTError(
+                        `Discord asked to wait ${Math.ceil(delay / 1000)}s before retrying, longer than maxBackoff (${Math.ceil(this.#limiter.maxBackoff / 1000)}s).`,
+                        response.status,
+                        data.code,
+                        payload,
+                        { method, path },
+                    );
                 this.#emit(this.#hooks.onRetry, {
                     method,
                     path,

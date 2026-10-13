@@ -399,3 +399,148 @@ describe("abort listeners", () => {
         expect(count(controller.signal)).toBe(0);
     });
 });
+
+describe("server-controlled backoff", () => {
+    const limited = (retryAfter: string, extra: Record<string, string> = {}) =>
+        new Response(
+            JSON.stringify({
+                message: "rate limited",
+                retry_after: Number(retryAfter),
+                global: false,
+            }),
+            {
+                status: 429,
+                headers: { "retry-after": retryAfter, ...extra },
+            },
+        );
+
+    function client(
+        maxBackoff: number | undefined,
+        responses: (n: number) => Response,
+    ) {
+        let calls = 0;
+        const rest = new REST({
+            token: TOKEN,
+            retries: 2,
+            maxBackoff,
+            transport: new HttpTransport({
+                fetch: async () => responses(++calls),
+            }),
+        });
+        return { rest, calls: () => calls };
+    }
+
+    test("a Retry-After longer than maxBackoff fails the request at once instead of sleeping", async () => {
+        const { rest, calls } = client(200, () => limited("86400"));
+        const started = Date.now();
+        const error = await rest.get("/users/@me").catch((e: unknown) => e);
+        expect(Date.now() - started).toBeLessThan(500);
+        expect(error).toBeInstanceOf(RESTError);
+        expect((error as RESTError).status).toBe(429);
+        expect((error as RESTError).message).toMatch(/86400s.*maxBackoff/);
+        expect(calls()).toBe(1);
+    });
+
+    test("a hostile global limit cannot wedge later requests beyond maxBackoff", async () => {
+        const { rest } = client(150, (n) =>
+            n === 1
+                ? limited("86400", { "x-ratelimit-global": "true" })
+                : new Response("{}"),
+        );
+        await rest.get("/users/@me").catch(() => undefined);
+        const started = Date.now();
+        await rest.get("/channels/1");
+        const waited = Date.now() - started;
+        // The gate holds for about maxBackoff and then opens; it neither blocks for a day nor opens at once.
+        expect(waited).toBeGreaterThanOrEqual(100);
+        expect(waited).toBeLessThan(1000);
+    });
+
+    test("a limit too large for setTimeout still gates", async () => {
+        const { rest } = client(120, (n) =>
+            n === 1
+                ? limited("1e20", {
+                      "x-ratelimit-global": "true",
+                      "x-ratelimit-reset-after": "1e20",
+                  })
+                : new Response("{}"),
+        );
+        await rest.get("/users/@me").catch(() => undefined);
+        const started = Date.now();
+        await rest.get("/channels/1");
+        expect(Date.now() - started).toBeGreaterThanOrEqual(80);
+    });
+
+    test("a bucket's reset-after is capped too", async () => {
+        const { rest } = client(100, (n) =>
+            n === 1
+                ? new Response("{}", {
+                      headers: {
+                          "x-ratelimit-bucket": "b",
+                          "x-ratelimit-remaining": "0",
+                          "x-ratelimit-reset-after": "99999",
+                      },
+                  })
+                : new Response("{}"),
+        );
+        await rest.get("/channels/5/messages");
+        const started = Date.now();
+        await rest.get("/channels/5/messages");
+        const waited = Date.now() - started;
+        expect(waited).toBeGreaterThanOrEqual(60);
+        expect(waited).toBeLessThan(1000);
+    });
+
+    test("a normal Retry-After is still honoured and retried", async () => {
+        const { rest, calls } = client(5000, (n) =>
+            n === 1 ? limited("0.05") : new Response("{}"),
+        );
+        const started = Date.now();
+        await rest.get("/users/@me");
+        expect(calls()).toBe(2);
+        expect(Date.now() - started).toBeGreaterThanOrEqual(40);
+    });
+
+    test("the default ceiling is ten minutes, and sleep() survives delays beyond setTimeout's limit", async () => {
+        const controller = new AbortController();
+        let resolved = false;
+        const waiting = sleep(3_000_000_000, controller.signal, "/x").then(
+            () => (resolved = true),
+        );
+        waiting.catch(() => undefined);
+        await new Promise((r) => setTimeout(r, 40));
+        expect(resolved).toBe(false); // a clamped timer would have fired at once
+        controller.abort();
+        await expect(waiting).rejects.toThrow();
+        const { rest } = client(undefined, () => limited("700"));
+        const error = await rest.get("/users/@me").catch((e: unknown) => e);
+        expect((error as RESTError).message).toMatch(/700s.*maxBackoff/);
+        expect(() => new REST({ token: TOKEN, maxBackoff: -1 })).toThrow(
+            RangeError,
+        );
+        expect(
+            () => new REST({ token: TOKEN, maxBackoff: Number.NaN }),
+        ).toThrow(RangeError);
+    });
+});
+
+describe("custom transport errors", () => {
+    test("a webhook token in a thrown error does not reach the cause", async () => {
+        class Leaky extends HttpTransport {
+            public override async request(): Promise<never> {
+                throw new Error(
+                    `connect failed https://discord.com/api/webhooks/1/${WEBHOOK_TOKEN}`,
+                );
+            }
+        }
+        const rest = new REST({
+            token: TOKEN,
+            transport: new Leaky(),
+            retry: { maxRetries: 0 },
+        } as never);
+        const error = await rest.get("/x").catch((e: unknown) => e);
+        expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain(WEBHOOK_TOKEN);
+        const cause = (error as { cause?: Error }).cause;
+        expect(`${cause?.message}${cause?.stack}`).not.toContain(WEBHOOK_TOKEN);
+    });
+});
