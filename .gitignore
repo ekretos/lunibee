@@ -26,7 +26,6 @@ roster.json
 *.lock
 !bun.lock
 
-benchmarks/
 
 *.tmp.ts
 lunibee.js.org/src/content/docs/api/

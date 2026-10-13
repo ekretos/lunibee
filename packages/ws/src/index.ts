@@ -472,6 +472,7 @@ export class Gateway {
     public ownsGuild(guildId: string): boolean {
         const count = this.#options.shardCount;
         if (count <= 1) return true;
+        if (!/^\d{1,20}$/.test(guildId)) return false;
         return (
             Number((BigInt(guildId) >> 22n) % BigInt(count)) ===
             this.#options.shardId
@@ -628,7 +629,10 @@ export class Gateway {
         }
         this.#emit("RAW", { event: event ?? "UNKNOWN", data });
         if (this.#closed) return;
-        this.#emit(event ?? "dispatch", data);
+        // Real Gateway events are UPPER_SNAKE_CASE; anything else could
+        // collide with a lifecycle event (`close`, `ready`, `error`).
+        if (event == null || /^[A-Z][A-Z0-9_]*$/.test(event))
+            this.#emit(event ?? "dispatch", data);
     }
     #handleHello(interval: number): void {
         this.#setState(

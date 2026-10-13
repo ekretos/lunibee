@@ -248,3 +248,21 @@ describe("audit F-B", () => {
         expect(() => gateway({ reconnectMaxDelay: -1 })).toThrow(RangeError);
     });
 });
+
+describe("audit F-B4/F-B5", () => {
+    test("a dispatch named like a lifecycle event is not re-emitted", async () => {
+        const g = gateway();
+        const seen: string[] = [];
+        g.on("close" as never, () => seen.push("close"));
+        const socket = await ready(g);
+        socket.dispatch("close", {}, 2);
+        socket.dispatch("MESSAGE_CREATE", {}, 3);
+        expect(seen).toEqual([]);
+        g.close();
+    });
+
+    test("ownsGuild is false for a non-numeric id", () => {
+        const g = gateway({ shardCount: 2, shardId: 0 });
+        expect(g.ownsGuild("abc")).toBe(false);
+    });
+});

@@ -602,6 +602,8 @@ export class VoiceReceiver {
             packet.byteOffset,
             packet.byteLength,
         );
+        // RTP version 2 only: anything else is not audio for this stream.
+        if ((packet[0]! & 0xc0) !== 0x80) return;
         const ssrc = view.getUint32(8, false);
 
         const userId = this.#ssrcMap.get(ssrc);
@@ -723,14 +725,17 @@ export function entersState<T extends VoiceConnection | AudioPlayer>(
             emitter.off("stateChange", onChange);
             resolve(target);
         };
-        const timer = setTimeout(() => {
-            emitter.off("stateChange", onChange);
-            reject(
-                new VoiceError(
-                    `Did not enter state "${String(status)}" within ${timeoutMs}ms.`,
-                ),
-            );
-        }, timeoutMs);
+        const timer = setTimeout(
+            () => {
+                emitter.off("stateChange", onChange);
+                reject(
+                    new VoiceError(
+                        `Did not enter state "${String(status)}" within ${timeoutMs}ms.`,
+                    ),
+                );
+            },
+            Math.min(timeoutMs, 2_147_483_647),
+        );
         emitter.on("stateChange", onChange);
     });
 }

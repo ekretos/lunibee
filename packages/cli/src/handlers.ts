@@ -142,7 +142,7 @@ export async function discover(eventsDir: string): Promise<Discovery> {
 /** The generated src/handlers/event.ts for `handlers`. */
 export function binderSource(handlers: readonly Handler[]): string {
     const imports = handlers
-        .map((h) => `import ${h.importName} from "${h.path}";`)
+        .map((h) => `import ${h.importName} from ${JSON.stringify(h.path)};`)
         .join("\n");
     // Each handler gets the client first. `client as never` lets a handler
     // declare the bot's own Client subclass; the event arguments stay typed.

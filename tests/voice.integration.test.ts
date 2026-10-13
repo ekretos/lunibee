@@ -54,6 +54,7 @@ function mockUdp(): VoiceUdpTransport & {
 function rtpPacket(ssrc: number, payload: number[] = []): Uint8Array {
     const buf = new Uint8Array(12 + payload.length);
     const view = new DataView(buf.buffer);
+    buf[0] = 0x80;
     view.setUint32(8, ssrc, false);
     buf.set(payload, 12);
     return buf;

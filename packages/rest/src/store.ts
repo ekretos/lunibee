@@ -61,12 +61,21 @@ export class MemoryRateLimitStore implements RateLimitStore {
     /** Minimum interval between automatic prunes, in ms. */
     static readonly #PRUNE_INTERVAL = 60_000;
     #lastPruneAt = 0;
+    /** Most entries either map keeps; the oldest are dropped first. */
+    static readonly #MAX_ENTRIES = 10_000;
+
+    static #evict(map: Map<string, unknown>): void {
+        while (map.size > MemoryRateLimitStore.#MAX_ENTRIES)
+            map.delete(map.keys().next().value as string);
+    }
 
     public getBucketHash(route: string): string | undefined {
         return this.#routeBuckets.get(route);
     }
     public setBucketHash(route: string, hash: string): void {
+        this.#routeBuckets.delete(route);
         this.#routeBuckets.set(route, hash);
+        MemoryRateLimitStore.#evict(this.#routeBuckets);
     }
     public getBucket(key: string): BucketState | undefined {
         return this.#buckets.get(key);
@@ -90,7 +99,9 @@ export class MemoryRateLimitStore implements RateLimitStore {
         return { granted: false, retryAfterMs: state.resetAt - now };
     }
     public updateBucket(key: string, state: BucketState): void {
+        this.#buckets.delete(key);
         this.#buckets.set(key, state);
+        MemoryRateLimitStore.#evict(this.#buckets);
         // Amortised eviction: sweep expired buckets at most once per interval
         // so the map cannot grow unbounded across long-lived processes.
         const now = Date.now();

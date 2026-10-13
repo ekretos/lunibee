@@ -38,8 +38,16 @@ export class HandlerRegistry<
         event: K,
         ...args: Events[K]
     ): Promise<void> {
+        const errors: unknown[] = [];
         for (const handler of this.#handlers[event] ?? [])
-            await handler(...args);
+            try {
+                await handler(...args);
+            } catch (error) {
+                errors.push(error);
+            }
+        if (errors.length === 1) throw errors[0];
+        if (errors.length > 1)
+            throw new AggregateError(errors, "Several handlers failed.");
     }
     /** Emits an event using the conventional emitter name. @param event Event key. @param args Event arguments. @returns A promise fulfilled after handlers complete. */
     public emit<K extends keyof Events>(

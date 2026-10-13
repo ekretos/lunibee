@@ -80,3 +80,39 @@ describe("audit F-E/F-F", () => {
         expect(r.ok && r.values["__proto__"]).toBe("hello");
     });
 });
+
+describe("audit backlog batch", () => {
+    test("timestamp rejects values that print in scientific notation", async () => {
+        const { timestamp } =
+            await import("../packages/formatters/src/index.ts");
+        expect(() => timestamp(1e21)).toThrow(RangeError);
+        expect(timestamp(5)).toBe("<t:5>");
+    });
+
+    test("HandlerRegistry runs every handler even when one fails", async () => {
+        const { HandlerRegistry } =
+            await import("../packages/handlers/src/index.ts");
+        const registry = new HandlerRegistry<{ x: [number] }>();
+        const seen: number[] = [];
+        registry.on("x", () => {
+            throw new Error("boom");
+        });
+        registry.on("x", (n: number) => void seen.push(n));
+        await expect(registry.dispatch("x", 1)).rejects.toThrow("boom");
+        expect(seen).toEqual([1]);
+    });
+
+    test("the CLI component kind guard ignores inherited names", async () => {
+        const { binderSource } =
+            await import("../packages/cli/src/handlers.ts");
+        const src = binderSource([
+            {
+                event: "ready",
+                file: "r",
+                path: '../events/ready/x";evil//',
+                importName: "h",
+            },
+        ] as never);
+        expect(src).toContain('from "../events/ready/x\\";evil//"');
+    });
+});

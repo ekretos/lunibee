@@ -1004,7 +1004,7 @@ export class ClusterManager {
 
     /** Routes one shard-bus message: replies for the parent are consumed, shard-targeted messages go to the owning cluster only, broadcasts to every other cluster. */
     #onBus(from: ClusterInfo, raw: unknown): void {
-        const message = raw as {
+        let message = raw as {
             source?: unknown;
             target?: unknown;
             type?: unknown;
@@ -1014,10 +1014,27 @@ export class ClusterManager {
             !message ||
             typeof message !== "object" ||
             typeof message.type !== "string" ||
-            typeof message.source !== "number" ||
+            message.type.length === 0 ||
+            message.type.length > 256 ||
+            (message as { id?: unknown }).id === undefined ||
+            typeof (message as { id?: unknown }).id !== "string" ||
+            (message as { id: string }).id.length > 256 ||
+            !Number.isInteger(message.source) ||
             (message.target !== null && !Number.isInteger(message.target))
         )
             return;
+        // Relay only the documented envelope, so undeclared fields cannot
+        // ride along to every other cluster.
+        const { type, id, source, target, data, expectsReply } =
+            message as Record<string, unknown>;
+        message = {
+            type,
+            id,
+            source,
+            target,
+            data,
+            ...(expectsReply === undefined ? {} : { expectsReply }),
+        } as typeof message;
         if (this.#tooBig(message.data)) {
             this.#emit(
                 "error",

@@ -220,7 +220,8 @@ export async function createComponent(
         io.out("\n1. Button\n2. String select\n3. Modal");
     const kindAnswer = ask(io, kindInput, "Component:", usage);
     if (!kindAnswer) return 0;
-    const kind = KINDS[kindAnswer.toLowerCase()];
+    const lowered = kindAnswer.toLowerCase();
+    const kind = Object.hasOwn(KINDS, lowered) ? KINDS[lowered] : undefined;
     if (!kind)
         throw new CliError(
             `Unknown component type: ${kindAnswer}`,

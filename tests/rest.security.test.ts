@@ -576,3 +576,24 @@ describe("input normalisation", () => {
         expect(file.name).not.toMatch(/[\r\n"]/);
     });
 });
+
+describe("rate-limit store bounds", () => {
+    test("the memory store keeps a bounded number of buckets", async () => {
+        const { MemoryRateLimitStore } =
+            await import("../packages/rest/src/store.ts");
+        const store = new MemoryRateLimitStore();
+        const far = Date.now() + 3.15e10;
+        for (let i = 0; i < 12_000; i++) {
+            store.setBucketHash(`r${i}`, `h${i}`);
+            store.updateBucket(`b${i}`, {
+                remaining: 1,
+                limit: 1,
+                resetAt: far,
+            } as never);
+        }
+        expect(store.getBucketHash("r0")).toBeUndefined();
+        expect(store.getBucket("b0")).toBeUndefined();
+        expect(store.getBucketHash("r11999")).toBe("h11999");
+        expect(store.getBucket("b11999")).toBeDefined();
+    });
+});

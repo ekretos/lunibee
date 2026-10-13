@@ -1060,6 +1060,20 @@ describe("payload limits", () => {
         );
     });
 
+    test("only the documented envelope is relayed, and bad envelopes are dropped", async () => {
+        const { manager, children } = setup({ maxMessageBytes: 1000 });
+        await manager.spawn();
+        const base = { source: 0, target: 1, type: "t", data: 1, id: "ok" };
+        children[0]!.bus({ ...base, extra: big(900) } as never);
+        children[0]!.bus({ ...base, id: "x".repeat(300) });
+        children[0]!.bus({ ...base, type: "t".repeat(300) });
+        children[0]!.bus({ ...base, source: 1.5 });
+        await tick();
+        const got = children[1]!.busFrames();
+        expect(got.map((m) => m.id)).toEqual(["ok"]);
+        expect(got[0]).not.toHaveProperty("extra");
+    });
+
     test("a request waiting for an oversized answer settles at once", async () => {
         const { manager, children } = setup({ maxMessageBytes: 1000 });
         await manager.spawn();

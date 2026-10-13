@@ -32,6 +32,8 @@ export function timestamp(
         throw new TypeError("Timestamp must be a finite Unix timestamp.");
     if (style !== undefined && !/^[tTdDfFR]$/.test(style))
         throw new RangeError("Invalid Discord timestamp style.");
+    if (!Number.isSafeInteger(Math.floor(unixSeconds)))
+        throw new RangeError("Timestamp is out of range.");
     return `<t:${Math.floor(unixSeconds)}${style ? `:${style}` : ""}>`;
 }
 

@@ -134,6 +134,7 @@ describe("Voice", () => {
         // followed by a 4-byte audio payload.
         const payload = new Uint8Array([1, 2, 3, 4]);
         const packet = new Uint8Array(12 + payload.length);
+        packet[0] = 0x80;
         new DataView(packet.buffer).setUint32(8, 12345, false);
         packet.set(payload, 12);
         onMessageCb!(packet);
