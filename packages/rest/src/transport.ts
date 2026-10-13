@@ -1,4 +1,4 @@
-import { RESTError, abortError } from "./errors.js";
+import { RESTError, abortError, sanitizeCause } from "./errors.js";
 
 /** Minimal fetch shape the transport depends on, so a stub needs no extras. */
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -15,6 +15,39 @@ export interface TransportRequest {
     body?: BodyInit;
     /** Caller cancellation signal. */
     signal?: AbortSignal;
+}
+
+/** Hosts that are this machine, where cleartext is acceptable. */
+const LOOPBACK = /^(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i;
+
+/**
+ * Checks a base URL before the bot token is sent to it. It must be an
+ * `https:` URL with no credentials, query or fragment; `http:` is accepted
+ * for this machine, or anywhere with `allowInsecure`.
+ * @throws {TypeError} Without repeating any credentials the URL contained.
+ */
+export function parseBaseURL(raw: string, allowInsecure = false): string {
+    let url: URL;
+    try {
+        url = new URL(raw);
+    } catch {
+        throw new TypeError("baseURL must be an absolute http(s) URL.");
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:")
+        throw new TypeError("baseURL must use https.");
+    if (url.username || url.password)
+        throw new TypeError("baseURL must not contain credentials.");
+    if (url.search || url.hash)
+        throw new TypeError("baseURL must not contain a query or fragment.");
+    if (
+        url.protocol === "http:" &&
+        !allowInsecure &&
+        !LOOPBACK.test(url.hostname)
+    )
+        throw new TypeError(
+            "baseURL must use https: the bot token would travel in cleartext (allowInsecureBaseURL: true overrides this for a trusted network).",
+        );
+    return raw.replace(/\/$/, "");
 }
 
 /** Thrown by {@link HttpTransport} when the attempt never produced a response. */
@@ -42,13 +75,16 @@ export class HttpTransport {
     public constructor(
         options: {
             baseURL?: string;
+            /** Allow a cleartext `http://` base URL on a network you trust (a REST proxy). Default false. */
+            allowInsecureBaseURL?: boolean;
             timeout?: number;
             fetch?: FetchLike;
         } = {},
     ) {
-        this.#baseURL = (
-            options.baseURL ?? "https://discord.com/api/v10"
-        ).replace(/\/$/, "");
+        this.#baseURL = parseBaseURL(
+            options.baseURL ?? "https://discord.com/api/v10",
+            options.allowInsecureBaseURL,
+        );
         this.#timeout = Math.max(1, options.timeout ?? 15_000);
         this.#fetch =
             options.fetch ?? ((input, init) => globalThis.fetch(input, init));
@@ -88,6 +124,9 @@ export class HttpTransport {
                 headers: request.headers,
                 body: request.body,
                 signal: controller.signal,
+                // Discord's API does not redirect; one that does is not
+                // something to send the token to.
+                redirect: "error",
             });
         } catch (error) {
             if (error instanceof RESTError) throw error;
@@ -99,7 +138,7 @@ export class HttpTransport {
                     ? `Discord REST request timed out after ${this.#timeout}ms`
                     : "Discord REST request failed",
                 timedOut,
-                error,
+                sanitizeCause(error),
             );
         } finally {
             clearTimeout(timer);

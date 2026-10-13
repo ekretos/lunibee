@@ -47,6 +47,33 @@ export function redactPath(path: string): string {
     );
 }
 
+/** Webhook and interaction tokens inside any text, such as the URL in a network error's message. */
+const TOKEN_IN_TEXT =
+    /(\/(?:webhooks|interactions)\/[^/\s?"'`]+\/)[^/\s?"'`]+/gi;
+
+/** Hides webhook and interaction tokens in free text. */
+export function redactText(text: string): string {
+    return text.replace(TOKEN_IN_TEXT, "$1:token");
+}
+
+/**
+ * A copy of a lower-level error that is safe to attach as a `cause`: the same
+ * name and code, with tokens removed from the message and stack. Runtimes put
+ * the request URL in network error messages, and the URL holds webhook tokens.
+ */
+export function sanitizeCause(error: unknown): unknown {
+    if (!(error instanceof Error)) return undefined;
+    const copy = new Error(redactText(error.message));
+    copy.name = error.name;
+    if (error.stack) copy.stack = redactText(error.stack);
+    for (const key of ["code", "errno", "syscall"] as const) {
+        const value = (error as unknown as Record<string, unknown>)[key];
+        if (typeof value === "string" || typeof value === "number")
+            (copy as unknown as Record<string, unknown>)[key] = value;
+    }
+    return copy;
+}
+
 /** What to check when Discord refuses an action the bot attempted. */
 const HINTS: Readonly<Record<number, string>> = {
     50001: "The bot cannot see this resource: check that it is in the guild and has View Channel there.",

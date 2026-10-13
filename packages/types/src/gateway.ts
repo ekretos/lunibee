@@ -241,5 +241,8 @@ export interface GatewayOptions {
 export interface RESTOptions {
     timeout?: number;
     retries?: number;
+    /** Where requests go. Must be `https:` (or `http:` on this machine) with no credentials, query or fragment. */
     baseURL?: string;
+    /** Allow a cleartext `http://` `baseURL` on a network you trust, such as a REST proxy. Default false. */
+    allowInsecureBaseURL?: boolean;
 }

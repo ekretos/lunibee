@@ -225,6 +225,8 @@ export class REST {
             retries?: number;
             retryPolicy?: RetryPolicy;
             baseURL?: string;
+            /** Allow a cleartext `http://` base URL on a network you trust (a REST proxy). Default false. */
+            allowInsecureBaseURL?: boolean;
             hooks?: RESTHooks;
             store?: RateLimitStore;
             /** Replaces the HTTP stage, e.g. with a recording transport in tests. */
@@ -245,6 +247,7 @@ export class REST {
             options.transport ??
             new HttpTransport({
                 baseURL: options.baseURL,
+                allowInsecureBaseURL: options.allowInsecureBaseURL,
                 timeout: options.timeout,
             });
         const store = options.store ?? new MemoryRateLimitStore();

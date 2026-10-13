@@ -90,7 +90,7 @@ export const RULES: Rule[] = [
         id: "plain-http",
         description: "plain http:// URL to a non-local host",
         pattern:
-            /["'`]http:\/\/(?!localhost\b|127\.0\.0\.1\b|\[::1\]|0\.0\.0\.0\b|example\.|\$\{)/,
+            /["'`]http:\/\/(?!localhost\b|127\.0\.0\.1\b|\[::1\]|0\.0\.0\.0\b|example\.|\$\{)[A-Za-z0-9]/,
         kind: "api",
     },
 ];
@@ -152,8 +152,9 @@ export function kindsFor(file: string): Rule["kind"][] {
         : ["secret"];
 }
 
-async function git(args: string[]): Promise<string> {
+async function git(args: string[], cwd?: string): Promise<string> {
     const process = Bun.spawn(["git", ...args], {
+        cwd,
         stdout: "pipe",
         stderr: "pipe",
     });
@@ -165,14 +166,14 @@ async function git(args: string[]): Promise<string> {
     return out;
 }
 
-/** Scans every tracked file in the working tree. */
-export async function scanTree(): Promise<Finding[]> {
-    const files = (await git(["ls-files"])).split("\n").filter(Boolean);
+/** Scans every tracked file in the working tree of `cwd` (default: the current directory). */
+export async function scanTree(cwd?: string): Promise<Finding[]> {
+    const files = (await git(["ls-files"], cwd)).split("\n").filter(Boolean);
     const findings: Finding[] = [];
     for (const file of files) {
         const kinds = kindsFor(file);
         if (kinds.length === 0) continue;
-        const text = await Bun.file(file)
+        const text = await Bun.file(cwd ? `${cwd}/${file}` : file)
             .text()
             .catch(() => "");
         findings.push(...scanText(file, text, kinds));
@@ -181,15 +182,11 @@ export async function scanTree(): Promise<Finding[]> {
 }
 
 /** Scans every line added in any commit of any branch (secrets only). */
-export async function scanHistory(): Promise<Finding[]> {
-    const log = await git([
-        "log",
-        "--all",
-        "-p",
-        "--no-color",
-        "-U0",
-        "--format=commit %h",
-    ]);
+export async function scanHistory(cwd?: string): Promise<Finding[]> {
+    const log = await git(
+        ["log", "--all", "-p", "--no-color", "-U0", "--format=commit %h"],
+        cwd,
+    );
     const findings: Finding[] = [];
     let commit = "";
     let file = "";
@@ -213,23 +210,37 @@ export async function scanHistory(): Promise<Finding[]> {
     return findings;
 }
 
-if (import.meta.main) {
-    const history = process.argv.includes("--history");
+/**
+ * Runs the scan and reports it.
+ * @returns The process exit code: 0 when clean, 1 when there are findings.
+ */
+export async function main(
+    argv: readonly string[],
+    cwd?: string,
+    log: { out(line: string): void; err(line: string): void } = {
+        out: (line) => console.log(line),
+        err: (line) => console.error(line),
+    },
+): Promise<number> {
+    const history = argv.includes("--history");
     const findings = [
-        ...(await scanTree()),
-        ...(history ? await scanHistory() : []),
+        ...(await scanTree(cwd)),
+        ...(history ? await scanHistory(cwd) : []),
     ];
     for (const f of findings)
-        console.error(
+        log.err(
             `${f.file}:${f.line}  ${f.rule}: ${f.description} (${f.excerpt})`,
         );
     if (findings.length > 0) {
-        console.error(
+        log.err(
             `\n${findings.length} finding(s). Remove the secret and rotate it, or add "security-ok: <reason>" for a reviewed exception.`,
         );
-        process.exit(1);
+        return 1;
     }
-    console.log(
+    log.out(
         `Security scan passed${history ? " (working tree and history)" : ""}.`,
     );
+    return 0;
 }
+
+if (import.meta.main) process.exit(await main(process.argv.slice(2)));

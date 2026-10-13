@@ -44,7 +44,8 @@ new REST(options )
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `token` | `string` | — | Discord bot token. |
-| `baseURL` | `string` | `https://discord.com/api/v10` | Override the Discord base URL, including the API version. |
+| `baseURL` | `string` | `https://discord.com/api/v10` | Override the Discord base URL, including the API version. The bot token is sent to it, so it must be `https:` (or `http:` on this machine) with no credentials, query or fragment; anything else throws a `TypeError`. |
+| `allowInsecureBaseURL` | `boolean` | `false` | Accept a cleartext `http://` `baseURL` on a network you trust, such as an internal REST proxy. |
 | `timeout` | `number` | `15000` | Per-attempt timeout in milliseconds. |
 | `retries` | `number` | `2` | Maximum retries for the default policy. |
 | `retryPolicy` | `RetryPolicy` | — | Replaces the default retry policy entirely. |

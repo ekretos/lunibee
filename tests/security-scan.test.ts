@@ -1,8 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
     RULES,
     kindsFor,
+    main,
     mask,
+    scanHistory,
     scanText,
     scanTree,
 } from "../scripts/security-scan.ts";
@@ -112,5 +117,92 @@ describe("security scan rules", () => {
 
     test("the repository itself is clean", async () => {
         expect(await scanTree()).toEqual([]);
+    });
+});
+
+describe("scanning a repository", () => {
+    const dirs: string[] = [];
+    afterAll(async () => {
+        for (const dir of dirs) await rm(dir, { recursive: true, force: true });
+    });
+    const run = (cwd: string, ...args: string[]) => {
+        const result = Bun.spawnSync(["git", ...args], {
+            cwd,
+            env: {
+                ...process.env,
+                GIT_AUTHOR_NAME: "t",
+                GIT_AUTHOR_EMAIL: "t@example.org",
+                GIT_COMMITTER_NAME: "t",
+                GIT_COMMITTER_EMAIL: "t@example.org",
+            },
+        });
+        if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+    };
+    async function repo(): Promise<string> {
+        const dir = await mkdtemp(join(tmpdir(), "lunibee-scan-"));
+        dirs.push(dir);
+        run(dir, "init", "-q", "-b", "main");
+        return dir;
+    }
+    const capture = () => {
+        const out: string[] = [];
+        const err: string[] = [];
+        return {
+            out,
+            err,
+            log: {
+                out: (l: string) => out.push(l),
+                err: (l: string) => err.push(l),
+            },
+        };
+    };
+
+    test("a secret that was committed and later removed is still found in the history", async () => {
+        const dir = await repo();
+        await writeFile(
+            join(dir, "config.ts"),
+            `export const token = "${fake.github}";\n`,
+        );
+        run(dir, "add", "-A");
+        run(dir, "commit", "-qm", "oops");
+        await writeFile(
+            join(dir, "config.ts"),
+            "export const token = process.env.TOKEN;\n",
+        );
+        run(dir, "commit", "-qam", "fix");
+
+        expect(await scanTree(dir)).toEqual([]);
+        const found = await scanHistory(dir);
+        expect(found).toHaveLength(1);
+        expect(found[0]).toMatchObject({ rule: "github-token", line: 1 });
+        expect(found[0]!.file).toMatch(/^[0-9a-f]+:config\.ts$/);
+        expect(found[0]!.excerpt).not.toContain(fake.github);
+
+        const clean = capture();
+        expect(await main([], dir, clean.log)).toBe(0);
+        expect(clean.out).toEqual(["Security scan passed."]);
+        const dirty = capture();
+        expect(await main(["--history"], dir, dirty.log)).toBe(1);
+        expect(dirty.err.join("\n")).toMatch(/github-token/);
+        expect(dirty.err.join("\n")).not.toContain(fake.github);
+        expect(dirty.err.at(-1)).toMatch(/1 finding/);
+    });
+
+    test("a clean repository passes with and without history, and the tree scan reports a secret that is still there", async () => {
+        const dir = await repo();
+        await writeFile(join(dir, "a.ts"), "export const a = 1;\n");
+        run(dir, "add", "-A");
+        run(dir, "commit", "-qm", "init");
+        const ok = capture();
+        expect(await main(["--history"], dir, ok.log)).toBe(0);
+        expect(ok.out).toEqual([
+            "Security scan passed (working tree and history).",
+        ]);
+
+        await writeFile(join(dir, "b.ts"), `const k = "${fake.aws}";\n`);
+        run(dir, "add", "-A");
+        const bad = capture();
+        expect(await main([], dir, bad.log)).toBe(1);
+        expect(bad.err[0]).toMatch(/^b\.ts:1 {2}aws-key/);
     });
 });
