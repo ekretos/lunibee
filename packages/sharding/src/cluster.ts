@@ -669,6 +669,18 @@ export class ClusterManager {
         this.clusters.set(id, info);
         this.#allReady = false;
 
+        // `send()` can fail after it returned: a worker that exits while a frame
+        // is being written emits `error` (EPIPE, "Channel closed") later. With no
+        // listener that is an uncaught exception, and it would end the manager.
+        // The worker's `exit` event does the actual recovery.
+        child.on("error", (error: Error) =>
+            this.#emit(
+                "error",
+                new Error(`Cluster ${id} process error: ${error.message}`, {
+                    cause: error,
+                }),
+            ),
+        );
         child.on("message", (frame) => this.#onFrame(info, child, frame));
         child.once("exit", (code, signal) =>
             this.#onExit(info, child, code, signal),

@@ -1221,3 +1221,37 @@ describe("limits are counted in UTF-8 bytes", () => {
         expect(((await sent) as Error).message).toMatch(/in time/);
     });
 });
+
+describe("worker process errors", () => {
+    test("an asynchronous send failure is reported, not thrown, and the cluster is restarted by its exit", async () => {
+        const { manager, children, errors } = setup({
+            clusterCount: 1,
+            shardCount: 2,
+        });
+        await manager.spawn();
+        children[0]!.ready();
+        await tick();
+        // Node emits this after send() returned, when the channel dies mid-write.
+        const failure = Object.assign(new Error("write EPIPE"), {
+            code: "EPIPE",
+        });
+        expect(() => children[0]!.emit("error", failure)).not.toThrow();
+        expect(errors).toHaveLength(1);
+        expect(errors[0]!.message).toBe("Cluster 0 process error: write EPIPE");
+        expect(errors[0]!.cause).toBe(failure);
+        // Nothing else changed: the exit that follows does the recovery.
+        expect(manager.clusters.get(0)!.state).toBe("ready");
+        children[0]!.exit(1, null);
+        await tick(30);
+        expect(children).toHaveLength(2);
+    });
+
+    test("a worker that errors repeatedly never stops the manager", async () => {
+        const { manager, children, errors } = setup();
+        await manager.spawn();
+        for (let i = 0; i < 20; i++)
+            children[i % 2]!.emit("error", new Error(`boom ${i}`));
+        expect(errors).toHaveLength(20);
+        expect(await manager.request(0, "t", null)).toBeDefined();
+    });
+});

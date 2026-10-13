@@ -7,6 +7,8 @@ export interface IdentifyBudget {
     remaining: number;
     /** Milliseconds until `remaining` resets, counted from construction. */
     resetAfter: number;
+    /** Milliseconds between resets after that one. Discord resets the budget every 24 hours (the default). */
+    period?: number;
 }
 
 /** Options for an {@link IdentifyCoordinator}. */
@@ -62,6 +64,7 @@ export class IdentifyCoordinator {
     #remaining: number | undefined;
     #total: number | undefined;
     #resetAt = Number.POSITIVE_INFINITY;
+    #period = 24 * 60 * 60 * 1000;
     #timer: unknown;
     #timerAt = Number.POSITIVE_INFINITY;
     #closed = false;
@@ -95,6 +98,9 @@ export class IdentifyCoordinator {
             this.#total = options.budget.total;
             this.#remaining = options.budget.remaining;
             this.#resetAt = this.#now() + options.budget.resetAfter;
+            this.#period = options.budget.period ?? this.#period;
+            if (!(this.#period > 0))
+                throw new RangeError("budget.period must be positive.");
         }
     }
 
@@ -183,7 +189,9 @@ export class IdentifyCoordinator {
         const now = this.#now();
         if (this.#total !== undefined && now >= this.#resetAt) {
             this.#remaining = this.#total;
-            this.#resetAt = Number.POSITIVE_INFINITY;
+            // The budget refills every period, so the next reset is known: a
+            // later exhaustion waits for it instead of failing for good.
+            while (now >= this.#resetAt) this.#resetAt += this.#period;
         }
         let next = Number.POSITIVE_INFINITY;
         for (const key of this.#keys.values()) {
@@ -194,14 +202,6 @@ export class IdentifyCoordinator {
             }
             if (this.#remaining !== undefined && this.#remaining <= 0) {
                 const waiter = key.queue[0]!;
-                if (this.#resetAt === Number.POSITIVE_INFINITY) {
-                    // No reset time is known: nothing can be granted, fail loudly.
-                    key.queue.shift();
-                    waiter.fail(
-                        new Error("The session start limit is exhausted."),
-                    );
-                    continue;
-                }
                 this.#onBudgetWait?.({
                     shardId: waiter.shardId,
                     waitMs: this.#resetAt - now,

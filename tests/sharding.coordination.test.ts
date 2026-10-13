@@ -156,6 +156,93 @@ describe("IdentifyCoordinator", () => {
         coordinator.close();
     });
 
+    test("waits for every refill, not only the first", async () => {
+        const { coordinator, advance } = fakeCoordinator({
+            interval: 0,
+            budget: {
+                total: 2,
+                remaining: 2,
+                resetAfter: 10_000,
+                period: 10_000,
+            },
+        });
+        const granted: number[] = [];
+        const failures: string[] = [];
+        const ask = (shard: number) =>
+            coordinator
+                .acquire(shard, shard)
+                .then(() => {
+                    granted.push(shard);
+                    coordinator.release(shard, shard);
+                })
+                .catch((error: Error) => failures.push(error.message));
+        void ask(0);
+        void ask(1);
+        void ask(2); // waits for the first reset
+        await settle();
+        expect(granted).toEqual([0, 1]);
+        advance(10_000);
+        await settle();
+        expect(granted).toEqual([0, 1, 2]);
+        // The budget is spent again: the next request waits for the second reset instead of failing.
+        void ask(3);
+        void ask(4);
+        await settle();
+        expect(granted).toEqual([0, 1, 2, 3]);
+        advance(9_999);
+        await settle();
+        expect(granted).toEqual([0, 1, 2, 3]);
+        advance(1);
+        await settle();
+        expect(granted).toEqual([0, 1, 2, 3, 4]);
+        // A long quiet spell skips whole periods without drifting.
+        advance(35_000);
+        void ask(5);
+        void ask(6);
+        void ask(7);
+        await settle();
+        expect(granted).toEqual([0, 1, 2, 3, 4, 5, 6]);
+        advance(5_000);
+        await settle();
+        expect(granted.at(-1)).toBe(7);
+        expect(failures).toEqual([]);
+        coordinator.close();
+    });
+
+    test("the default refill period is a day, and a bad period is refused", async () => {
+        const { coordinator, advance } = fakeCoordinator({
+            interval: 0,
+            budget: { total: 1, remaining: 0, resetAfter: 1000 },
+        });
+        const granted: number[] = [];
+        void coordinator.acquire(0, 0).then(() => granted.push(0));
+        await settle();
+        advance(1000);
+        await settle();
+        expect(granted).toEqual([0]); // first reset after resetAfter
+        coordinator.release(0, 0);
+        void coordinator.acquire(1, 1).then(() => granted.push(1));
+        await settle();
+        advance(86_399_000);
+        await settle();
+        expect(granted).toEqual([0]);
+        advance(1000);
+        await settle();
+        expect(granted).toEqual([0, 1]);
+        coordinator.close();
+        expect(
+            () =>
+                new IdentifyCoordinator({
+                    budget: {
+                        total: 1,
+                        remaining: 1,
+                        resetAfter: 1,
+                        period: 0,
+                    },
+                }),
+        ).toThrow(RangeError);
+    });
+
     test("close() rejects waiters, stops the timer and refuses new requests", async () => {
         const { coordinator, timers } = fakeCoordinator();
         await coordinator.acquire(0, 0);

@@ -186,3 +186,121 @@ describe("Voice integration", () => {
         expect(player.state).toBe("stopped");
     });
 });
+
+describe("AudioPlayer play() while a stream is playing", () => {
+    /** A stream the test feeds by hand. */
+    function manual() {
+        let controller!: ReadableStreamDefaultController<Uint8Array>;
+        const stream = new ReadableStream<Uint8Array>({
+            start: (c) => void (controller = c),
+        });
+        return {
+            audio: new AudioStream(stream),
+            push: (n: number) => {
+                // A cancelled stream refuses data, like a producer that stopped.
+                try {
+                    controller.enqueue(new Uint8Array([n]));
+                } catch {
+                    /* closed */
+                }
+            },
+            end: () => {
+                try {
+                    controller.close();
+                } catch {
+                    /* closed */
+                }
+            },
+        };
+    }
+    class Recording extends AudioPlayer {
+        public readonly chunks: number[] = [];
+        public finishes = 0;
+        public constructor() {
+            super();
+            this.on("finish", () => this.finishes++);
+        }
+        protected override onChunk(chunk: Uint8Array): void {
+            this.chunks.push(chunk[0]!);
+        }
+    }
+    const tick = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    test("replacing a playing stream leaves the new one playing, and the old one's end changes nothing", async () => {
+        const player = new Recording();
+        const a = manual();
+        const b = manual();
+        void player.play(a.audio);
+        a.push(1);
+        await tick();
+        const second = player.play(b.audio); // not awaited: the audit's race
+        a.push(2);
+        b.push(10);
+        a.push(3);
+        b.push(11);
+        await second;
+        await tick();
+        b.push(12);
+        a.push(4);
+        await tick();
+        // Nothing from A after B took over, and B's chunks arrive in order.
+        expect(player.chunks.filter((c) => c < 10)).toEqual([1]);
+        expect(player.chunks.filter((c) => c >= 10)).toEqual([10, 11, 12]);
+        a.end();
+        await tick();
+        // The old stream ending changes nothing.
+        expect(player.state).toBe("playing");
+        expect(player.finishes).toBe(0);
+        b.end();
+        await tick();
+        expect(player.state).toBe("idle");
+        expect(player.finishes).toBe(1);
+    });
+
+    test("when several play() calls race, the last one plays and the others are released", async () => {
+        const player = new Recording();
+        const a = manual();
+        const [b, c, d] = [manual(), manual(), manual()];
+        void player.play(a.audio);
+        await tick();
+        const calls = [
+            player.play(b.audio),
+            player.play(c.audio),
+            player.play(d.audio),
+        ];
+        await Promise.all(calls);
+        c.push(7);
+        d.push(30);
+        b.push(20);
+        await tick();
+        expect(player.current).toBe(d.audio);
+        expect(player.chunks).toEqual([30]);
+        // The superseded streams were cancelled, not left open and unread.
+        expect(b.audio.stream.locked).toBe(false);
+        await expect(b.audio.stream.getReader().read()).resolves.toMatchObject({
+            done: true,
+        });
+        d.end();
+        await tick();
+        expect(player.finishes).toBe(1);
+    });
+
+    test("stop() then play() leaves no loop from the first stream", async () => {
+        const player = new Recording();
+        const a = manual();
+        const b = manual();
+        void player.play(a.audio);
+        a.push(1);
+        await tick();
+        await player.stop();
+        void player.play(b.audio);
+        a.push(2);
+        b.push(10);
+        await tick();
+        expect(player.chunks).toEqual([1, 10]);
+        b.push(11);
+        await tick();
+        expect(player.chunks).toEqual([1, 10, 11]);
+        await player.stop();
+    });
+});

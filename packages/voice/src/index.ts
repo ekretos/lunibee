@@ -356,6 +356,10 @@ export class AudioPlayer {
     #reader?: ReadableStreamDefaultReader<Uint8Array>;
     /** Resolves the pump's pause await when the player is resumed or stopped. */
     #resumeSignal?: () => void;
+    /** Identifies the pump loop that owns the player; a stop or a new `play()` retires the old loop. */
+    #generation = 0;
+    /** The latest `play()` call; an earlier call still waiting for `stop()` gives way to it. */
+    #ticket = 0;
     readonly #playerListeners: ListenerSets<AudioPlayerEvents> = {};
 
     /** Current player state. */
@@ -376,12 +380,20 @@ export class AudioPlayer {
      * @param audioStream Stream to play.
      */
     public async play(audioStream: AudioStream): Promise<void> {
+        const ticket = ++this.#ticket;
         if (this.#state === "playing" || this.#state === "paused")
             await this.stop();
+        if (ticket !== this.#ticket) {
+            // A newer play() arrived while this one waited for stop(): it wins,
+            // and this stream is never read, so release it.
+            audioStream.stream.cancel().catch(() => undefined);
+            return;
+        }
+        const generation = ++this.#generation;
         this.#stream = audioStream;
         this.#reader = audioStream.stream.getReader();
         this.#transition("playing");
-        this.#pump().catch((err) => this.#emitError(err));
+        this.#pump(generation).catch((err) => this.#emitError(err));
     }
 
     /** Pauses a currently-playing stream. No-op if not playing. */
@@ -407,6 +419,9 @@ export class AudioPlayer {
      */
     public async stop(): Promise<void> {
         if (this.#state === "idle" || this.#state === "stopped") return;
+        // The loop reading the old stream must not outlive this call, whatever
+        // state a following play() puts the player in.
+        this.#generation++;
         const reader = this.#reader;
         this.#reader = undefined;
         this.#stream = undefined;
@@ -452,7 +467,7 @@ export class AudioPlayer {
     }
 
     /** Reads chunks from the reader while the player is in a playing state. */
-    async #pump(): Promise<void> {
+    async #pump(generation: number): Promise<void> {
         const reader = this.#reader;
         if (!reader) return;
         while (true) {
@@ -462,9 +477,13 @@ export class AudioPlayer {
                     this.#resumeSignal = resolve;
                 });
             }
-            // Abort if stopped/idle (e.g. resolved by stop()).
-            if (this.#state !== "playing") return;
+            // Abort if stopped/idle (e.g. resolved by stop()) or replaced.
+            if (generation !== this.#generation || this.#state !== "playing")
+                return;
             const { done, value } = await reader.read();
+            // A stop() or a newer play() retired this loop during the read:
+            // drop what it read and leave the new stream's state alone.
+            if (generation !== this.#generation) return;
             if (done) {
                 if (this.#state === "playing" || this.#state === "paused") {
                     this.#transition("idle");
