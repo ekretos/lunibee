@@ -88,7 +88,11 @@ export interface APITextDisplayComponent {
 }
 export interface APIMediaGalleryComponent {
     type: typeof ComponentEnum.MediaGallery;
-    items: { media: { url: string; description?: string } }[];
+    items: {
+        media: { url: string };
+        description?: string;
+        spoiler?: boolean;
+    }[];
 }
 /** Default values accepted by an auto-populated entity select. */
 export interface APISelectDefaultValue {
@@ -107,10 +111,7 @@ export interface APISeparatorComponent {
 }
 export interface APIThumbnailComponent {
     type: typeof ComponentEnum.Thumbnail;
-    url: string;
-    proxy_url?: string;
-    width?: number;
-    height?: number;
+    media: { url: string };
     description?: string;
     spoiler?: boolean;
 }
@@ -558,8 +559,10 @@ export class CreateTextDisplay {
 }
 
 export class CreateMediaGallery {
-    readonly #items: { media: { url: string; description?: string } }[] = [];
-    public addItems(...items: { url: string; description?: string }[]): this {
+    readonly #items: APIMediaGalleryComponent["items"] = [];
+    public addItems(
+        ...items: { url: string; description?: string; spoiler?: boolean }[]
+    ): this {
         if (!items.length) {
             throw new TypeError("At least one media gallery item is required.");
         }
@@ -568,7 +571,13 @@ export class CreateMediaGallery {
                 "MediaGallery can only contain up to 10 items.",
             );
         }
-        this.#items.push(...items.map((item) => ({ media: item })));
+        this.#items.push(
+            ...items.map(({ url, description, spoiler }) => ({
+                media: { url },
+                ...(description !== undefined ? { description } : {}),
+                ...(spoiler !== undefined ? { spoiler } : {}),
+            })),
+        );
         return this;
     }
     public toJSON(): APIMediaGalleryComponent {
@@ -646,7 +655,7 @@ export class CreateThumbnail {
     public toJSON(): APIThumbnailComponent {
         const data: APIThumbnailComponent = {
             type: ComponentEnum.Thumbnail,
-            url: this.#url,
+            media: { url: this.#url },
         };
         if (this.#description !== undefined)
             data.description = this.#description;

@@ -187,7 +187,7 @@ describe("Builders — Components V2", () => {
             new CreateThumbnail().setUrl("https://a.b/t.png").toJSON(),
         ).toEqual({
             type: ComponentEnum.Thumbnail,
-            url: "https://a.b/t.png",
+            media: { url: "https://a.b/t.png" },
         });
         const full: APIThumbnailComponent = new CreateThumbnail()
             .setUrl("https://a.b/t.png")
@@ -196,7 +196,7 @@ describe("Builders — Components V2", () => {
             .toJSON();
         expect(full).toEqual({
             type: ComponentEnum.Thumbnail,
-            url: "https://a.b/t.png",
+            media: { url: "https://a.b/t.png" },
             description: "alt text",
             spoiler: true,
         });

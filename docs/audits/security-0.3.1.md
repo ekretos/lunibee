@@ -245,7 +245,7 @@ GitHub repository settings (branch protection, secret scanning) remain unverifie
 - **Impact:** the whole message is rejected with `Invalid Form Body` (50035). Reported by a downstream bot whose now-playing card (song artwork) failed on every send; it works around it with its own helper.
 - **Fix:** emit `media: { url }`, with `description` and `spoiler` beside `media` as Discord documents; align `APIThumbnailComponent`.
 - **Regression test:** assert the exact `toJSON()` shape.
-- **Status:** Open
+- **Status:** Fixed — `toJSON()` emits `media: { url }`; exact-shape test in `tests/components-v2.test.ts`.
 
 ### B-02 — `CreateMediaGallery` puts `description` inside `media`
 
@@ -255,4 +255,4 @@ GitHub repository settings (branch protection, secret scanning) remain unverifie
 - **Impact:** descriptions (alt text) are likely dropped silently rather than rejected (reported, not yet confirmed against the API).
 - **Fix:** move `description` (and `spoiler`) beside `media`; align the type.
 - **Regression test:** assert the exact `toJSON()` shape.
-- **Status:** Open
+- **Status:** Fixed — `description` and `spoiler` sit beside `media` (the unconfirmed "dropped silently" claim is moot); exact-shape test in `tests/components-v2.test.ts`.

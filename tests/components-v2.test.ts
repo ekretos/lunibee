@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
     CreateContainer,
     CreateSection,
@@ -56,16 +56,14 @@ test("Components V2 Builders > all builders serialize correctly and validate", (
                 type: ComponentEnum.MediaGallery,
                 items: [
                     {
-                        media: {
-                            url: "https://example.com/image.png",
-                            description: "test",
-                        },
+                        media: { url: "https://example.com/image.png" },
+                        description: "test",
                     },
                 ],
             },
             {
                 type: ComponentEnum.Thumbnail,
-                url: "https://example.com/thumb.png",
+                media: { url: "https://example.com/thumb.png" },
             },
             {
                 type: ComponentEnum.ContentInventoryEntry,
@@ -86,4 +84,30 @@ test("Components V2 Builders > all builders serialize correctly and validate", (
     expect(() => new CreateFileComponent().setUrl("")).toThrow();
     expect(() => new CreateThumbnail().setUrl("")).toThrow();
     expect(() => new CreateContentInventoryEntry().setId("")).toThrow();
+});
+
+describe("Discord payload shapes", () => {
+    test("a thumbnail carries its URL in media", () => {
+        expect(
+            new CreateThumbnail().setUrl("https://a.b/t.png").toJSON(),
+        ).toEqual({
+            type: ComponentEnum.Thumbnail,
+            media: { url: "https://a.b/t.png" },
+        });
+    });
+
+    test("a gallery item keeps description and spoiler beside media", () => {
+        const [item] = new CreateMediaGallery()
+            .addItems({
+                url: "https://a.b/i.png",
+                description: "d",
+                spoiler: true,
+            })
+            .toJSON().items;
+        expect(item).toEqual({
+            media: { url: "https://a.b/i.png" },
+            description: "d",
+            spoiler: true,
+        });
+    });
 });

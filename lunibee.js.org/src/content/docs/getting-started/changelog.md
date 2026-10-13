@@ -9,6 +9,7 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 
 ### ⚠️ Changed
 
+- **`CreateThumbnail` and `CreateMediaGallery` now emit the payload Discord accepts.** A thumbnail is `{ type: 11, media: { url } }` (it was `{ type: 11, url }`, which Discord rejected with `Invalid Form Body`, 50035), and a gallery item is `{ media: { url }, description?, spoiler? }` (`description` was inside `media`). `APIThumbnailComponent` and `APIMediaGalleryComponent` changed to match, and `addItems()` accepts `spoiler`. Code that read `.url` from a thumbnail's `toJSON()`, or built `APIThumbnailComponent` by hand, must use `media.url`. Remove any workaround helper for these two components.
 - **`Gateway.connect()` rejects instead of throwing** when the Gateway was permanently closed. It returns a promise, so `.catch()`, `Promise.allSettled()` and `await` in a `try` now see the error; code that relied on a synchronous throw from a non-awaited call must handle the rejection.
 - **`CreateEmbed.toJSON()` throws a `RangeError` when the embed's text adds up to more than Discord's 6000 characters** (title, description, footer text, author name, field names and values), instead of leaving Discord to answer 400.
 - **`ClusterManager` runs under Bun** (Bun 1.4's `child_process.fork()` with IPC is supported and tested); the Node-only guard is gone.
