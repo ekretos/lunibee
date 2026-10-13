@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 /** Version of the coordinator ↔ host wire protocol. Both sides must agree. */
 export const REMOTE_PROTOCOL_VERSION = 1;
-/** Largest text frame either side accepts, in bytes. */
+/** Largest text frame either side accepts, in UTF-8 bytes. */
 export const MAX_REMOTE_FRAME_BYTES = 8 * 1024 * 1024;
 
 /** WebSocket close codes used between a coordinator and a host. */
@@ -83,9 +83,20 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isInt = (value: unknown): value is number =>
     typeof value === "number" && Number.isInteger(value) && value >= 0;
 
-function parseJson(text: unknown): Record<string, unknown> | null {
-    if (typeof text !== "string" || text.length > MAX_REMOTE_FRAME_BYTES)
-        return null;
+/** The size of a string on the wire, in UTF-8 bytes. */
+export function utf8Bytes(text: string): number {
+    return Buffer.byteLength(text, "utf8");
+}
+
+function parseJson(
+    text: unknown,
+    maxBytes: number,
+): Record<string, unknown> | null {
+    if (typeof text !== "string") return null;
+    // A UTF-16 code unit takes at least one byte and at most three, so the
+    // length decides most frames without counting bytes.
+    if (text.length > maxBytes) return null;
+    if (text.length * 3 > maxBytes && utf8Bytes(text) > maxBytes) return null;
     try {
         const value: unknown = JSON.parse(text);
         return isRecord(value) ? value : null;
@@ -119,8 +130,11 @@ export function verifyChallenge(
 }
 
 /** Validates a text frame from the coordinator; `null` when malformed. */
-export function parseToHost(text: unknown): ToHost | null {
-    const v = parseJson(text);
+export function parseToHost(
+    text: unknown,
+    maxBytes = MAX_REMOTE_FRAME_BYTES,
+): ToHost | null {
+    const v = parseJson(text, maxBytes);
     if (!v) return null;
     switch (v.t) {
         case "challenge":
@@ -175,8 +189,11 @@ export function parseToHost(text: unknown): ToHost | null {
 }
 
 /** Validates a text frame from a host; `null` when malformed. */
-export function parseToCoordinator(text: unknown): ToCoordinator | null {
-    const v = parseJson(text);
+export function parseToCoordinator(
+    text: unknown,
+    maxBytes = MAX_REMOTE_FRAME_BYTES,
+): ToCoordinator | null {
+    const v = parseJson(text, maxBytes);
     if (!v) return null;
     switch (v.t) {
         case "hello":

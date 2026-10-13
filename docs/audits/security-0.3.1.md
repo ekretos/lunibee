@@ -143,8 +143,8 @@ This pass re-read the current files on branch `v0.3`, including the security sca
 | ID | Severity | Location | Finding | Status |
 | --- | --- | --- | --- | --- |
 | R-06 | — | `.github/workflows/ci.yml`, `.github/workflows/security.yml` | Workflow triggers are intentionally limited to the maintained `master` and `dev` branches; release/tag branches such as `v0.3` are not expected to run CI on every push. | **Accepted design** — confirmed by maintainer; not a defect |
-| R-07 | P2 | `packages/sharding/src/cluster.ts: payloadSize()`; `packages/sharding/src/remote-protocol.ts: parseJson()` | The advertised message/frame limits are named in bytes, but use `string.length` / `JSON.stringify(value).length`. These count UTF-16 code units, not UTF-8 wire bytes. Non-ASCII payloads can therefore exceed the intended byte limit. | **Open** — source-confirmed; add multibyte boundary tests and use `Buffer.byteLength(serialized, "utf8")` |
-| R-08 | P2 | `scripts/security-scan.ts: OPT_OUT / scanText()` | Any occurrence of `security-ok: <reason>` anywhere on a line suppresses every rule on that line. The implementation does not verify that the marker is in a comment or that the exception applies only to the matched finding. A string literal or unrelated text on the same line can therefore silence the tripwire. | **Open** — source-confirmed; require a recognized comment marker and test that unrelated tokens on the same line are still reported |
+| R-07 | P2 | `packages/sharding/src/cluster.ts: payloadSize()`; `packages/sharding/src/remote-protocol.ts: parseJson()` | The advertised message/frame limits are named in bytes, but use `string.length` / `JSON.stringify(value).length`. These count UTF-16 code units, not UTF-8 wire bytes. Non-ASCII payloads can therefore exceed the intended byte limit. | **Fixed** — limits are UTF-8 bytes: `payloadSize()` uses `Buffer.byteLength`, the host-link parsers check bytes (cheap length test first); tests at the byte boundary for ASCII, CJK and emoji in `tests/cluster.manager.test.ts` and `tests/cluster.remote.test.ts` |
+| R-08 | P2 | `scripts/security-scan.ts: OPT_OUT / scanText()` | Any occurrence of `security-ok: <reason>` anywhere on a line suppresses every rule on that line. The implementation does not verify that the marker is in a comment or that the exception applies only to the matched finding. A string literal or unrelated text on the same line can therefore silence the tripwire. | **Fixed** — an exception must be `security-ok(<rule>): <reason>` in a comment, covers only the named rule and only matches before the comment; strings, other rules and secrets inside the reason are still reported (`tests/security-scan.test.ts`) |
 
 #### R-06 — branch-specific CI coverage (accepted design)
 
@@ -166,7 +166,7 @@ Evidence: `scanText()` skips a whole line when `OPT_OUT.test(line)` matches; the
 
 - **No new P0 finding identified by this source review.** This is not a claim that the repository is vulnerability-free.
 - **R-06 is accepted design, not a defect:** automatic CI is intentionally limited to `master` and `dev`; use manual or release-specific verification when needed.
-- **R-07 and R-08 should be fixed and covered by regression tests** to make the advertised message limit and secret-scanning tripwire behave as intended.
+- **R-07 and R-08 are fixed and covered by regression tests.**
 - Repository settings remain unverified: secret scanning/push protection, private vulnerability reporting availability, and required status checks need confirmation in GitHub settings.
 - No tests, dependency audit, build, or GitHub Actions run was executed as part of this third pass; do not treat the source review as runtime verification.
 
@@ -180,8 +180,8 @@ This pass re-fetched the current source and the existing audit report after the 
 | ID | Current verdict | Evidence |
 | --- | --- | --- |
 | R-06 | **Accepted design** | Excluding the release branch `v0.3` from push triggers is intentional. Do not add every release branch to CI. |
-| R-07 | **Still open** | `payloadSize()` still uses JavaScript `.length`; remote `parseJson()` still checks `text.length`. The limit is not measured in UTF-8 bytes. |
-| R-08 | **Still open** | `scanText()` still skips the entire line whenever `OPT_OUT.test(line)` matches, regardless of whether the marker is in a comment. |
+| R-07 | **Fixed** | See the table above: limits are measured in UTF-8 bytes. |
+| R-08 | **Fixed** | See the table above: exceptions are rule-scoped and comment-only. |
 
 ### R-09 — workflow triggers do not exactly match the requested maintained-branch policy
 
@@ -189,7 +189,7 @@ This pass re-fetched the current source and the existing audit report after the 
 - **Location:** `.github/workflows/ci.yml`, `.github/workflows/security.yml`
 - **Problem:** the stated policy is automatic checks only for `master` and `dev`, but the current CI push and pull-request filters list `master` and `main` (not `dev`). The Security workflow push filter lists `master`, `main`, and `dev`, while its unfiltered `pull_request:` trigger runs for pull requests targeting any branch.
 - **Impact:** `main` can trigger workflows unexpectedly; `dev` does not get the regular CI workflow on push or targeted pull request; Security runs on PRs beyond the two intended maintained branches.
-- **Status:** **Open — policy mismatch confirmed from workflow source.**
+- **Status:** **Fixed** — `ci.yml` and `security.yml` now trigger on push and pull request for `master` and `dev` only (plus `workflow_dispatch`, and the weekly schedule for Security); `tests/workflows.test.ts` pins the triggers, read-only permissions and SHA-pinned Actions. Branch protection and a live run on GitHub remain unverified.
 - **Fix:** if the intended policy applies to both workflows, set push and pull-request branch filters to `[master, dev]` in both files. Keep `schedule` and `workflow_dispatch` if you still want scheduled and manual security checks. Do not add `v0.3` or feature/release branches.
 - **Verification:** after changing triggers, inspect the workflow event configuration and confirm with test PRs/pushes to `master`, `dev`, and a non-maintained branch. Branch protection/required checks remain a separate repository setting.
 
@@ -197,6 +197,6 @@ This pass re-fetched the current source and the existing audit report after the 
 
 - No new P0 finding identified in this source review.
 - R-06 remains accepted design: release branches are intentionally excluded from automatic CI.
-- R-07 and R-08 remain actionable code findings.
-- R-09 should be resolved if the policy is strictly `master` and `dev` for both CI and Security workflows.
+- R-07 and R-08 are fixed with regression tests.
+- R-09 is fixed; the workflows follow the `master` and `dev` policy.
 - GitHub repository settings and actual workflow execution remain unverified.

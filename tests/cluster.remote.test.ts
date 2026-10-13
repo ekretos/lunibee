@@ -1194,3 +1194,37 @@ function catchError(fn: () => unknown): unknown {
     }
     return undefined;
 }
+
+describe("frame limits are counted in UTF-8 bytes", () => {
+    const frame = (value: string) =>
+        JSON.stringify({ t: "pong", n: 1, pad: value });
+    const overhead = new TextEncoder().encode(frame("")).length;
+
+    test("a frame is accepted up to the byte limit and refused one byte over, for any script", () => {
+        for (const [char, bytes] of [
+            ["a", 1],
+            ["漢", 3],
+            ["🙂", 4],
+        ] as const) {
+            const limit = overhead + bytes * 20;
+            const fits = frame(char.repeat(20));
+            const over = frame(char.repeat(21));
+            expect({
+                char,
+                ok: parseToCoordinator(fits, limit) !== null,
+            }).toEqual({ char, ok: true });
+            expect({
+                char,
+                ok: parseToCoordinator(over, limit) !== null,
+            }).toEqual({ char, ok: false });
+        }
+        // A string with few code units but many bytes is still counted by bytes.
+        const wide = frame("漢".repeat(100));
+        expect(wide.length).toBeLessThan(overhead + 150);
+        expect(parseToCoordinator(wide, overhead + 150)).toBeNull();
+        expect(parseToHost(JSON.stringify({ t: "ping", n: 1 }), 5)).toBeNull();
+        expect(
+            parseToHost(JSON.stringify({ t: "ping", n: 1 }), 100),
+        ).not.toBeNull();
+    });
+});

@@ -17,8 +17,12 @@
  * Keep GitHub secret scanning with push protection and CodeQL as independent
  * checks, and rotate anything real it ever reports: deleting it is not enough.
  *
- * A line may opt out with `security-ok: <reason>` in a comment next to it;
- * the reason is required so the exception can be reviewed.
+ * An exception is a comment at the end of the line that names the rule and
+ * gives a reason: `// security-ok(shell-exec): runs a fixed command`,
+ * `# security-ok(plain-http): …` or `<!-- security-ok(github-token): … -->`.
+ * It covers only the named rules, and only matches that come before the
+ * comment, so text in a string, another finding on the same line, or a
+ * secret placed inside the reason is still reported.
  */
 
 /** One thing the scan looks for. */
@@ -121,7 +125,30 @@ export const RULES: Rule[] = [
     },
 ];
 
-const OPT_OUT = /security-ok:\s*\S/;
+/**
+ * `security-ok(rule[, rule…]): reason` after a comment opener, running to the
+ * end of the line (or to the end of an HTML or block comment). The reason must be present and must not
+ * end in a quote or bracket, which would mean the "comment" is really text in a
+ * string literal.
+ */
+const EXCEPTION =
+    /(?:\/\/|#|<!--|\/\*)[ \t]*security-ok\(([a-z][a-z0-9, -]*)\):[ \t]*(\S.*?)[ \t]*(?:-->|\*\/)?[ \t]*$/;
+
+/** The exception on a line: the rules it names and where its comment starts. */
+export function exceptionOn(
+    line: string,
+): { rules: Set<string>; start: number } | undefined {
+    const match = EXCEPTION.exec(line);
+    if (!match) return undefined;
+    const reason = match[2]!;
+    // A reason that closes a string or call (`fake";`, `x')`) means the marker
+    // sits inside code, not in a comment.
+    if (/["'`)\]};,]$/.test(reason)) return undefined;
+    return {
+        rules: new Set(match[1]!.split(/[ ,]+/).filter(Boolean)),
+        start: match.index,
+    };
+}
 
 /** Hides the middle of a match. */
 export function mask(text: string): string {
@@ -139,18 +166,21 @@ export function scanText(
     const findings: Finding[] = [];
     const lines = text.split("\n");
     for (const [index, line] of lines.entries()) {
-        if (OPT_OUT.test(line)) continue;
+        const exception = exceptionOn(line);
         for (const rule of RULES) {
             if (!kinds.includes(rule.kind)) continue;
             const match = rule.pattern.exec(line);
-            if (match)
-                findings.push({
-                    rule: rule.id,
-                    description: rule.description,
-                    file,
-                    line: index + 1,
-                    excerpt: mask(match[0]),
-                });
+            if (!match) continue;
+            // Reviewed: the rule is named and the match is in the code part.
+            if (exception?.rules.has(rule.id) && match.index < exception.start)
+                continue;
+            findings.push({
+                rule: rule.id,
+                description: rule.description,
+                file,
+                line: index + 1,
+                excerpt: mask(match[0]),
+            });
         }
     }
     return findings;
@@ -258,7 +288,7 @@ export async function main(
         );
     if (findings.length > 0) {
         log.err(
-            `\n${findings.length} finding(s). Remove the secret and rotate it, or add "security-ok: <reason>" for a reviewed exception.`,
+            `\n${findings.length} finding(s). Remove the secret and rotate it, or add "security-ok(<rule>): <reason>" in a comment for a reviewed exception.`,
         );
         return 1;
     }

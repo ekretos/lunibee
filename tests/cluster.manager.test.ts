@@ -1145,3 +1145,79 @@ describe("payload limits", () => {
         expect(await manager.request(1, "t", null)).toBeDefined();
     });
 });
+
+describe("limits are counted in UTF-8 bytes", () => {
+    // 3 bytes per CJK character, 4 per emoji, 1 per ASCII letter.
+    const cjk = (n: number) => "漢".repeat(n);
+    const emoji = (n: number) => "🙂".repeat(n);
+    const relayed = async (data: string) => {
+        const { manager, children, errors } = setup({ maxMessageBytes: 1000 });
+        await manager.spawn();
+        children[0]!.bus({ source: 0, target: 1, type: "t", data, id: "m" });
+        await tick();
+        return {
+            delivered: children[1]!.busFrames().length === 1,
+            errors: errors.length,
+        };
+    };
+
+    test("a string is measured as it travels, not by its length", async () => {
+        expect(await relayed("a".repeat(1000))).toEqual({
+            delivered: true,
+            errors: 0,
+        });
+        expect(await relayed("a".repeat(1001))).toEqual({
+            delivered: false,
+            errors: 1,
+        });
+        // 333 characters = 999 bytes fits; 334 characters = 1002 bytes does not.
+        expect(await relayed(cjk(333))).toEqual({ delivered: true, errors: 0 });
+        expect(await relayed(cjk(334))).toEqual({
+            delivered: false,
+            errors: 1,
+        });
+        // 250 emoji = 1000 bytes (500 code units) fits; 251 does not.
+        expect(await relayed(emoji(250))).toEqual({
+            delivered: true,
+            errors: 0,
+        });
+        expect(await relayed(emoji(251))).toEqual({
+            delivered: false,
+            errors: 1,
+        });
+    });
+
+    test("an object is measured as its JSON text in bytes", async () => {
+        const { manager, children, errors } = setup({ maxMessageBytes: 1000 });
+        await manager.spawn();
+        // {"a":"…"} costs 8 bytes around the value.
+        children[0]!.bus({
+            source: 0,
+            target: 1,
+            type: "t",
+            data: { a: cjk(330) },
+            id: "ok",
+        });
+        children[0]!.bus({
+            source: 0,
+            target: 1,
+            type: "t",
+            data: { a: cjk(331) },
+            id: "big",
+        });
+        await tick();
+        expect(children[1]!.busFrames().map((m) => m.id)).toEqual(["ok"]);
+        expect(errors).toHaveLength(1);
+        await expect(manager.request(0, "t", { a: cjk(331) })).rejects.toThrow(
+            RangeError,
+        );
+        // Within the limit, the request is sent (the fake worker stays silent so only the sending is checked).
+        children[0]!.behavior.silentShards = new Set([0]);
+        const sent = manager
+            .request(0, "t", { a: cjk(330) }, { timeoutMs: 20 })
+            .catch((error: Error) => error);
+        await tick(5);
+        expect(children[0]!.busFrames()).toHaveLength(1);
+        expect(((await sent) as Error).message).toMatch(/in time/);
+    });
+});

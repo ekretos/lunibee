@@ -98,7 +98,7 @@ export interface ClusterManagerOptions {
     reassignOnGiveUp?: boolean;
     /**
      * Largest shard-bus message, request payload or worker reply the manager
-     * handles, measured as its JSON text. Bigger ones from a worker are
+     * handles, in UTF-8 bytes (a string as it is, anything else as its JSON text). Bigger ones from a worker are
      * dropped before they are relayed (an `error` event says so; a request
      * waiting for the answer times out as usual), and bigger ones passed to
      * `request()`, `broadcast()` or `requestCluster()` throw a `RangeError`.
@@ -238,13 +238,17 @@ type LiveState = "starting" | "ready";
 /** Default for `maxMessageBytes`. */
 const DEFAULT_MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
 
-/** The size of a payload as JSON text; `Infinity` for one that cannot be serialized (a cycle). */
+/**
+ * The size of a payload in UTF-8 bytes: a string as it is, anything else as
+ * its JSON text. `Infinity` for one that cannot be serialized (a cycle).
+ */
 function payloadSize(value: unknown): number {
     if (value === undefined || value === null) return 0;
-    if (typeof value === "string") return value.length;
+    if (typeof value === "string") return Buffer.byteLength(value, "utf8");
     if (typeof value !== "object") return String(value).length;
     try {
-        return JSON.stringify(value)?.length ?? 0;
+        const text = JSON.stringify(value);
+        return text === undefined ? 0 : Buffer.byteLength(text, "utf8");
     } catch {
         return Number.POSITIVE_INFINITY;
     }

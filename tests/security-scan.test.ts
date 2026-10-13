@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
     RULES,
+    exceptionOn,
     kindsFor,
     main,
     mask,
@@ -77,18 +78,84 @@ describe("security scan rules", () => {
             });
     });
 
-    test("a reviewed exception needs a reason", () => {
+    test("an exception names the rule, gives a reason, and sits in a comment", () => {
+        const ok = (line: string, kinds: ("secret" | "api")[] = ["api"]) =>
+            scanText("p.ts", line, kinds).map((f) => f.rule);
         expect(
-            scanText("p.ts", "eval(x); // security-ok: sandboxed test", [
-                "api",
-            ]),
+            ok("eval(x); // security-ok(dynamic-code): sandboxed test"),
+        ).toEqual([]);
+        expect(ok("exec(x); # security-ok(shell-exec): fixed command")).toEqual(
+            [],
+        );
+        expect(ok("eval(x); /* security-ok(dynamic-code): fixture */")).toEqual(
+            [],
+        );
+        expect(
+            ok(
+                `k = "${fake.github}" <!-- security-ok(github-token): revoked docs example -->`,
+                ["secret"],
+            ),
         ).toEqual([]);
         expect(
-            scanText("p.ts", "eval(x); // security-ok:", ["api"]),
-        ).toHaveLength(1);
+            ok(
+                "eval(x); // security-ok(dynamic-code, shell-exec): both reviewed",
+            ),
+        ).toEqual([]);
+        // No reason, no rule, or a different rule: still reported.
+        expect(ok("eval(x); // security-ok(dynamic-code):")).toEqual([
+            "dynamic-code",
+        ]);
+        expect(ok("eval(x); // security-ok: reason only")).toEqual([
+            "dynamic-code",
+        ]);
+        expect(ok("eval(x); // security-ok")).toEqual(["dynamic-code"]);
+        expect(ok("eval(x); // security-ok(tls-off): wrong rule")).toEqual([
+            "dynamic-code",
+        ]);
+    });
+
+    test("an exception covers only the rule it names", () => {
+        const line =
+            "eval(code); exec(cmd); // security-ok(dynamic-code): reviewed";
+        expect(scanText("p.ts", line, ["api"]).map((f) => f.rule)).toEqual([
+            "shell-exec",
+        ]);
+    });
+
+    test("marker text inside a string or beside a secret does not hide it", () => {
+        const secret = (line: string) =>
+            scanText("p.ts", line, ["secret"]).map((f) => f.rule);
         expect(
-            scanText("p.ts", "eval(x); // security-ok", ["api"]),
-        ).toHaveLength(1);
+            secret(
+                `const t = "${fake.github}"; const s = "// security-ok(github-token): fake";`,
+            ),
+        ).toEqual(["github-token"]);
+        expect(
+            secret(
+                `const s = "// security-ok(github-token): fake"; const t = "${fake.github}";`,
+            ),
+        ).toEqual(["github-token"]);
+        expect(
+            secret(`x(); // security-ok(github-token): see ${fake.github}`),
+        ).toEqual(["github-token"]);
+        expect(
+            secret(
+                `${fake.github} is described by security-ok(github-token): reviewed`,
+            ),
+        ).toEqual(["github-token"]);
+        expect(
+            secret(
+                `log("${fake.github}") // note: security-ok(github-token) is not a comment form`,
+            ),
+        ).toEqual(["github-token"]);
+    });
+
+    test("exceptionOn reads the rules and where the comment starts", () => {
+        const found = exceptionOn("code(); // security-ok(a-b, c): why");
+        expect(found?.rules).toEqual(new Set(["a-b", "c"]));
+        expect(found?.start).toBe(8);
+        expect(exceptionOn("no marker here")).toBeUndefined();
+        expect(exceptionOn('s = "// security-ok(x): y";')).toBeUndefined();
     });
 
     test("which rules apply to which files", () => {
@@ -156,17 +223,6 @@ describe("secrets in other shapes", () => {
             "base64",
         );
         expect(rules(`key: ${encoded}`)).toEqual(["encoded-private-key"]);
-    });
-
-    test("a token carrying a reviewed exception is accepted, a bare note is not", () => {
-        expect(
-            rules(
-                `${fake.github} <!-- security-ok: revoked example from the docs -->`,
-            ),
-        ).toEqual([]);
-        expect(rules(`${fake.github} <!-- security-ok -->`)).toEqual([
-            "github-token",
-        ]);
     });
 });
 

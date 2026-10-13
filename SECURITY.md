@@ -64,5 +64,5 @@ alongside it, and none replaces the others.
 
 `bun run audit:security` runs the dependency audit, the secret scan and the
 risky-API scan. A line that must break a rule carries
-`security-ok: <reason>` in a comment, and the reason is reviewed. Never commit
+a comment such as `// security-ok(shell-exec): runs a fixed command`, which names the rule and gives a reason that is reviewed; it covers only that rule on that line. Never commit
 a token, even a revoked one.
