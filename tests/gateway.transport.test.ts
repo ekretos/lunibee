@@ -296,6 +296,14 @@ function framer(): (payload: unknown) => Promise<Uint8Array> {
 }
 
 describe("ZlibStreamDecoder", () => {
+    test("a frame that inflates past maxFrameBytes fails the stream", async () => {
+        const decoder = new ZlibStreamDecoder(undefined, 1000);
+        const bytes = await framer()({ op: 0, d: "a".repeat(100_000) });
+        expect(bytes.length).toBeLessThan(1000);
+        await expect(decoder.push(bytes)).rejects.toThrow(/inflated past/);
+        await expect(decoder.push(bytes)).rejects.toThrow();
+    });
+
     test("a complete frame decodes to exactly one payload", async () => {
         const decoder = new ZlibStreamDecoder();
         const frame = framer();

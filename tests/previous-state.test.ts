@@ -183,3 +183,62 @@ describe("delete events pass the removed structure", () => {
         expect(previous).toBeNull();
     });
 });
+
+describe("partial payloads", () => {
+    test("a message without a member keeps the cached timeout (F-D1)", () => {
+        const { client, gw } = setup();
+        const until = new Date(Date.now() + 3_600_000).toISOString();
+        gw.emit("GUILD_MEMBER_UPDATE", {
+            guild_id: GUILD,
+            user,
+            roles: [],
+            communication_disabled_until: until,
+        });
+        const member = client.guilds.members(GUILD).get("400")!;
+        expect(member.timedOutUntil?.toISOString()).toBe(until);
+        gw.emit("GUILD_MEMBER_UPDATE", { guild_id: GUILD, user, roles: [] });
+        expect(
+            client.guilds
+                .members(GUILD)
+                .get("400")!
+                .timedOutUntil?.toISOString(),
+        ).toBe(until);
+        gw.emit("GUILD_MEMBER_UPDATE", {
+            guild_id: GUILD,
+            user,
+            roles: [],
+            communication_disabled_until: null,
+        });
+        expect(
+            client.guilds.members(GUILD).get("400")!.timedOutUntil,
+        ).toBeNull();
+    });
+
+    test("a MESSAGE_UPDATE without an author does not throw (F-D6)", () => {
+        const { client, gw } = setup();
+        const seen: unknown[] = [];
+        client.on("messageUpdate", (m) => seen.push(m));
+        expect(() =>
+            gw.emit("MESSAGE_UPDATE", {
+                id: "1",
+                channel_id: "900",
+                embeds: [],
+            }),
+        ).not.toThrow();
+        expect(seen).toEqual([]);
+    });
+});
+
+describe("destroy (F-D4)", () => {
+    test("stops collectors and empties the caches", () => {
+        const { client } = setup();
+        const collector = client.createCollector("guildMemberUpdate", {
+            time: 60_000,
+        });
+        expect(client.guilds.size).toBe(1);
+        client.destroy();
+        expect(collector.ended).toBe(true);
+        expect(collector.endReason).toBe("destroyed");
+        expect(client.guilds.size).toBe(0);
+    });
+});

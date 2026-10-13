@@ -419,6 +419,7 @@ export class Client
     }
     readonly #gateway: Gateway;
     /** Which resources Gateway events are allowed to cache. */
+    readonly #collectors = new Set<{ stop(reason?: string): void }>();
     readonly #cache: Required<NonNullable<ClientOptions["cache"]>>;
     readonly #resourceContext: ResourceContext;
 
@@ -630,6 +631,21 @@ export class Client
             this.emit(ClientEvent.MessageCreate, cached);
         });
         this.#gateway.on("MESSAGE_UPDATE", (data) => {
+            const partial = data as import("@lunibee/types").APIMessage;
+            if (!partial.author) {
+                // Discord sends only the changed fields for some updates
+                // (an embed unfurl, say). With no author there is nothing to
+                // build a message from: patch the cached one, or ignore it.
+                const cachedMessage = this.channels
+                    .cachedMessages(partial.channel_id)
+                    ?.cache.peek(partial.id);
+                if (!cachedMessage) return;
+                const before = this.#snapshot(cachedMessage);
+                if (partial.content !== undefined)
+                    cachedMessage.content = partial.content;
+                this.emit(ClientEvent.MessageUpdate, cachedMessage, before);
+                return;
+            }
             const message = new Message(
                 data as import("@lunibee/types").APIMessage,
                 this.#resourceContext,
@@ -1164,11 +1180,19 @@ export class Client
         if (this.#cache.users)
             this.#merge(this.users, member.user.id, member.user);
         if (!this.#cache.members) return member;
-        return this.#merge(
-            this.guilds.members(guildId),
-            member.user.id,
-            member,
-        );
+        const members = this.guilds.members(guildId);
+        const known = members.get(member.user.id);
+        const timedOutUntil = known?.timedOutUntil;
+        const merged = this.#merge(members, member.user.id, member);
+        // A partial member (the one on a message) leaves the timeout out; that
+        // is "not sent", not "no timeout", so the cached value stays.
+        if (
+            known &&
+            timedOutUntil !== undefined &&
+            data.communication_disabled_until === undefined
+        )
+            merged.timedOutUntil = timedOutUntil;
+        return merged;
     }
 
     /** A voice state without a channel means the user left voice. */
@@ -1262,7 +1286,11 @@ export class Client
                 );
         };
         this.on(event, listener);
-        collector.onDispose(() => this.off(event, listener));
+        this.#collectors.add(collector);
+        collector.onDispose(() => {
+            this.off(event, listener);
+            this.#collectors.delete(collector);
+        });
         return collector;
     }
 
@@ -1398,6 +1426,13 @@ export class Client
     public destroy(): void {
         this.state = "destroyed";
         this.#gateway.close();
+        // Collectors hold timers and listeners, and the caches hold every
+        // structure the bot has seen: release both.
+        for (const collector of [...this.#collectors])
+            collector.stop("destroyed");
+        this.users.clear();
+        this.guilds.clear();
+        this.channels.clear();
     }
 
     // ── InteractionClient implementation ─────────────────────────────────────

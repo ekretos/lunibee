@@ -116,3 +116,29 @@ describe("audit backlog batch", () => {
         expect(src).toContain('from "../events/ready/x\\";evil//"');
     });
 });
+
+describe("attachment root", () => {
+    test("a missing root gives a clear error and a dotfile name is allowed", async () => {
+        const { mkdtemp, writeFile } = await import("node:fs/promises");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const { CreateAttachment } =
+            await import("../packages/builders/src/index.ts");
+        await expect(
+            new CreateAttachment("a.txt", {
+                root: "/definitely/not/here",
+            }).toBuffer(),
+        ).rejects.toThrow(/root folder was not found/);
+        const dir = await mkdtemp(join(tmpdir(), "lb-"));
+        await writeFile(join(dir, "..dotfile"), "x");
+        const outside = join(dir, "..", "lb-outside.txt");
+        await writeFile(outside, "y");
+        expect(
+            (await new CreateAttachment("..dotfile", { root: dir }).toBuffer())
+                .length,
+        ).toBe(1);
+        await expect(
+            new CreateAttachment(outside, { root: dir }).toBuffer(),
+        ).rejects.toThrow(/outside/);
+    });
+});

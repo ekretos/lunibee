@@ -41,7 +41,12 @@ function assertSafePath(path: string): void {
         } catch {
             throw new TypeError("REST path has malformed percent-encoding.");
         }
-        if (decoded === "." || decoded === "..")
+        if (
+            decoded === "." ||
+            decoded === ".." ||
+            (/[\\/]/.test(decoded) &&
+                decoded.split(/[\\/]/).some((s) => s === "." || s === ".."))
+        )
             throw new TypeError(
                 "REST paths must not contain '.' or '..' segments.",
             );

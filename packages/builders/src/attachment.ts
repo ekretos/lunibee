@@ -84,12 +84,20 @@ export class CreateAttachment {
 
 /** Resolves `file` against `root`, refusing anything outside it (after following symlinks). */
 async function insideRoot(root: string, file: string): Promise<string> {
-    const base = await realpath(root);
+    const base = await realpath(root).catch(() => {
+        throw new Error("Attachment root folder was not found.");
+    });
     const target = await realpath(resolve(base, file)).catch(() => {
         throw new Error("Attachment file was not found inside its root.");
     });
     const rel = relative(base, target);
-    if (rel === "" || rel.startsWith("..") || isAbsolute(rel))
+    if (
+        rel === "" ||
+        rel === ".." ||
+        rel.startsWith("../") ||
+        rel.startsWith("..\\") ||
+        isAbsolute(rel)
+    )
         throw new Error("Attachment file is outside its root folder.");
     return target;
 }

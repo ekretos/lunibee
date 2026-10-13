@@ -597,3 +597,11 @@ describe("rate-limit store bounds", () => {
         expect(store.getBucket("b11999")).toBeDefined();
     });
 });
+
+describe("encoded path separators", () => {
+    test("a segment that decodes to a dot-segment path is refused", async () => {
+        const rest = new REST({ token: TOKEN });
+        for (const path of ["/a/%2f..%2f..%2fb", "/a/..%5c..", "/a/%2e%2e%2f"])
+            await expect(rest.get(path)).rejects.toThrow(TypeError);
+    });
+});
