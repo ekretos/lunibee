@@ -9,12 +9,24 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 
 ### ⚠️ Changed
 
+* **`Gateway.connect()` rejects instead of throwing** when the Gateway was permanently closed. It returns a promise, so `.catch()`, `Promise.allSettled()` and `await` in a `try` now see the error; code that relied on a synchronous throw from a non-awaited call must handle the rejection.
+* **`CreateEmbed.toJSON()` throws a `RangeError` when the embed's text adds up to more than Discord's 6000 characters** (title, description, footer text, author name, field names and values), instead of leaving Discord to answer 400.
 * **`ClusterManager` runs under Bun** (Bun 1.4's `child_process.fork()` with IPC is supported and tested); the Node-only guard is gone.
 * **Shard messages are routed.** A message to one shard goes only to the cluster that owns it (it used to reach every other cluster, and each ignored it); a broadcast still goes to every other cluster. A message to a shard whose cluster is down fails fast. Behaviour change for code that read targeted messages meant for other shards.
 * **`ShardManager.shardCount`** is the deployment total; it equals the number of shards when a manager owns all of them, as before. Use the new `shardIds` for the shards a manager owns.
 * **`ClusterInfo`** gained `state`, `restarts`, `startedAt`, `readyAt`, `lastReadyAt` and `report`, and the object is now the same across restarts. `manager.clusters` still lists only live clusters. `ShardHealth` gained `status`, `readyAt` and `disconnectedAt`.
 * **`intents` must be an array.** `new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] })`. An OR-ed bitfield (`GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages`), a single number, a single name or an `IntentsBitField` throws a `TypeError` from `Client`, `Gateway`, `ShardManager` and `resolveGatewayIntents()`. `IntentsBitField` itself still takes one intent or an array in `add`, `remove`, `has`, `any` and `equals`; pass `bits.toArray()` to a client.
 * **Bun 1.4 is the minimum** (`engines.bun` is `>=1.4.0`); CI and the docs build run on Bun 1.4.2. Node 22 keeps working but is unsupported.
+
+### 🔒 Security
+
+The findings, with severity and status, are in [`docs/audits/security-0.3.1.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1.md). A dependency audit of the lockfile and a scan of the tree and of the whole Git history found no vulnerable dependency and no secret.
+
+* **The REST `baseURL` is validated before the bot token is sent to it.** It must be `https:` (or `http:` on this machine), with no credentials, query or fragment; anything else throws a `TypeError` that never repeats the URL's credentials. A cleartext `http://` URL on a network you trust, such as an internal REST proxy, needs `allowInsecureBaseURL: true`. `fetch` is called with `redirect: "error"`, so a redirect cannot carry the token to another host.
+* **Network error causes no longer carry webhook or interaction tokens.** Runtimes put the request URL in the message of a failed `fetch`; the `cause` of a `TransportError` is now a copy with those tokens removed.
+* **`ShardBus` replies cannot be forged or double-counted.** A request resolves only from the shard it was sent to, a shard counts once in a broadcast however often it answers, and envelopes with a malformed `type`, `id`, `source` or `target` are dropped. `close()` settles pending requests at once (a request rejects, a broadcast resolves with what it has) instead of leaving their timers running, and sending on a closed bus fails with a clear error.
+* **Cluster IPC and host connections are bounded.** A worker may have only one IDENTIFY request per shard waiting, and a coordinator closes connections beyond `remote.maxUnauthenticated` (default 16) that have not authenticated (`RemoteClose.TooManyConnections`, 4429).
+* **`SECURITY.md`** (disclosure policy), a **Security workflow** (`bun audit`, a secret and risky-API scan of the tree and history, dependency review on pull requests, CodeQL), least-privilege workflow permissions, GitHub Actions pinned to commit SHAs, and a release **package smoke test** (`bun run smoke:install` packs every package and installs `lunibee` into an empty project). New scripts: `audit:security`, `smoke:install`.
 
 ### ✨ Added
 

@@ -11,6 +11,9 @@ Two parts. **Removed:** the APIs deprecated in 0.2.x are gone (see the changelog
 
 | Before | After |
 | --- | --- |
+| `new REST({ baseURL: "http://rest-proxy:8080" })` | `https://`, or add `allowInsecureBaseURL: true` for a trusted network. URLs with credentials, a query or a fragment are refused |
+| `try { gateway.connect() } catch {}` on a closed Gateway | `await gateway.connect()` (or `.catch()`): it rejects instead of throwing |
+| An embed over 6000 characters failed at Discord with 400 | `toJSON()` throws a `RangeError` first |
 | `new ClusterManager(...)` ran only under Node; workers read `SHARD_LIST` / `SHARD_COUNT` / `CLUSTER_ID` by hand and a `ShardManager` in a worker started every shard | Runs under Bun. In a worker, `new ShardManager({ token, intents })` owns only the cluster's `SHARD_LIST`, takes IDENTIFY slots from the parent and reports ready (`LUNIBEE_CLUSTER_WORKER=1`, `CLUSTER_COUNT` and `LUNIBEE_IDENTIFY` are new). A worker that built its own Gateways keeps working; pace them with `ClusterWorker.current()?.identifyGate` or `identify: { coordinate: false }` |
 | A `ShardBus` message to one shard reached every other cluster | Reaches only the cluster that owns the shard |
 | `intents: GatewayIntentBits.Guilds \| GatewayIntentBits.GuildMessages` (or a number) | `intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]`; the old forms throw a `TypeError` |

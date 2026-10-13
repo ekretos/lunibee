@@ -104,7 +104,8 @@
     "bench:compare": "bun scripts/bench-compare.mjs",
     "build:all": "bun run build && bun run build:dts",
     "publish:all": "bun run scripts/publish.ts",
-    "audit:security": "bun scripts/security-scan.ts && bun audit"
+    "audit:security": "bun scripts/security-scan.ts && bun audit",
+    "smoke:install": "bun scripts/smoke-install.ts"
   },
   "dependencies": {
     "@lunibee/builders": "workspace:*",
