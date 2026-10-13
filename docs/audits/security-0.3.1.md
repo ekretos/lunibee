@@ -169,3 +169,34 @@ Evidence: `scanText()` skips a whole line when `OPT_OUT.test(line)` matches; the
 - **R-07 and R-08 should be fixed and covered by regression tests** to make the advertised message limit and secret-scanning tripwire behave as intended.
 - Repository settings remain unverified: secret scanning/push protection, private vulnerability reporting availability, and required status checks need confirmation in GitHub settings.
 - No tests, dependency audit, build, or GitHub Actions run was executed as part of this third pass; do not treat the source review as runtime verification.
+
+
+## Fourth pass — follow-up re-audit (2026-10-13)
+
+This pass re-fetched the current source and the existing audit report after the maintainer clarified the intended workflow policy. This was a source-only review; no test, build, dependency audit, or GitHub Actions run was executed.
+
+### Previous findings rechecked
+
+| ID | Current verdict | Evidence |
+| --- | --- | --- |
+| R-06 | **Accepted design** | Excluding the release branch `v0.3` from push triggers is intentional. Do not add every release branch to CI. |
+| R-07 | **Still open** | `payloadSize()` still uses JavaScript `.length`; remote `parseJson()` still checks `text.length`. The limit is not measured in UTF-8 bytes. |
+| R-08 | **Still open** | `scanText()` still skips the entire line whenever `OPT_OUT.test(line)` matches, regardless of whether the marker is in a comment. |
+
+### R-09 — workflow triggers do not exactly match the requested maintained-branch policy
+
+- **Severity:** P2 (workflow/policy correctness, not a security exploit)
+- **Location:** `.github/workflows/ci.yml`, `.github/workflows/security.yml`
+- **Problem:** the stated policy is automatic checks only for `master` and `dev`, but the current CI push and pull-request filters list `master` and `main` (not `dev`). The Security workflow push filter lists `master`, `main`, and `dev`, while its unfiltered `pull_request:` trigger runs for pull requests targeting any branch.
+- **Impact:** `main` can trigger workflows unexpectedly; `dev` does not get the regular CI workflow on push or targeted pull request; Security runs on PRs beyond the two intended maintained branches.
+- **Status:** **Open — policy mismatch confirmed from workflow source.**
+- **Fix:** if the intended policy applies to both workflows, set push and pull-request branch filters to `[master, dev]` in both files. Keep `schedule` and `workflow_dispatch` if you still want scheduled and manual security checks. Do not add `v0.3` or feature/release branches.
+- **Verification:** after changing triggers, inspect the workflow event configuration and confirm with test PRs/pushes to `master`, `dev`, and a non-maintained branch. Branch protection/required checks remain a separate repository setting.
+
+### Updated disposition
+
+- No new P0 finding identified in this source review.
+- R-06 remains accepted design: release branches are intentionally excluded from automatic CI.
+- R-07 and R-08 remain actionable code findings.
+- R-09 should be resolved if the policy is strictly `master` and `dev` for both CI and Security workflows.
+- GitHub repository settings and actual workflow execution remain unverified.
