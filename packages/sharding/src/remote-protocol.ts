@@ -11,6 +11,7 @@ export const RemoteClose = {
     AuthFailed: 4401,
     HelloTimeout: 4408,
     DuplicateHost: 4409,
+    TooManyConnections: 4429,
     UnknownHost: 4410,
     VersionMismatch: 4426,
     HostLost: 4504,

@@ -275,6 +275,8 @@ export class ClusterManager {
     #coordinator?: IdentifyCoordinator;
     #allReady = false;
     #clusterCount = 0;
+    /** Shards of each cluster that are waiting for an IDENTIFY slot. */
+    readonly #identifyWaiting = new Map<number, Set<number>>();
     readonly #remote?: RemoteHosts;
     /** Which host runs each cluster. Fixed for the life of a spawn, so a cluster returns to its host. */
     readonly #hostOf = new Map<number, string>();
@@ -668,6 +670,7 @@ export class ClusterManager {
         child.removeAllListeners("message");
         this.#clearStartTimer(info.id);
         this.#coordinator?.drop(info.id, `Cluster ${info.id} exited.`);
+        this.#identifyWaiting.delete(info.id);
         this.#tracker.failOwner(info.id, `Cluster ${info.id} exited.`);
         this.clusters.delete(info.id);
         this.#allReady = false;
@@ -867,9 +870,30 @@ export class ClusterManager {
                     });
                     return;
                 }
+                // A shard asks for one slot at a time, so a worker cannot queue
+                // more requests than it has shards.
+                let waiting = this.#identifyWaiting.get(info.id);
+                if (!waiting)
+                    this.#identifyWaiting.set(info.id, (waiting = new Set()));
+                if (waiting.has(frame.shardId)) {
+                    reply({
+                        kind: "identify-deny",
+                        id: frame.id,
+                        error: `Shard ${frame.shardId} is already waiting for a slot.`,
+                    });
+                    return;
+                }
+                waiting.add(frame.shardId);
+                const settled = (): void => {
+                    waiting.delete(frame.shardId);
+                };
                 this.#coordinator.acquire(info.id, frame.shardId).then(
-                    () => reply({ kind: "identify-grant", id: frame.id }),
-                    (error: unknown) =>
+                    () => {
+                        settled();
+                        reply({ kind: "identify-grant", id: frame.id });
+                    },
+                    (error: unknown) => {
+                        settled();
                         reply({
                             kind: "identify-deny",
                             id: frame.id,
@@ -877,7 +901,8 @@ export class ClusterManager {
                                 error instanceof Error
                                     ? error.message
                                     : String(error),
-                        }),
+                        });
+                    },
                 );
                 return;
             }

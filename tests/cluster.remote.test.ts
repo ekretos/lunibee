@@ -1048,3 +1048,47 @@ describe("shutdown", () => {
         expect(host.connected).toBe(false);
     });
 });
+
+describe("resource limits", () => {
+    test("connections that have not authenticated are capped", async () => {
+        const { port } = await deployment(
+            ["a"],
+            {},
+            { maxUnauthenticated: 3, helloTimeout: 5000 },
+        );
+        const sockets: Awaited<ReturnType<typeof rawHost>>[] = [];
+        for (let i = 0; i < 6; i++)
+            sockets.push(await rawHost(port, `x${i}`, { hello: false }));
+        await until(() => sockets.filter((s) => s.closed()).length >= 3);
+        const refused = sockets.filter(
+            (s) => s.closed()?.code === RemoteClose.TooManyConnections,
+        );
+        expect(refused).toHaveLength(3);
+        // Closing one frees a place.
+        sockets[0]!.socket.close();
+        await tick(30);
+        const again = await rawHost(port, "later", { hello: false });
+        await until(() => again.find("challenge"));
+        expect(again.closed()).toBeUndefined();
+    });
+
+    test("a worker cannot queue many IDENTIFY requests for one shard", async () => {
+        const { manager, agents, spawning } = await deployment(["a"], {
+            shardCount: 2,
+            clusterCount: 1,
+            maxConcurrency: 1,
+            identify: { interval: 10_000 },
+        });
+        await spawning;
+        const child = await until(() => agents.get("a")!.children[0]);
+        for (let id = 1; id <= 50; id++)
+            child.control({ kind: "identify", id, shardId: 0 });
+        await until(() => child.controlFrames("identify-deny").length >= 48);
+        expect(child.controlFrames("identify-grant")).toHaveLength(1);
+        const denied = child.controlFrames("identify-deny");
+        // One request holds the slot, one waits behind it, the rest are refused.
+        expect(denied).toHaveLength(48);
+        expect(denied[0]!.error).toMatch(/already waiting/);
+        void manager;
+    });
+});

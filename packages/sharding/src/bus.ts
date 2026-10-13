@@ -51,6 +51,27 @@ export interface ShardBusOptions {
     /** Most requests waiting for a reply at once (default 10,000); more are rejected. */
     maxPending?: number;
 }
+/** Longest message type or ID a bus accepts. */
+const MAX_NAME_LENGTH = 256;
+
+/** Checks the envelope of a message that arrived from a transport, which is untrusted input. */
+function isShardMessage(message: unknown): message is ShardMessage {
+    if (!message || typeof message !== "object") return false;
+    const m = message as Record<string, unknown>;
+    return (
+        typeof m.type === "string" &&
+        m.type.length > 0 &&
+        m.type.length <= MAX_NAME_LENGTH &&
+        typeof m.id === "string" &&
+        m.id.length <= MAX_NAME_LENGTH &&
+        // -1 is the parent process (see ClusterManager.request()).
+        Number.isInteger(m.source) &&
+        (m.source as number) >= -1 &&
+        (m.target === null ||
+            (Number.isInteger(m.target) && (m.target as number) >= -1))
+    );
+}
+
 /** Cross-shard messaging: send, broadcast, and request/reply over a {@link ShardBusTransport}. */
 export class ShardBus {
     /** Underlying transport. */
@@ -74,10 +95,15 @@ export class ShardBus {
         string,
         {
             target: number | null;
+            /** Shards that already answered; a shard counts once. */
+            seen: Set<number>;
             reply: (reply: ShardReply) => void;
             fail: (error: Error) => void;
+            /** Ends the wait now: a request rejects, a broadcast resolves with what it has. */
+            cancel: (error: Error) => void;
         }
     >();
+    #closed = false;
     /** Creates a shard bus. @param shardId Shard ID. @param channelName Application-specific channel name. @throws {RangeError} If shard ID is invalid. @throws {TypeError} If channel name is empty. */
     public constructor(
         shardId: number,
@@ -215,6 +241,8 @@ export class ShardBus {
         rejectOnPeerDown = false,
     ): Promise<ShardReply<R>[]> {
         const replies: ShardReply<R>[] = [];
+        if (this.#closed)
+            return Promise.reject(new Error("ShardBus is closed."));
         if (this.#pending.size >= this.#maxPending)
             return Promise.reject(
                 new Error(
@@ -230,24 +258,33 @@ export class ShardBus {
             };
             const timer = setTimeout(finish, timeoutMs);
             requestId = this.#publish(target, type, data, true);
+            const fail = (error: Error): void => {
+                if (!rejectOnPeerDown) return;
+                clearTimeout(timer);
+                this.#pending.delete(requestId);
+                reject(error);
+            };
             this.#pending.set(requestId, {
                 target,
+                seen: new Set(),
                 reply: (reply) => {
                     replies.push(reply as ShardReply<R>);
                     if (replies.length >= expected) finish();
                 },
-                fail: (error) => {
-                    if (rejectOnPeerDown) {
-                        clearTimeout(timer);
-                        this.#pending.delete(requestId);
-                        reject(error);
-                    }
-                },
+                fail,
+                cancel: (error) => (rejectOnPeerDown ? fail(error) : finish()),
             });
         });
     }
     /** Closes the transport. @returns Nothing. */
     public close(): void {
+        if (this.#closed) return;
+        this.#closed = true;
+        // Nothing can answer once the transport is gone, so end the waits now
+        // instead of leaving their timers to fire later.
+        for (const pending of [...this.#pending.values()])
+            pending.cancel(new Error("ShardBus is closed."));
+        this.#pending.clear();
         this.#transport.close();
         this.#handlers.clear();
         this.#errorHandlers.clear();
@@ -261,6 +298,7 @@ export class ShardBus {
     ): string {
         if (!type.trim())
             throw new TypeError("Shard message type is required.");
+        if (this.#closed) throw new Error("ShardBus is closed.");
         const id = `${this.#namespace}:${this.#shardId}:${++this.#counter}`;
         this.#transport.post({
             source: this.#shardId,
@@ -274,23 +312,35 @@ export class ShardBus {
     }
     /** Routes an incoming message to matching handlers. @param message Message envelope. @returns Nothing. */
     #dispatch(message: ShardMessage): void {
-        if (
-            !message ||
-            typeof message !== "object" ||
-            typeof message.type !== "string"
-        )
-            return;
+        if (this.#closed || !isShardMessage(message)) return;
         if (
             message.source === this.#shardId ||
             (message.target !== null && message.target !== this.#shardId)
         )
             return;
         if (message.type === REPLY_TYPE) {
-            const reply = message.data as ReplyPayload;
-            this.#pending.get(reply?.requestId)?.reply({
+            const reply = message.data as ReplyPayload | null;
+            if (
+                !reply ||
+                typeof reply !== "object" ||
+                typeof reply.requestId !== "string"
+            )
+                return;
+            const pending = this.#pending.get(reply.requestId);
+            // Late, unknown and duplicate answers are dropped, and so is an
+            // answer from a shard other than the one that was asked: nobody
+            // can resolve a request by guessing its ID.
+            if (
+                !pending ||
+                pending.seen.has(message.source) ||
+                (pending.target !== null && pending.target !== message.source)
+            )
+                return;
+            pending.seen.add(message.source);
+            pending.reply({
                 shardId: message.source,
                 ...(reply.error !== undefined
-                    ? { error: reply.error }
+                    ? { error: String(reply.error) }
                     : { result: reply.result }),
             });
             return;

@@ -41,6 +41,8 @@ export interface RemoteOptions {
     lease?: number;
     /** Milliseconds a new connection has to authenticate before it is closed. Default 10,000. */
     helloTimeout?: number;
+    /** Most connections that may be waiting to authenticate at once; more are closed. Default 16. */
+    maxUnauthenticated?: number;
     /** Also run clusters on the coordinator's own machine. Default false: clusters run on the hosts only. */
     local?: boolean;
 }
@@ -59,6 +61,8 @@ export interface HostStatus {
 interface SocketData {
     nonce: string;
     id?: string;
+    /** Whether this socket is counted in `#unauthenticated`. */
+    counted?: boolean;
     helloTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -155,6 +159,8 @@ export class RemoteHosts {
     #watchdog?: ReturnType<typeof setInterval>;
     #epoch = 0;
     #ping = 0;
+    /** Sockets that have not said hello yet. */
+    #unauthenticated = 0;
 
     public constructor(options: RemoteOptions, hooks: RemoteHooks) {
         if (typeof options.secret !== "string" || options.secret.length < 16)
@@ -350,6 +356,12 @@ export class RemoteHosts {
     }
 
     #open(ws: ServerWebSocket<SocketData>): void {
+        if (this.#unauthenticated >= (this.#options.maxUnauthenticated ?? 16)) {
+            ws.close(RemoteClose.TooManyConnections, "Too many connections.");
+            return;
+        }
+        this.#unauthenticated++;
+        ws.data.counted = true;
         ws.data.helloTimer = setTimeout(
             () => ws.close(RemoteClose.HelloTimeout, "No hello."),
             this.#options.helloTimeout ?? 10_000,
@@ -447,6 +459,7 @@ export class RemoteHosts {
             return;
         }
         clearTimeout(ws.data.helloTimer);
+        this.#uncount(ws);
         ws.data.id = id;
         const link: Link = {
             id,
@@ -465,8 +478,16 @@ export class RemoteHosts {
         for (const waiter of [...this.#waiters]) waiter.check();
     }
 
+    #uncount(ws: ServerWebSocket<SocketData>): void {
+        if (ws.data.counted) {
+            ws.data.counted = false;
+            this.#unauthenticated--;
+        }
+    }
+
     #closed(ws: ServerWebSocket<SocketData>, reason: string): void {
         clearTimeout(ws.data.helloTimer);
+        this.#uncount(ws);
         const link = ws.data.id ? this.#links.get(ws.data.id) : undefined;
         if (link && link.ws === ws)
             this.#drop(link, reason || "The connection closed.");
