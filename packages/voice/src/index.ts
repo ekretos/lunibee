@@ -139,6 +139,8 @@ export class VoiceConnection {
         return this;
     }
 
+    readonly #listening = new WeakSet<VoiceUdpTransport>();
+
     /** Attaches protocol transports, replacing and cleaning up the old pair when present. @param gateway Voice gateway transport. @param udp UDP transport. @returns This connection. @throws {VoiceError} If the connection is destroyed. @throws {TypeError} If a transport is missing. */
     public attachTransports(
         gateway: VoiceGatewayTransport,
@@ -149,6 +151,9 @@ export class VoiceConnection {
             throw new TypeError(
                 "Both voice gateway and UDP transports are required.",
             );
+        // The same pair again is a no-op: closing it first would end the
+        // transports just attached.
+        if (this.gateway === gateway && this.udp === udp) return this;
         if (this.gateway || this.udp) this.#closeTransports();
         this.gateway = gateway;
         this.udp = udp;
@@ -156,7 +161,10 @@ export class VoiceConnection {
         // later-replaced transport (whose listener cannot be unregistered — the
         // VoiceUdpTransport interface exposes no removal API) are ignored.
         const attachedUdp = udp;
-        if (attachedUdp.onMessage) {
+        // A transport that comes back must not get a second listener (it
+        // cannot be removed), or every datagram would be delivered twice.
+        if (attachedUdp.onMessage && !this.#listening.has(attachedUdp)) {
+            this.#listening.add(attachedUdp);
             attachedUdp.onMessage((packet) => {
                 if (this.udp === attachedUdp) this.receiver.onPacket(packet);
             });
@@ -559,21 +567,26 @@ export class VoiceReceiver {
         if (this.connection.state === VoiceConnectionState.Destroyed)
             throw new VoiceError("Voice connection has been destroyed.");
         let controllerRef: ReadableStreamDefaultController<Uint8Array>;
-        const stream = new ReadableStream<Uint8Array>({
-            start: (controller) => {
-                controllerRef = controller;
-                let set = this.#streams.get(userId);
-                if (!set) this.#streams.set(userId, (set = new Set()));
-                set.add(controller);
+        const stream = new ReadableStream<Uint8Array>(
+            {
+                start: (controller) => {
+                    controllerRef = controller;
+                    let set = this.#streams.get(userId);
+                    if (!set) this.#streams.set(userId, (set = new Set()));
+                    set.add(controller);
+                },
+                cancel: () => {
+                    const set = this.#streams.get(userId);
+                    if (set) {
+                        set.delete(controllerRef);
+                        if (set.size === 0) this.#streams.delete(userId);
+                    }
+                },
             },
-            cancel: () => {
-                const set = this.#streams.get(userId);
-                if (set) {
-                    set.delete(controllerRef);
-                    if (set.size === 0) this.#streams.delete(userId);
-                }
-            },
-        });
+            // About a second of 20 ms packets; a reader that falls further
+            // behind loses the newest packets instead of growing the heap.
+            { highWaterMark: 50 },
+        );
         return new AudioStream(stream, { title: `User ${userId} Audio` });
     }
 
@@ -627,6 +640,7 @@ export class VoiceReceiver {
 
         for (const controller of controllers) {
             try {
+                if ((controller.desiredSize ?? 1) <= 0) continue;
                 controller.enqueue(payload);
             } catch {
                 // Ignore errors on closed streams.
@@ -647,6 +661,8 @@ const voiceConnections = new Map<string, VoiceConnection>();
  * Joins (or moves to) a voice channel, reusing the guild's tracked connection.
  * Mirrors `@discordjs/voice`'s `joinVoiceChannel`; transports are still attached
  * with {@link VoiceConnection.attachTransports}.
+ * The connection stays tracked after `disconnect()` (a later join reuses it) and
+ * leaves the registry only on `destroy()`.
  * @param options Guild, channel and self mute/deaf flags.
  * @returns The guild's voice connection.
  * @throws {TypeError} If the guild or channel ID is empty.

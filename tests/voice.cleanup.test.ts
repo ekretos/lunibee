@@ -61,3 +61,37 @@ describe("RTP validation and long waits", () => {
         connection.destroy();
     });
 });
+
+describe("transports and backpressure (F-H2, F-H4)", () => {
+    test("attaching the same pair twice delivers each datagram once", () => {
+        const connection = new VoiceConnection("1");
+        let listener: ((p: Uint8Array) => void) | undefined;
+        let listeners = 0;
+        const udp = {
+            send() {},
+            close() {},
+            onMessage(fn: (p: Uint8Array) => void) {
+                listeners++;
+                listener = fn;
+            },
+        };
+        const gateway = { send() {}, close() {} };
+        connection.attachTransports(gateway as never, udp as never);
+        connection.attachTransports(gateway as never, udp as never);
+        expect(listeners).toBe(1);
+        expect(listener).toBeDefined();
+        connection.destroy();
+    });
+
+    test("an unread subscriber stream keeps a bounded backlog", async () => {
+        const connection = new VoiceConnection("1");
+        connection.receiver.mapSsrc(5, "u");
+        const reader = connection.receiver.subscribe("u").stream.getReader();
+        for (let i = 0; i < 5000; i++) connection.receiver.onPacket(rtp(5));
+        connection.receiver.close();
+        let count = 0;
+        while (!(await reader.read()).done) count++;
+        expect(count).toBeLessThanOrEqual(51);
+        expect(count).toBeGreaterThan(0);
+    });
+});

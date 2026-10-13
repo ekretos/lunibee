@@ -163,3 +163,28 @@ describe("URL schemes (F-E4)", () => {
         expect(link("x", "https://a.test")).toBe("[x](https://a.test)");
     });
 });
+
+describe("option payloads Discord rejects (F-E7)", () => {
+    test("non-finite choice values and min above an existing max throw", async () => {
+        const { CreateNumberOption, CreateStringOption } =
+            await import("../packages/builders/src/index.ts");
+        expect(() =>
+            new CreateNumberOption().addChoices({
+                name: "a",
+                value: Number.NaN,
+            }),
+        ).toThrow(TypeError);
+        expect(() =>
+            new CreateNumberOption().addChoices({
+                name: "a",
+                value: new Date() as never,
+            }),
+        ).toThrow(TypeError);
+        expect(() =>
+            new CreateStringOption().addChoices({ name: "a", value: "" }),
+        ).toThrow(RangeError);
+        expect(() =>
+            new CreateNumberOption().setMaxValue(1).setMinValue(5),
+        ).toThrow(RangeError);
+    });
+});

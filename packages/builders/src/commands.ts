@@ -235,6 +235,9 @@ export class CreateNumericOption extends CreateCommandOption {
             "min_value",
             this.#integer,
         );
+        const max = this.data.max_value as number | undefined;
+        if (max !== undefined && value > max)
+            throw new RangeError("min_value cannot exceed max_value.");
         this.data.min_value = value;
         return this;
     }
@@ -490,7 +493,18 @@ function appendChoices(
         throw new RangeError("Autocomplete options cannot define choices.");
     if (current.length + choices.length > 25)
         throw new RangeError("An option cannot contain more than 25 choices.");
-    for (const choice of choices) validateText(choice.name, "Choice name", 100);
+    for (const choice of choices) {
+        validateText(choice.name, "Choice name", 100);
+        const value: unknown = choice.value;
+        if (
+            typeof value === "string"
+                ? value.length === 0 || value.length > 100
+                : typeof value !== "number" || !Number.isFinite(value)
+        )
+            throw new TypeError(
+                "Choice value must be a string of 1-100 characters or a finite number.",
+            );
+    }
     data.choices = [...current, ...choices.map((choice) => ({ ...choice }))];
 }
 
