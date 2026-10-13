@@ -5,7 +5,13 @@ const LIBRARY_URL = "https://github.com/Ekretos/lunibee";
 const USER_AGENT = `DiscordBot (${LIBRARY_URL}, ${LIBRARY_VERSION})`;
 
 import { MemoryRateLimitStore, type RateLimitStore } from "./store.js";
-import { RESTError, abortError, redactPath, sanitizeCause, sleep } from "./errors.js";
+import {
+    RESTError,
+    abortError,
+    redactPath,
+    sanitizeCause,
+    sleep,
+} from "./errors.js";
 import {
     createRouteKey,
     serializeQuery,
@@ -592,7 +598,11 @@ export class REST {
                     : new Blob([file.data as ArrayBuffer], {
                           type: file.contentType ?? "application/octet-stream",
                       });
-            form.append(`files[${i}]`, blob, file.name);
+            form.append(
+                `files[${i}]`,
+                blob,
+                file.name.replace(/[\r\n"\\]/g, "_"),
+            );
         }
         return form;
     }

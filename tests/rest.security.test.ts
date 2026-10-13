@@ -527,7 +527,7 @@ describe("server-controlled backoff", () => {
 describe("custom transport errors", () => {
     test("a webhook token in a thrown error does not reach the cause", async () => {
         class Leaky extends HttpTransport {
-            public override async request(): Promise<never> {
+            public override async send(): Promise<never> {
                 throw new Error(
                     `connect failed https://discord.com/api/webhooks/1/${WEBHOOK_TOKEN}`,
                 );
@@ -539,8 +539,40 @@ describe("custom transport errors", () => {
             retry: { maxRetries: 0 },
         } as never);
         const error = await rest.get("/x").catch((e: unknown) => e);
-        expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain(WEBHOOK_TOKEN);
+        expect(
+            JSON.stringify(error, Object.getOwnPropertyNames(error)),
+        ).not.toContain(WEBHOOK_TOKEN);
         const cause = (error as { cause?: Error }).cause;
         expect(`${cause?.message}${cause?.stack}`).not.toContain(WEBHOOK_TOKEN);
+    });
+});
+
+describe("input normalisation", () => {
+    test("baseURL is normalised and bare ? or # is refused", () => {
+        expect(
+            new HttpTransport({ baseURL: "https://discord.com/api/v10/" })
+                .baseURL,
+        ).toBe("https://discord.com/api/v10");
+        expect(
+            () => new HttpTransport({ baseURL: "https://discord.com/api?" }),
+        ).toThrow(TypeError);
+    });
+
+    test("multipart file names cannot inject part headers", async () => {
+        let body: FormData | undefined;
+        const rest = new REST({
+            token: TOKEN,
+            transport: new HttpTransport({
+                fetch: (async (_u: unknown, init: RequestInit) => {
+                    body = init.body as FormData;
+                    return new Response("{}", { status: 200 });
+                }) as never,
+            }),
+        });
+        await rest.postWithFiles("/channels/1/messages", {}, [
+            { name: 'a"\r\nX-Evil: 1.png', data: new Uint8Array([1]) },
+        ] as never);
+        const file = body!.get("files[0]") as File;
+        expect(file.name).not.toMatch(/[\r\n"]/);
     });
 });

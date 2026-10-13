@@ -214,3 +214,37 @@ describe("lifecycle", () => {
         g.close();
     });
 });
+
+describe("audit F-B", () => {
+    test("a corrupt compressed frame closes the socket for a resumable reconnect", async () => {
+        const g = gateway({ compress: true });
+        const errors: unknown[] = [];
+        g.on("error", (e: unknown) => errors.push(e));
+        const connecting = g.connect("wss://main.test");
+        const socket = FakeWebSocket.instances.at(-1)!;
+        socket.open();
+        await connecting;
+        socket.emit("message", {
+            data: new Uint8Array([1, 2, 3, 4, 0, 0, 255, 255]).buffer,
+        });
+        await wait(30);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(socket.closeCode).toBe(4000);
+        g.close();
+    });
+
+    test("compress parameter joins a query-less URL with ?", async () => {
+        const g = gateway({ compress: true });
+        const connecting = g.connect("wss://main.test");
+        const socket = FakeWebSocket.instances.at(-1)!;
+        expect(socket.url).toBe("wss://main.test?compress=zlib-stream");
+        socket.open();
+        await connecting;
+        g.close();
+    });
+
+    test("zero reconnect delays are rejected", () => {
+        expect(() => gateway({ reconnectBaseDelay: 0 })).toThrow(RangeError);
+        expect(() => gateway({ reconnectMaxDelay: -1 })).toThrow(RangeError);
+    });
+});

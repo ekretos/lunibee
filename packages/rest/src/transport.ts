@@ -37,7 +37,7 @@ export function parseBaseURL(raw: string, allowInsecure = false): string {
         throw new TypeError("baseURL must use https.");
     if (url.username || url.password)
         throw new TypeError("baseURL must not contain credentials.");
-    if (url.search || url.hash)
+    if (url.search || url.hash || /[?#]/.test(raw))
         throw new TypeError("baseURL must not contain a query or fragment.");
     if (
         url.protocol === "http:" &&
@@ -47,7 +47,7 @@ export function parseBaseURL(raw: string, allowInsecure = false): string {
         throw new TypeError(
             "baseURL must use https: the bot token would travel in cleartext (allowInsecureBaseURL: true overrides this for a trusted network).",
         );
-    return raw.replace(/\/$/, "");
+    return url.href.replace(/\/$/, "");
 }
 
 /** Thrown by {@link HttpTransport} when the attempt never produced a response. */

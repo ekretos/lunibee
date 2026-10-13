@@ -127,6 +127,7 @@ export class WebSocketTransport {
                 decoded = this.#decoder.push(event.data);
             } catch (error) {
                 this.#handlers.onError(this.#asError(error));
+                this.#failDecoding(generation);
                 return;
             }
             if (!(decoded instanceof Promise)) {
@@ -145,6 +146,7 @@ export class WebSocketTransport {
                 .catch((error) => {
                     if (!this.#owns(generation)) return;
                     this.#handlers.onError(this.#asError(error));
+                    this.#failDecoding(generation);
                 });
         });
         socket.addEventListener("close", (event) => {
@@ -178,6 +180,14 @@ export class WebSocketTransport {
             this.#handlers.onError(this.#asError(error));
             return false;
         }
+    }
+
+    /**
+     * A decoder that failed cannot be trusted for any later frame, so the
+     * socket is closed (4000, resumable) and the close path resets the decoder.
+     */
+    #failDecoding(generation: number): void {
+        if (this.#owns(generation)) this.close(4000, "decoder failure");
     }
 
     /** Closes the current socket, if any. Its `close` event still fires. */

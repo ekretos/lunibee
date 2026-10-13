@@ -206,6 +206,9 @@ export class Gateway {
     public constructor(options: GatewayOptions) {
         if (!options.token?.trim())
             throw new TypeError("A Gateway token is required.");
+        for (const key of ["reconnectBaseDelay", "reconnectMaxDelay"] as const)
+            if (options[key] !== undefined && !(options[key]! > 0))
+                throw new RangeError(`Gateway ${key} must be greater than 0.`);
         const resolvedIntents = resolveGatewayIntents(options.intents);
         if (!Number.isInteger(resolvedIntents) || resolvedIntents < 0)
             throw new TypeError(
@@ -348,7 +351,7 @@ export class Gateway {
         const connectURL = this.#options.compress
             ? url.includes("compress=")
                 ? url
-                : `${url}&compress=zlib-stream`
+                : `${url}${url.includes("?") ? "&" : "?"}compress=zlib-stream`
             : url;
         return this.#reconnect.attempt(() => this.#open(connectURL));
     }
