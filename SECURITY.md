@@ -51,6 +51,15 @@ Past reviews and the status of every finding are in `docs/audits/`.
   variables. Use `wss://` (`remote.tls`) on networks you do not control.
 - **Discord payloads** are untrusted input.
 
+## What the automated checks do and do not cover
+
+`bun audit` checks the lockfile against known advisories. `scripts/security-scan.ts`
+looks for known secret formats (tokens, keys, credentials in URLs) and risky calls
+in every tracked file and in every line ever committed. It is a tripwire, not proof:
+a secret in an unknown format, split across lines or encrypted is not found.
+Dependency review, CodeQL and GitHub secret scanning with push protection run
+alongside it, and none replaces the others.
+
 ## For contributors
 
 `bun run audit:security` runs the dependency audit, the secret scan and the

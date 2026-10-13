@@ -5,6 +5,7 @@ import {
     REMOTE_PROTOCOL_VERSION,
     RemoteClose,
     HOST_ID,
+    isLoopbackHost,
     parseToHost,
     signChallenge,
     type ToCoordinator,
@@ -12,8 +13,10 @@ import {
 
 /** Options for a {@link ClusterHost}. */
 export interface ClusterHostOptions {
-    /** The coordinator's address: `ws://host:port` or `wss://host:port`. */
+    /** The coordinator's address: `wss://host:port`. `ws://` is accepted for this machine, or anywhere with `allowInsecure`. */
     url: string;
+    /** Connect with `ws://` to a coordinator on another machine, over a network you fully trust. Default false. */
+    allowInsecure?: boolean;
     /** The coordinator's shared secret. */
     secret: string;
     /** This host's ID: letters, digits, `.`, `_`, `-`. Must be unique in the deployment. */
@@ -90,8 +93,24 @@ export class ClusterHost {
             throw new RangeError("secret must be at least 16 characters.");
         if (!options.script?.trim())
             throw new TypeError("A worker script path is required.");
-        if (!/^wss?:\/\//.test(options.url))
+        let url: URL;
+        try {
+            url = new URL(options.url);
+        } catch {
+            throw new TypeError("url must be an absolute ws:// or wss:// URL.");
+        }
+        if (url.protocol !== "ws:" && url.protocol !== "wss:")
             throw new TypeError("url must start with ws:// or wss://.");
+        if (url.username || url.password)
+            throw new TypeError("url must not contain credentials.");
+        if (
+            url.protocol === "ws:" &&
+            !options.allowInsecure &&
+            !isLoopbackHost(url.hostname)
+        )
+            throw new TypeError(
+                "url must use wss:// to reach another machine (allowInsecure: true overrides this for a network you fully trust).",
+            );
         this.#options = options;
         this.#delay = options.reconnectDelay ?? 1000;
     }

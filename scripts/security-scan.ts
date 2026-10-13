@@ -4,6 +4,19 @@
  *   bun scripts/security-scan.ts             tracked files: secrets and risky APIs
  *   bun scripts/security-scan.ts --history   also every line ever added on any branch
  *
+ * What it is: a fast, dependency-free tripwire for the secret formats and
+ * risky calls listed in RULES, run on every line (long lines included) of every
+ * tracked text file, and, with `--history`, on every line any commit ever added.
+ * CI runs it with `--history`, so a secret that was committed and then removed
+ * is still reported. It finds PEM private-key headers (also base64-encoded),
+ * tokens in URLs, and the token formats named below.
+ *
+ * What it is not: proof that a repository holds no secret. It matches known
+ * shapes with regular expressions; a secret in an unknown format, split across
+ * lines, encrypted or obfuscated is not found, and binary files are skipped.
+ * Keep GitHub secret scanning with push protection and CodeQL as independent
+ * checks, and rotate anything real it ever reports: deleting it is not enough.
+ *
  * A line may opt out with `security-ok: <reason>` in a comment next to it;
  * the reason is required so the exception can be reviewed.
  */
@@ -60,6 +73,19 @@ export const RULES: Rule[] = [
         kind: "secret",
     },
     {
+        id: "url-credentials",
+        description: "credentials inside a URL",
+        pattern:
+            /\b[a-z][a-z0-9+.-]{1,15}:\/\/(?!(?:user|username):(?:pass|password)@)[^\s/:@"'`<>]+:[^\s/@"'`<>]{3,}@(?!example\.|localhost\b|\$\{)[^\s"'`<>]+/i,
+        kind: "secret",
+    },
+    {
+        id: "encoded-private-key",
+        description: "base64-encoded private key block",
+        pattern: /LS0tLS1CRUdJTi[A-Za-z0-9+/=]{20,}/,
+        kind: "secret",
+    },
+    {
         id: "private-key",
         description: "Private key block",
         pattern:
@@ -113,7 +139,6 @@ export function scanText(
     const findings: Finding[] = [];
     const lines = text.split("\n");
     for (const [index, line] of lines.entries()) {
-        if (line.length > 4000) continue; // minified or data blobs
         if (OPT_OUT.test(line)) continue;
         for (const rule of RULES) {
             if (!kinds.includes(rule.kind)) continue;

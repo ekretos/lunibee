@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { getEventListeners } from "node:events";
 import { HttpTransport, REST, RESTError } from "../packages/rest/src/index.ts";
+import { abortable, sleep } from "../packages/rest/src/errors.ts";
 
 const TOKEN = "OTk5.AAAAAA.token-value-that-must-never-leak-1234";
 const WEBHOOK_TOKEN = "wh-secret-0123456789abcdef";
@@ -322,3 +324,78 @@ function threw(fn: () => unknown): boolean {
         return true;
     }
 }
+
+describe("abort listeners", () => {
+    const count = (signal: AbortSignal) =>
+        getEventListeners(signal, "abort").length;
+
+    test("sleep() leaves no listener behind, however it ends", async () => {
+        const controller = new AbortController();
+        for (let i = 0; i < 50; i++) await sleep(1, controller.signal, "/x");
+        expect(count(controller.signal)).toBe(0);
+
+        const pending = sleep(10_000, controller.signal, "/x");
+        const settled = pending.catch((e: unknown) => e);
+        expect(count(controller.signal)).toBe(1);
+        controller.abort();
+        expect(await settled).toBeInstanceOf(Error);
+        expect(count(controller.signal)).toBe(0);
+
+        // Already aborted: nothing is registered.
+        await expect(sleep(5, controller.signal, "/x")).rejects.toThrow();
+        expect(count(controller.signal)).toBe(0);
+        // No delay, no signal needed.
+        await sleep(0, controller.signal, "/x");
+        await sleep(5, undefined, "/x");
+    });
+
+    test("abortable() leaves no listener behind when the work finishes first or fails", async () => {
+        const controller = new AbortController();
+        for (let i = 0; i < 50; i++)
+            await abortable(Promise.resolve(), controller.signal, "/x");
+        expect(count(controller.signal)).toBe(0);
+        await expect(
+            abortable(
+                Promise.reject(new Error("boom")),
+                controller.signal,
+                "/x",
+            ),
+        ).rejects.toThrow("boom");
+        expect(count(controller.signal)).toBe(0);
+
+        let finish!: () => void;
+        const slow = new Promise<void>((resolve) => (finish = resolve));
+        const racing = abortable(slow, controller.signal, "/x");
+        expect(count(controller.signal)).toBe(1);
+        finish();
+        await racing;
+        expect(count(controller.signal)).toBe(0);
+
+        const never = new Promise<void>(() => undefined);
+        const aborted = abortable(never, controller.signal, "/x").catch(
+            (e: unknown) => e,
+        );
+        controller.abort();
+        expect(await aborted).toBeInstanceOf(Error);
+        expect(count(controller.signal)).toBe(0);
+        await expect(
+            abortable(never, controller.signal, "/x"),
+        ).rejects.toThrow();
+        expect(
+            await abortable(Promise.resolve(), undefined, "/x"),
+        ).toBeUndefined();
+    });
+
+    test("one signal reused for many requests does not accumulate listeners", async () => {
+        const controller = new AbortController();
+        const client = new REST({
+            token: TOKEN,
+            transport: new HttpTransport({
+                fetch: async () => new Response("{}"),
+            }),
+        });
+        for (let i = 0; i < 100; i++)
+            await client.get("/users/@me", { signal: controller.signal });
+        expect(count(controller.signal)).toBe(0);
+    });
+});

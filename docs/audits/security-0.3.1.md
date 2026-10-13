@@ -25,6 +25,20 @@ Severity: P0 critical, P1 high, P2 medium, P3 low (AGENT.md).
 | S-12 | P3 | Gateway | `connect()` threw synchronously instead of rejecting. **Fixed** |
 | S-13 | P3 | Builders | An embed over 6000 characters was accepted. **Fixed** |
 
+## Second pass
+
+An independent re-read of the same tag raised five points. Each was checked against the code.
+
+| ID | Severity | Finding | Verdict | Status |
+| --- | --- | --- | --- | --- |
+| R-01 | P1 | The CI workflow did not run `audit:security` | Valid: only the separate Security workflow and `bun run ci` did | **Fixed**: a step in `ci.yml`; a planted token makes `bun run audit:security` exit 1 (checked) |
+| R-02 | P2 | REST `sleep()` and `abortable()` leave `abort` listeners behind | Valid, reproduced: one listener per wait on a reused signal | **Fixed**, `tests/rest.security.test.ts` counts listeners over 100 requests |
+| R-03 | P1 | Remote clustering allows cleartext WebSockets | Valid as a default: `0.0.0.0` without TLS was accepted | **Fixed**: loopback by default; other addresses need `tls` or `allowInsecure`; hosts need `wss://` or `allowInsecure` |
+| R-04 | P1/P2 | The scanner's coverage has limits | Valid: it skipped lines over 4000 characters | **Improved**: no line limit; URL credentials and base64 private keys added; scope and limits documented. It stays a tripwire |
+| R-05 | P2 | Local IPC has no payload limit | Valid for worker messages relayed by the manager | **Fixed** at the manager: `maxMessageBytes` |
+
+Remaining after R-05: the worker's own `IpcTransport` receives frames only from its manager, so no limit was added there; a worker that sends a message the manager drops leaves the sender's request to time out (bounded by its timeout and `maxPendingRequests`).
+
 ## Findings
 
 ### S-01 No security policy (P1)
@@ -105,6 +119,6 @@ Severity: P0 critical, P1 high, P2 medium, P3 low (AGENT.md).
 1. **Repository settings** are not files: enable secret scanning with push protection, private vulnerability reporting, and require
    the `Security` and `CI` checks on protected branches. Not verified here.
 2. The CodeQL, dependency-review and package-smoke jobs have not run on GitHub; the first run may need tuning.
-3. IPC frames between a manager and its **local** workers are not size-limited beyond what the runtime allows; workers are trusted code.
-4. A `ClusterHost` link is authenticated but not encrypted unless `remote.tls` or a TLS proxy is used.
+3. Worker messages are limited at the manager (`maxMessageBytes`), after the runtime has already deserialized them; a hostile local worker can still use memory up to what its own IPC allows. Workers are trusted code.
+4. A `ClusterHost` link is authenticated; it is encrypted only with `remote.tls` or a TLS proxy, and plain `ws://` beyond this machine needs `allowInsecure` on both sides.
 5. Soak behaviour under sustained load (memory growth, rate-limit queues) is covered by the existing soak and benchmark jobs, not by new tests.

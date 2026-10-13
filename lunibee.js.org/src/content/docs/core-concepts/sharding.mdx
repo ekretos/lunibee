@@ -321,6 +321,8 @@ const clusters = new ClusterManager({
   waitForReady: true,
   remote: {
     port: 7070,
+    hostname: "0.0.0.0",                   // the default, 127.0.0.1, is this machine only
+    tls: { cert: process.env.TLS_CERT!, key: process.env.TLS_KEY! },   // required beyond loopback
     secret: process.env.CLUSTER_SECRET!,   // 16+ characters, shared with every host
     hosts: ["eu-1", "eu-2", "us-1"],       // clusters are placed on these, in this order
     lease: 15_000,
@@ -353,6 +355,8 @@ const clusters = new ClusterManager({
   waitForReady: true,
   remote: {
     port: 7070,
+    hostname: "0.0.0.0",
+    tls: { cert: process.env.TLS_CERT, key: process.env.TLS_KEY },
     secret: process.env.CLUSTER_SECRET,
     hosts: ["eu-1", "eu-2", "us-1"],
     lease: 15_000,
@@ -379,7 +383,8 @@ await host.connect();
 **Security.**
 - A host proves it knows `remote.secret` by answering a random challenge with an HMAC (the secret never travels), and the coordinator checks it in constant time. Unknown IDs (when `hosts` is set), duplicates, protocol mismatches, malformed or binary frames and a missing hello are closed with codes `4401`, `4410`, `4409`, `4426`, `4400` and `4408` (`RemoteClose`).
 - A coordinator can only set the worker contract variables (`SHARD_LIST`, `SHARD_COUNT`, `CLUSTER_ID`, `CLUSTER_COUNT`, `LUNIBEE_SHARD_BUS`, `LUNIBEE_CLUSTER_WORKER`, `LUNIBEE_IDENTIFY`) in a remote worker and can only send `SIGTERM`, `SIGKILL` or `SIGINT`; the script is the host's own, and the bot token is read from the host's environment, never sent.
-- The HMAC does not encrypt or sign the frames. Across a network you do not control, terminate TLS (`remote.tls` gives `wss://`, or put a TLS proxy in front) and restrict the port.
+- **Encryption is required off this machine.** The coordinator listens on `127.0.0.1` unless you say otherwise, and refuses to listen on any other address without `remote.tls` (`wss://`). Behind a TLS proxy, bind `127.0.0.1` and let the proxy forward; on a network you fully trust, `remote.allowInsecure: true` accepts plain `ws://`. A `ClusterHost` likewise refuses `ws://` to another machine unless `allowInsecure: true`. The HMAC proves who a host is; it does not encrypt or sign frames, so without TLS shard messages and worker output travel in the clear.
+- **Size limits.** Frames on the host link are capped at 8 MiB, and `maxMessageBytes` (default 8 MiB) caps what the coordinator relays from any worker, local or remote, and what `request()`, `broadcast()` and `requestCluster()` accept. An oversized worker message is dropped with an `error` event; a request waiting for it times out as usual, and an oversized answer to a request settles it with an error at once.
 
 **Failure and fencing.** A shard must never run in two places. A host kills all its workers the moment its connection closes, and also after one `lease` without hearing from the coordinator. The coordinator pings every third of a lease and treats a host as lost only after two leases of silence, so the host has already fenced itself; only then are its clusters restarted (`hostLeave` event). When a host reconnects with the same ID (it retries with backoff), its clusters start again on it (`hostJoin`). `hosts()` lists every host with its clusters, and `health().clusters[].host` says where each cluster runs.
 

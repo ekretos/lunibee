@@ -1024,3 +1024,124 @@ describe("recovery by reassignment", () => {
         expect(manager.health().missingShards).toEqual([0, 2]);
     });
 });
+
+describe("payload limits", () => {
+    const big = (n: number) => "x".repeat(n);
+
+    test("an oversized shard-bus message from a worker is dropped, reported, and not relayed", async () => {
+        const { manager, children, errors } = setup({ maxMessageBytes: 1000 });
+        await manager.spawn();
+        children[0]!.bus({
+            source: 0,
+            target: 1,
+            type: "t",
+            data: big(2000),
+            id: "m1",
+        });
+        children[0]!.bus({
+            source: 0,
+            target: null,
+            type: "t",
+            data: { blob: big(2000) },
+            id: "m2",
+        });
+        children[0]!.bus({
+            source: 0,
+            target: 1,
+            type: "t",
+            data: big(500),
+            id: "m3",
+        });
+        await tick();
+        expect(children[1]!.busFrames().map((m) => m.id)).toEqual(["m3"]);
+        expect(errors).toHaveLength(2);
+        expect(errors[0]!.message).toMatch(
+            /more than 1000 bytes; it was not relayed/,
+        );
+    });
+
+    test("a request waiting for an oversized answer settles at once", async () => {
+        const { manager, children } = setup({ maxMessageBytes: 1000 });
+        await manager.spawn();
+        children[0]!.behavior.ignoreRequests = new Set(["huge"]);
+        const pending = manager.requestCluster(0, "huge", null, {
+            timeoutMs: 10_000,
+        });
+        await tick();
+        const id = (children[0]!.controlFrames("request")[0] as { id: string })
+            .id;
+        const started = Date.now();
+        children[0]!.control({ kind: "reply", id, result: big(5000) });
+        await expect(pending).rejects.toThrow(
+            /answered with more than 1000 bytes/,
+        );
+        expect(Date.now() - started).toBeLessThan(500);
+    });
+
+    test("an oversized health report is ignored and a cyclic payload counts as oversized", async () => {
+        const { manager, children, errors } = setup({ maxMessageBytes: 1000 });
+        await manager.spawn();
+        children[0]!.control({
+            kind: "health",
+            report: {
+                shards: [
+                    {
+                        id: 0,
+                        state: "dispatch",
+                        ping: 1,
+                        status: "ready",
+                        pad: big(3000),
+                    },
+                ],
+                reportedAt: 1,
+            },
+        });
+        expect(manager.health().clusters[0]!.shards).toEqual([]);
+        expect(errors[0]!.message).toMatch(/health report/);
+        const cycle: Record<string, unknown> = {};
+        cycle.self = cycle;
+        children[0]!.bus({
+            source: 0,
+            target: 1,
+            type: "t",
+            data: cycle,
+            id: "c",
+        });
+        await tick();
+        expect(children[1]!.busFrames()).toHaveLength(0);
+    });
+
+    test("requests this process sends are checked against the same limit", async () => {
+        const { manager } = setup({ maxMessageBytes: 1000 });
+        await manager.spawn();
+        await expect(manager.request(0, "t", big(2000))).rejects.toThrow(
+            RangeError,
+        );
+        await expect(manager.broadcast("t", { a: big(2000) })).rejects.toThrow(
+            /maxMessageBytes/,
+        );
+        await expect(manager.requestCluster(0, "t", big(2000))).rejects.toThrow(
+            RangeError,
+        );
+        expect(await manager.request(0, "t", big(900))).toBeDefined();
+        expect(() => setup({ maxMessageBytes: 0 })).toThrow(RangeError);
+    });
+
+    test("a flood of oversized messages leaves nothing pending and the cluster running", async () => {
+        const { manager, children, errors } = setup({ maxMessageBytes: 500 });
+        await manager.spawn();
+        for (let i = 0; i < 500; i++)
+            children[0]!.bus({
+                source: 0,
+                target: 1,
+                type: "t",
+                data: big(600),
+                id: `f${i}`,
+            });
+        await tick();
+        expect(errors).toHaveLength(500);
+        expect(children[1]!.busFrames()).toHaveLength(0);
+        expect(children[0]!.kills).toEqual([]);
+        expect(await manager.request(1, "t", null)).toBeDefined();
+    });
+});

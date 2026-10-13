@@ -5,6 +5,7 @@ import type { Server, ServerWebSocket } from "bun";
 import {
     HOST_ID,
     MAX_REMOTE_FRAME_BYTES,
+    isLoopbackHost,
     REMOTE_PROTOCOL_VERSION,
     RemoteClose,
     parseToCoordinator,
@@ -16,12 +17,22 @@ import {
 export interface RemoteOptions {
     /** TCP port. `0` picks a free one (read it from `ClusterManager#remotePort`). */
     port: number;
-    /** Interface to bind. Default `0.0.0.0`; use `127.0.0.1` behind a proxy or tunnel. */
+    /**
+     * Interface to bind. Default `127.0.0.1`, which only this machine can
+     * reach. Any other address needs `tls` or `allowInsecure`.
+     */
     hostname?: string;
     /** Shared secret, at least 16 characters. Hosts prove they know it; it never crosses the wire. */
     secret: string;
-    /** TLS for `wss://`. Use it whenever hosts connect over a network you do not control. */
+    /** TLS for `wss://`. Required to listen on a non-loopback address unless `allowInsecure` is set. */
     tls?: { cert: string; key: string };
+    /**
+     * Listen on a non-loopback address without TLS: frames (shard messages
+     * and worker output) travel unencrypted and unsigned. Only for a network
+     * you fully trust, or when a TLS proxy in front terminates the connection.
+     * Default false.
+     */
+    allowInsecure?: boolean;
     /**
      * The host IDs that make up the deployment. Clusters are placed on them in
      * this order, and an unlisted host is refused. Without it, the hosts that
@@ -175,6 +186,22 @@ export class RemoteHosts {
             throw new RangeError(
                 "remote.port must be an integer from 0 to 65535.",
             );
+        if (
+            options.tls &&
+            (typeof options.tls.cert !== "string" ||
+                typeof options.tls.key !== "string" ||
+                !options.tls.cert ||
+                !options.tls.key)
+        )
+            throw new TypeError("remote.tls needs a non-empty cert and key.");
+        if (
+            !options.tls &&
+            !options.allowInsecure &&
+            !isLoopbackHost(options.hostname ?? "127.0.0.1")
+        )
+            throw new RangeError(
+                "remote listens on a network address without TLS: set remote.tls, bind 127.0.0.1 behind a TLS proxy, or set remote.allowInsecure for a network you fully trust.",
+            );
         const lease = options.lease ?? 15_000;
         if (!Number.isFinite(lease) || lease < 30)
             throw new RangeError(
@@ -214,7 +241,7 @@ export class RemoteHosts {
         const { port, hostname, tls, lease } = this.#options;
         this.#server = Bun.serve<SocketData>({
             port,
-            hostname: hostname ?? "0.0.0.0",
+            hostname: hostname ?? "127.0.0.1",
             ...(tls ? { tls } : {}),
             fetch: (request, server) => {
                 if (

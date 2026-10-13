@@ -106,10 +106,11 @@ describe("security scan rules", () => {
         ]);
     });
 
-    test("long lines (data blobs) are skipped and masks keep the middle hidden", () => {
-        expect(
-            scanText("a.ts", `${fake.github} ${"z".repeat(5000)}`, ["secret"]),
-        ).toEqual([]);
+    test("a secret on a very long line is still found, and masks keep the middle hidden", () => {
+        const long = `${"z".repeat(9000)} ${fake.github} ${"y".repeat(9000)}`;
+        const found = scanText("a.ts", long, ["secret"]);
+        expect(found.map((f) => f.rule)).toEqual(["github-token"]);
+        expect(found[0]!.excerpt).not.toContain(fake.github);
         expect(mask("short")).toBe("*****");
         expect(mask("abcdefghijklmnop")).toBe("abcd…****…op");
         expect(RULES.every((r) => r.id && r.description)).toBe(true);
@@ -117,6 +118,55 @@ describe("security scan rules", () => {
 
     test("the repository itself is clean", async () => {
         expect(await scanTree()).toEqual([]);
+    });
+});
+
+describe("secrets in other shapes", () => {
+    const rules = (text: string) =>
+        scanText("a.md", text, ["secret"]).map((f) => f.rule);
+
+    test("credentials inside a URL, but not placeholders or example hosts", () => {
+        expect(
+            rules(
+                `DATABASE_URL=${"postgres"}://admin:${"s3cretpass"}@db.internal/app`,
+            ),
+        ).toEqual(["url-credentials"]);
+        expect(
+            rules(`${"wss"}://bot:${"longpassword"}@gateway.internal`),
+        ).toEqual(["url-credentials"]);
+        expect(rules("https://user:pass@host.test")).toEqual([]);
+        expect(rules("https://username:password@host.test")).toEqual([]);
+        expect(rules("https://alice:hunter2@example.org")).toEqual([]);
+        expect(rules("https://alice:hunter2@localhost:3000")).toEqual([]);
+        expect(rules("https://discord.com/api/v10/users/@me")).toEqual([]);
+        expect(rules("mailto:someone@host.test")).toEqual([]);
+    });
+
+    test("a private key, plain or base64-encoded, and its multi-line block", () => {
+        const pem = [
+            fake.key,
+            "MIIEvQIBADANBgkqhkiG9w0BAQEFAASC",
+            "-----END RSA PRIVATE KEY-----",
+        ].join("\n");
+        // The header line is what identifies the block, wherever it sits in the file.
+        expect(
+            scanText("k.md", pem, ["secret"]).map((f) => [f.rule, f.line]),
+        ).toEqual([["private-key", 1]]);
+        const encoded = Buffer.from(`${fake.key}\nMIIEvQIBADANBg`).toString(
+            "base64",
+        );
+        expect(rules(`key: ${encoded}`)).toEqual(["encoded-private-key"]);
+    });
+
+    test("a token carrying a reviewed exception is accepted, a bare note is not", () => {
+        expect(
+            rules(
+                `${fake.github} <!-- security-ok: revoked example from the docs -->`,
+            ),
+        ).toEqual([]);
+        expect(rules(`${fake.github} <!-- security-ok -->`)).toEqual([
+            "github-token",
+        ]);
     });
 });
 

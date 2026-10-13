@@ -40,6 +40,11 @@ export const KILL_SIGNALS: ReadonlySet<string> = new Set([
     "SIGINT",
 ]);
 
+/** Whether a host name is this machine, where an unencrypted link is acceptable. */
+export function isLoopbackHost(hostname: string): boolean {
+    return /^(?:localhost|127(?:\.\d{1,3}){3}|\[::1\]|::1)$/i.test(hostname);
+}
+
 /** A host ID: letters, digits, `.`, `_` and `-`, up to 64 characters. */
 export const HOST_ID = /^[A-Za-z0-9._-]{1,64}$/;
 

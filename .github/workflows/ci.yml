@@ -47,6 +47,9 @@ jobs:
       - name: REST coverage report is current
         run: bun run audit:coverage
 
+      - name: Security audit (dependencies, secrets, risky APIs)
+        run: bun run audit:security
+
       - name: Typecheck every workspace package
         shell: bash
         run: |

@@ -1092,3 +1092,105 @@ describe("resource limits", () => {
         void manager;
     });
 });
+
+describe("transport security defaults", () => {
+    const make = (remote: object) =>
+        new ClusterManager({
+            token: "t",
+            script: "w.js",
+            remote: { port: 0, secret: SECRET, ...remote },
+        });
+
+    test("listening on a network address needs TLS or an explicit opt-in", () => {
+        // Loopback is the default and needs nothing.
+        expect(() => make({})).not.toThrow();
+        for (const hostname of ["127.0.0.1", "localhost", "[::1]", "127.0.0.2"])
+            expect(() => make({ hostname })).not.toThrow();
+        for (const hostname of [
+            "0.0.0.0",
+            "10.0.0.5",
+            "coordinator.example.com",
+            "::",
+        ])
+            expect({
+                hostname,
+                error: String(catchError(() => make({ hostname }))),
+            }).toEqual({
+                hostname,
+                error: expect.stringContaining("without TLS"),
+            });
+        expect(() =>
+            make({ hostname: "0.0.0.0", allowInsecure: true }),
+        ).not.toThrow();
+        expect(() =>
+            make({ hostname: "0.0.0.0", tls: { cert: "CERT", key: "KEY" } }),
+        ).not.toThrow();
+        expect(() => make({ tls: { cert: "", key: "KEY" } })).toThrow(
+            /cert and key/,
+        );
+        expect(() => make({ tls: { cert: "CERT" } })).toThrow(/cert and key/);
+    });
+
+    test("the default listener is reachable from this machine only", async () => {
+        const { manager } = await deployment(["a"]);
+        const response = await fetch(`http://127.0.0.1:${manager.remotePort}`);
+        expect(response.status).toBe(426);
+    });
+
+    test("a host connects over ws:// only to this machine, unless told otherwise", () => {
+        const host = (url: string, extra: object = {}) =>
+            new ClusterHost({
+                url,
+                secret: SECRET,
+                id: "a",
+                script: "w.js",
+                ...extra,
+            });
+        for (const url of [
+            "wss://coordinator.example.com:7070",
+            "ws://localhost:7070",
+            "ws://127.0.0.1:7070",
+            "ws://[::1]:7070",
+        ])
+            expect(() => host(url)).not.toThrow();
+        expect(() => host("ws://coordinator.example.com:7070")).toThrow(
+            /wss:\/\//,
+        );
+        expect(() => host("ws://10.0.0.5:7070")).toThrow(/wss:\/\//);
+        expect(() =>
+            host("ws://10.0.0.5:7070", { allowInsecure: true }),
+        ).not.toThrow();
+        expect(() => host("wss://user:pass@example.com")).toThrow(
+            /credentials/,
+        );
+        expect(() => host("not a url")).toThrow(/absolute/);
+        try {
+            host("wss://user:hunter2@example.com");
+        } catch (error) {
+            expect(String(error)).not.toContain("hunter2");
+        }
+    });
+
+    test("authentication failures never reveal why, and weak secrets are refused", async () => {
+        const { port } = await deployment(["a"]);
+        const wrongSecret = await rawHost(port, "a", {
+            secret: "x".repeat(40),
+        });
+        await until(wrongSecret.closed);
+        const unknownHost = await rawHost(port, "unlisted");
+        await until(unknownHost.closed);
+        // A wrong secret and a wrong ID differ only in the close code, never in a message that helps guess the secret.
+        expect(wrongSecret.closed()!.reason).toBe("Authentication failed.");
+        expect(wrongSecret.received.map((m) => m.t)).toEqual(["challenge"]);
+        expect(() => make({ secret: "short" })).toThrow(/at least 16/);
+    });
+});
+
+function catchError(fn: () => unknown): unknown {
+    try {
+        fn();
+    } catch (error) {
+        return error;
+    }
+    return undefined;
+}

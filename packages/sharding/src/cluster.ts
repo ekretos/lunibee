@@ -96,6 +96,15 @@ export interface ClusterManagerOptions {
      * offline. Default false.
      */
     reassignOnGiveUp?: boolean;
+    /**
+     * Largest shard-bus message, request payload or worker reply the manager
+     * handles, measured as its JSON text. Bigger ones from a worker are
+     * dropped before they are relayed (an `error` event says so; a request
+     * waiting for the answer times out as usual), and bigger ones passed to
+     * `request()`, `broadcast()` or `requestCluster()` throw a `RangeError`.
+     * Default 8 MiB, the same limit as the host link.
+     */
+    maxMessageBytes?: number;
     /** Default timeout for `request()`, `requestCluster()` and `broadcast()`. Default 5000. */
     requestTimeout?: number;
     /** Most requests waiting for answers at once. Default 10,000. */
@@ -226,6 +235,21 @@ export interface BroadcastResult<R = unknown> {
 
 type LiveState = "starting" | "ready";
 
+/** Default for `maxMessageBytes`. */
+const DEFAULT_MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
+
+/** The size of a payload as JSON text; `Infinity` for one that cannot be serialized (a cycle). */
+function payloadSize(value: unknown): number {
+    if (value === undefined || value === null) return 0;
+    if (typeof value === "string") return value.length;
+    if (typeof value !== "object") return String(value).length;
+    try {
+        return JSON.stringify(value)?.length ?? 0;
+    } catch {
+        return Number.POSITIVE_INFINITY;
+    }
+}
+
 const isLive = (state: ClusterState): state is LiveState =>
     state === "starting" || state === "ready";
 
@@ -315,6 +339,12 @@ export class ClusterManager {
         ] as const)
             if (value !== undefined && (!Number.isInteger(value) || value < 1))
                 throw new RangeError(`${name} must be a positive integer.`);
+        if (
+            options.maxMessageBytes !== undefined &&
+            (!Number.isInteger(options.maxMessageBytes) ||
+                options.maxMessageBytes < 1)
+        )
+            throw new RangeError("maxMessageBytes must be a positive integer.");
         for (const [name, value] of [
             ["spawnInterval", options.spawnInterval],
             ["startTimeout", options.startTimeout],
@@ -909,17 +939,51 @@ export class ClusterManager {
             case "identify-done":
                 this.#coordinator?.release(info.id, frame.shardId);
                 return;
-            case "reply":
+            case "reply": {
+                // An oversized answer settles the request with an error now
+                // instead of being held until its timeout.
+                const tooBig =
+                    frame.error === undefined && this.#tooBig(frame.result);
                 this.#tracker.answer(frame.id, `c:${info.id}`, info.id, {
                     ...(frame.error !== undefined
                         ? { error: frame.error }
-                        : { result: frame.result }),
+                        : tooBig
+                          ? {
+                                error: `Cluster ${info.id} answered with more than ${this.#maxBytes} bytes.`,
+                            }
+                          : { result: frame.result }),
                 });
                 return;
+            }
             case "health":
+                if (this.#tooBig(frame.report)) {
+                    this.#emit(
+                        "error",
+                        new Error(
+                            `Cluster ${info.id} sent a health report of more than ${this.#maxBytes} bytes.`,
+                        ),
+                    );
+                    return;
+                }
                 info.report = frame.report;
                 return;
         }
+    }
+
+    get #maxBytes(): number {
+        return this.#options.maxMessageBytes ?? DEFAULT_MAX_MESSAGE_BYTES;
+    }
+
+    #tooBig(value: unknown): boolean {
+        return payloadSize(value) > this.#maxBytes;
+    }
+
+    /** @throws {RangeError} If a payload this process is about to send is over the limit. */
+    #assertSize(data: unknown, what: string): void {
+        if (this.#tooBig(data))
+            throw new RangeError(
+                `${what} is larger than maxMessageBytes (${this.#maxBytes}).`,
+            );
     }
 
     /** Routes one shard-bus message: replies for the parent are consumed, shard-targeted messages go to the owning cluster only, broadcasts to every other cluster. */
@@ -938,6 +1002,15 @@ export class ClusterManager {
             (message.target !== null && !Number.isInteger(message.target))
         )
             return;
+        if (this.#tooBig(message.data)) {
+            this.#emit(
+                "error",
+                new Error(
+                    `Cluster ${from.id} sent a shard-bus message of more than ${this.#maxBytes} bytes; it was not relayed.`,
+                ),
+            );
+            return;
+        }
         const frame = { [BUS_FRAME]: message };
         if (message.target === PARENT_ID) {
             const reply = message.data as ReplyPayload | undefined;
@@ -981,6 +1054,7 @@ export class ClusterManager {
         data: T,
         options: RequestOptions = {},
     ): Promise<R> {
+        this.#assertSize(data, "The request data");
         const owner = this.clusterForShard(shardId);
         if (!owner)
             throw new RangeError(
@@ -1028,6 +1102,7 @@ export class ClusterManager {
         data: T,
         options: RequestOptions = {},
     ): Promise<BroadcastResult<R>> {
+        this.#assertSize(data, "The request data");
         const keys = new Map<string, number>();
         const down: number[] = [];
         for (const [shard, clusterId] of this.#owner) {
@@ -1083,6 +1158,7 @@ export class ClusterManager {
         data: T,
         options: RequestOptions = {},
     ): Promise<R> {
+        this.#assertSize(data, "The request data");
         const cluster = this.#infos.get(clusterId);
         if (!cluster)
             throw new RangeError(`Cluster ${clusterId} does not exist.`);

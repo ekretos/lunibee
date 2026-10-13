@@ -11,6 +11,7 @@ Two parts. **Removed:** the APIs deprecated in 0.2.x are gone (see the changelog
 
 | Before | After |
 | --- | --- |
+| `remote: { port: 7070, secret }` listening on all interfaces | The default is now `127.0.0.1`. Set `hostname`, and `tls` (or `allowInsecure: true` on a trusted network); hosts connect with `wss://` (or `allowInsecure: true` for `ws://`) |
 | `new REST({ baseURL: "http://rest-proxy:8080" })` | `https://`, or add `allowInsecureBaseURL: true` for a trusted network. URLs with credentials, a query or a fragment are refused |
 | `try { gateway.connect() } catch {}` on a closed Gateway | `await gateway.connect()` (or `.catch()`): it rejects instead of throwing |
 | An embed over 6000 characters failed at Discord with 400 | `toJSON()` throws a `RangeError` first |

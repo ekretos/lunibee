@@ -157,13 +157,18 @@ export async function sleep(
 ): Promise<void> {
     if (delay <= 0) return;
     await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, delay);
-        const abort = (): void => {
+        // Every way out clears the timer and removes the listener, so a signal
+        // shared by many requests does not collect one listener per wait.
+        const finish = (error?: Error): void => {
             clearTimeout(timer);
-            reject(abortError(path, signal?.reason));
+            signal?.removeEventListener("abort", onAbort);
+            if (error) reject(error);
+            else resolve();
         };
-        if (signal?.aborted) return abort();
-        signal?.addEventListener("abort", abort, { once: true });
+        const onAbort = (): void => finish(abortError(path, signal?.reason));
+        const timer = setTimeout(finish, delay);
+        if (signal?.aborted) return onAbort();
+        signal?.addEventListener("abort", onAbort, { once: true });
     });
 }
 
@@ -175,14 +180,19 @@ export async function abortable(
 ): Promise<void> {
     if (!signal) return promise;
     if (signal.aborted) throw abortError(path, signal.reason);
-    return Promise.race([
-        promise,
-        new Promise<void>((_, reject) =>
-            signal.addEventListener(
-                "abort",
-                () => reject(abortError(path, signal.reason)),
-                { once: true },
-            ),
-        ),
-    ]);
+    return new Promise<void>((resolve, reject) => {
+        const onAbort = (): void => reject(abortError(path, signal.reason));
+        signal.addEventListener("abort", onAbort, { once: true });
+        // Whichever settles first, the listener goes.
+        promise.then(
+            () => {
+                signal.removeEventListener("abort", onAbort);
+                resolve();
+            },
+            (error: unknown) => {
+                signal.removeEventListener("abort", onAbort);
+                reject(error);
+            },
+        );
+    });
 }
