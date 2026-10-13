@@ -108,7 +108,7 @@ but they still share the event loop, so keep them cheap.
 
 ### Concurrent buckets
 
-Since 0.3.0 requests on a known bucket run in parallel, up to its remaining
+Since 0.3.1 requests on a known bucket run in parallel, up to its remaining
 allowance. Pass `concurrentBuckets: false` when per-bucket order matters. See
 [REST & Rate Limits](/core-concepts/rest/#concurrent-buckets).
 

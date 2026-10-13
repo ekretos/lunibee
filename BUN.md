@@ -52,7 +52,7 @@ such as `array()`, `at()`, `keyAt()` and `random()` copy the whole collection wi
 `[...this.values()]` on every call. Bun's engine (JavaScriptCore) is much slower than V8 at
 spreading an overridden iterator of a `Map` subclass. Lunibee can avoid the copy (walk once
 and stop at the index for `at()`, pick a random index while iterating for `random()`) — a fix
-that helps every runtime. Recorded with the benchmark targets in the roadmap (0.3.0).
+that helps every runtime. Recorded with the benchmark targets in the roadmap (0.3.1).
 
 **Recommendation:** make **Bun 1.4.x the documented minimum and the CI runtime.** Node 22 runs
 the built package correctly (no errors across 166 functions), so keeping Node as an

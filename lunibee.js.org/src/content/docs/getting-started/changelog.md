@@ -3,9 +3,9 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
-## v0.3.0 (unreleased)
+## v0.3.1 (unreleased)
 
-A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3-workflow.md`](https://github.com/ekretos/lunibee/blob/0.3.0/docs/lunibee-3-workflow.md).
+A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3-workflow.md`](https://github.com/ekretos/lunibee/blob/0.3.1/docs/lunibee-3-workflow.md).
 
 ### ⚠️ Changed
 
@@ -20,7 +20,7 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 
 * **`guildsPerShard`** (with `guildCount`) on `ClusterManager` and `ShardManager`: with `shardCount: "auto"`, the shard count is `ceil(guilds / guildsPerShard)` from the guild count Discord reports, instead of Discord's recommendation (1 to 2500; `autoScaleInterval` follows it). Together with `shardsPerCluster` this fixes how many guilds a shard and how many shards a cluster hold. New helpers `shardsForGuilds()`, `fetchGuildCount()`, `MAX_GUILDS_PER_SHARD`.
 * **Multi-host clusters.** `ClusterManager({ remote })` is a coordinator that accepts `ClusterHost` agents on other machines over an authenticated WebSocket (HMAC challenge, optional `wss://`). Clusters are placed on hosts round-robin and supervised like local ones, so IDENTIFY slots, routing, `request()` / `broadcast()`, health and recovery work across hosts. A host kills its workers when the link closes or after one `lease` without the coordinator, and the coordinator waits two leases before it treats the host as lost, so a shard never runs in two places. Remote workers get only the worker-contract variables and the host's own script. New: `ClusterHost`, `hosts()`, `remotePort`, the `hostJoin` / `hostLeave` events, `ClusterInfo.host`, `ClusterHealth.host`, `RemoteClose`. See [Multiple hosts](/core-concepts/sharding/#multiple-hosts).
-* **`ShardManager` and `ClusterManager` as one system.** The `ClusterManager` owns processes and the shard-to-cluster map; the `ShardManager` in each worker runs that cluster's Gateways. New: a documented worker contract (`LUNIBEE_CLUSTER_WORKER`, `CLUSTER_ID`, `CLUSTER_COUNT`, `SHARD_COUNT`, `SHARD_LIST`, `LUNIBEE_IDENTIFY`; `readClusterContext()`, `isClusterWorker()`) and a recursion guard (a worker cannot `spawn()`); deterministic, validated allocation (`allocateShards`, `shardsPerCluster`, `shardIds` for a slice of a deployment, `assignments()`, `clusterForShard()`); a readiness handshake (`ready()`, `waitForReady`, `startTimeout`, cluster states); **IDENTIFY coordination across all clusters** through the parent (`IdentifyCoordinator`: one IDENTIFY per `shard_id % max_concurrency` key per interval, the `session_start_limit` budget with wait-for-reset, an `identifyWait` event) in place of per-cluster pacing; typed events (`clusterSpawn`, `clusterReady`, `ready`, `clusterExit`, `clusterRestart`, `clusterUnstable`, `clusterStartTimeout`, `clusterGiveUp`, `shardsReassigned`, `identifyWait`, `error`); `request()`, `broadcast()` (explicit `{ replies, missing }`) and `requestCluster()` with timeouts, `AbortSignal`, a bounded pending map and owner-checked answers; `health()` / `refreshHealth({ metrics })`; `reassignOnGiveUp`, which moves a failed cluster's shards to a ready cluster only after it confirms (`ShardManager.addShards()`); and `ClusterWorker` for workers that do not use `ShardManager`. See [Sharding](/core-concepts/sharding/#shardmanager-and-clustermanager-together-030) and [ClusterManager](/reference/cluster-manager/).
+* **`ShardManager` and `ClusterManager` as one system.** The `ClusterManager` owns processes and the shard-to-cluster map; the `ShardManager` in each worker runs that cluster's Gateways. New: a documented worker contract (`LUNIBEE_CLUSTER_WORKER`, `CLUSTER_ID`, `CLUSTER_COUNT`, `SHARD_COUNT`, `SHARD_LIST`, `LUNIBEE_IDENTIFY`; `readClusterContext()`, `isClusterWorker()`) and a recursion guard (a worker cannot `spawn()`); deterministic, validated allocation (`allocateShards`, `shardsPerCluster`, `shardIds` for a slice of a deployment, `assignments()`, `clusterForShard()`); a readiness handshake (`ready()`, `waitForReady`, `startTimeout`, cluster states); **IDENTIFY coordination across all clusters** through the parent (`IdentifyCoordinator`: one IDENTIFY per `shard_id % max_concurrency` key per interval, the `session_start_limit` budget with wait-for-reset, an `identifyWait` event) in place of per-cluster pacing; typed events (`clusterSpawn`, `clusterReady`, `ready`, `clusterExit`, `clusterRestart`, `clusterUnstable`, `clusterStartTimeout`, `clusterGiveUp`, `shardsReassigned`, `identifyWait`, `error`); `request()`, `broadcast()` (explicit `{ replies, missing }`) and `requestCluster()` with timeouts, `AbortSignal`, a bounded pending map and owner-checked answers; `health()` / `refreshHealth({ metrics })`; `reassignOnGiveUp`, which moves a failed cluster's shards to a ready cluster only after it confirms (`ShardManager.addShards()`); and `ClusterWorker` for workers that do not use `ShardManager`. See [Sharding](/core-concepts/sharding/#shardmanager-and-clustermanager-together-031) and [ClusterManager](/reference/cluster-manager/).
 * **`ShardManager` inside a cluster:** `shardIds`, `cluster`, `identify` and `worker` options, `addShards()`, `report()`, the `ready` event, and a lifecycle `status` with `readyAt` / `disconnectedAt` on `health()`.
 * **Stable voice interface.** `voiceStateUpdate` / `voiceServerUpdate` (full raw payloads, no cache needed) and the new `Client#sendVoiceState(guildId, channelId | null, { selfMute?, selfDeaf? })` (also `Gateway#sendVoiceState`, `Gateway#ownsGuild`, `ShardManager#sendVoiceState`, which routes to the guild's shard) are the documented public API for voice clients. `raw` and `ws.send()` are unchanged. See [Voice integration](/core-concepts/voice-integration/).
 * **`jitter` option** on `Collection` and `Cache`: a 0-1 fraction of each entry's TTL randomly shaved off when it is set, so entries stored together do not expire together. Default `0`.
@@ -70,7 +70,7 @@ Everything deprecated in 0.2.x is gone. `lunibee migrate --fix` renames the old 
 
 ### 📚 Documentation
 
-* Quick Start, `examples/basic` and the Upgrading page use `bot`, `command()` and handles. The Upgrading page has a before/after table for 0.3.0.
+* Quick Start, `examples/basic` and the Upgrading page use `bot`, `command()` and handles. The Upgrading page has a before/after table for 0.3.1.
 
 ## v0.2.4
 
@@ -125,11 +125,11 @@ Security release. Fixes the findings of the 0.2.3 security review; the status of
 
 ## v0.2.3
 
-Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existing code keeps working; deprecated APIs are struck through in your editor and **removed in 0.3.0**.
+Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existing code keeps working; deprecated APIs are struck through in your editor and **removed in 0.3.1**.
 
-### ⚠️ Deprecated (removed in 0.3.0)
+### ⚠️ Deprecated (removed in 0.3.1)
 
-* **The pre-0.2.2 names** (`ButtonBuilder`, `ButtonStyle`, `ChannelType`…, all 49 of them) are now removed in **0.3.0** instead of 2.0. See [Upgrading](/getting-started/upgrading/) for the table of new names.
+* **The pre-0.2.2 names** (`ButtonBuilder`, `ButtonStyle`, `ChannelType`…, all 49 of them) are now removed in **0.3.1** instead of 2.0. See [Upgrading](/getting-started/upgrading/) for the table of new names.
 * **`setDMPermission()`** on slash and context-menu command builders: Discord deprecated `dm_permission`. Use `setContexts()`, which slash commands now have too: `setDMPermission(false)` → `setContexts(0)`.
 * **`Routes.channelPins` / `Routes.channelPin`**: Discord deprecated `/channels/{id}/pins`. Use `Routes.channelMessagesPins` (returns `{ items, has_more }`) and `Routes.channelMessagesPin`.
 * **`fetchInvite({ withExpiration })`**: no effect; Discord always returns `expires_at` and deprecated the `with_expiration` parameter, so it is no longer sent.
@@ -146,7 +146,7 @@ Packaging fixes for 0.2.2, and a deprecation pass. Nothing is removed and existi
 * `roles.setPositions(positions, reason)` and `channels.createWebhook(channelId, { name, reason })`, for the two routes bots still called by hand.
 * `Guild` carries `afkChannelId`, `afkTimeout`, `widgetEnabled`, `widgetChannelId`, `applicationId`, `publicUpdatesChannelId`, `safetyAlertsChannelId`, `maxPresences` and `maxVideoChannelUsers`.
 * `RESTErrorCode`: names for the Discord error codes bots handle, e.g. `error.code === RESTErrorCode.UnknownMessage`. `RESTError.hint` says what to check for Missing Access (50001) and Missing Permissions (50013).
-* **`lunibee migrate`** (CLI): lists the APIs removed in 0.3.0 in your `src/`; `--fix` renames the old Lunibee names (only where they are imported from Lunibee) and lists the calls to change by hand. See [CLI](/packages/cli/).
+* **`lunibee migrate`** (CLI): lists the APIs removed in 0.3.1 in your `src/`; `--fix` renames the old Lunibee names (only where they are imported from Lunibee) and lists the calls to change by hand. See [CLI](/packages/cli/).
 * `MessagePayload` and `Buildable<T>` types: type your own message payloads (builders or raw objects); every send and reply method accepts them.
 
 ### 🔧 Changed

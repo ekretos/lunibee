@@ -160,7 +160,7 @@ pages["rest.md"] =
 ${rest}
 \`\`\`
 
-\`bun run bench:rest\`. Since 0.3.0 requests on a bucket whose limit is known run concurrently, up to its remaining allowance (\`concurrentBuckets: true\`, the default). The gain appears when the round trip is longer than the bucket's window divided by its limit. Pass \`concurrentBuckets: false\` for strict per-bucket ordering. A separate 10,000-request soak test (\`tests/rest.soak.test.ts\`) checks that fewer than 1% of requests are rate limited.
+\`bun run bench:rest\`. Since 0.3.1 requests on a bucket whose limit is known run concurrently, up to its remaining allowance (\`concurrentBuckets: true\`, the default). The gain appears when the round trip is longer than the bucket's window divided by its limit. Pass \`concurrentBuckets: false\` for strict per-bucket ordering. A separate 10,000-request soak test (\`tests/rest.soak.test.ts\`) checks that fewer than 1% of requests are rate limited.
 `;
 
 const memory = await run([process.execPath, "benchmarks/cache-memory.ts"]);

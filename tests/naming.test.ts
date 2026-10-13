@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import * as lunibee from "../packages/lunibee/src/index.js";
 
 // 0.2.2 naming: builders are `CreateX`, `…Style` became `…Type`, `…Type` became `…Enum`.
-// The old names stay as deprecated aliases of the same values until 0.3.0.
+// The old names stay as deprecated aliases of the same values until 0.3.1.
 // Every deprecated alias is listed, so none can disappear or drift before then.
 const renamed: Record<string, string> = {
     ActionRowBuilder: "CreateActionRow",

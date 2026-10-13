@@ -51,7 +51,7 @@ Startup in rounds of `max_concurrency` paced by sent IDENTIFYs (`maxConcurrency`
 
 Docs: https://lunibee.js.org/core-concepts/sharding/
 
-## What's new in 0.3.0
+## What's new in 0.3.1
 
 `ShardManager` and `ClusterManager` work as one system: one worker contract, one IPC channel, one
 IDENTIFY authority, typed events, requests with timeouts, health and recovery. See

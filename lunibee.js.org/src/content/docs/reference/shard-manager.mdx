@@ -388,6 +388,6 @@ open. Only shards without a live socket count against the session start
 limit; if the budget is too small, `connect()` throws and leaves running shards
 alone.
 
-## In a cluster (0.3.0)
+## In a cluster (0.3.1)
 
 Inside a worker forked by [`ClusterManager`](/reference/cluster-manager/), a `ShardManager` owns only the cluster's shards (`shardIds`), takes every IDENTIFY slot from the parent, tells the parent when all its shards are ready and answers its health requests. `shardCount` is the deployment total. New members: `shardIds`, `addShards(ids)` (takes over shards of a failed cluster; on failure only the new shards are torn down), `report(metrics?)`, and the `ready` event (every owned shard is ready; emitted again after a drop). `health()` entries carry a lifecycle `status` (`idle`, `connecting`, `ready`, `disconnected`, `unstable`, `destroyed`), `readyAt` and `disconnectedAt` next to `state` and `ping`.

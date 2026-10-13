@@ -48,7 +48,7 @@ await manager.connect();
 
 ## Cross-Shard Messaging with `ShardBus`
 
-`ShardBus` passes messages between shards. Inside one process it uses a named `BroadcastChannel`; in a cluster forked by `ClusterManager` it uses IPC automatically (0.3.0), because a `BroadcastChannel` does not cross `fork()`ed processes.
+`ShardBus` passes messages between shards. Inside one process it uses a named `BroadcastChannel`; in a cluster forked by `ClusterManager` it uses IPC automatically (0.3.1), because a `BroadcastChannel` does not cross `fork()`ed processes.
 
 ```text
 ClusterManager (parent)
@@ -91,7 +91,7 @@ const total = all.reduce((sum, r) => sum + (r.result ?? 0), 0);
 
 `ShardingManager` is an alias of `ShardManager`.
 
-## Events, buckets and the start limit (0.3.0)
+## Events, buckets and the start limit (0.3.1)
 
 `ShardManager` re-emits what its shards do, each with the shard id first: `shardReady`, `shardDisconnect` (with `{ code, action }`), `shardResume`, `shardError` and `shardUnstable`.
 
@@ -135,7 +135,7 @@ new ClusterManager({
 
 Each crash inside `window` doubles the delay (up to `maxDelay`, plus jitter); more than `maxRestarts` crashes inside `window` stops restarting that cluster and calls `onGiveUp`. A cluster that stays up for a full `window` starts over. `ShardSupervisor` is exported for custom managers.
 
-## ShardManager and ClusterManager together (0.3.0)
+## ShardManager and ClusterManager together (0.3.1)
 
 Two managers, two jobs. **`ClusterManager` orchestrates processes; `ShardManager` runs shards.** The `ClusterManager` decides which cluster owns which shard, forks one worker per cluster, keeps the workers alive and hands out IDENTIFY slots. Inside each worker a `ShardManager` opens the Gateways for the shards that cluster owns. A shard is never owned by two clusters, and no manager starts a shard the other one owns.
 

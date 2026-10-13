@@ -1,9 +1,9 @@
 ---
 title: Upgrading
-description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.3.0.
+description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.3.1.
 ---
 
-## 0.2.x → 0.3.0 (unreleased)
+## 0.2.x → 0.3.1 (unreleased)
 
 Two parts. **Removed:** the APIs deprecated in 0.2.x are gone (see the changelog's Removed list); run `bunx lunibee migrate --fix` to rename the old names, then `bunx lunibee migrate` lists the calls to change by hand (`deleteRole` → `roles.remove`, `sendMessage` → `send`, `edit(id, options, reason)` → `edit(id, { ...options, reason })`…). **New workflow:** it sits beside the manager API, so move at your own pace.
 
@@ -45,9 +45,9 @@ A security release; upgrade. No code changes are required, but check these:
 
 ## 0.2.2 → 0.2.3
 
-Nothing breaks: deprecated APIs keep working until 0.3.0 and your editor strikes them
+Nothing breaks: deprecated APIs keep working until 0.3.1 and your editor strikes them
 through. `bunx lunibee migrate` lists them in your project and `--fix` renames the old
-names for you. To be ready for 0.3.0:
+names for you. To be ready for 0.3.1:
 
 | Deprecated | Use |
 |---|---|
@@ -101,7 +101,7 @@ bunx lunibee handler --fix    # add the client parameter, fix folder case, resyn
 `create command` now also generates `data` and `execute()`; existing command
 files keep working. See the [CLI page](/packages/cli/).
 
-The old names keep working in 0.2.x and are **removed in 0.3.0** (see [0.2.x → 0.3.0](#02x--030-unreleased)). To move to the new names, rename imports and uses:
+The old names keep working in 0.2.x and are **removed in 0.3.1** (see [0.2.x → 0.3.1](#02x--031-unreleased)). To move to the new names, rename imports and uses:
 
 | Before | Now |
 |---|---|

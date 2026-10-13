@@ -98,7 +98,7 @@ const COMMANDS: Command[] = [
         path: ["migrate"],
         usage: "lunibee migrate [--fix] [--dry-run] [--json]",
         summary:
-            "Find APIs removed in 0.3.0; --fix renames the old Lunibee names",
+            "Find APIs removed in 0.3.1; --fix renames the old Lunibee names",
         flags: ["fix", "dry-run", "json"],
         details:
             "Checks every file under src/. --fix renames the pre-0.2.2 names (ButtonBuilder →\nCreateButton, ChannelType → ChannelEnum…) only where the file imports them from lunibee\nor @lunibee/*, so discord.js names are never touched, and Routes.channelPin →\nRoutes.channelMessagesPin. Calls that cannot be proven to be Lunibee's (deleteRole,\nsendMessage, bulkDelete, setDMPermission, Routes.channelPins, withExpiration…) are\nlisted with their replacement to change by hand. Exits 1 while anything is left.",

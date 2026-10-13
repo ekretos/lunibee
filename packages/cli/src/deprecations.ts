@@ -2,7 +2,7 @@ import { readdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { escapeRegExp, paint, type IO } from "./io.js";
 
-/** Pre-0.2.2 names, removed in 0.3.0, and the names that replace them. */
+/** Pre-0.2.2 names, removed in 0.3.1, and the names that replace them. */
 export const RENAMED: Readonly<Record<string, string>> = {
     ActionRowBuilder: "CreateActionRow",
     ApplicationCommandOptionType: "ApplicationCommandOptionEnum",
@@ -416,7 +416,7 @@ export async function migrateDeprecations(
                 `${paint(io, "yellow", "⚠")} ${f.file}:${f.line} ${f.found}: use ${f.use}`,
             );
         io.out(
-            `\n${report.files} files checked, ${report.fixable.length} ${write ? "fixed" : "to fix"}, ${report.manual.length} to change by hand (removed in 0.3.0)`,
+            `\n${report.files} files checked, ${report.fixable.length} ${write ? "fixed" : "to fix"}, ${report.manual.length} to change by hand (removed in 0.3.1)`,
         );
         if (!options.fix && report.fixable.length)
             io.out(

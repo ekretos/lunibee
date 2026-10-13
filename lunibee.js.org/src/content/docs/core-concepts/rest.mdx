@@ -96,7 +96,7 @@ try {
 
 ## Concurrent Buckets
 
-Since 0.3.0, requests on a rate-limit bucket whose limit is already known run in parallel, up to its remaining allowance. Before that they ran one at a time, which keeps their order (messages to one channel arrive in the order you sent them). Pass `concurrentBuckets: false` to get that back:
+Since 0.3.1, requests on a rate-limit bucket whose limit is already known run in parallel, up to its remaining allowance. Before that they ran one at a time, which keeps their order (messages to one channel arrive in the order you sent them). Pass `concurrentBuckets: false` to get that back:
 
 ```ts
 const ordered = new REST({ token, concurrentBuckets: false });

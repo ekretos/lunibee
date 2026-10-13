@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import * as lunibee from "../packages/lunibee/src/index.ts";
 
 describe("the lunibee entry point", () => {
-    test("exports the 0.3.0 workflow", () => {
+    test("exports the 0.3.1 workflow", () => {
         const bot = new lunibee.Client({ token: "a.b", intents: [] });
         expect(typeof bot.guild("1").peek).toBe("function");
         expect(typeof bot.api.guilds).toBe("function");
@@ -13,7 +13,7 @@ describe("the lunibee entry point", () => {
         expect(lunibee.channelTypesOf("thread")).toEqual([10, 11, 12]);
     });
 
-    test("exports the 0.3.0 resources", () => {
+    test("exports the 0.3.1 resources", () => {
         for (const name of [
             "ShardSupervisor",
             "IpcTransport",

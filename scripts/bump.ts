@@ -5,7 +5,7 @@ const PACKAGES_DIR = join(import.meta.dir, "../packages");
 const ROOT_DIR = join(import.meta.dir, "..");
 const NEW_VERSION = process.argv[2];
 if (!NEW_VERSION || !/^\d+\.\d+\.\d+$/.test(NEW_VERSION)) {
-    console.error("Usage: bun scripts/bump.ts <major.minor.patch>, e.g. bun scripts/bump.ts 0.3.0");
+    console.error("Usage: bun scripts/bump.ts <major.minor.patch>, e.g. bun scripts/bump.ts 0.3.1");
     process.exit(1);
 }
 

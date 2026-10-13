@@ -38,5 +38,5 @@ export class GatewaySendLimiter {
     }
 }
 
-/** The limiter's name before 0.3.0. */
+/** The limiter's name before 0.3.1. */
 export const SendBudget = GatewaySendLimiter;

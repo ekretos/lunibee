@@ -133,7 +133,7 @@ Every manager follows one rule, so the reason is always in the same place:
 
 Lunibee sends it as the `X-Audit-Log-Reason` header, never in the request body. To delete something on Discord, managers use `remove()`; `delete()` only drops an entry from the cache.
 
-| Deprecated (removed in 0.3.0) | Use |
+| Deprecated (removed in 0.3.1) | Use |
 |---|---|
 | `roles.deleteRole(id)` | `roles.remove(id, reason?)` |
 | `emojis.deleteEmoji(id)` | `emojis.remove(id, reason?)` |

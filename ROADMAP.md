@@ -26,7 +26,7 @@ Day-to-day workflow (P0–P3 audits, the release checklist) lives in
 
 1.0 keeps today's names (`Client`, `Guild`, `GuildManager`, `Collection`…),
 with the 0.2.2 naming convention: builders `CreateX`, constant sets `…Enum`
-(`…Type` for styles). The pre-0.2.2 names are removed in 0.3.0.
+(`…Type` for styles). The pre-0.2.2 names are removed in 0.3.1.
 The renames in [docs/lunibee-2-architecture.md](docs/lunibee-2-architecture.md)
 (`GuildResource`, `GuildService`, `Store`, `Fleet`…) are **2.0 work**: its own
 staging rule forbids breaking the public API before its Stage 4. The internal
@@ -75,17 +75,17 @@ gate, docs build, changelog, upgrade notes).
   `CreateButton`), `…Style` constants are `…Type` (`ButtonStyle` →
   `ButtonType`), `…Type` constants are `…Enum` (`ChannelType` →
   `ChannelEnum`), plus the new `ActivityEnum`. Old names stay as deprecated
-  aliases until 0.3.0. New code, docs and examples use the new names.
+  aliases until 0.3.1. New code, docs and examples use the new names.
 - The seven items in [CLAUDE.md](CLAUDE.md): context-menu commands, default
   `allowed_mentions`, CDN exports, `reply({ withResponse })`, `showModal()`
   accepting `toJSON()` output, exported component payload types, and message
   stickers/poll/snapshots.
 
-### 0.3.0 — complete the platform
+### 0.3.1 — complete the platform
 
 - **A workflow of its own** (breaking, direction not chosen yet). Renamed entry
   points, definition-style events and commands, or result-style errors; the old API
-  stays as deprecated aliases. See Step 0b in `.roadmap/0.3.0.md`.
+  stays as deprecated aliases. See Step 0b in `.roadmap/0.3.1.md`.
 - **Typed payloads.** Replace `Record<string, unknown>` message, edit, reply
   and follow-up options with typed interfaces (content, embeds, components,
   files, `allowed_mentions`, flags, poll, message reference), keeping unknown
@@ -150,7 +150,7 @@ Ship when every item below is true.
 
 ## 1.0.0 exit criteria
 
-- [ ] 0.2.2, 0.3.0, 0.5.0 and 0.9.0 released; voice either shipped (0.4.0) or marked `@experimental`
+- [ ] 0.2.2, 0.3.1, 0.5.0 and 0.9.0 released; voice either shipped (0.4.0) or marked `@experimental`
 - [ ] No open P0 or P1 findings in the audits; P2/P3 findings fixed or tracked
 - [ ] Every public export is marked and covered by the API audit
 - [ ] No `Record<string, unknown>` in public message/interaction option types

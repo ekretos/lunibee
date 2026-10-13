@@ -3,7 +3,7 @@ title: Presence & Activity
 description: Set what the bot is playing, watching or saying, rotate it, and clear it.
 ---
 
-`bot.setActivity()` (0.3.0) sets the line under the bot's name. It wraps `bot.setPresence()`, which stays available for anything richer.
+`bot.setActivity()` (0.3.1) sets the line under the bot's name. It wraps `bot.setPresence()`, which stays available for anything richer.
 
 ```ts
 import { ActivityEnum, Client, IntentBits } from "lunibee";

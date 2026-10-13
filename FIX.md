@@ -6,7 +6,7 @@ Scope: consistency, typing, errors and docs only. **No new concepts.**
 
 Format and severity follow AGENT.md. Each item ships with a regression test,
 a reference-page update and a changelog entry. Renames keep the old name as a
-`@deprecated` alias (bottom of the defining file) until 0.3.0.
+`@deprecated` alias (bottom of the defining file) until 0.3.1.
 
 ## Evidence (ZedBot `src/`)
 
@@ -20,7 +20,7 @@ a reference-page update and a changelog entry. Renames keep the old name as a
 ## Guardrails (do not "brain rot" the API)
 
 - One way to do each thing. A new name replaces an old one; it never adds a third.
-- Every deprecated alias has a removal version (0.3.0).
+- Every deprecated alias has a removal version (0.3.1).
 - No custom-ID router, command framework, implicit fetching or global state in core.
 - A change ships only if it removes real lines or casts from ZedBot.
 
@@ -58,10 +58,10 @@ a reference-page update and a changelog entry. Renames keep the old name as a
   message reply/edit, interaction reply/edit/follow-up/update and webhooks.
 - **Regression test:** Type tests (`tsc` fixture) accept a builder and a raw object, and
   reject an unknown key. A runtime test that a builder serialises to the same body.
-- **Status:** Partly fixed (0.2.3), rest deferred to 0.3.0. `MessagePayload` and `Buildable<T>`
+- **Status:** Partly fixed (0.2.3), rest deferred to 0.3.1. `MessagePayload` and `Buildable<T>`
   ship as types users can adopt (`tests/message-payload.test.ts`). Typing the send/reply
   signatures with them broke ZedBot in 16 places (`embeds: unknown[]` payloads), so it moves to
-  0.3.0 Step 1, where breaking type changes are allowed.
+  0.3.1 Step 1, where breaking type changes are allowed.
 
 ## F3 — Methods for the routes people call directly
 
@@ -167,4 +167,4 @@ Done when ZedBot can drop its `.toJSON()` calls, the Lunibee-related casts and t
 `Routes` calls listed above without adding new ones.
 
 **State after 0.2.3:** F1, F3–F10 verified. F2 is partly done; its remaining, breaking half is
-0.3.0 Step 1. The `.toJSON()` calls in ZedBot are already unnecessary at runtime.
+0.3.1 Step 1. The `.toJSON()` calls in ZedBot are already unnecessary at runtime.

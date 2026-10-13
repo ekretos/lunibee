@@ -6,7 +6,7 @@ is the summary and the 1.0.0 promise; these files are the working plans behind i
 | File | Line | Theme | Status |
 |---|---|---|---|
 | [0.2.0.md](0.2.0.md) | 0.2.x | Friendlier API, naming, small fixes | 0.2.0 and 0.2.1 released; 0.2.2 in progress on `dev` |
-| [0.3.0.md](0.3.0.md) | 0.3.x | Complete the platform: typed payloads, previous state, sharding across processes, Gateway seams | Planned |
+| [0.3.1.md](0.3.1.md) | 0.3.x | Complete the platform: typed payloads, previous state, sharding across processes, Gateway seams | Planned |
 | [0.4.0.md](0.4.0.md) | 0.4.x | Voice that plays audio | Planned |
 | [0.5.0.md](0.5.0.md) | 0.5.x | Framework layer: commands, components, CLI projects, plugins, observability | Planned |
 
@@ -27,7 +27,7 @@ After 0.5.x comes the 0.9.0 API freeze and 1.0.0 (see ROADMAP.md).
 ## Conventions every step follows
 
 - Naming (from 0.2.2): builders `CreateX`, constant sets `…Enum`, style sets
-  `…Type`; old names stay as `@deprecated` aliases until 0.3.0.
+  `…Type`; old names stay as `@deprecated` aliases until 0.3.1.
 - Layering is enforced by `bun run check:deps`:
   types(0) < structures(1) < managers(2) < core(3) < lunibee(4).
 - No breaking change to the public API in a minor unless the file says so and
