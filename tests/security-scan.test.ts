@@ -20,6 +20,7 @@ const fake = {
     npm: `${"npm"}_${"b".repeat(36)}`,
     aws: `${"AKIA"}${"Q".repeat(16)}`,
     slack: `${"xoxb"}-${"1234567890"}-abc`,
+    webhook: `https://discord.com/api/webhooks/${"1".repeat(18)}/${"a".repeat(60)}`,
     key: `-----BEGIN ${"RSA"} PRIVATE KEY-----`,
 };
 
@@ -31,11 +32,17 @@ describe("security scan rules", () => {
             ]);
             expect({ name, rules: found.map((f) => f.rule) }).toEqual({
                 name,
-                rules: [expect.stringMatching(/token|key/)],
+                rules: [expect.stringMatching(/token|key|webhook/)],
             });
             expect(found[0]!.excerpt).not.toContain(secret);
             expect(found[0]).toMatchObject({ file: "a.ts", line: 1 });
         }
+    });
+
+    test("a Discord webhook URL is a secret", () => {
+        const found = scanText("a.ts", fake.webhook, ["secret"]);
+        expect(found.map((f) => f.rule)).toEqual(["discord-webhook"]);
+        expect(found[0]!.excerpt).not.toContain("a".repeat(40));
     });
 
     test("ordinary text and placeholders are not secrets", () => {
@@ -165,6 +172,14 @@ describe("security scan rules", () => {
         ]);
         expect(kindsFor("tests/a.test.ts")).toEqual(["secret"]);
         expect(kindsFor("README.md")).toEqual(["secret"]);
+        for (const f of [
+            "server.pem",
+            "a/id.key",
+            ".env.local",
+            ".npmrc",
+            "publish.bat",
+        ])
+            expect({ f, k: kindsFor(f) }).toEqual({ f, k: ["secret"] });
         expect(kindsFor("bun.lock")).toEqual([]);
         expect(kindsFor("node_modules/x/index.js")).toEqual([]);
         expect(kindsFor("logo.png")).toEqual([]);

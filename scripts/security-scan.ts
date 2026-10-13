@@ -52,6 +52,13 @@ export const RULES: Rule[] = [
         kind: "secret",
     },
     {
+        id: "discord-webhook",
+        description: "Discord webhook URL (the path holds its token)",
+        pattern:
+            /discord(?:app)?\.com\/api\/(?:v\d+\/)?webhooks\/\d{15,}\/[A-Za-z0-9_-]{40,}/,
+        kind: "secret",
+    },
+    {
         id: "github-token",
         description: "GitHub token",
         pattern:
@@ -194,7 +201,7 @@ export function kindsFor(file: string): Rule["kind"][] {
     )
         return [];
     if (
-        !/\.(ts|tsx|js|mjs|cjs|json|md|mdx|yml|yaml|toml|txt|sh|env)$/.test(
+        !/(\.(ts|tsx|js|mjs|cjs|json|md|mdx|yml|yaml|toml|txt|sh|env|pem|key|crt|cer|p12|bat|cmd|ps1|ini|cfg|properties)|(^|\/)\.(env|npmrc|netrc)(\..*)?)$/.test(
             file,
         )
     )
@@ -239,7 +246,7 @@ export async function scanTree(cwd?: string): Promise<Finding[]> {
 /** Scans every line added in any commit of any branch (secrets only). */
 export async function scanHistory(cwd?: string): Promise<Finding[]> {
     const log = await git(
-        ["log", "--all", "-p", "--no-color", "-U0", "--format=commit %h"],
+        ["log", "--all", "-m", "-p", "--no-color", "-U0", "--format=commit %h"],
         cwd,
     );
     const findings: Finding[] = [];

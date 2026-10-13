@@ -12,7 +12,10 @@ type Workflow = {
     permissions?: Record<string, string>;
     jobs: Record<
         string,
-        { permissions?: Record<string, string>; steps?: { uses?: string }[] }
+        {
+            permissions?: Record<string, string>;
+            steps?: { uses?: string; with?: Record<string, unknown> }[];
+        }
     >;
 };
 
@@ -82,5 +85,33 @@ describe("workflows", () => {
         expect(await Bun.file(dir + "ci.yml").text()).toContain(
             "bun run audit:security",
         );
+    });
+
+    test("no checkout keeps the token in .git/config", async () => {
+        for (const file of files)
+            for (const job of Object.values((await load(file)).jobs))
+                for (const step of job.steps ?? [])
+                    if (step.uses?.startsWith("actions/checkout@"))
+                        expect({
+                            file,
+                            persist: step.with?.["persist-credentials"],
+                        }).toEqual({ file, persist: false });
+    });
+
+    test("workflow-level grants are read-only; Pages grants live on the deploy job", async () => {
+        for (const file of files) {
+            const { permissions } = await load(file);
+            for (const [name, level] of Object.entries(permissions ?? {}))
+                expect({ file, name, level }).toEqual({
+                    file,
+                    name,
+                    level: "read",
+                });
+        }
+        const deploy = (await load("deploy-docs.yml")).jobs.deploy!;
+        expect(deploy.permissions).toEqual({
+            pages: "write",
+            "id-token": "write",
+        });
     });
 });
