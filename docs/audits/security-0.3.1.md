@@ -122,3 +122,52 @@ Remaining after R-05: the worker's own `IpcTransport` receives frames only from 
 3. Worker messages are limited at the manager (`maxMessageBytes`), after the runtime has already deserialized them; a hostile local worker can still use memory up to what its own IPC allows. Workers are trusted code.
 4. A `ClusterHost` link is authenticated; it is encrypted only with `remote.tls` or a TLS proxy, and plain `ws://` beyond this machine needs `allowInsecure` on both sides.
 5. Soak behaviour under sustained load (memory growth, rate-limit queues) is covered by the existing soak and benchmark jobs, not by new tests.
+
+
+## Third pass — fresh source re-audit (2026-10-13)
+
+This pass re-read the current files on branch `v0.3`, including the security scanner, REST abort helpers, cluster IPC relay, remote protocol, and CI workflow triggers. It was a **source review only**: this session did not execute Bun tests or GitHub Actions, inspect repository branch-protection settings, or run a live penetration test. Historical command/test results above are retained as previously reported, not newly re-verified.
+
+### Status of the second-pass fixes
+
+| ID | Re-check | Result |
+| --- | --- | --- |
+| R-01 | `ci.yml` invokes `bun run audit:security`; `security.yml` checks out full history and invokes `bun scripts/security-scan.ts --history` | **Code wiring verified**; workflow execution and required-check settings not verified |
+| R-02 | `sleep()` and `abortable()` remove listeners on normal and abort paths; regression tests count listeners | **Source and test coverage verified**; tests not rerun in this pass |
+| R-03 | Remote listener defaults to loopback; non-loopback bind requires TLS or explicit opt-in; remote host URL rejects cleartext non-loopback unless opted in | **Source and regression-test coverage verified** |
+| R-04 | Scanner has no 4,000-character skip, includes URL credentials and encoded private-key patterns, and documents limitations | **Source and test coverage verified**; regex scanning remains a tripwire, not proof of no secrets |
+| R-05 | Manager enforces `maxMessageBytes` for payloads it relays | **Partially verified**: a limit exists, but its implementation counts JavaScript string/code-unit length rather than UTF-8 bytes; see R-07 |
+
+### New findings
+
+| ID | Severity | Location | Finding | Status |
+| --- | --- | --- | --- | --- |
+| R-06 | P1 | `.github/workflows/ci.yml`, `.github/workflows/security.yml` | The workflows' push branch filters omit `v0.3`; CI's pull-request base filter also only includes `master` and `main`. A direct push to `v0.3` does not trigger either workflow, and a PR targeting `v0.3` does not trigger CI (the Security workflow's unfiltered PR trigger does run). | **Open** — workflow trigger gap confirmed from source; repository protection settings not visible |
+| R-07 | P2 | `packages/sharding/src/cluster.ts: payloadSize()`; `packages/sharding/src/remote-protocol.ts: parseJson()` | The advertised message/frame limits are named in bytes, but use `string.length` / `JSON.stringify(value).length`. These count UTF-16 code units, not UTF-8 wire bytes. Non-ASCII payloads can therefore exceed the intended byte limit. | **Open** — source-confirmed; add multibyte boundary tests and use `Buffer.byteLength(serialized, "utf8")` |
+| R-08 | P2 | `scripts/security-scan.ts: OPT_OUT / scanText()` | Any occurrence of `security-ok: <reason>` anywhere on a line suppresses every rule on that line. The implementation does not verify that the marker is in a comment or that the exception applies only to the matched finding. A string literal or unrelated text on the same line can therefore silence the tripwire. | **Open** — source-confirmed; require a recognized comment marker and test that unrelated tokens on the same line are still reported |
+
+#### R-06 — branch-specific CI coverage
+
+Evidence: `ci.yml` declares `push.branches: [master, main]` and `pull_request.branches: [master, main]`. `security.yml` declares push branches `[master, main, dev]`; its pull-request trigger has no base-branch filter. Neither push trigger includes the audited `v0.3` branch.
+
+**Fix:** include supported release branches in the relevant push and pull-request filters, or deliberately prohibit direct pushes and ensure the release branch's PR checks are required. Verify the actual ruleset/branch protection in GitHub and run both workflows against a PR targeting `v0.3`.
+
+#### R-07 — limits are character counts, not byte counts
+
+Evidence: `payloadSize()` returns `value.length` for strings and `JSON.stringify(value).length` for objects; `parseJson()` rejects based on `text.length`. Those expressions do not measure UTF-8 bytes. This is a mismatch between the API/documented limit and the enforcement unit, not evidence of an unbounded input path: the code still applies a finite character-count cap.
+
+**Fix:** serialize once, measure with `Buffer.byteLength(serialized, "utf8")`, and use that same serialized representation for sending where practical. Add tests around the exact limit with ASCII, CJK, and emoji payloads. Keep in mind that the WebSocket runtime has already received/deserialized some input before application-level validation, and the local IPC runtime deserializes frames before the manager checks them.
+
+#### R-08 — suppression marker is broader than its documentation
+
+Evidence: `scanText()` skips a whole line when `OPT_OUT.test(line)` matches; the regex accepts the marker wherever it appears. This is a scanner robustness issue, not proof that a secret currently exists.
+
+**Fix:** recognize the marker only in supported comment syntax and require the reason to be associated with the specific finding; avoid skipping unrelated rules on that line. Add tests for marker text inside a string, a token plus unrelated marker text, and a valid adjacent comment exception.
+
+### Current re-audit disposition
+
+- **No new P0 finding identified by this source review.** This is not a claim that the repository is vulnerability-free.
+- **R-06 should be resolved before treating `v0.3` as having complete automated release gates.**
+- **R-07 and R-08 should be fixed and covered by regression tests** to make the advertised message limit and secret-scanning tripwire behave as intended.
+- Repository settings remain unverified: secret scanning/push protection, private vulnerability reporting availability, and required status checks need confirmation in GitHub settings.
+- No tests, dependency audit, build, or GitHub Actions run was executed as part of this third pass; do not treat the source review as runtime verification.
