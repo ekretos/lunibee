@@ -36,7 +36,7 @@ new Cache<K, V>(options?: CacheOptions)
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-new Cache<K, V>(options?: CacheOptions)
+new Cache(options)
 ```
 </TabItem>
 </Tabs>
@@ -63,8 +63,8 @@ const messageCache = new Cache<string, Message>({
 ```js
 import { Cache } from "lunibee";
 
-const messageCache = new Cache<string, Message>({
-  maxSize ,
+const messageCache = new Cache({
+  maxSize: 500,
   ttl: 5 * 60 * 1000, // 5 minutes
 });
 ```
@@ -92,7 +92,7 @@ const msg = messageCache.get(messageId);
 
 ### `set(key, value)`
 
-Stores a value. Evicts the oldest entry when `maxSize` is exceeded.
+Stores a value. Evicts the least recently used entry when `maxSize` is exceeded.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -245,8 +245,8 @@ async function getGuildPreview(guildId: string) {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const guildPreviewCache = new Cache<string, Record<string, unknown>>({
-  maxSize ,
+const guildPreviewCache = new Cache({
+  maxSize: 100,
   ttl: 10 * 60 * 1000, // 10 minutes
 });
 
@@ -271,7 +271,7 @@ import { Cache, type Message } from "lunibee";
 const messageCache = new Cache<string, Message>({
   maxSize: 1000,
   ttl: 60 * 1000,   // 60 seconds
-  sweepInterval: 10 * 1000, // sweep every 10s
+  sweepInterval: 10 * 1000, // accepted for compatibility; expiry no longer needs it
 });
 
 client.on("messageCreate", (message) => {
@@ -285,10 +285,10 @@ client.on("messageDelete", (data) => {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const messageCache = new Cache<string, Message>({
-  maxSize ,
+const messageCache = new Cache({
+  maxSize: 1000,
   ttl: 60 * 1000,   // 60 seconds
-  sweepInterval: 10 * 1000, // sweep every 10s
+  sweepInterval: 10 * 1000, // accepted for compatibility; expiry no longer needs it
 });
 
 client.on("messageCreate", (message) => {

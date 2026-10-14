@@ -380,4 +380,17 @@ export {
     type AuditLogQuery,
 } from "./audit-log.js";
 export { Sticker, stickerURL } from "./sticker.js";
-export { PermissionsBitField } from "@lunibee/core";
+export {
+    Permission,
+    Permissions,
+    PermissionFlagsBits,
+    PermissionSet,
+    PermissionsBitField,
+    PermissionOverwriteEnum,
+    computePermissions,
+    type PermissionContext,
+    type PermissionOverwrite,
+    type PermissionRole,
+    type PermissionName,
+    type PermissionResolvable,
+} from "./permissions.js";

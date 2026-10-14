@@ -450,11 +450,16 @@ export class REST {
                     attempt < this.#retryPolicy.maxRetries &&
                     this.#retryPolicy.shouldRetry(method, 0)
                 ) {
-                    await sleep(
-                        this.#retryPolicy.getDelay(attempt),
-                        options.signal,
+                    const delay = this.#retryPolicy.getDelay(attempt);
+                    // Status 0: the retry follows a network failure, not a response.
+                    this.#emit(this.#hooks.onRetry, {
+                        method,
                         path,
-                    );
+                        attempt,
+                        status: 0,
+                        delayMs: delay,
+                    });
+                    await sleep(delay, options.signal, path);
                     continue;
                 }
                 throw new RESTError(failure.message, 0, undefined, undefined, {

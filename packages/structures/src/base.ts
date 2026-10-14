@@ -94,7 +94,7 @@ export interface ResourceContext {
         roleIds: readonly string[],
         channelId?: string,
         timedOutUntil?: Date | null,
-    ): import("@lunibee/core").PermissionSet | null;
+    ): import("./permissions.js").PermissionSet | null;
     kickMember?(
         guildId: string,
         userId: string,
@@ -145,7 +145,7 @@ export interface ResourceContext {
  * `null` goes back to inheriting. Permissions not named keep their state.
  */
 export type PermissionOverwriteChanges = Partial<
-    Record<import("@lunibee/core").PermissionName, boolean | null>
+    Record<import("./permissions.js").PermissionName, boolean | null>
 >;
 
 // ─── CDN helpers ──────────────────────────────────────────────────────────────

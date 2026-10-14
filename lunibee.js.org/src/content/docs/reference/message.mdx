@@ -47,6 +47,9 @@ import { Message } from "lunibee";
 | `mentionEveryone` | `boolean` | Whether `@everyone` or `@here` was used. |
 | `pinned` | `boolean` | Whether the message is pinned. |
 | `type` | `number` | Message type (0 = default, 19 = reply, etc.). |
+| `reference` | `APIMessageReference \| undefined` | The `message_reference` (reply, forward or crosspost source). |
+| `referencedMessage` | `Message \| null \| undefined` | The replied-to message; `null` when Discord says it was deleted. |
+| `member` | `GuildMember \| null` | The author as a guild member (see 0.2.1 below). |
 
 ## Boolean Getters
 
@@ -92,6 +95,8 @@ client.on("messageCreate", async (message) => {
 
 ### `edit(options)`
 
+`update(options)` is an alias. `toJSON()` returns a plain-object snapshot of the fields.
+
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
@@ -105,7 +110,7 @@ const updated = await message.edit({ content: "Edited content!" });
 </TabItem>
 </Tabs>
 
-### `delete()` / `pin()` / `unpin()` / `crosspost()` / `suppressEmbeds()`
+### `delete(reason?)` / `pin(reason?)` / `unpin(reason?)` / `crosspost()` / `suppressEmbeds()`
 
 ```ts
 await message.delete();
@@ -121,7 +126,7 @@ await message.suppressEmbeds();
 <TabItem label="TypeScript">
 ```ts
 await message.react("👍");
-await message.react("<:lunibee:123456789>");
+await message.react("lunibee:123456789");  // custom emoji: name:id
 await message.removeReaction("👍");             // bot's own
 await message.removeReaction("👍", userId);    // specific user
 await message.removeAllReactions();
@@ -130,7 +135,7 @@ await message.removeAllReactions();
 <TabItem label="JavaScript">
 ```js
 await message.react("👍");
-await message.react("<:lunibee:123456789>");
+await message.react("lunibee:123456789");  // custom emoji: name:id
 await message.removeReaction("👍");
 await message.removeReaction("👍", userId);
 await message.removeAllReactions();

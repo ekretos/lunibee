@@ -48,13 +48,17 @@ await gateway.connect();
 | `shardCount` | `number` | `1` | Total number of shards. |
 | `reconnect` | `boolean` | `true` | Automatically reconnect on network drops. |
 | `maxReconnectAttempts` | `number` | `Infinity` | Maximum consecutive reconnection attempts. |
+| `connectTimeout` | `number` | `30000` | How long a socket may stay connecting before it is closed and retried. |
 | `reconnectBaseDelay` | `number` | `1000` | First reconnect delay, doubled per attempt. |
 | `reconnectMaxDelay` | `number` | `30000` | Ceiling for the reconnect backoff. |
+| `reconnectStormLimit` | `number` | `5` | Reconnects inside `reconnectStormWindow` after which `unstable` is emitted and the delay keeps doubling. |
+| `reconnectStormWindow` | `number` | `60000` | Span over which reconnects are counted for storm detection. |
 | `heartbeatAckTimeout` | `number` | `10000` | How long to wait for a heartbeat ACK before reconnecting. |
 | `zombieTimeout` | `number` | `30000` | Silence after which the connection is treated as dead. Must exceed `heartbeatAckTimeout`. |
 | `compress` | `boolean` | `false` | Enable `zlib-stream` transport compression. |
-| `properties` | `GatewayProperties` | Android defaults | Identify properties (`os`, `browser`, `device`). |
+| `properties` | `GatewayProperties` | `{ os: process.platform, browser: "Lunibee", device: "Lunibee" }` | Identify properties (`os`, `browser`, `device`). |
 | `presence` | `GatewayPresence` | `online` | Initial presence sent with IDENTIFY. |
+| `createSocket` | `SocketFactory` | global `WebSocket` | Constructs the underlying socket (alternative transport or a test stub). |
 
 ## Transport compression
 

@@ -5,7 +5,7 @@ description: BigInt-backed permission bitfield checker. Supports named permissio
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`PermissionSet` (also exported as `PermissionsBitField` for Discord.js compatibility) provides named permission checks against Discord's 64-bit permission bitfield.
+`PermissionSet` (with a `PermissionsBitField` subclass for Discord.js compatibility, which adds the static `Flags` and `All` constants) provides named permission checks against Discord's 64-bit permission bitfield. Sets are immutable.
 
 ## Import
 
@@ -31,15 +31,17 @@ import { PermissionsBitField } from "lunibee";
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-new PermissionSet(bits: bigint | string | number = 0n)
+new PermissionSet(value: PermissionResolvable = 0n)
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-new PermissionSet(bits: bigint | string | number = 0n)
+new PermissionSet(value = 0n)
 ```
 </TabItem>
 </Tabs>
+
+`value` is a bitfield (bigint, number or decimal string), a permission name, another set, or an array of these. A negative value throws a `RangeError`, anything else unparseable a `TypeError`.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -59,12 +61,13 @@ const perms = new PermissionSet(member.permissions.bitfield);
 | Property | Type | Description |
 |---|---|---|
 | `bitfield` | `bigint` | The raw bitfield as a BigInt. |
+| `kickMembers`, `banMembers`, `administrator`, … | `boolean` | One camelCase getter per permission (up to `useExternalApps`), true when the bit is set. |
 
 ## Methods
 
 ### `has(...permissions)`
 
-Returns `true` only if **all** of the given permissions are present. Accepts a `Permission` constant, a `bigint`, or a camelCase/PascalCase permission name string.
+Returns `true` only if **all** of the given permissions are present. Accepts a `Permission` constant, a `bigint`, a number, a `PermissionSet`, an array, or a camelCase/PascalCase permission name string.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -171,6 +174,10 @@ const permNames = member.permissions.toArray();
 </TabItem>
 </Tabs>
 
+### `equals(other)`
+
+Whether another `PermissionSet` or raw bitfield (bigint, number or string) has the same bits.
+
 ### `toString()`
 
 Returns the bitfield as a decimal string (useful for API payloads).
@@ -202,26 +209,50 @@ All `Permission` keys use **camelCase**. A `Permissions` (PascalCase) alias is a
 | `manageGuild` | `1 << 5` |
 | `addReactions` | `1 << 6` |
 | `viewAuditLog` | `1 << 7` |
+| `prioritySpeaker` | `1 << 8` |
+| `stream` | `1 << 9` |
 | `viewChannel` | `1 << 10` |
 | `sendMessages` | `1 << 11` |
+| `sendTTSMessages` | `1 << 12` |
 | `manageMessages` | `1 << 13` |
 | `embedLinks` | `1 << 14` |
 | `attachFiles` | `1 << 15` |
 | `readMessageHistory` | `1 << 16` |
 | `mentionEveryone` | `1 << 17` |
+| `useExternalEmojis` | `1 << 18` |
+| `viewGuildInsights` | `1 << 19` |
 | `connect` | `1 << 20` |
 | `speak` | `1 << 21` |
 | `muteMembers` | `1 << 22` |
 | `deafenMembers` | `1 << 23` |
 | `moveMembers` | `1 << 24` |
+| `useVAD` | `1 << 25` |
+| `changeNickname` | `1 << 26` |
+| `manageNicknames` | `1 << 27` |
 | `manageRoles` | `1 << 28` |
 | `manageWebhooks` | `1 << 29` |
+| `manageGuildExpressions` | `1 << 30` |
+| `useApplicationCommands` | `1 << 31` |
+| `requestToSpeak` | `1 << 32` |
 | `manageEvents` | `1 << 33` |
 | `manageThreads` | `1 << 34` |
+| `createPublicThreads` | `1 << 35` |
+| `createPrivateThreads` | `1 << 36` |
+| `useExternalStickers` | `1 << 37` |
+| `sendMessagesInThreads` | `1 << 38` |
+| `useEmbeddedActivities` | `1 << 39` |
 | `moderateMembers` | `1 << 40` |
+| `viewCreatorMonetizationAnalytics` | `1 << 41` |
+| `useSoundboard` | `1 << 42` |
+| `createGuildExpressions` | `1 << 43` |
+| `createEvents` | `1 << 44` |
+| `useExternalSounds` | `1 << 45` |
+| `sendVoiceMessages` | `1 << 46` |
+| `setVoiceChannelStatus` | `1 << 48` |
 | `sendPolls` | `1 << 49` |
-
-*(and more — see `packages/core/src/permissions.ts` for the full list)*
+| `useExternalApps` | `1 << 50` |
+| `pinMessages` | `1 << 51` |
+| `bypassSlowmode` | `1 << 52` |
 
 ## Examples
 
@@ -284,8 +315,9 @@ await interaction.reply({ embeds: [embed], ephemeral: true });
 - `missing(...permissions)` returns the requested permission names the set lacks.
 - New flags: `setVoiceChannelStatus` (bit 48), `pinMessages` (51), `bypassSlowmode` (52).
 - `computePermissions({ guildId, ownerId, memberId, memberRoleIds, roles, overwrites })`
-  resolves effective permissions in Discord's order (`@everyone`, roles, member
-  overwrites); owners and administrators get every permission.
+  resolves effective permissions in Discord's order (base from `@everyone` and the member's roles, then the
+  `@everyone` overwrite, role overwrites, member overwrite); owners and administrators get every permission.
+  With `timedOutUntil` in the future, the member keeps only `viewChannel` and `readMessageHistory`.
 
 ```ts
 const perms = computePermissions({ guildId, ownerId, memberId, memberRoleIds, roles, overwrites });

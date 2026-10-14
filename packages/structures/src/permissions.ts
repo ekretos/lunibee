@@ -1,0 +1,669 @@
+/** Permission overwrite target types. */
+export enum PermissionOverwriteEnum {
+    Role = 0,
+    Member = 1,
+}
+
+/** Lunibee idiomatic camelCase permission bitflags. */
+export const Permission = {
+    createInstantInvite: 1n << 0n,
+    kickMembers: 1n << 1n,
+    banMembers: 1n << 2n,
+    administrator: 1n << 3n,
+    manageChannels: 1n << 4n,
+    manageGuild: 1n << 5n,
+    addReactions: 1n << 6n,
+    viewAuditLog: 1n << 7n,
+    prioritySpeaker: 1n << 8n,
+    stream: 1n << 9n,
+    viewChannel: 1n << 10n,
+    sendMessages: 1n << 11n,
+    sendTTSMessages: 1n << 12n,
+    manageMessages: 1n << 13n,
+    embedLinks: 1n << 14n,
+    attachFiles: 1n << 15n,
+    readMessageHistory: 1n << 16n,
+    mentionEveryone: 1n << 17n,
+    useExternalEmojis: 1n << 18n,
+    viewGuildInsights: 1n << 19n,
+    connect: 1n << 20n,
+    speak: 1n << 21n,
+    muteMembers: 1n << 22n,
+    deafenMembers: 1n << 23n,
+    moveMembers: 1n << 24n,
+    useVAD: 1n << 25n,
+    changeNickname: 1n << 26n,
+    manageNicknames: 1n << 27n,
+    manageRoles: 1n << 28n,
+    manageWebhooks: 1n << 29n,
+    manageGuildExpressions: 1n << 30n,
+    useApplicationCommands: 1n << 31n,
+    requestToSpeak: 1n << 32n,
+    manageEvents: 1n << 33n,
+    manageThreads: 1n << 34n,
+    createPublicThreads: 1n << 35n,
+    createPrivateThreads: 1n << 36n,
+    useExternalStickers: 1n << 37n,
+    sendMessagesInThreads: 1n << 38n,
+    useEmbeddedActivities: 1n << 39n,
+    moderateMembers: 1n << 40n,
+    viewCreatorMonetizationAnalytics: 1n << 41n,
+    useSoundboard: 1n << 42n,
+    createGuildExpressions: 1n << 43n,
+    createEvents: 1n << 44n,
+    useExternalSounds: 1n << 45n,
+    sendVoiceMessages: 1n << 46n,
+    setVoiceChannelStatus: 1n << 48n,
+    sendPolls: 1n << 49n,
+    useExternalApps: 1n << 50n,
+    pinMessages: 1n << 51n,
+    bypassSlowmode: 1n << 52n,
+} as const;
+
+/** Canonical PascalCase permission constants. */
+export const Permissions = {
+    CreateInstantInvite: 1n << 0n,
+    KickMembers: 1n << 1n,
+    BanMembers: 1n << 2n,
+    Administrator: 1n << 3n,
+    ManageChannels: 1n << 4n,
+    ManageGuild: 1n << 5n,
+    AddReactions: 1n << 6n,
+    ViewAuditLog: 1n << 7n,
+    PrioritySpeaker: 1n << 8n,
+    Stream: 1n << 9n,
+    ViewChannel: 1n << 10n,
+    SendMessages: 1n << 11n,
+    SendTTSMessages: 1n << 12n,
+    ManageMessages: 1n << 13n,
+    EmbedLinks: 1n << 14n,
+    AttachFiles: 1n << 15n,
+    ReadMessageHistory: 1n << 16n,
+    MentionEveryone: 1n << 17n,
+    UseExternalEmojis: 1n << 18n,
+    ViewGuildInsights: 1n << 19n,
+    Connect: 1n << 20n,
+    Speak: 1n << 21n,
+    MuteMembers: 1n << 22n,
+    DeafenMembers: 1n << 23n,
+    MoveMembers: 1n << 24n,
+    UseVAD: 1n << 25n,
+    ChangeNickname: 1n << 26n,
+    ManageNicknames: 1n << 27n,
+    ManageRoles: 1n << 28n,
+    ManageWebhooks: 1n << 29n,
+    ManageGuildExpressions: 1n << 30n,
+    UseApplicationCommands: 1n << 31n,
+    RequestToSpeak: 1n << 32n,
+    ManageEvents: 1n << 33n,
+    ManageThreads: 1n << 34n,
+    CreatePublicThreads: 1n << 35n,
+    CreatePrivateThreads: 1n << 36n,
+    UseExternalStickers: 1n << 37n,
+    SendMessagesInThreads: 1n << 38n,
+    UseEmbeddedActivities: 1n << 39n,
+    ModerateMembers: 1n << 40n,
+    ViewCreatorMonetizationAnalytics: 1n << 41n,
+    UseSoundboard: 1n << 42n,
+    CreateGuildExpressions: 1n << 43n,
+    CreateEvents: 1n << 44n,
+    UseExternalSounds: 1n << 45n,
+    SendVoiceMessages: 1n << 46n,
+    SetVoiceChannelStatus: 1n << 48n,
+    SendPolls: 1n << 49n,
+    UseExternalApps: 1n << 50n,
+    PinMessages: 1n << 51n,
+    BypassSlowmode: 1n << 52n,
+} as const;
+
+/**
+ * Permission flag bits with **bigint** values matching Discord's permission bit
+ * positions. Mirrors discord.js's `PermissionFlagsBits`, so bitwise composition
+ * (`Flags.A | Flags.B`) OR-s the bits instead of concatenating strings.
+ *
+ * The same object as {@link Permissions}, under the discord.js name. It is a
+ * `const` object rather than a TS `enum` because enums cannot hold bigint
+ * members; the same-named union type below preserves usage as a type.
+ */
+export const PermissionFlagsBits = Permissions;
+
+/** Union of {@link PermissionFlagsBits} values (all bigint). */
+export type PermissionFlagsBits =
+    (typeof PermissionFlagsBits)[keyof typeof PermissionFlagsBits];
+
+/** A permission flag name, such as `"BanMembers"`, accepted wherever a permission can be given by name. */
+export type PermissionName =
+    | keyof typeof Permission
+    | keyof typeof Permissions
+    | keyof typeof PermissionFlagsBits;
+
+export type PermissionResolvable =
+    | bigint
+    | number
+    | string
+    | PermissionName
+    | PermissionFlagsBits
+    | PermissionSet
+    | PermissionResolvable[];
+
+/** Immutable permission bitfield with direct boolean getters. */
+export class PermissionSet {
+    /** Permission bitfield. */
+    public readonly bitfield: bigint;
+
+    /** Creates a permission set. @param value Initial permission bitfield or array of permissions. @throws {RangeError} If the value is negative. @throws {TypeError} If the value is not a valid integer. */
+    public constructor(value: PermissionResolvable = 0n) {
+        try {
+            if (Array.isArray(value)) {
+                let bit = 0n;
+                for (const item of value) {
+                    bit |= this.#resolve(item);
+                }
+                this.bitfield = bit;
+            } else if (value instanceof PermissionSet) {
+                this.bitfield = value.bitfield;
+            } else {
+                const bitfield = this.#resolve(value);
+                if (bitfield < 0n)
+                    throw new RangeError(
+                        "Permission bitfield cannot be negative.",
+                    );
+                this.bitfield = bitfield;
+            }
+        } catch (error) {
+            if (error instanceof RangeError) throw error;
+            throw new TypeError(
+                "Permission bitfield must be a valid non-negative integer.",
+                { cause: error },
+            );
+        }
+    }
+
+    // Direct camelCase boolean getters for instant checks (e.g. member.permissions.kickMembers)
+    public get createInstantInvite(): boolean {
+        return (
+            (this.bitfield & Permission.createInstantInvite) ===
+            Permission.createInstantInvite
+        );
+    }
+    public get kickMembers(): boolean {
+        return (
+            (this.bitfield & Permission.kickMembers) === Permission.kickMembers
+        );
+    }
+    public get banMembers(): boolean {
+        return (
+            (this.bitfield & Permission.banMembers) === Permission.banMembers
+        );
+    }
+    public get administrator(): boolean {
+        return (
+            (this.bitfield & Permission.administrator) ===
+            Permission.administrator
+        );
+    }
+    public get manageChannels(): boolean {
+        return (
+            (this.bitfield & Permission.manageChannels) ===
+            Permission.manageChannels
+        );
+    }
+    public get manageGuild(): boolean {
+        return (
+            (this.bitfield & Permission.manageGuild) === Permission.manageGuild
+        );
+    }
+    public get addReactions(): boolean {
+        return (
+            (this.bitfield & Permission.addReactions) ===
+            Permission.addReactions
+        );
+    }
+    public get viewAuditLog(): boolean {
+        return (
+            (this.bitfield & Permission.viewAuditLog) ===
+            Permission.viewAuditLog
+        );
+    }
+    public get prioritySpeaker(): boolean {
+        return (
+            (this.bitfield & Permission.prioritySpeaker) ===
+            Permission.prioritySpeaker
+        );
+    }
+    public get stream(): boolean {
+        return (this.bitfield & Permission.stream) === Permission.stream;
+    }
+    public get viewChannel(): boolean {
+        return (
+            (this.bitfield & Permission.viewChannel) === Permission.viewChannel
+        );
+    }
+    public get sendMessages(): boolean {
+        return (
+            (this.bitfield & Permission.sendMessages) ===
+            Permission.sendMessages
+        );
+    }
+    public get sendTTSMessages(): boolean {
+        return (
+            (this.bitfield & Permission.sendTTSMessages) ===
+            Permission.sendTTSMessages
+        );
+    }
+    public get manageMessages(): boolean {
+        return (
+            (this.bitfield & Permission.manageMessages) ===
+            Permission.manageMessages
+        );
+    }
+    public get embedLinks(): boolean {
+        return (
+            (this.bitfield & Permission.embedLinks) === Permission.embedLinks
+        );
+    }
+    public get attachFiles(): boolean {
+        return (
+            (this.bitfield & Permission.attachFiles) === Permission.attachFiles
+        );
+    }
+    public get readMessageHistory(): boolean {
+        return (
+            (this.bitfield & Permission.readMessageHistory) ===
+            Permission.readMessageHistory
+        );
+    }
+    public get mentionEveryone(): boolean {
+        return (
+            (this.bitfield & Permission.mentionEveryone) ===
+            Permission.mentionEveryone
+        );
+    }
+    public get useExternalEmojis(): boolean {
+        return (
+            (this.bitfield & Permission.useExternalEmojis) ===
+            Permission.useExternalEmojis
+        );
+    }
+    public get viewGuildInsights(): boolean {
+        return (
+            (this.bitfield & Permission.viewGuildInsights) ===
+            Permission.viewGuildInsights
+        );
+    }
+    public get connect(): boolean {
+        return (this.bitfield & Permission.connect) === Permission.connect;
+    }
+    public get speak(): boolean {
+        return (this.bitfield & Permission.speak) === Permission.speak;
+    }
+    public get muteMembers(): boolean {
+        return (
+            (this.bitfield & Permission.muteMembers) === Permission.muteMembers
+        );
+    }
+    public get deafenMembers(): boolean {
+        return (
+            (this.bitfield & Permission.deafenMembers) ===
+            Permission.deafenMembers
+        );
+    }
+    public get moveMembers(): boolean {
+        return (
+            (this.bitfield & Permission.moveMembers) === Permission.moveMembers
+        );
+    }
+    public get useVAD(): boolean {
+        return (this.bitfield & Permission.useVAD) === Permission.useVAD;
+    }
+    public get changeNickname(): boolean {
+        return (
+            (this.bitfield & Permission.changeNickname) ===
+            Permission.changeNickname
+        );
+    }
+    public get manageNicknames(): boolean {
+        return (
+            (this.bitfield & Permission.manageNicknames) ===
+            Permission.manageNicknames
+        );
+    }
+    public get manageRoles(): boolean {
+        return (
+            (this.bitfield & Permission.manageRoles) === Permission.manageRoles
+        );
+    }
+    public get manageWebhooks(): boolean {
+        return (
+            (this.bitfield & Permission.manageWebhooks) ===
+            Permission.manageWebhooks
+        );
+    }
+    public get manageGuildExpressions(): boolean {
+        return (
+            (this.bitfield & Permission.manageGuildExpressions) ===
+            Permission.manageGuildExpressions
+        );
+    }
+    public get useApplicationCommands(): boolean {
+        return (
+            (this.bitfield & Permission.useApplicationCommands) ===
+            Permission.useApplicationCommands
+        );
+    }
+    public get requestToSpeak(): boolean {
+        return (
+            (this.bitfield & Permission.requestToSpeak) ===
+            Permission.requestToSpeak
+        );
+    }
+    public get manageEvents(): boolean {
+        return (
+            (this.bitfield & Permission.manageEvents) ===
+            Permission.manageEvents
+        );
+    }
+    public get manageThreads(): boolean {
+        return (
+            (this.bitfield & Permission.manageThreads) ===
+            Permission.manageThreads
+        );
+    }
+    public get createPublicThreads(): boolean {
+        return (
+            (this.bitfield & Permission.createPublicThreads) ===
+            Permission.createPublicThreads
+        );
+    }
+    public get createPrivateThreads(): boolean {
+        return (
+            (this.bitfield & Permission.createPrivateThreads) ===
+            Permission.createPrivateThreads
+        );
+    }
+    public get useExternalStickers(): boolean {
+        return (
+            (this.bitfield & Permission.useExternalStickers) ===
+            Permission.useExternalStickers
+        );
+    }
+    public get sendMessagesInThreads(): boolean {
+        return (
+            (this.bitfield & Permission.sendMessagesInThreads) ===
+            Permission.sendMessagesInThreads
+        );
+    }
+    public get useEmbeddedActivities(): boolean {
+        return (
+            (this.bitfield & Permission.useEmbeddedActivities) ===
+            Permission.useEmbeddedActivities
+        );
+    }
+    public get moderateMembers(): boolean {
+        return (
+            (this.bitfield & Permission.moderateMembers) ===
+            Permission.moderateMembers
+        );
+    }
+    public get viewCreatorMonetizationAnalytics(): boolean {
+        return (
+            (this.bitfield & Permission.viewCreatorMonetizationAnalytics) ===
+            Permission.viewCreatorMonetizationAnalytics
+        );
+    }
+    public get useSoundboard(): boolean {
+        return (
+            (this.bitfield & Permission.useSoundboard) ===
+            Permission.useSoundboard
+        );
+    }
+    public get createGuildExpressions(): boolean {
+        return (
+            (this.bitfield & Permission.createGuildExpressions) ===
+            Permission.createGuildExpressions
+        );
+    }
+    public get createEvents(): boolean {
+        return (
+            (this.bitfield & Permission.createEvents) ===
+            Permission.createEvents
+        );
+    }
+    public get useExternalSounds(): boolean {
+        return (
+            (this.bitfield & Permission.useExternalSounds) ===
+            Permission.useExternalSounds
+        );
+    }
+    public get sendVoiceMessages(): boolean {
+        return (
+            (this.bitfield & Permission.sendVoiceMessages) ===
+            Permission.sendVoiceMessages
+        );
+    }
+    public get sendPolls(): boolean {
+        return (this.bitfield & Permission.sendPolls) === Permission.sendPolls;
+    }
+    public get useExternalApps(): boolean {
+        return (
+            (this.bitfield & Permission.useExternalApps) ===
+            Permission.useExternalApps
+        );
+    }
+
+    /** Checks whether all supplied permissions are present (AND). @param permissions Permission names or raw bits. @returns True when every requested permission is present. */
+    public has(...permissions: PermissionResolvable[]): boolean {
+        if (permissions.length === 1) {
+            const p = permissions[0]!;
+            const bit = typeof p === "bigint" ? p : this.#resolve(p);
+            return (this.bitfield & bit) === bit;
+        }
+        for (let i = 0; i < permissions.length; i++) {
+            const p = permissions[i]!;
+            const bit = typeof p === "bigint" ? p : this.#resolve(p);
+            if ((this.bitfield & bit) !== bit) return false;
+        }
+        return true;
+    }
+
+    /** Checks whether any supplied permission is present (OR). @param permissions Permission names or raw bits. @returns True when at least one requested permission is present. */
+    public any(...permissions: PermissionResolvable[]): boolean {
+        if (permissions.length === 1) {
+            const p = permissions[0]!;
+            const bit = typeof p === "bigint" ? p : this.#resolve(p);
+            return (this.bitfield & bit) !== 0n;
+        }
+        for (let i = 0; i < permissions.length; i++) {
+            const p = permissions[i]!;
+            const bit = typeof p === "bigint" ? p : this.#resolve(p);
+            if ((this.bitfield & bit) !== 0n) return true;
+        }
+        return false;
+    }
+
+    /** Returns the known permission names from `permissions` that this set lacks. @param permissions Permission names or raw bits. */
+    public missing(...permissions: PermissionResolvable[]): PermissionName[] {
+        const wanted = new PermissionSet(permissions);
+        return wanted.toArray().filter((name) => !this.has(name));
+    }
+
+    /** Returns a new set with permissions added. @param permissions Permission names or raw bits. @returns A new permission set. */
+    public add(...permissions: PermissionResolvable[]): PermissionSet {
+        let bitfield = this.bitfield;
+        for (let i = 0; i < permissions.length; i++) {
+            const p = permissions[i]!;
+            bitfield |= typeof p === "bigint" ? p : this.#resolve(p);
+        }
+        return new PermissionSet(bitfield);
+    }
+
+    /** Returns a new set with permissions removed. @param permissions Permission names or raw bits. @returns A new permission set. */
+    public remove(...permissions: PermissionResolvable[]): PermissionSet {
+        let bitfield = this.bitfield;
+        for (let i = 0; i < permissions.length; i++) {
+            const p = permissions[i]!;
+            bitfield &= ~(typeof p === "bigint" ? p : this.#resolve(p));
+        }
+        return new PermissionSet(bitfield);
+    }
+
+    /** Checks equality with another permission set or raw bitfield. @param other Permission set or raw bitfield. @returns True when both values are equal. */
+    public equals(other: PermissionSet | bigint | number | string): boolean {
+        return (
+            this.bitfield ===
+            (other instanceof PermissionSet
+                ? other.bitfield
+                : new PermissionSet(other).bitfield)
+        );
+    }
+
+    /** Returns the decimal permission representation. @returns Decimal permission bitfield. */
+    public toString(): string {
+        return this.bitfield.toString();
+    }
+
+    /** Returns known permission names contained in this set. @returns Names of all enabled known permissions. */
+    public toArray(): PermissionName[] {
+        return (Object.keys(Permission) as PermissionName[]).filter(
+            (permission) => this.has(permission),
+        );
+    }
+
+    /** Resolves a named permission, enum value, or raw bit. @param permission Permission name, enum value, or raw bit. @returns Numeric permission bit. */
+    /** Names Discord has since renamed, still accepted when resolving a permission by name. */
+    static readonly #renamed: Readonly<Record<string, string>> = {
+        ManageEmojisAndStickers: "ManageGuildExpressions",
+        ManageEmojis: "ManageGuildExpressions",
+        UseSlashCommands: "UseApplicationCommands",
+    };
+
+    #resolve(permission: PermissionResolvable): bigint {
+        if (typeof permission === "bigint") return permission;
+        if (typeof permission === "number") return BigInt(permission);
+        if (permission instanceof PermissionSet) return permission.bitfield;
+        if (Array.isArray(permission)) {
+            let bit = 0n;
+            for (let i = 0; i < permission.length; i++)
+                bit |= this.#resolve(permission[i]!);
+            return bit;
+        }
+        if (typeof permission === "string") {
+            const renamed = PermissionSet.#renamed[permission];
+            if (renamed) return this.#resolve(renamed);
+            if (permission in Permission)
+                return (Permission as Record<string, bigint>)[permission]!;
+            if (permission in Permissions)
+                return (Permissions as Record<string, bigint>)[permission]!;
+            if (permission in PermissionFlagsBits)
+                return (PermissionFlagsBits as Record<string, bigint>)[
+                    permission
+                ]!;
+            const lower =
+                permission.charAt(0).toLowerCase() + permission.slice(1);
+            if (lower in Permission)
+                return (Permission as Record<string, bigint>)[lower]!;
+            return BigInt(permission);
+        }
+        return 0n;
+    }
+}
+
+/** Permissions bitfield alias. */
+export class PermissionsBitField extends PermissionSet {
+    /** Permission flags bits enum. */
+    public static readonly Flags = PermissionFlagsBits;
+    /** Permission flags constants. */
+    public static readonly All = Permission;
+
+    /** Creates a permissions bitfield. @param value Initial permission bitfield or array of permissions. */
+    public constructor(value: PermissionResolvable = 0n) {
+        super(value);
+    }
+}
+
+/** Every known permission bit. */
+const ALL_PERMISSIONS = Object.values(Permission).reduce(
+    (bits, bit) => bits | bit,
+    0n,
+);
+
+/** A role as needed for permission resolution. */
+export interface PermissionRole {
+    id: string;
+    permissions: PermissionResolvable;
+}
+
+/** A channel permission overwrite (Discord's `permission_overwrites` entry). */
+export interface PermissionOverwrite {
+    id: string;
+    type: PermissionOverwriteEnum | number;
+    allow: PermissionResolvable;
+    deny: PermissionResolvable;
+}
+
+/** Everything needed to resolve a member's permissions. */
+export interface PermissionContext {
+    guildId: string;
+    /** Guild owner ID; the owner has every permission. */
+    ownerId?: string;
+    memberId: string;
+    memberRoleIds: readonly string[];
+    /** Guild roles, including `@everyone` (whose ID is the guild ID). */
+    roles: readonly PermissionRole[];
+    /** Channel overwrites; omit for guild-level permissions. */
+    overwrites?: readonly PermissionOverwrite[];
+    /** When the member's timeout ends; while it is in the future the member keeps only View Channel and Read Message History. */
+    timedOutUntil?: Date | number | null;
+}
+
+const bits = (value: PermissionResolvable): bigint =>
+    new PermissionSet(value).bitfield;
+
+/**
+ * Resolves a member's effective permissions the way Discord does: base
+ * permissions from `@everyone` and the member's roles (owner and
+ * administrator get everything), then the channel's `@everyone` overwrite,
+ * the combined role overwrites, and finally the member overwrite. A member
+ * whose timeout has not ended keeps only View Channel and Read Message History.
+ */
+export function computePermissions(context: PermissionContext): PermissionSet {
+    if (context.ownerId !== undefined && context.ownerId === context.memberId)
+        return new PermissionSet(ALL_PERMISSIONS);
+    const roles = new Map(context.roles.map((role) => [role.id, role]));
+    let base = bits(roles.get(context.guildId)?.permissions ?? 0n);
+    for (const id of context.memberRoleIds)
+        base |= bits(roles.get(id)?.permissions ?? 0n);
+    if (base & Permission.administrator)
+        return new PermissionSet(ALL_PERMISSIONS);
+    const overwrites = context.overwrites ?? [];
+    const everyone = overwrites.find((o) => o.id === context.guildId);
+    if (everyone) base = (base & ~bits(everyone.deny)) | bits(everyone.allow);
+    const memberRoles = new Set(context.memberRoleIds);
+    let allow = 0n;
+    let deny = 0n;
+    for (const overwrite of overwrites)
+        if (
+            overwrite.type === PermissionOverwriteEnum.Role &&
+            overwrite.id !== context.guildId &&
+            memberRoles.has(overwrite.id)
+        ) {
+            allow |= bits(overwrite.allow);
+            deny |= bits(overwrite.deny);
+        }
+    base = (base & ~deny) | allow;
+    const member = overwrites.find(
+        (o) =>
+            o.type === PermissionOverwriteEnum.Member &&
+            o.id === context.memberId,
+    );
+    if (member) base = (base & ~bits(member.deny)) | bits(member.allow);
+    // Discord: timed-out members lose every permission except View Channel and
+    // Read Message History. Owners and administrators returned above.
+    const until =
+        context.timedOutUntil instanceof Date
+            ? context.timedOutUntil.getTime()
+            : (context.timedOutUntil ?? 0);
+    if (until > Date.now())
+        base &= Permission.viewChannel | Permission.readMessageHistory;
+    return new PermissionSet(base);
+}

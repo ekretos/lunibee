@@ -36,12 +36,13 @@ import { User } from "lunibee";
 | `flags` | `number` | Public user flags bitfield. |
 | `displayName` | `string` | Global name if set, otherwise username. |
 | `createdAt` | `Date` | Account creation timestamp from snowflake. |
+| `createdTimestamp` | `number` | The same, in milliseconds since the Unix epoch. |
 
 ## Methods
 
 ### `avatarURL(options?)`
 
-Returns the user's avatar URL, or `null` if they have no avatar.
+Returns the user's avatar URL, or `null` if they have no avatar. The extension defaults to `gif` for an animated (`a_`) hash and `png` otherwise; `forceStatic` turns the animated default into `png`.
 
 <Tabs>
 <TabItem label="TypeScript">

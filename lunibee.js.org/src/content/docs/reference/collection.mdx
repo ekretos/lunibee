@@ -38,7 +38,7 @@ const col = new Collection([["id1", user1], ["id2", user2]]);
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const col = new Collection<string, User>();
+const col = new Collection();
 // From entries:
 const col = new Collection([["id1", user1], ["id2", user2]]);
 ```
@@ -180,7 +180,7 @@ Returns `true` if **all** entries match the predicate.
 
 ### `first()`
 
-Returns the first value, or the first `n` values as an array.
+Returns the first value (insertion order), or `undefined` when empty.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -197,11 +197,11 @@ const firstUser = client.users.cache.first();
 
 ### `last()`
 
-Returns the last value, or the last `n` values as an array.
+Returns the last value, or `undefined` when empty.
 
 ### `firstKey()` / `lastKey()`
 
-Returns the first or last key(s).
+Returns the first or last key, or `undefined` when empty.
 
 ### `at(index)`
 
@@ -318,7 +318,7 @@ Returns the entries as `[key, value]` pairs.
 
 ## Example
 
-**Filter and display online guild members**
+**List community guilds**
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -341,7 +341,7 @@ console.log("Community guilds:", onlineMembers.join(", "));
 </TabItem>
 </Tabs>
 
-**Get the 5 most recently joined users**
+**Get the 5 newest user accounts**
 
 <Tabs>
 <TabItem label="TypeScript">

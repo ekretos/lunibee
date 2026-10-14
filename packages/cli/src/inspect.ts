@@ -212,7 +212,7 @@ async function environmentFindings(
     bunVersion: string,
 ): Promise<Finding[]> {
     const findings: Finding[] = [];
-    const required = "1.2.0";
+    const required = "1.4.0";
     findings.push(
         compareVersions(bunVersion, required) >= 0
             ? { level: "ok", message: `Bun ${bunVersion}` }

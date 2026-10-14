@@ -154,14 +154,14 @@ client.on("interactionCreate", async (interaction) => {
 
 ## 0.2.1 Additions
 
-Members from messages, interactions, the member cache and `guilds.members(id).fetch()` are attached to the client, so they can act on themselves. Every action takes an optional audit-log `reason`.
+Members from messages, interactions, the member cache and `guilds.members(id).fetch()` are attached to the client, so they can act on themselves. Every action takes an optional audit-log `reason`, and throws when the member is not attached to a client.
 
 | Method | Description |
 |---|---|
 | `permissionsIn(channelId)` | Permissions in a channel, with its overwrites; `null` when the channel or guild is not cached. |
 | `kick(reason?)` | Kicks the member. |
 | `ban({ reason?, deleteMessageSeconds? })` | Bans the member. |
-| `timeout(ms \| null, reason?)` | Times the member out, or clears the timeout with `null`. |
+| `timeout(ms \| null, reason?)` | Times the member out, or clears the timeout with `null`. `ms` must be positive (a `RangeError` otherwise). |
 | `setNickname(nick \| null, reason?)` | Sets or clears the nickname. |
 | `addRole(roleId, reason?)` / `removeRole(roleId, reason?)` | Changes one role. |
 | `edit(options, reason?)` | Any member field Discord accepts. |

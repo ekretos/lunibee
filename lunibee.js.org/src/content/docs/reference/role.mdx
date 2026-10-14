@@ -37,8 +37,10 @@ import { Role } from "lunibee";
 | `position` | `number` | Position in the role hierarchy. |
 | `unicodeEmoji` | `string \| null` | Unicode emoji icon. |
 | `iconHash` | `string \| null` | Custom icon image hash. |
+| `colors` | `{ primary, secondary, tertiary } \| null` | Gradient or holographic colours, when the role has more than a solid colour. |
 | `tags` | `Record<string, unknown> \| null` | Role tags (bot ID, integration ID, etc.). |
 | `createdAt` | `Date` | When the role was created (from snowflake). |
+| `createdTimestamp` | `number` | The same, in milliseconds. |
 
 ## Methods
 
@@ -110,7 +112,7 @@ client.on("guildMemberAdd", async (memberData) => {
   const WELCOME_ROLE_ID = "123456789012345678";
   const guild = client.guilds.get(memberData.guild_id);
   if (!guild) return;
-  await client.channels.members(memberData.guild_id).addRole(memberData.user.id, WELCOME_ROLE_ID);
+  await client.guilds.members(memberData.guild_id).addRole(memberData.user.id, WELCOME_ROLE_ID);
 });
 ```
 </TabItem>
@@ -120,7 +122,7 @@ client.on("guildMemberAdd", async (memberData) => {
   const WELCOME_ROLE_ID = "123456789012345678";
   const guild = client.guilds.get(memberData.guild_id);
   if (!guild) return;
-  await client.channels.members(memberData.guild_id).addRole(memberData.user.id, WELCOME_ROLE_ID);
+  await client.guilds.members(memberData.guild_id).addRole(memberData.user.id, WELCOME_ROLE_ID);
 });
 ```
 </TabItem>

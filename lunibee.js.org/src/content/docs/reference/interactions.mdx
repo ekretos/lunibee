@@ -43,22 +43,27 @@ import {
 | `token` | `string` | Interaction token (valid for 15 minutes). |
 | `guildId` | `string \| undefined` | Guild ID if the interaction happened in a server. |
 | `channelId` | `string \| undefined` | Channel ID. |
-| `user` | raw user data | The user who triggered the interaction. |
-| `member` | `GuildMember \| undefined` | The guild member who triggered it (if in a guild). |
+| `user` | `User \| null` | The user who triggered the interaction. |
+| `member` | `GuildMember \| null` | The guild member who triggered it (`null` outside a guild). |
+| `type` | `number` | Interaction type. |
+| `data` | `InteractionData` | The raw interaction payload. |
+| `replied` / `deferred` | `boolean` | Whether the initial response was sent or deferred. |
+| `entitlements` | `readonly APIEntitlement[]` | What the user (and guild) own from your SKUs; `hasEntitlement(skuId)` checks for an active one. |
 
 ## Common Methods (all types)
 
 | Method | Description |
 |---|---|
-| `reply(options)` | Sends the initial response. Accepts `content`, `embeds`, `components`, `ephemeral`. |
-| `deferReply(options?)` | Acknowledges immediately, showing a loading state. |
-| `editReply(options)` | Edits the initial response (after `reply` or `deferReply`). |
-| `deleteReply()` | Deletes the initial response. |
+| `reply(options)` | Sends the initial response. Accepts a string or `content`, `embeds`, `components`, `ephemeral`, `files`, `poll`. Throws if the interaction was already acknowledged. |
+| `deferReply(options?)` | Acknowledges immediately, showing a loading state. Throws if already acknowledged. |
+| `editReply(options)` | Edits the initial response (after `reply` or `deferReply`; throws before). |
+| `deleteReply()` | Deletes the initial response (throws before acknowledging). |
+| `update(options)` | Edits the message a component is on, as the initial response. |
 | `followUp(options)` | Sends a follow-up message. |
 
 ## Type Guards
 
-Use type guard methods on the base `Interaction` to narrow to the correct subtype:
+Use type guard methods on the base `Interaction` to narrow to the correct subtype. Besides the four below there are `isCommand()` (any application command), `isContextMenuCommand()`, `isUserContextMenuCommand()`, `isMessageContextMenuCommand()`, and for components `isButton()`, `isStringSelectMenu()`, `isUserSelectMenu()`, `isRoleSelectMenu()`, `isMentionableSelectMenu()`, `isChannelSelectMenu()` and `isAnySelectMenu()`. `isChatInputCommand()` is false for context-menu commands.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -150,11 +155,14 @@ client.on("interactionCreate", async (interaction) => {
 | `getUser(name, required?)` | `object \| null` | Gets the resolved user data. |
 | `getChannel(name, required?)` | `object \| null` | Gets the resolved channel data. |
 | `getRole(name, required?)` | `object \| null` | Gets the resolved role data. |
+| `getMentionable(name, required?)` | `object \| null` | Gets the resolved user or role data. |
 | `getAttachment(name, required?)` | `object \| null` | Gets the attachment data. |
+| `getFocused(full?)` | value or option | Autocomplete: the focused option's value, or the whole option with `true`. Throws when none is focused. |
+| `raw` | `readonly APIInteractionDataOption[]` | The raw option list. |
 | `getSubcommand(required?)` | `string \| null` | Gets the subcommand name. |
 | `getSubcommandGroup(required?)` | `string \| null` | Gets the subcommand group name. |
 
-When `required = true`, the method throws a `TypeError` if the option is missing.
+When `required = true`, the method throws a `TypeError` if the option is missing (or its resolved data is). An option of a different type counts as missing.
 
 ### Full Example
 
@@ -195,6 +203,12 @@ client.on("interactionCreate", async (interaction) => {
 
 ---
 
+## `ContextMenuCommandInteraction` — User and Message Commands
+
+A `CommandInteraction` for a right-click command (`isContextMenuCommand()`). It adds `targetId` (the user or message ID), `targetUser` (`User \| null`), `targetMember` (`GuildMember \| null`, in a guild) and `targetMessage` (`Message \| null`).
+
+---
+
 ## `ComponentInteraction` — Buttons & Select Menus
 
 Triggered when a user clicks a button or chooses a select menu option.
@@ -206,14 +220,14 @@ Triggered when a user clicks a button or chooses a select menu option.
 | `customId` | `string` | The `customId` set on the component. |
 | `componentType` | `number` | Component type (2 = Button, 3 = String Select, etc.). |
 | `values` | `string[]` | Selected values (only for select menus). |
-| `message` | `Message` | The message containing the component. |
+| `messageId` | `string \| undefined` | The ID of the message the component is on. |
 
 ### Additional Methods
 
 | Method | Description |
 |---|---|
 | `update(options)` | Updates the originating message instead of sending a new reply. |
-| `deferUpdate()` | Defers without showing a loading state (for components). |
+| `deferUpdate(options?)` | Defers without showing a loading state (for components). |
 
 ### Example
 
@@ -263,7 +277,13 @@ Triggered when a user submits a modal form.
 | Property | Type | Description |
 |---|---|---|
 | `customId` | `string` | The `customId` set on the modal. |
-| `fields` | `ModalFields` | Accessor for submitted text input values. |
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `getInputValue(customId)` | The submitted text of a text input, or `undefined`. |
+| `getRequiredInputValue(customId)` | The same, but throws a `TypeError` when the input is missing. |
 
 ### Reading Field Values
 
@@ -332,6 +352,7 @@ Triggered as a user types in a slash command option with `autocomplete: true`.
 |---|---|---|
 | `commandName` | `string` | The slash command name. |
 | `options` | `CommandOptions` | Resolved options (use `getFocused` for the active field). |
+| `focusedOption` | `{ name, value, type } \| undefined` | The option the user is typing in. |
 
 ### `respond(choices)`
 

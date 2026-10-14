@@ -1,6 +1,6 @@
 ---
 title: Utils
-description: Lightweight general-purpose utility functions — sleep, randomInt, and isSnowflake.
+description: Lightweight general-purpose utility functions — sleep, randomInt, isSnowflake and prefix-command argument parsing.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -108,13 +108,14 @@ function randomInt(min, max)
 
 ## `isSnowflake(value)`
 
-Returns `true` if the string is a valid Discord snowflake (1–20 digit numeric string).
+Returns `true` if the string looks like a Discord snowflake: 16 to 22 decimal digits.
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
 isSnowflake("123456789012345678")  // → true
 isSnowflake("not-a-snowflake")     // → false
+isSnowflake("12345")               // → false (too short)
 isSnowflake("99999999999999999999") // → true (20 digits)
 ```
 </TabItem>
@@ -122,6 +123,7 @@ isSnowflake("99999999999999999999") // → true (20 digits)
 ```js
 isSnowflake("123456789012345678")  // → true
 isSnowflake("not-a-snowflake")     // → false
+isSnowflake("12345")               // → false (too short)
 isSnowflake("99999999999999999999") // → true (20 digits)
 ```
 </TabItem>
@@ -192,7 +194,7 @@ async function sendAll(channels: Channel[], content: string) {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-async function sendAll(channels , content) {
+async function sendAll(channels, content) {
   for (const channel of channels) {
     await channel.send({ content });
     await sleep(500); // 500ms between each send to avoid rate limits

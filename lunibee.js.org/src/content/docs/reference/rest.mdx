@@ -262,7 +262,7 @@ For each request the client:
 4. waits while the bucket is exhausted or a global limit is active;
 5. records `X-RateLimit-Remaining`, `X-RateLimit-Reset-After` and `X-RateLimit-Bucket` from the response.
 
-A `429` is retried after `retry_after` (from the body) or the `Retry-After` header, or one second when neither is usable. A `429` with `global: true` (or `X-RateLimit-Global`) pauses every request until the global limit resets. The `onRateLimit` hook fires before each wait.
+A `429` is retried after `retry_after` (from the body) or the `Retry-After` header, or one second when neither is usable. A `429` with `global: true` (or `X-RateLimit-Global`) pauses every request until the global limit resets. The `onRateLimit` hook fires for every `429` response; a wait the client imposes on itself from earlier headers (an exhausted bucket, an active global limit) does not fire it.
 
 ### Bounded backoff
 
@@ -322,7 +322,7 @@ The default policy is `createRetryPolicy(retries)`, with `retries` defaulting to
 | `5xx` | `GET`, `HEAD`, `PUT`, `DELETE` | `min(10 s, 500 ms × 2^attempt)` plus up to 250 ms of jitter |
 | network failure (DNS, reset, TLS) | `GET`, `HEAD`, `PUT`, `DELETE` | same as `5xx` |
 
-`POST` and `PATCH` are never replayed after a `5xx` or a network failure: Discord may already have acted on them, and a second message or a second ban is worse than an error. A timeout is never retried. The `onRetry` hook fires before each retry.
+`POST` and `PATCH` are never replayed after a `5xx` or a network failure: Discord may already have acted on them, and a second message or a second ban is worse than an error. A timeout is never retried. The `onRetry` hook fires before each retry of an error response (`429`, `5xx`); a retry after a network failure does not fire it.
 
 A custom policy:
 
@@ -456,8 +456,8 @@ const rest = new REST({
 |---|---|
 | `onRequest` | `{ method, path, attempt }`, before every HTTP attempt. |
 | `onResponse` | `{ method, path, status, durationMs }`, after every response. |
-| `onRateLimit` | `{ method, path, retryAfterMs, global, bucket? }`, before waiting on a limit. |
-| `onRetry` | `{ method, path, attempt, status, delayMs }`, before a retry. |
+| `onRateLimit` | `{ method, path, retryAfterMs, global, bucket? }`, for every `429` response. |
+| `onRetry` | `{ method, path, attempt, status, delayMs }`, before retrying an error response. |
 
 `rest.setHooks(hooks)` replaces all hooks at runtime.
 

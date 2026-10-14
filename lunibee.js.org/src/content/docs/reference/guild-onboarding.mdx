@@ -3,12 +3,13 @@ title: Onboarding & Welcome Screen
 description: GuildOnboarding, OnboardingPrompt, OnboardingPromptOption, GuildWelcomeScreen and WelcomeScreenChannel.
 ---
 
-Structures for a guild's onboarding flow and welcome screen. Fetch the raw payloads with `client.guilds.fetchOnboarding(guildId)` and `client.guilds.fetchWelcomeScreen(guildId)`; edit them with `editOnboarding()` and `editWelcomeScreen()` (both need Manage Guild, and the welcome screen needs the Community feature).
+Structures for a guild's onboarding flow and welcome screen. Fetch the raw payloads with `client.guilds.fetchOnboarding(guildId)` and `client.guilds.fetchWelcomeScreen(guildId)`; wrap them with `new GuildOnboarding(raw)` / `new GuildWelcomeScreen(raw)`. Edit them with `editOnboarding()` (needs Manage Guild and Manage Roles) and `editWelcomeScreen()` (needs Manage Guild and the Community feature).
 
 ## GuildOnboarding
 
 | Property | Type | Description |
 |---|---|---|
+| `id` | `string` | The guild's ID. |
 | `prompts` | `OnboardingPrompt[]` | The questions new members answer. |
 | `defaultChannelIds` | `string[]` | Channels every new member is given. |
 | `enabled` | `boolean` | Whether onboarding is on. |
@@ -18,6 +19,7 @@ Structures for a guild's onboarding flow and welcome screen. Fetch the raw paylo
 
 | Property | Type | Description |
 |---|---|---|
+| `id` | `string` | Prompt ID. |
 | `type` | `number` | Prompt type (multiple choice or dropdown). |
 | `title` | `string` | The question. |
 | `options` | `OnboardingPromptOption[]` | The answers. |
@@ -29,6 +31,7 @@ Structures for a guild's onboarding flow and welcome screen. Fetch the raw paylo
 
 | Property | Type | Description |
 |---|---|---|
+| `id` | `string` | Option ID. |
 | `title` | `string` | The answer's label. |
 | `description` | `string \| null` | Optional description. |
 | `emoji` | `APIPartialEmoji \| undefined` | The answer's emoji. |

@@ -37,7 +37,8 @@ import { Guild } from "lunibee";
 | `verificationLevel` | `number` | Verification level (0–4). |
 | `premiumTier` | `number` | Boost level (0–3). |
 | `premiumSubscriptionCount` | `number` | Total boosts. |
-| `memberCount` | `number \| undefined` | Approximate member count. |
+| `memberCount` | `number \| undefined` | Member count (`member_count`, else the approximate count). |
+| `approximateMemberCount` / `approximatePresenceCount` | `number \| undefined` | Approximate counts, when Discord sent them. |
 | `vanityUrlCode` | `string \| null` | Custom invite slug. |
 | `preferredLocale` | `string` | Server locale (e.g. `"en-US"`). |
 | `nsfwLevel` | `number` | NSFW level (0–3). |
@@ -45,6 +46,16 @@ import { Guild } from "lunibee";
 | `systemChannelId` | `string \| null` | System messages channel. |
 | `maxMembers` | `number` | Member cap. |
 | `mfaLevel` | `number` | MFA requirement for moderators. |
+| `discoverySplash` | `string \| null` | Discovery splash hash. |
+| `systemChannelFlags` | `number` | System channel flags bitfield. |
+| `explicitContentFilter`, `defaultMessageNotifications` | `number` | Content filter and default notification levels. |
+| `afkChannelId` / `afkTimeout` | `string \| null` / `number \| undefined` | AFK channel and timeout (seconds). |
+| `widgetEnabled` / `widgetChannelId` | `boolean` / `string \| null` | Server widget settings. |
+| `applicationId` | `string \| null` | Application that created the guild, if a bot did. |
+| `publicUpdatesChannelId`, `safetyAlertsChannelId` | `string \| null` | Community update and safety alert channels. |
+| `maxPresences` | `number \| null` | Presence cap (`null` for the default). |
+| `maxVideoChannelUsers` | `number \| undefined` | Video channel user cap. |
+| `premiumProgressBarEnabled` | `boolean` | Whether the boost progress bar shows. |
 
 ## Boolean Getters
 
@@ -113,7 +124,7 @@ Returns the discovery splash URL, or `null`.
 
 ### `widgetImageURL(style?)`
 
-Returns a guild widget image URL.
+Returns a guild widget image URL. `style` is `"shield"` (default), `"banner1"`, `"banner2"`, `"banner3"` or `"banner4"`.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -232,6 +243,8 @@ and removed with the guild:
 | Method | Holds |
 |---|---|
 | `members(guildId)` | `GuildMember` by user ID |
+| `bans(guildId)` | Bans by user ID |
+| `scheduledEvents(guildId)` | Scheduled events by ID |
 | `roles(guildId)` | `Role` by ID |
 | `emojis(guildId)` | `Emoji` by ID |
 | `stickers(guildId)` | Stickers (`fetchAll`, `create`, `edit`, `remove`) |
@@ -304,6 +317,7 @@ if (guild.premiumTier >= PremiumTier.Tier2) { /* 50 MB uploads */ }
 | `actions` | What Discord does when it fires. |
 | `enabled` | Whether the rule is on. |
 | `exemptRoles`, `exemptChannels` | IDs the rule ignores. |
+| `toJSON()` | A plain object with the fields above. |
 
 ## `BaseStructure`
 

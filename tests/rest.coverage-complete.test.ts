@@ -229,3 +229,31 @@ describe("serializeQuery", () => {
         expect(serializeQuery("a=1")).toBe("?a=1");
     });
 });
+
+describe("onRetry after a network failure", () => {
+    test("fires with status 0", async () => {
+        const { REST } = await import("../packages/rest/src/index.ts");
+        const retries: { status: number; attempt: number }[] = [];
+        let calls = 0;
+        const rest = new REST({
+            token: "a.b.c-token-0123456789",
+            retryPolicy: {
+                maxRetries: 1,
+                shouldRetry: () => true,
+                getDelay: () => 1,
+            },
+            hooks: { onRetry: (ctx) => retries.push(ctx) },
+            transport: new HttpTransport({
+                fetch: async () => {
+                    if (calls++ === 0) throw new Error("socket reset");
+                    return new Response("{}", {
+                        headers: { "content-type": "application/json" },
+                    });
+                },
+            }),
+        });
+        await rest.get<unknown>("/users/@me");
+        await Bun.sleep(1);
+        expect(retries).toMatchObject([{ status: 0, attempt: 0 }]);
+    });
+});

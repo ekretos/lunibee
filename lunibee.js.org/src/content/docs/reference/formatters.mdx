@@ -216,7 +216,7 @@ subtext("Last updated 3 hours ago")  // → "-# Last updated 3 hours ago"
 
 ### `masked(text)`
 
-Masks text using the backtick escape for display without markdown parsing.
+An alias of `spoiler()`: wraps text in `||...||`.
 
 ### `escapeMarkdown(value)`
 
@@ -285,7 +285,7 @@ bulletList("Apples", "Oranges", "Bananas")
 
 ### `link(label, url, title?)`
 
-Creates a Markdown hyperlink.
+Creates a Markdown hyperlink. `url` must start with `http://`, `https://` or `discord://` (otherwise a `TypeError`); brackets in the label are escaped, and parentheses, quotes and spaces in the URL are percent-encoded.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -294,7 +294,7 @@ link("Lunibee Docs", "https://lunibee.js.org")
 // → "[Lunibee Docs](https://lunibee.js.org)"
 
 link("Hover me", "https://lunibee.js.org", "Official documentation")
-// → "[Hover me](https://lunibee.js.org 'Official documentation')"
+// → '[Hover me](https://lunibee.js.org "Official documentation")'
 ```
 </TabItem>
 <TabItem label="JavaScript">
@@ -303,7 +303,7 @@ link("Lunibee Docs", "https://lunibee.js.org")
 // → "[Lunibee Docs](https://lunibee.js.org)"
 
 link("Hover me", "https://lunibee.js.org", "Official documentation")
-// → "[Hover me](https://lunibee.js.org 'Official documentation')"
+// → '[Hover me](https://lunibee.js.org "Official documentation")'
 ```
 </TabItem>
 </Tabs>
@@ -314,7 +314,7 @@ link("Hover me", "https://lunibee.js.org", "Official documentation")
 
 ### `userMention(id)`
 
-Creates a `<@userId>` mention string.
+Creates a `<@userId>` mention string. Throws a `TypeError` unless `id` is a snowflake (1 to 20 digits); the same holds for `channelMention()` and `roleMention()`.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -367,23 +367,23 @@ roleMention("111222333")  // → "<@&111222333>"
 
 ## Timestamps
 
-### `timestamp(dateOrMs, style?)`
+### `timestamp(unixSeconds, style?)`
 
-Creates a Discord timestamp that renders dynamically in each user's local timezone.
+Creates a Discord timestamp that renders dynamically in each user's local timezone. It takes a Unix time in **seconds** (fractions are floored), not milliseconds or a `Date`. Throws a `TypeError` for a non-finite number and a `RangeError` for an unknown style or an out-of-range value.
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-timestamp(Date.now())                  // → "<t:1700000000>"
-timestamp(new Date(), "R")             // → "<t:1700000000:R>"
-timestamp(1700000000, "F")             // → "<t:1700000000:F>"
+timestamp(Math.floor(Date.now() / 1000)) // → "<t:1700000000>"
+timestamp(1700000000, "R")               // → "<t:1700000000:R>"
+timestamp(1700000000, "F")               // → "<t:1700000000:F>"
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-timestamp(Date.now())                  // → "<t:1700000000>"
-timestamp(new Date(), "R")             // → "<t:1700000000:R>"
-timestamp(1700000000, "F")             // → "<t:1700000000:F>"
+timestamp(Math.floor(Date.now() / 1000)) // → "<t:1700000000>"
+timestamp(1700000000, "R")               // → "<t:1700000000:R>"
+timestamp(1700000000, "F")               // → "<t:1700000000:F>"
 ```
 </TabItem>
 </Tabs>

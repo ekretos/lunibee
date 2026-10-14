@@ -1,5 +1,5 @@
 import { BaseStructure, Channel, User, CDN_BASE, cdnURL } from "./base.js";
-import { PermissionsBitField } from "@lunibee/core";
+import { PermissionsBitField } from "./permissions.js";
 import type { ImageURLOptions, ResourceContext } from "./base.js";
 
 /** Parses a Discord ISO timestamp into a Date, returning null for absent or invalid values. */

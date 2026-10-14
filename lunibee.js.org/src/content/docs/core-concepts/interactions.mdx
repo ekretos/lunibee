@@ -223,7 +223,7 @@ client.on("interactionCreate", async (interaction) => {
     const description = interaction.getRequiredInputValue("ticket_description");
 
     await interaction.reply({
-      content: `Ticket created **Subject:** ${subject}`,
+      content: `Ticket created! **Subject:** ${subject}`,
       ephemeral: true,
     });
   }

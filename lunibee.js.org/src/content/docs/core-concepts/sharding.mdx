@@ -52,9 +52,9 @@ await manager.connect();
 
 ```text
 ClusterManager (parent)
- ├─ cluster 0 ── shards 0, 2 ──┐  worker.send(frame)
- ├─ cluster 1 ── shards 1, 3 ──┼─▶ parent relays the frame to every other cluster
- └─ cluster 2 ── shards 4    ──┘  and, when a cluster exits, tells the others which shards are gone
+ ├─ cluster 0 ── shards 0, 3 ──┐  worker.send(frame)
+ ├─ cluster 1 ── shards 1, 4 ──┼─▶ parent relays the frame to every other cluster
+ └─ cluster 2 ── shards 2    ──┘  and, when a cluster exits, tells the others which shards are gone
 ```
 
 Your code does not change: `new ShardBus(shardId, "my-bot")` picks the transport. Pass `{ transport }` (a `ShardBusTransport`: `post`, `onMessage`, `close`) to override it. A request to a shard whose cluster dies rejects at once instead of waiting for its timeout, `maxPending` (10,000 by default) bounds the requests waiting for replies, and an error thrown by a handler reaches `onError` listeners, or becomes a process warning (`LUNIBEE_SHARD_BUS_ERROR`) when there are none.
@@ -93,7 +93,7 @@ const total = all.reduce((sum, r) => sum + (r.result ?? 0), 0);
 
 ## Events, buckets and the start limit (0.3.1)
 
-`ShardManager` re-emits what its shards do, each with the shard id first: `shardReady`, `shardDisconnect` (with `{ code, action }`), `shardResume`, `shardError` and `shardUnstable`.
+`ShardManager` re-emits what its shards do, each with the shard id first: `shardReady`, `shardDisconnect` (with `{ code, action }`), `shardResume`, `shardError` and `shardUnstable`; `ready` (no arguments) fires once every shard it owns is ready, and again after a shard recovers.
 
 ```ts
 manager.on("shardReady", (id) => console.log(`shard ${id} ready`));
@@ -112,7 +112,7 @@ remaining session-start budget and tells you when it resets.
 ```ts
 const manager = new ShardManager({ token, intents, shardCount: "auto" });
 await manager.connect();
-manager.health(); // [{ id, state, ping }, ...]
+manager.health(); // [{ id, state, ping, status }, ...]
 ```
 
 Rounds are spaced from the moment each shard sends IDENTIFY/RESUME, not from
@@ -123,7 +123,7 @@ too-small budget never tears down running shards.
 
 ## Restarting crashed clusters
 
-`ClusterManager` re-forks a cluster that exits. By default every crash is restarted after `restartDelay`. For a crash loop, add a supervisor policy:
+`ClusterManager` re-forks a cluster that exits. By default every crash is restarted after `restartDelay` (5 s). For a crash loop, add a supervisor policy:
 
 ```ts
 new ClusterManager({
@@ -133,7 +133,7 @@ new ClusterManager({
 });
 ```
 
-Each crash inside `window` doubles the delay (up to `maxDelay`, plus jitter); more than `maxRestarts` crashes inside `window` stops restarting that cluster and calls `onGiveUp`. A cluster that stays up for a full `window` starts over. `ShardSupervisor` is exported for custom managers.
+Each crash inside `window` multiplies the delay by `backoff` (doubles it here; up to `maxDelay`, plus jitter); more than `maxRestarts` crashes inside `window` stops restarting that cluster and calls `onGiveUp`. A cluster that stays up for a full `window` starts over. `ShardSupervisor` is exported for custom managers.
 
 ## ShardManager and ClusterManager together (0.3.1)
 
@@ -236,7 +236,7 @@ await shards.connect();
 
 Two numbers decide the layout, and you can set either:
 
-- **Guilds per shard.** Discord assigns a guild to a shard by its ID, so you cannot place guilds one by one; you choose the **shard count**. With `shardCount: "auto"`, `guildsPerShard: 1000` gives `ceil(guilds / 1000)` shards (at least one), using the guild count Discord reports for your application, or `guildCount` if you pass it. Without `guildsPerShard`, `"auto"` uses Discord's own recommendation. The value is capped at 2500, Discord's limit per shard, and the count is re-checked by `autoScaleInterval`. Guild IDs spread evenly, so a shard holds about that many guilds, not exactly.
+- **Guilds per shard.** Discord assigns a guild to a shard by its ID, so you cannot place guilds one by one; you choose the **shard count**. With `shardCount: "auto"`, `guildsPerShard: 1000` gives `ceil(guilds / 1000)` shards (at least one), using the guild count Discord reports for your application, or `guildCount` if you pass it. Without `guildsPerShard`, `"auto"` uses Discord's own recommendation. It must be 1 to 2500 (Discord's limit per shard; anything else throws a `RangeError`), and the count is re-checked by `autoScaleInterval`. Guild IDs spread evenly, so a shard holds about that many guilds, not exactly.
 - **Shards per cluster.** `shardsPerCluster: 4` starts `ceil(shards / 4)` clusters; or set `clusterCount` instead (not both).
 
 ```ts
@@ -297,7 +297,7 @@ await clusters.refreshHealth({ metrics: true }); // asks every worker; metrics a
 //                metrics?: { rssBytes, heapUsedBytes, cpuUserMicros, cpuSystemMicros } }] }
 ```
 
-A shard's lifecycle `status` (`connecting`, `ready`, `disconnected`, `unstable`) is separate from its Gateway `state`. Cluster health follows the process: a transient Gateway problem in one shard, a reconnect storm included, never restarts a healthy cluster; the Gateway's own reconnect and zombie detection handle it. Only an exited process (or a missed `startTimeout`) is restarted.
+A shard's lifecycle `status` (`idle`, `connecting`, `ready`, `disconnected`, `unstable`, `destroyed`) is separate from its Gateway `state`. Cluster health follows the process: a transient Gateway problem in one shard, a reconnect storm included, never restarts a healthy cluster; the Gateway's own reconnect and zombie detection handle it. Only an exited process (or a missed `startTimeout`) is restarted.
 
 ### When a cluster keeps crashing
 
@@ -381,7 +381,7 @@ await host.connect();
 **Placement.** Cluster `n` goes to host `n % hosts.length`, in the order of `remote.hosts` (or, without it, the hosts that had joined at `spawn()`, sorted by ID; `minHosts` says how many to wait for). `remote.local: true` adds the coordinator's own machine as the first place. A cluster stays on its host for the life of the spawn: when it crashes it restarts there. While the host is away, each restart attempt fails at once and counts toward `supervisor.maxRestarts`, so a long outage can take the cluster to `failed`; set `maxRestarts` and `window` with that in mind. With `reassignOnGiveUp`, its shards move to a ready cluster on any host after `supervisor.maxRestarts`.
 
 **Security.**
-- A host proves it knows `remote.secret` by answering a random challenge with an HMAC (the secret never travels), and the coordinator checks it in constant time. Unknown IDs (when `hosts` is set), duplicates, protocol mismatches, malformed or binary frames and a missing hello are closed with codes `4401`, `4410`, `4409`, `4426`, `4400` and `4408` (`RemoteClose`).
+- A host proves it knows `remote.secret` by answering a random challenge with an HMAC (the secret never travels), and the coordinator checks it in constant time. A failed proof, unknown IDs (when `hosts` is set), duplicates, protocol mismatches, malformed or binary frames, a missing hello and too many unauthenticated connections are closed with codes `4401`, `4410`, `4409`, `4426`, `4400`, `4408` and `4429` (`RemoteClose`).
 - A coordinator can only set the worker contract variables (`SHARD_LIST`, `SHARD_COUNT`, `CLUSTER_ID`, `CLUSTER_COUNT`, `LUNIBEE_SHARD_BUS`, `LUNIBEE_CLUSTER_WORKER`, `LUNIBEE_IDENTIFY`) in a remote worker and can only send `SIGTERM`, `SIGKILL` or `SIGINT`; the script is the host's own, and the bot token is read from the host's environment, never sent.
 - **Encryption is required off this machine.** The coordinator listens on `127.0.0.1` unless you say otherwise, and refuses to listen on any other address without `remote.tls` (`wss://`). Behind a TLS proxy, bind `127.0.0.1` and let the proxy forward; on a network you fully trust, `remote.allowInsecure: true` accepts plain `ws://`. A `ClusterHost` likewise refuses `ws://` to another machine unless `allowInsecure: true`. The HMAC proves who a host is; it does not encrypt or sign frames, so without TLS shard messages and worker output travel in the clear.
 - **Size limits.** Frames on the host link are capped at 8 MiB, and `maxMessageBytes` (default 8 MiB) caps what the coordinator relays from any worker, local or remote, and what `request()`, `broadcast()` and `requestCluster()` accept. An oversized worker message is dropped with an `error` event; a request waiting for it times out as usual, and an oversized answer to a request settles it with an error at once.

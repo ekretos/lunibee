@@ -130,12 +130,36 @@ function validateAcyclicGraph(manifests: Map<string, PackageManifest>): void {
     for (const packageName of manifests.keys()) visit(packageName, []);
 }
 
+/**
+ * A runtime import of a workspace package must be a declared dependency:
+ * `package.json` is what an installed copy resolves with. Type-only imports
+ * (`import type`, `import("…").X` in types) are erased and not checked.
+ * @throws {Error} If a source file imports an undeclared workspace package.
+ */
+async function validateSourceImports(manifests: Map<string, PackageManifest>): Promise<void> {
+    const runtime = /^\s*(?:import(?!\s+type\b)[^;]*?\sfrom\s*|export(?!\s+type\b)[^;]*?\sfrom\s*|import\s*)["'](@lunibee\/[a-z-]+)["']/gm;
+    for (const manifest of manifests.values()) {
+        const declared = new Set([...manifest.dependencies, manifest.name]);
+        const glob = new Bun.Glob("src/**/*.ts");
+        for await (const file of glob.scan({ cwd: join(process.cwd(), manifest.directory) })) {
+            if (/\.test\.ts$/.test(file)) continue;
+            const text = await Bun.file(join(process.cwd(), manifest.directory, file)).text();
+            for (const match of text.matchAll(runtime)) {
+                const target = match[1]!;
+                if (manifests.has(target) && !declared.has(target))
+                    throw new Error(`${manifest.directory}/${file} imports ${target} at runtime, but ${manifest.name} does not depend on it.`);
+            }
+        }
+    }
+}
+
 /** Runs all dependency graph checks. @returns Nothing. @throws {Error} If the workspace graph is invalid. */
 async function main(): Promise<void> {
     const manifests = await loadManifests();
     validateDependencyTargets(manifests);
     validateLayerOrdering(manifests);
     validateAcyclicGraph(manifests);
+    await validateSourceImports(manifests);
     console.log(`Dependency graph valid: ${manifests.size} workspace packages, no invalid layer edges, no cycles.`);
 }
 

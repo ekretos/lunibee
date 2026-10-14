@@ -14,7 +14,7 @@ Layer 3:  @lunibee/core
              │
 Layer 2:  @lunibee/managers ◄─── @lunibee/collection
              │
-Layer 1:  @lunibee/structures ◄─ @lunibee/builders, @lunibee/rest, @lunibee/ws
+Layer 1:  @lunibee/structures, @lunibee/builders, @lunibee/rest, @lunibee/ws
              │
 Layer 0:  @lunibee/types, @lunibee/utils, @lunibee/formatters
 ```
@@ -53,5 +53,6 @@ Layer 0:  @lunibee/types, @lunibee/utils, @lunibee/formatters
 | [`@lunibee/formatters`](/packages/formatters/) | Mentions, timestamps, and Markdown helpers |
 | [`@lunibee/utils`](/packages/utils/) | Shared low-level utilities |
 | [`@lunibee/types`](/packages/types/) | Discord API v10 types and constants |
+| [`@lunibee/cli`](/packages/cli/) | The `lunibee` command: scaffolding, handler/command sync, project checks |
 
 The package pages explain the public API and include examples. Start with the package that matches the task you are trying to accomplish; you can always move to a lower layer later.

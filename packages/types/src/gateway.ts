@@ -229,6 +229,8 @@ export interface AllowedMentions {
 /** Gateway connection configuration. */
 export interface GatewayOptions {
     intents?: GatewayIntentResolvable;
+    /** zlib-stream transport compression; `ClientOptions.compress` is shorthand for this. */
+    compress?: boolean;
     reconnect?: boolean;
     maxReconnectAttempts?: number;
     reconnectBaseDelay?: number;
