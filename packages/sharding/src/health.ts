@@ -84,7 +84,7 @@ export interface ClusterHealth {
     lastReadyAt?: number;
     /** Per-shard health from the worker's last report. Empty until it reports. */
     shards: ShardHealth[];
-    /** Present when requested with `health({ metrics: true })` and the worker answered. */
+    /** Present when requested with `refreshHealth({ metrics: true })` and the worker answered. */
     metrics?: WorkerMetrics;
     /** When `shards` and `metrics` were reported (epoch ms). */
     reportedAt?: number;

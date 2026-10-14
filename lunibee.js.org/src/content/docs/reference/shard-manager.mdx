@@ -1,393 +1,558 @@
 ---
 title: ShardManager
-description: Manages multiple Gateway connections (shards) for large bots, with auto-shard count and reconnect support.
+description: Runs several Gateway shards in one process — shard count resolution, IDENTIFY pacing and session budget, lifecycle events, health, cluster workers and restart policy.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`ShardManager` from `@lunibee/sharding` manages multiple `Gateway` connections (shards) for bots serving more than 2,500 guilds. It supports automatic shard count discovery, per-shard info, and horizontal reconnect logic.
+`ShardManager` (from `@lunibee/sharding`) runs several [`Gateway`](/reference/gateway/) connections, one per shard, in one process. It:
+
+- works out the shard count (fixed, Discord's recommendation, or sized by guild count);
+- starts shards without breaking Discord's IDENTIFY limits (one per rate-limit key every 5 s, `max_concurrency` keys at once, and the daily session budget);
+- reports shard lifecycle events and per-shard health;
+- inside a worker forked by [`ClusterManager`](/reference/cluster-manager/), owns only that cluster's shards, takes IDENTIFY slots from the parent and reports readiness and health to it.
+
+Sharding is required once a bot is in 2,500 guilds. Below that, use `Client`. For several processes or machines, see [`ClusterManager`](/reference/cluster-manager/); for messages between shards, see [`ShardBus`](/reference/shard-bus/); for the concepts, see [Sharding](/core-concepts/sharding/).
 
 ## Import
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { ShardManager } from "@lunibee/sharding";
-// or via the main package:
-import { ShardManager } from "lunibee";
+import { ShardManager, ShardingManager } from "@lunibee/sharding";
+// also re-exported:
+import { ShardManager, GatewayIntentBits } from "lunibee";
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { ShardManager } from "@lunibee/sharding";
-// or via the main package:
-import { ShardManager } from "lunibee";
+import { ShardManager, ShardingManager } from "@lunibee/sharding";
+// also re-exported:
+import { ShardManager, GatewayIntentBits } from "lunibee";
 ```
 </TabItem>
 </Tabs>
+
+`ShardingManager` is the same class under its Discord.js name.
+
+The examples below are TypeScript; the JavaScript is the same without type annotations.
+
+## Quick start
+
+```ts
+import { ShardManager, GatewayIntentBits } from "lunibee";
+
+const manager = new ShardManager({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+  shardCount: 4,
+});
+
+// With a fixed shard count the Gateways exist now, so dispatch listeners
+// can be attached before anything connects.
+for (const { id, gateway } of manager.values()) {
+  gateway.on("MESSAGE_CREATE", (message) => handleMessage(id, message));
+}
+
+manager.on("shardReady", (id) => console.log(`shard ${id} ready`));
+manager.on("shardError", (id, error) => console.error(`shard ${id}`, error));
+manager.on("ready", () => console.log("all shards ready"));
+
+await manager.connect();
+
+process.on("SIGINT", () => {
+  manager.destroy();
+  process.exit(0);
+});
+```
+
+`ShardManager` gives you raw Gateways: dispatches are `d` payloads, the same as with a bare [`Gateway`](/reference/gateway/#dispatch-events). Its own events (below) are about shard lifecycle only.
 
 ## Constructor
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
 new ShardManager(options: ShardManagerOptions)
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-new ShardManager(options )
-```
-</TabItem>
-</Tabs>
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `token` | `string` | Required | Discord bot token. |
-| `intents` | `GatewayIntentResolvable` (array) | Required | Gateway intents for all shards. |
-| `shardCount` | `number \| "auto"` | `1` | Number of shards. `"auto"` fetches Discord's recommendation. |
-| `guildsPerShard` / `guildCount` | `number` | none | With `"auto"`, `ceil(guilds / guildsPerShard)` shards (1 to 2500) instead of Discord's recommendation; `guildCount` skips asking Discord. |
-| `shardIds` | `number[]` | all (or the cluster's list) | The shards this manager runs, out of `shardCount`. |
-| `cluster` | `ClusterContext \| false` | read from the environment | The worker contract. `false` ignores it. |
-| `identify` | `IdentifyGate \| false` | the parent inside a coordinated cluster | Where IDENTIFY slots come from. `false` paces locally with `spawnDelay`. |
-| `reconnect` | `boolean` | `true` | Automatic reconnect for every shard. |
-| `spawnDelay` | `number` | `5000` | Milliseconds between shard starts. See below. |
-| `autoScaleInterval` | `number` | — | Milliseconds between automatic shard-count checks (minimum `1000`). Only applies with `shardCount: "auto"`. |
+| `token` | `string` | — | Bot token. Required. |
+| `intents` | `GatewayIntentResolvable` | — | Required. An array of `GatewayIntentBits`, used by every shard. |
+| `shardCount` | `number \| "auto"` | `1` | Total shards in the deployment. `"auto"` asks Discord when `connect()` runs. Inside a cluster worker it defaults to the cluster's count. See [Shard count](#shard-count). |
+| `guildsPerShard` | `number` | — | With `shardCount: "auto"` only: size the deployment as `ceil(guilds / guildsPerShard)` shards (at least one) instead of Discord's recommendation. An integer from 1 to 2500. |
+| `guildCount` | `number` | asked from Discord | The guild count for `guildsPerShard`, so no extra request is made. A non-negative integer. |
+| `shardIds` | `number[]` | every shard, or the cluster's own list | The shards this manager runs, out of `shardCount`. Unique integers in `[0, shardCount)`. |
+| `reconnect` | `boolean` | `true` | Passed to every `Gateway`: reconnect automatically after a close that is not fatal. |
+| `spawnDelay` | `number` | `5000` | Milliseconds between startup rounds when pacing locally. `0` starts every round at once. See [IDENTIFY pacing](#identify-pacing). |
+| `maxConcurrency` | `number` | Discord's `max_concurrency` if known, else `1` | Shards per startup round when pacing locally. Capped at Discord's value when it is known. |
+| `handshakeTimeout` | `number` | `15000` | How long a startup round waits for its shards to send IDENTIFY or RESUME before the next `spawnDelay` starts, in ms. With an IDENTIFY gate, how long a shard holds its slot waiting for the handshake. |
+| `autoScaleInterval` | `number` | — | With `shardCount: "auto"`: re-check the shard count this often, in ms, and reshard when it changes. An integer of at least `1000`. |
 | `onAutoScaleError` | `(error: unknown) => void` | — | Called when a background auto-scale check fails. |
+| `cluster` | `ClusterContext \| false` | read from the environment | The worker contract. `false` ignores it; a `ClusterContext` overrides it. See [Inside a cluster worker](#inside-a-cluster-worker). |
+| `identify` | `IdentifyGate \| false` | the parent, inside a coordinated cluster | Where IDENTIFY slots come from. `false` paces locally with `spawnDelay`. |
+| `worker` | `ClusterWorker \| false` | this process's `ClusterWorker` inside a cluster | The worker that answers the parent's health and shard-assignment requests and is told when the shards are ready. |
 
-### Shard start pacing
+The constructor throws:
 
-Discord allows **one IDENTIFY every 5 seconds** per rate-limit key. `spawnDelay`
-therefore defaults to `ShardManager.IDENTIFY_INTERVAL` (5000 ms): starting shards
-back to back trips that limit and Discord answers with close code `4008` and
-invalid-session churn.
+- `TypeError` for a missing or blank `token`, or `intents` that is not an array;
+- `RangeError` for a `shardCount` that is not a positive integer, a `guildsPerShard` outside 1–2500 or used without `shardCount: "auto"`, invalid or duplicate `shardIds` (checked now with a fixed count, at `connect()` with `"auto"`), an `autoScaleInterval` that is not an integer of at least 1000, a negative or non-finite `spawnDelay`, a `maxConcurrency` that is not a positive integer, or a negative `handshakeTimeout`;
+- inside a cluster worker, `RangeError` for `shardCount: "auto"`, a `shardCount` that differs from the cluster's, or `shardIds` that are not a subset of the cluster's shards, and `TypeError` for `autoScaleInterval` (auto-scaling belongs to `ClusterManager` there).
 
-This means an *N*-shard bot takes roughly `(N - 1) × 5s` to finish connecting. That
-is the protocol-correct behaviour. Pass `spawnDelay: 0` only when something else
-already paces your handshakes, such as an external scheduler or a bucketed
-`max_concurrency` allowance.
-
-<Tabs>
-<TabItem label="TypeScript">
-```ts
-const manager = new ShardManager({
-  token: process.env.DISCORD_TOKEN!,
-  intents: [IntentBits.guilds],
-  shardCount: 4,
-  // Default: ShardManager.IDENTIFY_INTERVAL (5000).
-  spawnDelay: ShardManager.IDENTIFY_INTERVAL,
-});
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const manager = new ShardManager({
-  token: process.env.DISCORD_TOKEN,
-  intents: [IntentBits.guilds],
-  shardCount: 4,
-  spawnDelay: ShardManager.IDENTIFY_INTERVAL,
-});
-```
-</TabItem>
-</Tabs>
+With a number for `shardCount`, the Gateways are created in the constructor. With `"auto"`, they are created by the first `connect()`.
 
 ## Properties
 
 | Property | Type | Description |
 |---|---|---|
-| `shards` | `Map<number, Gateway>` | Map of shard ID to `Gateway` instance. |
+| `shards` | `Map<number, Gateway>` | The shards this manager owns, by shard ID. |
+| `shardCount` | `number` | Total shards in the deployment (Discord's `num_shards`) once the shard set exists; `0` before that and after `destroy()`. |
+| `shardIds` | `number[]` | IDs of the owned shards, ascending. |
+| `ShardManager.IDENTIFY_INTERVAL` | `number` (static) | `5000`, Discord's minimum interval between IDENTIFYs on one rate-limit key. |
 
 ## Methods
 
 ### `connect()`
 
-Starts all shards. Uses `shardCount: "auto"` to query Discord for the recommended count.
+Creates the shard set if it does not exist yet (resolving `"auto"` first; a destroyed manager is rebuilt), then connects every shard that has no live socket. Returns when every started shard's socket is open; listen for `ready` (or `shardReady`) to know when sessions are identified.
 
-<Tabs>
-<TabItem label="TypeScript">
+- Shards that already have a live socket are left alone and do not count against the session budget.
+- Without an IDENTIFY gate, shards start in rounds paced by `spawnDelay`. With a gate, every shard waits for its slot. See [IDENTIFY pacing](#identify-pacing).
+- When `/gateway/bot` was read (with `"auto"`, or after `fetchGatewayInfo()`) and the session budget has fewer IDENTIFYs left than shards to start, it throws before starting any and leaves running shards alone.
+- If a shard fails to connect, it destroys the whole shard set and throws `Error("Failed to connect shard N.")` with the shard's error as `cause`. With `reconnect: true` a Gateway keeps retrying instead of rejecting, so this is mostly seen with `reconnect: false` or a refused IDENTIFY slot.
+- Starts the `autoScaleInterval` timer. Calling `connect()` again replaces that timer instead of adding one.
+
 ```ts
 await manager.connect();
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-await manager.connect();
-```
-</TabItem>
-</Tabs>
 
 ### `destroy()`
 
-Closes all shard connections and clears the shard map.
+Closes every shard, clears `shards`, the health records and the auto-scale timer, and sets `shardCount` to `0`. The next `connect()` builds a new shard set with new `Gateway` objects, so listeners attached to the old Gateways are not carried over.
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
 manager.destroy();
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-manager.destroy();
+
+### `addShards(shardIds)`
+
+Takes over more shards of the same deployment and connects them through the same IDENTIFY path as `connect()`. `ClusterManager` uses it to move a failed cluster's shards to a healthy one (`reassignOnGiveUp`).
+
+- Throws `RangeError` if an ID is outside `[0, shardCount)`, listed twice, or already owned.
+- Creates the shard set first if needed.
+- If a new shard fails to connect, only the new shards are closed and removed, and the error is thrown; the shards that were already running keep their sessions.
+
+```ts
+await manager.addShards([6, 7]);
 ```
-</TabItem>
-</Tabs>
+
+### `reshard(count)`
+
+Sets `shardCount` to `count`, destroys every shard and connects again. Every session is closed, so this is a full restart of the shard set, not a rolling one. With `shardIds` set, those IDs must still fit the new count.
+
+### `checkAutoScale()`
+
+Does nothing unless the manager was created with `shardCount: "auto"`. Otherwise resolves the shard count again (Discord's recommendation, or `guildsPerShard`) and calls `reshard()` when it differs from `shardCount`. Failures are passed to `onAutoScaleError` and never thrown. `autoScaleInterval` calls it on a timer; a manager keeps auto-scaling after a reshard.
 
 ### `fetchRecommendedShardCount()`
 
-Fetches the recommended shard count from Discord's `/gateway/bot` endpoint.
+Resolves the shard count `"auto"` would use: Discord's recommendation from `/gateway/bot`, or with `guildsPerShard`, `shardsForGuilds(guildCount ?? fetchGuildCount(token), guildsPerShard)`. Throws if a request fails or Discord's answer is unusable.
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
 const count = await manager.fetchRecommendedShardCount();
-console.log(`Recommended shards: ${count}`);
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const count = await manager.fetchRecommendedShardCount();
-console.log(`Recommended shards: ${count}`);
+
+### `fetchGatewayInfo()`
+
+Reads `GET /gateway/bot` and remembers the answer: the recommended shard count, and `sessionStartLimit` (`total`, `remaining`, `resetAfter`, `maxConcurrency`) when Discord sent one. The next `connect()` uses it for `maxConcurrency` and the session-budget check. Returns a [`GatewayBotInfo`](#fetchgatewaybottoken).
+
+```ts
+const info = await manager.fetchGatewayInfo();
+console.log(info.shards, info.sessionStartLimit?.remaining);
 ```
-</TabItem>
-</Tabs>
 
 ### `getShardIdForGuild(guildId)`
 
-Calculates which shard handles a given guild ID using Discord's formula:
+The shard that receives a guild's events, by Discord's formula `(guildId >> 22) % shardCount`:
 
-```
-shardId = (guildId >> 22) % totalShards
-```
-
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-const shardId = manager.getShardIdForGuild("123456789012345678");
-console.log(`Guild is on shard ${shardId}`);
+const shardId = manager.getShardIdForGuild("175928847299117063");
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const shardId = manager.getShardIdForGuild("123456789012345678");
-console.log(`Guild is on shard ${shardId}`);
-```
-</TabItem>
-</Tabs>
 
-### `broadcast(payload)`
+It keeps using the last shard count after `destroy()` and during a reshard, so a guild maps to the same shard until the new set exists. It does not check that this manager owns that shard; `manager.get(shardId)` is `undefined` when it does not.
 
-Sends a raw Gateway payload to all shards.
+### `sendVoiceState(guildId, channelId, options?)`
 
-### `info()`
+Sends a voice state update (opcode 4) on the shard that owns the guild. `options` is `{ selfMute?, selfDeaf? }`; `channelId: null` leaves the channel. Returns `false` when that shard is not owned here or is not connected.
 
-Returns an array of `ShardInfo` objects:
-
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-const info = manager.info();
-for (const shard of info) {
-  console.log(`Shard ${shard.id}: ${shard.state} — ping ${shard.ping}ms`);
-}
+manager.sendVoiceState(guildId, voiceChannelId, { selfDeaf: true });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const info = manager.info();
-for (const shard of info) {
-  console.log(`Shard ${shard.id}: ${shard.state} — ping ${shard.ping}ms`);
-}
-```
-</TabItem>
-</Tabs>
 
-`ShardInfo` shape:
+### `get(id)`
 
-<Tabs>
-<TabItem label="TypeScript">
+The `Gateway` of shard `id`, or `undefined`.
+
+### `values()`
+
+A `ShardInfo[]` snapshot of the owned shards:
+
 ```ts
 interface ShardInfo {
-  id: number;
-  state: GatewayState;
-  ping: number;
-  guilds: number; // only available if guild count tracking is enabled
+  id: number;        // shard ID
+  gateway: Gateway;  // its connection
 }
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-  id;
-  state: GatewayState;
-  ping;
-  guilds; // only available if guild count tracking is enabled
+
+### `health()`
+
+A [`ShardHealth`](#health) entry per owned shard.
+
+### `report(metrics?)`
+
+A [`WorkerReport`](#health) for a cluster parent: `health()` plus `reportedAt`, and with `metrics: true` the process's memory and CPU numbers. A cluster worker answers the parent's health requests with it.
+
+### `on(event, listener)`, `off(event, listener)`
+
+Add or remove a listener for one of the [events](#events). Both return the manager. An exception thrown by a listener is caught and dropped, so it cannot disturb a shard.
+
+## Events
+
+| Event | Arguments | When |
+|---|---|---|
+| `shardReady` | `shardId: number` | The shard received READY. |
+| `shardResume` | `shardId: number` | The shard resumed its session (RESUMED). |
+| `shardDisconnect` | `shardId: number, close: { code: number; action: string }` | The shard's socket closed. `action` is `"resume"`, `"identify"` or `"stop"`; the Gateway may reconnect by itself. See [close codes](/reference/gateway/#close-codes). |
+| `shardError` | `shardId: number, error: Error` | The shard's Gateway emitted `error`. |
+| `shardUnstable` | `shardId: number, info: { reconnects: number; delay: number }` | The shard reconnected too often too fast and is backing off (the Gateway's [`unstable`](/reference/gateway/#lifecycle-events) event). |
+| `ready` | — | Every owned shard is ready. Emitted again each time all shards are ready after one dropped (disconnected or became unstable). |
+
+```ts
+manager.on("shardDisconnect", (id, { code, action }) => {
+  console.warn(`shard ${id} closed with ${code}, next: ${action}`);
+});
+```
+
+Inside a cluster worker, `ready` also tells the parent that the cluster is ready and pushes a health report to it.
+
+## Shard count
+
+| `shardCount` | Result |
+|---|---|
+| a number | That many shards. |
+| omitted | `1`, or the cluster's count inside a worker. |
+| `"auto"` | Discord's recommendation from `GET /gateway/bot`, read by the first `connect()`. |
+| `"auto"` with `guildsPerShard` | `ceil(guilds / guildsPerShard)`, at least 1, where `guilds` is `guildCount` or `approximate_guild_count` from `GET /applications/@me`. |
+
+Discord assigns guilds to shards by their ID, so `guildsPerShard` sets the average per shard, not an exact split. Discord's hard limit is 2,500 guilds per shard and it recommends about 1,000.
+
+```ts
+const manager = new ShardManager({
+  token,
+  intents: [GatewayIntentBits.Guilds],
+  shardCount: "auto",
+  guildsPerShard: 1000,
+  autoScaleInterval: 6 * 60 * 60 * 1000, // re-check every 6 hours
+  onAutoScaleError: (error) => console.error("auto-scale failed", error),
+});
+```
+
+With `"auto"`, the Gateways do not exist until `connect()` creates and connects them in one step, so a dispatch listener added after `await connect()` can miss early events. To attach listeners first, resolve the count yourself and pass the number:
+
+```ts
+const shardCount = await new ShardManager({ token, intents, shardCount: "auto" })
+  .fetchRecommendedShardCount();
+const manager = new ShardManager({ token, intents, shardCount });
+for (const { gateway } of manager.values()) gateway.on("GUILD_CREATE", onGuild);
+await manager.connect();
+```
+
+### Helpers
+
+All exported from `@lunibee/sharding` and `lunibee`.
+
+#### `fetchGatewayBot(token)`
+
+`GET /gateway/bot`. Returns:
+
+```ts
+interface GatewayBotInfo {
+  shards: number;                // recommended shard count
+  sessionStartLimit?: {          // only when Discord sent all four fields
+    total: number;
+    remaining: number;
+    resetAfter: number;          // ms until `remaining` resets
+    maxConcurrency: number;      // at least 1
+  };
 }
 ```
-</TabItem>
-</Tabs>
 
-## Example
+Throws `Error("Gateway discovery failed with status N")` for a non-2xx answer and an error for a shard count that is not a positive integer.
 
-<Tabs>
-<TabItem label="TypeScript">
+#### `fetchGuildCount(token)`
+
+`GET /applications/@me` and returns `approximate_guild_count`. Throws for a non-2xx answer or a missing or invalid count.
+
+#### `shardsForGuilds(guilds, guildsPerShard)`
+
+`Math.max(1, Math.ceil(guilds / guildsPerShard))`. Throws `RangeError` unless `guildsPerShard` is an integer from 1 to 2500 and `guilds` a non-negative integer.
+
 ```ts
-import { ShardManager, IntentBits } from "lunibee";
-
-const manager = new ShardManager({
-  token: process.env.DISCORD_TOKEN!,
-  intents: [IntentBits.guilds, IntentBits.guildMessages],
-  shardCount: "auto",
-});
-
-await manager.connect();
-console.log(`Running ${manager.shards.size} shards.`);
-
-// Graceful shutdown
-process.on("SIGINT", () => {
-  manager.destroy();
-  process.exit(0);
-});
+shardsForGuilds(0, 1000);    // 1
+shardsForGuilds(2501, 1000); // 3
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { ShardManager, IntentBits } from "lunibee";
 
-const manager = new ShardManager({
-  token: process.env.DISCORD_TOKEN,
-  intents: [IntentBits.guilds, IntentBits.guildMessages],
-  shardCount: "auto",
-});
+#### `MAX_GUILDS_PER_SHARD`
 
-await manager.connect();
-console.log(`Running ${manager.shards.size} shards.`);
+`2500`.
 
-// Graceful shutdown
-process.on("SIGINT", () => {
-  manager.destroy();
-  process.exit(0);
-});
-```
-</TabItem>
-</Tabs>
+## IDENTIFY pacing
 
-> [!NOTE]
-> Sharding is only required for bots in **2,500+ guilds**. For smaller bots, use `Client` directly.
+Discord allows one IDENTIFY per rate-limit key every 5 seconds. The key is `shardId % max_concurrency`, so a bot with `max_concurrency` 16 can identify 16 shards at once, one per key. On top of that, `session_start_limit` caps how many IDENTIFYs a bot may send per day. Going over either gets close code `4008` or invalid sessions.
 
-## `ClusterManager`
+`ShardManager` paces in one of two ways.
 
-For very large bots (100k+ guilds), use `ClusterManager` from `@lunibee/sharding` to distribute shards across multiple processes:
+### Local pacing (the default outside a coordinated cluster)
 
-<Tabs>
-<TabItem label="TypeScript">
+1. The concurrency is `maxConcurrency`, else Discord's `max_concurrency` if `/gateway/bot` was read, else 1. An override is capped at Discord's value when that is known.
+2. Shards to start are put in buckets by `id % concurrency`. Round *n* starts the *n*-th shard of every bucket together, so a round never puts two shards on one key.
+3. Before the next round, the manager waits for every shard of this round to send IDENTIFY or RESUME (up to `handshakeTimeout`), then waits `spawnDelay`. The interval is measured from the handshake, not from the socket opening, so a slow HELLO cannot squeeze two IDENTIFYs on one key together.
+4. If the remembered session budget has fewer IDENTIFYs left than shards to start, `connect()` throws `Session start limit exhausted: …` before starting any.
+
+With concurrency 1 and the defaults, *N* shards take about `(N − 1) × (handshake + 5 s)` to start. `spawnDelay: 0` removes the wait between rounds; use it only when something else paces the handshakes.
+
+The budget check uses the answer remembered from the last `/gateway/bot` read; it is not counted down as shards start. Call `fetchGatewayInfo()` before `connect()` to check against a fresh value. Without a read (a fixed `shardCount` and no `fetchGatewayInfo()`), there is no budget check.
+
+### An IDENTIFY gate
+
+With an `identify` gate, every shard to start calls `gate.acquire(shardId)` in parallel, connects once it resolves, waits for its IDENTIFY or RESUME to be sent (up to `handshakeTimeout`), then calls `gate.release(shardId)`. The gate decides the spacing; `spawnDelay`, `maxConcurrency` and the local budget check are not used.
+
 ```ts
-import { ClusterManager } from "@lunibee/sharding";
-
-const cluster = new ClusterManager({
-  token: process.env.DISCORD_TOKEN!,
-  script: "./dist/bot.js",  // worker script path
-  shardCount: "auto",
-  clusterCount: 4,          // number of child processes
-});
-
-await cluster.spawn();
+interface IdentifyGate {
+  acquire(shardId: number): Promise<void>; // resolves when the shard may IDENTIFY now
+  release(shardId: number): void;          // the shard has sent its IDENTIFY
+}
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { ClusterManager } from "@lunibee/sharding";
 
-const cluster = new ClusterManager({
-  token: process.env.DISCORD_TOKEN,
-  script: "./dist/bot.js",  // worker script path
-  shardCount: "auto",
-  clusterCount: 4,          // number of child processes
-});
+Inside a coordinated cluster the gate is the parent `ClusterManager` (see below). Outside one you can pass your own, for example backed by a lock shared between processes, or by an `IdentifyCoordinator`.
 
-await cluster.spawn();
+### `IdentifyCoordinator`
+
+The scheduler `ClusterManager` runs in the parent to hand out IDENTIFY slots to every cluster. It can be used on its own.
+
+```ts
+new IdentifyCoordinator(options?: IdentifyCoordinatorOptions)
 ```
-</TabItem>
-</Tabs>
-
-> [!IMPORTANT]
-> `ClusterManager` uses Node's `child_process.fork()`, which Bun does not fully
-> support. Run the cluster manager under Node.js; `spawn()` throws on a runtime
-> whose `fork()` is unavailable. Individual clusters can still run under Bun.
-
-### Options
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `token` | `string` | Required | Discord bot token. |
-| `script` | `string` | Required | Worker script each cluster runs. |
-| `shardCount` | `number \| "auto"` | `"auto"` | Total shards across all clusters. |
-| `clusterCount` | `number` | CPU count | Number of child processes. |
-| `autoScaleInterval` | `number` | — | Milliseconds between shard-count checks. |
-| `onAutoScaleError` | `(error: Error) => void` | — | Called when an auto-scale check fails. |
-| `shutdownTimeout` | `number` | `5000` | Grace period after `SIGTERM` before `SIGKILL`. |
-| `restartOnExit` | `boolean` | `true` | Re-fork a cluster that exits unexpectedly. |
-| `restartDelay` | `number` | `5000` | Delay before re-forking a crashed cluster. |
-| `onClusterExit` | `(cluster, code, signal) => void` | — | Called whenever a cluster exits, before any restart. |
-
-### Crash supervision
-
-A cluster that dies — an uncaught rejection, an OOM kill — takes its shards offline
-permanently unless something re-forks it. `ClusterManager` supervises every child:
-an unexpected exit calls `onClusterExit` and then re-forks the **same shard
-assignment** after `restartDelay`. Exits caused by `shutdownAll()` or `killAll()`
-are never restarted.
-
-<Tabs>
-<TabItem label="TypeScript">
-```ts
-const cluster = new ClusterManager({
-  token: process.env.DISCORD_TOKEN!,
-  script: "./dist/bot.js",
-  onClusterExit: (info, code, signal) => {
-    console.warn(`Cluster ${info.id} exited`, { code, signal, shards: info.shards });
-  },
-});
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const cluster = new ClusterManager({
-  token: process.env.DISCORD_TOKEN,
-  script: "./dist/bot.js",
-  onClusterExit: (info, code, signal) => {
-    console.warn(`Cluster ${info.id} exited`, { code, signal, shards: info.shards });
-  },
-});
-```
-</TabItem>
-</Tabs>
-
-> [!NOTE]
-> Restarts are not yet backed off: a cluster that crashes on startup is re-forked
-> every `restartDelay`. Set `restartOnExit: false` and supervise externally if your
-> process manager already handles restarts.
-
-### Shutting down
+| `maxConcurrency` | `number` | `1` | Discord's `max_concurrency`. Shards with the same `id % maxConcurrency` share a key. A positive integer. |
+| `interval` | `number` | `5000` (`IDENTIFY_INTERVAL`) | Milliseconds between two IDENTIFYs on one key, counted from the release. Not negative. |
+| `budget` | `IdentifyBudget` | — | The session budget. Without it the coordinator paces but never blocks on a budget. |
+| `holdTimeout` | `number` | `60000` | A granted slot that is not released within this many ms is released for its holder. Above 0. |
+| `onBudgetWait` | `(info: { shardId: number; waitMs: number }) => void` | — | Called when the next request on a key has to wait for the budget to reset. Can be called more than once for the same wait. |
+| `now`, `schedule`, `cancel` | functions | `Date.now`, `setTimeout` (unref'd), `clearTimeout` | Clock and timer, for tests. |
 
 ```ts
-await cluster.shutdownAll();  // SIGTERM, then SIGKILL after shutdownTimeout
-cluster.killAll();            // immediate, no grace period
+interface IdentifyBudget {
+  total: number;      // session_start_limit.total
+  remaining: number;  // session_start_limit.remaining
+  resetAfter: number; // ms until `remaining` resets, counted from construction
+  period?: number;    // ms between later resets; default 24 h
+}
 ```
 
-## Startup Pacing, Budget and Health (0.2.0)
+The constructor throws `RangeError` for a `maxConcurrency` that is not a positive integer, a negative `interval`, a `holdTimeout` of 0 or less, or a `budget.period` of 0 or less.
 
-| Option / member | Description |
+| Member | Description |
 |---|---|
-| `maxConcurrency` | Shards per startup round. Defaults to Discord's `max_concurrency` (auto shard count) or 1, and is capped at Discord's value when known. |
-| `handshakeTimeout` | How long a round waits for its shards to send IDENTIFY/RESUME before `spawnDelay` starts (default 15000 ms). |
-| `fetchGatewayInfo()` | Reads `/gateway/bot`: recommended shards and `sessionStartLimit`. |
-| `health()` | `[{ id, state, ping }]` per shard. |
+| `acquire(owner, shardId)` | Waits for the shard's turn on key `shardId % maxConcurrency`. Resolves when it may IDENTIFY now. Rejects if `owner` is dropped or the coordinator closes first. `owner` is any number identifying the requester (a cluster ID in `ClusterManager`). |
+| `release(owner, shardId)` | The shard has sent its IDENTIFY: its key rests for `interval`. Ignored unless that owner and shard hold the slot. |
+| `drop(owner, reason?)` | Rejects the owner's waiting requests and frees the slots it holds. |
+| `close()` | Rejects every waiter, stops the timer and refuses new requests. |
+| `pump()` | Grants every slot that is due and arms one timer for the next. Called internally; tests call it after moving the clock. |
+| `maxConcurrency` | The concurrency in use. |
+| `remaining` | IDENTIFYs left in the budget, or `undefined` without one. |
+| `waiting` | Requests waiting for a slot. |
+| `holding` | Slots granted and not released yet. |
 
-`connect()` spaces rounds from the moment IDENTIFY is sent, not from socket
-open. Only shards without a live socket count against the session start
-limit; if the budget is too small, `connect()` throws and leaves running shards
-alone.
+Each grant takes one from `remaining`. At `0`, requests wait until the reset time, when `remaining` is set back to `total` and the next reset is one `period` later, so a later exhaustion also waits instead of failing.
 
-## In a cluster (0.3.1)
+Using one as the gate of a single-process `ShardManager`, so an exhausted budget waits for the reset instead of throwing:
 
-Inside a worker forked by [`ClusterManager`](/reference/cluster-manager/), a `ShardManager` owns only the cluster's shards (`shardIds`), takes every IDENTIFY slot from the parent, tells the parent when all its shards are ready and answers its health requests. `shardCount` is the deployment total. New members: `shardIds`, `addShards(ids)` (takes over shards of a failed cluster; on failure only the new shards are torn down), `report(metrics?)`, and the `ready` event (every owned shard is ready; emitted again after a drop). `health()` entries carry a lifecycle `status` (`idle`, `connecting`, `ready`, `disconnected`, `unstable`, `destroyed`), `readyAt` and `disconnectedAt` next to `state` and `ping`.
+```ts
+import { IdentifyCoordinator, ShardManager, fetchGatewayBot } from "lunibee";
+
+const info = await fetchGatewayBot(token);
+const limit = info.sessionStartLimit;
+const coordinator = new IdentifyCoordinator({
+  maxConcurrency: limit?.maxConcurrency ?? 1,
+  ...(limit && {
+    budget: { total: limit.total, remaining: limit.remaining, resetAfter: limit.resetAfter },
+  }),
+  onBudgetWait: ({ shardId, waitMs }) =>
+    console.warn(`shard ${shardId} waits ${Math.ceil(waitMs / 1000)}s for the session budget`),
+});
+
+const manager = new ShardManager({
+  token,
+  intents,
+  shardCount: info.shards,
+  identify: {
+    acquire: (shardId) => coordinator.acquire(0, shardId),
+    release: (shardId) => coordinator.release(0, shardId),
+  },
+});
+await manager.connect();
+```
+
+`IDENTIFY_INTERVAL` (`5000`) is exported as a constant as well as `ShardManager.IDENTIFY_INTERVAL`.
+
+## Inside a cluster worker
+
+A process forked by `ClusterManager` gets the worker contract in its environment. `ShardManager` reads it with `readClusterContext()` unless `cluster: false` is passed, and then:
+
+- runs only the cluster's shards (`SHARD_LIST`), with `shardCount` set to the deployment total (`SHARD_COUNT`);
+- uses this process's `ClusterWorker` (`ClusterWorker.current()`) to answer the parent's health requests with `report()` and its shard-assignment requests with `addShards()`;
+- when the parent coordinates IDENTIFY (`LUNIBEE_IDENTIFY=coordinated`, the default), takes every IDENTIFY slot from the parent through `ClusterWorker.identifyGate`, so the limits hold across all clusters;
+- on `ready`, tells the parent the cluster is ready (`ClusterWorker.ready()`) and pushes a health report.
+
+The worker script needs no sharding options:
+
+```ts
+import { ShardManager, ShardBus, GatewayIntentBits } from "lunibee";
+
+const manager = new ShardManager({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [GatewayIntentBits.Guilds],
+});
+
+for (const id of manager.shardIds)
+  new ShardBus(id, "my-bot").respond("guildCount", () => countGuilds(id));
+
+await manager.connect();
+```
+
+`shardCount: "auto"` and `autoScaleInterval` are refused in a worker: the parent decides the shard count. `shardIds` may narrow the cluster's list but not go outside it.
+
+Overrides:
+
+| Option | Effect |
+|---|---|
+| `cluster: false` | Ignore the environment: behave like a standalone manager. No worker and no gate are attached unless passed. |
+| `cluster: context` | Use this `ClusterContext` instead of the environment. `ClusterWorker.current()` is not attached automatically; pass `worker` (and the gate follows `context.coordinatedIdentify`). |
+| `worker: false` | Do not answer the parent or report readiness. Without a worker there is also no coordinated gate. |
+| `identify: false` | Pace locally with `spawnDelay` instead of asking the parent. |
+
+### `ClusterContext`, `readClusterContext()`, `isClusterWorker()`
+
+```ts
+interface ClusterContext {
+  clusterId: number;            // CLUSTER_ID
+  clusterCount: number;         // CLUSTER_COUNT
+  shardCount: number;           // SHARD_COUNT, the deployment total
+  shardIds: number[];           // SHARD_LIST, comma separated
+  coordinatedIdentify: boolean; // LUNIBEE_IDENTIFY === "coordinated"
+}
+```
+
+- `isClusterWorker(env = process.env)` is `true` when `LUNIBEE_CLUSTER_WORKER` is `"1"`.
+- `readClusterContext(env = process.env)` returns `null` outside a worker, and throws `RangeError` when the variables are present but malformed (not non-negative integers, or shard IDs outside `SHARD_COUNT` or repeated).
+
+`ClusterWorker`, `allocateShards()`, `validateShardIds()` and the parent side are documented in [ClusterManager](/reference/cluster-manager/).
+
+## Health
+
+`health()` returns one `ShardHealth` per owned shard:
+
+```ts
+interface ShardHealth {
+  id: number;
+  state: GatewayState;     // the Gateway's connection state
+  ping: number;            // last heartbeat round trip in ms, -1 before the first ACK
+  status: ShardStatus;     // lifecycle, see below
+  readyAt?: number;        // epoch ms the shard last became ready
+  disconnectedAt?: number; // epoch ms its socket last closed
+}
+```
+
+| `ShardStatus` | Meaning |
+|---|---|
+| `"idle"` | Created, never started. |
+| `"connecting"` | Started by `connect()`/`addShards()`, or waiting for its IDENTIFY slot. |
+| `"ready"` | READY or RESUMED received; events are flowing. |
+| `"disconnected"` | The socket closed; the Gateway may be reconnecting by itself. |
+| `"unstable"` | The Gateway reported repeated reconnects and is backing off. |
+| `"destroyed"` | Set by `destroy()`. Because `destroy()` also removes the shards, `health()` returns an empty list afterwards rather than `"destroyed"` entries. |
+
+`state` is the socket-level [`GatewayState`](/reference/gateway/#states); `status` is the shard's lifecycle as the manager sees it.
+
+```ts
+for (const shard of manager.health())
+  console.log(shard.id, shard.status, shard.state, `${shard.ping}ms`);
+```
+
+`report(metrics?)` wraps it for a cluster parent:
+
+```ts
+interface WorkerReport {
+  shards: ShardHealth[];
+  metrics?: WorkerMetrics; // only with report(true)
+  reportedAt: number;      // epoch ms
+}
+
+interface WorkerMetrics {
+  rssBytes: number;        // process.memoryUsage().rss
+  heapUsedBytes: number;   // process.memoryUsage().heapUsed
+  cpuUserMicros: number;   // process.cpuUsage().user
+  cpuSystemMicros: number; // process.cpuUsage().system
+}
+```
+
+The parent asks for metrics with `ClusterManager.refreshHealth({ metrics: true })`.
+
+## `ShardSupervisor`
+
+The restart policy `ClusterManager` uses for crashed clusters. It only does arithmetic on timestamps; it does not fork, kill or emit anything. `ClusterManager` builds one from its `restartDelay` and `supervisor` options and reports the outcome as its `clusterRestart`, `clusterUnstable` and `clusterGiveUp` events (see [ClusterManager](/reference/cluster-manager/)).
+
+```ts
+new ShardSupervisor(options?: SupervisorOptions, random?: () => number)
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `restartDelay` | `number` | `5000` | Delay before the first restart, in ms. Not negative. |
+| `backoff` | `number` | `1` | Each further crash inside `window` multiplies the delay by this. At least 1; `1` is a fixed delay. |
+| `maxDelay` | `number` | `300000` (5 min) | Cap on the delay before jitter. Not negative. |
+| `jitter` | `number` | `0` | Random spread added to each delay, as a fraction of it, from 0 to 1. |
+| `maxRestarts` | `number` | `Infinity` | Give up after this many restarts inside `window`. Not negative. |
+| `window` | `number` | `60000` | The span over which restarts are counted, in ms; older crashes are forgotten. Above 0. |
+
+Invalid values throw `RangeError`. `random` defaults to `Math.random`; inject it for tests.
+
+| Method | Description |
+|---|---|
+| `next(id, now = Date.now())` | Records a crash of cluster `id`. Returns the delay before restarting it, or `null` to give up because it already restarted `maxRestarts` times inside `window`. Giving up clears its history. |
+| `reset(id?)` | Forgets one cluster's crashes, or every cluster's. |
+
+The delay for the *n*-th crash inside the window is `round(min(maxDelay, restartDelay × backoff^(n−1)) × (1 + jitter × random()))`. Jitter is added after the cap, so a delay can reach `maxDelay × (1 + jitter)`.
+
+```ts
+const supervisor = new ShardSupervisor(
+  { restartDelay: 100, backoff: 2, maxDelay: 350, jitter: 0.5 },
+  () => 1,
+);
+[0, 1, 2, 3].map((t) => supervisor.next(7, t)); // [150, 300, 525, 525]
+```
+
+## Shutdown
+
+`destroy()` closes every Gateway and clears the auto-scale timer; nothing else keeps the process alive. Inside a cluster worker, the parent stops the process with `SIGTERM` (then `SIGKILL` after its `shutdownTimeout`), so close the shards on `SIGTERM`:
+
+```ts
+process.on("SIGTERM", () => {
+  manager.destroy();
+  process.exit(0);
+});
+```
+
+A `ClusterWorker` exits the process by itself when the parent's IPC channel closes, so an orphaned worker does not keep its sessions running beside a replacement.

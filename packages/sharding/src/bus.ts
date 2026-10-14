@@ -216,7 +216,9 @@ export class ShardBus {
     }
     /**
      * Sends a request to every other shard and collects replies until
-     * `expected` have arrived or `timeoutMs` elapses (never rejects).
+     * `expected` have arrived or `timeoutMs` elapses. A timeout or a shard
+     * going away does not reject; a closed bus, a blank type or too many
+     * pending requests does.
      */
     public broadcastRequest<R = unknown, T = unknown>(
         type: string,

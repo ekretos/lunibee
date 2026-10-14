@@ -279,3 +279,10 @@ GitHub repository settings (branch protection, secret scanning) remain unverifie
 | D-04 | P3 | `joinVoiceChannel()` with an empty `channelId` registers the new connection before `setChannel` throws, leaving a `disconnected` entry in the registry. | Open |
 | D-05 | P3 | `VoiceConnection.setSpeaking()` always sends `ssrc: 0`. | Open — documented; send your own op 5 for the real SSRC |
 | D-06 | P3 | `killAll()` JSDoc said "force-kills"; it sends SIGTERM without escalation. | Fixed (comment corrected) |
+| D-07 | P2 | Over IPC, a `ShardBus` message to a shard in the same worker is never delivered: the parent does not relay back to the sending cluster and `IpcTransport` does not deliver locally; a broadcast skips the sender's own cluster. | Open — documented as a limitation on the ShardBus page |
+| D-08 | P3 | `ShardBus.respond()` handlers cannot be removed with `off()` (the wrapper is not returned); they stay until `close()`. | Open |
+| D-09 | P3 | `ShardManager` with `shardCount: "auto"` creates its Gateways inside `connect()`, so dispatch listeners attached afterwards can miss the first events. | Open — workaround documented |
+| D-10 | P3 | The local session-budget check reads the remembered `/gateway/bot` answer and does not count down as shards start. | Open |
+| D-11 | P3 | `ShardSupervisor` jitter is applied after the `maxDelay` cap, so a delay can reach `maxDelay × (1 + jitter)`. | Open — documented |
+| D-12 | P3 | `autoScaleInterval` with a fixed `shardCount` runs a timer that never does anything. | Open |
+| D-13 | P3 | Source comments: `health.ts` named `health({ metrics })` (it is `refreshHealth`), and `broadcastRequest()` claimed it never rejects. | Fixed (comments corrected) |

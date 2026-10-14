@@ -1,0 +1,394 @@
+---
+title: ShardBus
+description: Messages between shards — send, broadcast, request/respond, envelope validation, transports (BroadcastChannel, IPC, custom), routing through ClusterManager, limits and error handling.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`ShardBus` (from `@lunibee/sharding`) passes messages between shards. Each shard (or each process standing in for one) creates a bus with its shard ID and a channel name shared by the whole bot, then:
+
+- sends a message to one shard, or broadcasts to every other shard;
+- asks one shard a question and waits for its answer (`request` / `respond`);
+- asks every shard and collects the answers (`broadcastRequest`).
+
+It never evaluates code it receives: a request names a handler type, and only handlers you registered with `respond()` answer. It is the replacement for Discord.js's `broadcastEval`.
+
+The transport is chosen for you: a `BroadcastChannel` inside one process, IPC inside a worker forked by [`ClusterManager`](/reference/cluster-manager/), relayed by the parent to the other clusters. See [Sharding](/core-concepts/sharding/) for the overall picture and [ShardManager](/reference/shard-manager/) for running the shards.
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ShardBus, BroadcastChannelTransport, IpcTransport } from "@lunibee/sharding";
+// also re-exported:
+import { ShardBus } from "lunibee";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ShardBus, BroadcastChannelTransport, IpcTransport } from "@lunibee/sharding";
+// also re-exported:
+import { ShardBus } from "lunibee";
+```
+</TabItem>
+</Tabs>
+
+The types `ShardMessage`, `ShardReply`, `ShardMessageHandler`, `ShardBusErrorHandler`, `ShardBusOptions`, `ShardBusTransport` and `IpcEndpoint` are exported from both packages too.
+
+The examples below are TypeScript; the JavaScript is the same without type annotations.
+
+## Quick start
+
+```ts
+import { ShardBus } from "lunibee";
+
+const bus = new ShardBus(shardId, "my-bot");
+
+// Fire and forget.
+bus.on<{ section: string }>("reload", (message) => reloadConfig(message.data.section));
+bus.broadcast("reload", { section: "commands" });
+
+// Request and reply.
+bus.respond("guildCount", () => guildCache.size);
+const onShard1 = await bus.request<number>(1, "guildCount", null);
+const others = await bus.broadcastRequest<number>("guildCount", null, {
+  expected: totalShards - 1,
+});
+const total = guildCache.size + others.reduce((sum, reply) => sum + (reply.result ?? 0), 0);
+
+// Handler failures.
+bus.onError((error, message) => console.error(`handler for ${message.type} failed`, error));
+
+// When the shard stops.
+bus.close();
+```
+
+## Constructor
+
+```ts
+new ShardBus(shardId: number, channelName: string, options?: ShardBusOptions)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `shardId` | `number` | The shard this bus speaks for. Messages addressed to it are delivered here; its own messages are never delivered back to it. A non-negative integer. |
+| `channelName` | `string` | A name shared by every bus of the bot, such as the bot's name. Trimmed. Buses with different names do not hear each other on a `BroadcastChannel`. |
+| `options.transport` | `ShardBusTransport` | How messages travel. Default: `IpcTransport` inside a worker forked by `ClusterManager`, else `BroadcastChannelTransport(channelName)`. See [Transports](#transports). |
+| `options.maxPending` | `number` | Most requests (`request` and `broadcastRequest` together) waiting for replies at once. Default `10000`. Further ones reject at once. |
+
+The constructor throws `RangeError` if `shardId` is not a non-negative integer and `TypeError` if `channelName` is empty or blank.
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `channelName` | `string` | The trimmed channel name. Message IDs are `channelName:shardId:counter`. |
+
+## Methods
+
+### `send(target, type, data)`
+
+Sends `data` to shard `target` under `type`. Returns the message ID. Nothing confirms delivery; a message to a shard that does not exist or has no handler for `type` is dropped.
+
+```ts
+bus.send(3, "invalidate", { guildId });
+```
+
+Throws `RangeError` if `target` is not a non-negative integer, `TypeError` if `type` is blank, and `Error("ShardBus is closed.")` after `close()`.
+
+### `broadcast(type, data)`
+
+Sends `data` to every other shard. Returns the message ID. Same errors as `send` (without the target check).
+
+```ts
+bus.broadcast("reload", { section: "commands" });
+```
+
+### `on(type, handler)`, `off(type, handler)`
+
+Add or remove a handler for messages of `type`. A handler receives the whole [`ShardMessage`](#shardmessage). Several handlers per type are allowed; each runs once per message. Both return the bus. `on` throws `TypeError` for a blank type or a handler that is not a function.
+
+```ts
+const onReload = (message: ShardMessage<{ section: string }>) => reloadConfig(message.data.section);
+bus.on("reload", onReload);
+bus.off("reload", onReload);
+```
+
+A handler may be async. If it throws or its promise rejects, the error goes to the [error listeners](#error-handling); later handlers and messages are not affected.
+
+### `respond(type, handler)`
+
+Registers a handler that answers requests of `type`. It receives the payload and the message, and its return value (awaited) is sent back to the requesting shard; a thrown error is sent back as its message. Returns the bus.
+
+```ts
+bus.respond<{ guildId: string }, boolean>("hasGuild", ({ guildId }) => guildCache.has(guildId));
+```
+
+It only answers messages sent with `request()` or `broadcastRequest()` (or by `ClusterManager.request()` / `broadcast()`); a plain `send()` or `broadcast()` of the same type does not trigger a reply. A `respond` handler cannot be removed with `off()`; it stays until `close()`.
+
+### `request(target, type, data, timeoutMs?)`
+
+Sends a request to one shard and resolves with its handler's result.
+
+```ts
+const count = await bus.request<number>(1, "guildCount", null, 2000);
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `target` | — | The shard to ask. A non-negative integer. |
+| `type` | — | The handler type registered with `respond()` on that shard. |
+| `data` | — | The payload. |
+| `timeoutMs` | `5000` | How long to wait for the reply. |
+
+It rejects with:
+
+| Error | When |
+|---|---|
+| `RangeError` | `target` is not a non-negative integer. |
+| `Error(<handler's message>)` | The handler on that shard threw. |
+| `Error('Shard N did not reply to "type" within Tms.')` | No reply in time: no such shard, no handler, a slow handler, or a dropped message. |
+| `Error("Shard N went away before it replied.")` | The transport reported that shard gone (its cluster died, or the parent could not reach it). |
+| `Error("Too many shard requests waiting for a reply (maxPending).")` | `maxPending` requests are already waiting. |
+| `Error("ShardBus is closed.")` | The bus was closed before or while waiting. |
+
+### `broadcastRequest(type, data, options?)`
+
+Sends a request to every other shard and collects the replies. It resolves when `expected` replies have arrived or `timeoutMs` has passed, with whatever arrived. A shard that is down, slow or has no handler is simply missing from the list.
+
+| Option | Default | Description |
+|---|---|---|
+| `timeoutMs` | `5000` | How long to collect. |
+| `expected` | `Infinity` | Resolve as soon as this many replies arrived. Without it the call always waits the full `timeoutMs`. |
+
+```ts
+const replies = await bus.broadcastRequest<number>("guildCount", null, {
+  timeoutMs: 3000,
+  expected: totalShards - 1, // every shard but this one
+});
+for (const reply of replies) {
+  if (reply.error !== undefined) console.warn(`shard ${reply.shardId}: ${reply.error}`);
+}
+```
+
+It does not reject for a timeout or a shard going away, and `close()` resolves it with the replies collected so far. It rejects only when the bus is already closed, when `maxPending` requests are waiting, or for a blank `type`.
+
+The requesting shard is not asked, so add its own answer yourself if you need a total.
+
+### `onError(handler)`, `offError(handler)`
+
+Add or remove a listener for errors thrown or rejected by `on` handlers. Return the bus. `onError` throws `TypeError` if `handler` is not a function. See [Error handling](#error-handling).
+
+### `close()`
+
+Closes the bus: pending `request()`s reject with `"ShardBus is closed."`, pending `broadcastRequest()`s resolve with what they have, the transport is closed, and every handler and error listener is removed. Calling it again does nothing. After it, `send` and `broadcast` throw and `request` and `broadcastRequest` reject.
+
+## Message shapes
+
+### `ShardMessage`
+
+What handlers receive, and what transports carry.
+
+```ts
+interface ShardMessage<T = unknown> {
+  source: number;         // sending shard ID (-1 for the ClusterManager parent)
+  target: number | null;  // target shard ID, or null for a broadcast
+  type: string;           // the message type
+  data: T;                // the payload
+  id: string;             // unique message ID, "channelName:shardId:counter"
+  expectsReply?: boolean; // set on requests
+}
+```
+
+### `ShardReply`
+
+One entry of a `broadcastRequest()` result.
+
+```ts
+interface ShardReply<R = unknown> {
+  shardId: number; // the shard that answered
+  result?: R;      // the handler's result, when it succeeded
+  error?: string;  // the handler's error message, when it threw
+}
+```
+
+### Handler types
+
+```ts
+type ShardMessageHandler<T = unknown> = (message: ShardMessage<T>) => unknown;
+type ShardBusErrorHandler = (error: unknown, message: ShardMessage) => void;
+```
+
+### Payloads
+
+`data` must survive the transport. A `BroadcastChannel` uses the structured clone algorithm (plain objects, arrays, `Map`, `Date`, typed arrays; no functions or class instances with methods). IPC between forked clusters sends JSON, so across clusters `data` should be JSON-safe: a `Map` arrives as `{}`, a `Date` as a string, `undefined` fields disappear, and a `bigint` cannot be sent. Send plain data such as IDs and counts, not structures like `Guild` or `Collection`.
+
+Replies use the reserved type `"__lunibee:reply"`; do not use it for your own messages.
+
+## Envelope validation
+
+Every message arriving from a transport is untrusted input. A bus drops, without calling any handler, a message that is not an object or whose:
+
+- `type` is not a string of 1 to 256 characters;
+- `id` is not a string of at most 256 characters;
+- `source` is not an integer of at least `-1`;
+- `target` is neither `null` nor an integer of at least `-1`.
+
+It also ignores its own messages (`source` equal to its shard ID) and messages addressed to another shard. A reply is dropped unless its payload is an object with a string `requestId`.
+
+## Replies and request safety
+
+- **Only the asked shard can answer a `request()`.** A reply counts only if its `source` is the shard the request was sent to; nobody can settle a request by guessing its ID.
+- **A shard counts once in a `broadcastRequest()`,** however many replies it sends.
+- **Late, unknown and duplicate replies are dropped.** Once a request has settled or timed out, its ID is forgotten.
+- **Requests are bounded** by `maxPending`, and each one is released when it settles.
+- **A dead shard fails fast.** When the transport reports shards gone (`onPeerDown`), only `request()`s addressed to them reject, once each, instead of waiting for their timeout.
+- **Handlers never see code to run.** Only types registered with `respond()` answer.
+
+The `source` of a message is whatever the sending process wrote. The bus checks that replies come from the asked shard ID, but it cannot prove which process sent a message, so it is a channel between parts of your own bot, not a boundary against processes you do not trust.
+
+## Error handling
+
+Errors thrown synchronously by an `on` handler, and rejections of an async one, are caught per handler and passed to every `onError` listener with the message being handled. A listener that throws is ignored. With no listener, the error is raised as a process warning with code `LUNIBEE_SHARD_BUS_ERROR` (visible with `process.on("warning")`), never dropped silently.
+
+```ts
+bus.onError((error, message) => {
+  logger.error({ type: message.type, from: message.source, error }, "shard bus handler failed");
+});
+```
+
+Errors thrown by a `respond` handler are not reported here: they are sent back to the requester, where `request()` rejects with the message and `broadcastRequest()` lists it as `error`.
+
+## Transports
+
+A transport carries `ShardMessage`s between buses:
+
+```ts
+interface ShardBusTransport {
+  post(message: ShardMessage): void;                                     // send to the other buses
+  onMessage(listener: (message: ShardMessage) => void): void;           // receive from them
+  onPeerDown?(listener: (shardIds: readonly number[]) => void): void;   // optional: shards that died
+  close(): void;                                                         // stop and release
+}
+```
+
+`post` does not need to deliver a message back to the bus that sent it. `onPeerDown` is optional; without it a request to a dead shard waits for its timeout.
+
+### Default selection
+
+`new ShardBus(id, name)` without `transport` uses:
+
+- `IpcTransport` when `LUNIBEE_SHARD_BUS` is `"ipc"` and the process has an IPC channel (`process.send`). `ClusterManager` sets this variable in every worker it forks.
+- `BroadcastChannelTransport(channelName)` otherwise.
+
+### `BroadcastChannelTransport`
+
+```ts
+new BroadcastChannelTransport(name: string)
+```
+
+A named `BroadcastChannel`. Buses in the same process, or in worker threads of it, with the same `channelName` hear each other. It does not cross `fork()`ed processes and does not report peers going away.
+
+### `IpcTransport`
+
+```ts
+new IpcTransport(endpoint?: IpcEndpoint)
+```
+
+Sends each message to the parent process over IPC, wrapped in a `{ __lunibeeBus: message }` frame so it cannot be confused with the bot's own `process.send()` traffic, and receives the frames the parent relays. It also handles the parent's notice that a cluster's shards are gone (`onPeerDown`). Other IPC messages are ignored.
+
+`endpoint` defaults to `process`. It throws `Error` if the endpoint has no `send` function (the process was not forked with an IPC channel). `close()` removes its `message` listener.
+
+```ts
+interface IpcEndpoint {
+  send?(message: unknown): unknown;
+  on(event: "message", listener: (message: unknown) => void): unknown;
+  off(event: "message", listener: (message: unknown) => void): unknown;
+}
+```
+
+### A custom transport
+
+Implement `ShardBusTransport` to carry messages over something else, such as Redis pub/sub or NATS between machines, or an in-memory hub in tests:
+
+```ts
+import { ShardBus, type ShardBusTransport, type ShardMessage } from "lunibee";
+
+class RedisTransport implements ShardBusTransport {
+  #listener?: (message: ShardMessage) => void;
+
+  constructor(private readonly pub: RedisClient, private readonly sub: RedisClient, private readonly channel: string) {
+    sub.subscribe(channel, (raw) => this.#listener?.(JSON.parse(raw)));
+  }
+  post(message: ShardMessage): void {
+    void this.pub.publish(this.channel, JSON.stringify(message));
+  }
+  onMessage(listener: (message: ShardMessage) => void): void {
+    this.#listener = listener;
+  }
+  close(): void {
+    void this.sub.unsubscribe(this.channel);
+  }
+}
+
+const bus = new ShardBus(shardId, "my-bot", { transport: new RedisTransport(pub, sub, "my-bot:bus") });
+```
+
+(`RedisClient` stands for whichever client you use.) A bus validates every incoming envelope and ignores its own messages, so a transport may deliver everything to everyone. Parse incoming data defensively; a transport that throws in `post` makes `send` and `broadcast` throw and `request` and `broadcastRequest` reject.
+
+## Across clusters
+
+Inside workers forked by `ClusterManager`, every bus uses `IpcTransport` and the parent routes the frames:
+
+- A message to a shard goes only to the cluster that owns that shard.
+- A broadcast goes to every other cluster.
+- If the owning cluster is down or cannot be reached, the parent tells the sender that the shard is gone, so a `request()` to it rejects at once (`"went away before it replied"`).
+- When a cluster exits, the parent tells every other cluster that its shards are gone, so pending `request()`s to them reject.
+- A message to a shard that is not part of the deployment is dropped (a request to it times out).
+- The parent relays only the documented envelope fields (`source`, `target`, `type`, `data`, `id`, `expectsReply`), and drops an envelope whose `type` or `id` is not a string of the allowed length or whose `source` or `target` is not an integer (or a `null` target).
+- A message whose `data` is larger than `maxMessageBytes` (8 MiB by default, measured as JSON text) is not relayed; the parent emits `error`, and a request waiting for it times out.
+
+The parent only relays to **other** clusters. Two buses in the same worker process do not reach each other over IPC: a `send()` to a shard of the same cluster, and the part of a `broadcast()` meant for it, are not delivered. Within one process, call your code directly, or give those buses a second, `BroadcastChannelTransport` bus.
+
+`ClusterManager` can also ask shards itself: `request(shardId, type, data)` and `broadcast(type, data)` in the parent reach the same `respond()` handlers, with `source` set to `-1`. Its `broadcast()` expects one answer per shard of the deployment, so register the handler on a bus for every shard the worker owns:
+
+```ts
+// In the worker script
+const manager = new ShardManager({ token: process.env.DISCORD_TOKEN!, intents });
+for (const id of manager.shardIds)
+  new ShardBus(id, "my-bot").respond("guildCount", () => countGuildsOn(id));
+await manager.connect();
+
+// In the parent
+const { replies, missing } = await clusters.broadcast<number>("guildCount", null);
+```
+
+Its answers are accepted only from the cluster that owns the shard. See [ClusterManager](/reference/cluster-manager/) for `request()`, `broadcast()`, `requestCluster()`, `requestTimeout`, `maxPendingRequests` and `maxMessageBytes`.
+
+## Testing
+
+Pass an in-memory transport to run several buses in one test without channels or processes:
+
+```ts
+class Hub {
+  readonly members = new Set<MemberTransport>();
+  deliver(from: MemberTransport, message: ShardMessage) {
+    for (const member of this.members)
+      if (member !== from) queueMicrotask(() => member.listener?.(message));
+  }
+}
+class MemberTransport implements ShardBusTransport {
+  listener?: (message: ShardMessage) => void;
+  constructor(private readonly hub: Hub) { hub.members.add(this); }
+  post(message: ShardMessage) { this.hub.deliver(this, message); }
+  onMessage(listener: (message: ShardMessage) => void) { this.listener = listener; }
+  close() { this.hub.members.delete(this); }
+}
+
+const hub = new Hub();
+const a = new ShardBus(0, "test", { transport: new MemberTransport(hub) });
+const b = new ShardBus(1, "test", { transport: new MemberTransport(hub) });
+b.respond("ping", () => "pong");
+expect(await a.request(1, "ping", null)).toBe("pong");
+```
