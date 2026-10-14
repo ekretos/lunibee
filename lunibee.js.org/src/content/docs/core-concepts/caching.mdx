@@ -12,7 +12,7 @@ Lunibee manages Discord resources (Users, Guilds, Channels, Roles, Messages) usi
 
 When a resource is received via a Gateway event (or a channel is fetched via REST), the resource manager checks if an existing instance already exists in memory.
 
-If it exists, Lunibee mutates the existing structure in place and returns the same object reference. (`fetch()` on the user, member and role managers currently stores the fetched object in place of the cached one instead of merging into it.) This prevents subtle desynchronization bugs where two parts of your application hold different versions of the same guild or user.
+If it exists, Lunibee mutates the existing structure in place and returns the same object reference. This includes `fetch()` on every manager: a fetched resource is merged into the cached instance. This prevents subtle desynchronization bugs where two parts of your application hold different versions of the same guild or user.
 
 <Tabs>
 <TabItem label="TypeScript">

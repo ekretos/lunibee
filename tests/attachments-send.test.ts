@@ -101,3 +101,32 @@ describe("command managers accept builders", () => {
         expect(sent[2]).toEqual({ description: "Pong!" });
     });
 });
+
+describe("fetch keeps cached references current", () => {
+    test("users.fetch() updates the cached User instead of replacing it", async () => {
+        const { UserManager } =
+            await import("../packages/managers/src/index.ts");
+        const { REST } = await import("../packages/rest/src/index.ts");
+        let name = "first";
+        const rest = new REST({
+            token: "a.b.c-token-0123456789",
+            transport: new HttpTransport({
+                fetch: async () =>
+                    new Response(
+                        JSON.stringify({
+                            id: "123456789012345678",
+                            username: name,
+                        }),
+                        { headers: { "content-type": "application/json" } },
+                    ),
+            }),
+        });
+        const users = new UserManager(rest);
+        const a = await users.fetch("123456789012345678");
+        name = "second";
+        const b = await users.fetch("123456789012345678");
+        expect(b).toBe(a);
+        expect(a.username).toBe("second");
+        expect(users.get("123456789012345678")).toBe(a);
+    });
+});

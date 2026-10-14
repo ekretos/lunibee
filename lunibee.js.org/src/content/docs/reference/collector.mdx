@@ -286,7 +286,7 @@ const collector = client.createCollector("interactionCreate", {
   idle: 30_000,
   max: 5,
 });
-for await (const interaction of collector) await interaction.deferUpdate();
+for await (const interaction of collector) if (interaction.isButton()) await interaction.deferUpdate();
 ```
 
 ## Component and Modal Collectors (0.2.1)

@@ -133,8 +133,13 @@ export class ResourceManager<K, V> extends Manager<K, V> {
         return this.get(id) ?? this.fetch(id);
     }
 
+    /** Fetches from Discord; a cached instance is updated in place, so references to it stay current. */
     public fetch(id: K): Promise<V> {
-        return this.fetchOnce(id, () => this.#fetcher(id));
+        return this.fetchOnce(
+            id,
+            () => this.#fetcher(id),
+            (value) => this.upsert(value),
+        );
     }
 
     public async fetchMany(ids: Iterable<K>): Promise<V[]> {

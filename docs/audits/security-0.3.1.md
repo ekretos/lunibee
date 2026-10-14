@@ -286,3 +286,12 @@ GitHub repository settings (branch protection, secret scanning) remain unverifie
 | D-11 | P3 | `ShardSupervisor` jitter is applied after the `maxDelay` cap, so a delay can reach `maxDelay × (1 + jitter)`. | Open — documented |
 | D-12 | P3 | `autoScaleInterval` with a fixed `shardCount` runs a timer that never does anything. | Open |
 | D-13 | P3 | Source comments: `health.ts` named `health({ metrics })` (it is `refreshHealth`), and `broadcastRequest()` claimed it never rejects. | Fixed (comments corrected) |
+| D-14 | P2 | `ResourceManager.fetch()` stored the fetched object with `set()`, replacing the cached instance, so `users.fetch()` / `members.fetch()` / `roles.fetch()` left references held elsewhere stale. | **Fixed** — `fetch()` stores through `upsert()` (`tests/attachments-send.test.ts`, "fetch keeps cached references current") |
+| D-15 | P2 | `@lunibee/structures` imported `@lunibee/core` at runtime without declaring it (a hidden core ↔ structures cycle); installing `@lunibee/structures` alone failed. | **Fixed** — permissions moved into `@lunibee/structures`, core re-exports; `check:deps` now rejects undeclared runtime imports in source |
+| D-16 | P2 | `files: [new CreateAttachment(...)]` uploaded an empty file (`toAttachments` read `file.data`). | **Fixed** — files with `toBuffer()` are read at send time (`tests/attachments-send.test.ts`) |
+| D-17 | P3 | `onRetry` did not fire for retries after a network failure. | **Fixed** — fires with `status: 0` (`tests/rest.coverage-complete.test.ts`) |
+| D-18 | P3 | `lunibee doctor` accepted Bun 1.2 while `engines.bun` is `>=1.4.0`; `GatewayOptions` lacked `compress`. | **Fixed** |
+| D-19 | P3 | Snowflake checks differ: `isSnowflake` and prefix-arg parsing accept 16–22 digits, `Routes` / formatters / `ownsGuild` accept 1–20. | Open — each documented on its page |
+| D-20 | P3 | `ShardManager` in a cluster worker cannot be re-initialised after `destroy()` / `reshard()` when `shardCount` is omitted (`#ensureInitialized` uses `shardCount ?? 1`, not the worker context). | Open |
+| D-21 | P3 | `Collector` events are untyped (`EventEmitter`), so `collect` / `end` handler arguments are `any`. | Open |
+| D-22 | P3 | `benchmarks/rest-buckets.ts` is cited by `scripts/bench-docs.ts` but does not exist. | Open — the docs no longer cite it |

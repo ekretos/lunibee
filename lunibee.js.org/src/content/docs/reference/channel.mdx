@@ -230,6 +230,7 @@ client.on("interactionCreate", async (interaction) => {
   const channel = await client.channels.create(interaction.guildId!, {
     name: `ticket-${interaction.user.id}`,
     topic: `Support ticket for ${interaction.user.username}`,
+    type: 0, // text
     parent_id: TICKET_CATEGORY_ID,
   });
 
@@ -249,6 +250,7 @@ client.on("interactionCreate", async (interaction) => {
   const channel = await client.channels.create(interaction.guildId, {
     name: `ticket-${interaction.user.id}`,
     topic: `Support ticket for ${interaction.user.username}`,
+    type: 0, // text
     parent_id: TICKET_CATEGORY_ID,
   });
 
