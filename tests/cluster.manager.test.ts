@@ -1025,6 +1025,54 @@ describe("recovery by reassignment", () => {
     });
 });
 
+describe("readiness with a failed cluster (D-01)", () => {
+    test("a failed cluster whose shards moved no longer blocks ready()", async () => {
+        const { manager, children } = setup({
+            shardCount: 4,
+            clusterCount: 2,
+            supervisor: { maxRestarts: 0 },
+            reassignOnGiveUp: true,
+        });
+        let readyEvents = 0;
+        manager.on("ready", () => readyEvents++);
+        await manager.spawn();
+        // Cluster 1 starts; cluster 0 dies before it is ready.
+        children[1]!.ready();
+        await tick();
+        const waiting = manager.ready(1_000);
+        children[0]!.exit(1, null);
+        await tick(20);
+        await expect(waiting).resolves.toBeUndefined();
+        expect(readyEvents).toBe(1);
+        expect(manager.health().missingShards).toEqual([]);
+    });
+
+    test("ready() rejects when a failed cluster's shards are left with no owner", async () => {
+        const { manager, children } = setup({ supervisor: { maxRestarts: 0 } });
+        await manager.spawn();
+        children[1]!.ready();
+        await tick();
+        const waiting = manager.ready(1_000);
+        children[0]!.exit(1, null);
+        await expect(waiting).rejects.toThrow(
+            /Cluster 0 failed and shards \[0,2\] have no owner \(restarts exhausted\)/,
+        );
+    });
+
+    test("ready() rejects when no cluster can take the shards over", async () => {
+        const { manager, children } = setup({
+            clusterCount: 1,
+            shardCount: 2,
+            supervisor: { maxRestarts: 0 },
+            reassignOnGiveUp: true,
+        });
+        await manager.spawn();
+        const waiting = manager.ready(1_000);
+        children[0]!.exit(1, null);
+        await expect(waiting).rejects.toThrow(/no ready cluster to take them/);
+    });
+});
+
 describe("payload limits", () => {
     const big = (n: number) => "x".repeat(n);
 

@@ -52,6 +52,9 @@ export interface IpcEndpoint {
  * ({@link ClusterManager}) relays to every other worker. Selected
  * automatically in a worker forked by `ClusterManager`.
  */
+/** The IPC transports open on each endpoint, so buses in one process can reach each other. */
+const LOCAL = new WeakMap<IpcEndpoint, Set<IpcTransport>>();
+
 export class IpcTransport implements ShardBusTransport {
     readonly #endpoint: IpcEndpoint;
     readonly #listener: (frame: unknown) => void;
@@ -73,10 +76,24 @@ export class IpcTransport implements ShardBusTransport {
                 this.#down?.(record[PEER_DOWN_FRAME] as number[]);
         };
         endpoint.on("message", this.#listener);
+        let local = LOCAL.get(endpoint);
+        if (!local) LOCAL.set(endpoint, (local = new Set()));
+        local.add(this);
     }
 
+    /**
+     * Sends to the parent, which relays to other clusters, and delivers to the
+     * other buses in this process: the parent never sends a message back to the
+     * cluster it came from, so without this a shard could not reach a shard in
+     * its own worker. Each bus drops what is not addressed to it.
+     */
     public post(message: ShardMessage): void {
         this.#endpoint.send!({ [BUS_FRAME]: message });
+        for (const peer of LOCAL.get(this.#endpoint) ?? [])
+            if (peer !== this) {
+                const copy = structuredClone(message);
+                queueMicrotask(() => peer.#message?.(copy));
+            }
     }
 
     public onMessage(listener: (message: ShardMessage) => void): void {
@@ -89,6 +106,7 @@ export class IpcTransport implements ShardBusTransport {
 
     public close(): void {
         this.#endpoint.off("message", this.#listener);
+        LOCAL.get(this.#endpoint)?.delete(this);
     }
 }
 

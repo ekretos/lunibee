@@ -309,3 +309,54 @@ describe("ShardSupervisor", () => {
         manager.killAll();
     });
 });
+
+describe("IPC buses in the same worker (D-07)", () => {
+    function worker() {
+        const endpoint = new EventEmitter() as EventEmitter & {
+            send(frame: unknown): boolean;
+            sent: unknown[];
+        };
+        endpoint.sent = [];
+        endpoint.send = (frame) => {
+            endpoint.sent.push(frame);
+            return true;
+        };
+        const bus = (id: number) =>
+            new ShardBus(id, "app", {
+                transport: new IpcTransport(endpoint as never),
+            });
+        return { endpoint, bus };
+    }
+
+    test("send, broadcast and request reach a shard in the same process", async () => {
+        const { endpoint, bus } = worker();
+        const a = bus(0);
+        const b = bus(1);
+        const got: unknown[] = [];
+        b.on("hello", (m) => got.push(m.data));
+        b.respond("sum", (d: number[]) => d.reduce((x, y) => x + y, 0));
+        a.send(1, "hello", 1);
+        a.broadcast("hello", 2);
+        a.send(5, "hello", 3); // another shard: not delivered here
+        expect(await a.request<number>(1, "sum", [1, 2, 3], 500)).toBe(6);
+        await Bun.sleep(1);
+        expect(got).toEqual([1, 2]);
+        // Everything still goes to the parent for the other clusters.
+        expect(endpoint.sent.length).toBeGreaterThanOrEqual(4);
+        a.close();
+        b.close();
+    });
+
+    test("a closed bus stops receiving local messages", async () => {
+        const { bus } = worker();
+        const a = bus(0);
+        const b = bus(1);
+        const got: unknown[] = [];
+        b.on("x", (m) => got.push(m.data));
+        b.close();
+        a.send(1, "x", 1);
+        await Bun.sleep(1);
+        expect(got).toEqual([]);
+        a.close();
+    });
+});

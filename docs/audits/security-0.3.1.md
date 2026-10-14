@@ -273,13 +273,13 @@ GitHub repository settings (branch protection, secret scanning) remain unverifie
 
 | ID | Sev | Finding | Status |
 | --- | --- | --- | --- |
-| D-01 | P2 | `ClusterManager` readiness requires every cluster to be `ready`, so one `failed` cluster keeps `ready()`, `waitForReady` and the `ready` event pending forever, even after `reassignOnGiveUp` moved its shards (`#isReady()` in `cluster.ts`). | Open — documented on the ClusterManager page; check `health().missingShards` meanwhile |
+| D-01 | P2 | `ClusterManager` readiness requires every cluster to be `ready`, so one `failed` cluster keeps `ready()`, `waitForReady` and the `ready` event pending forever, even after `reassignOnGiveUp` moved its shards (`#isReady()` in `cluster.ts`). | **Fixed** — readiness ignores a failed cluster whose shards were reassigned, and pending `ready()` calls reject when shards are left with no owner (`tests/cluster.manager.test.ts`, "readiness with a failed cluster") |
 | D-02 | P3 | Shard-bus messages relayed between clusters do not check `source` against the sending cluster (answers to the parent are checked). Workers are trusted code. | Open |
 | D-03 | P3 | A spawn frame with an environment variable outside the host's whitelist is dropped as malformed; the coordinator's cluster stays `starting` until `startTimeout`. A stock coordinator never sends one. | Open |
 | D-04 | P3 | `joinVoiceChannel()` with an empty `channelId` registers the new connection before `setChannel` throws, leaving a `disconnected` entry in the registry. | Open |
 | D-05 | P3 | `VoiceConnection.setSpeaking()` always sends `ssrc: 0`. | Open — documented; send your own op 5 for the real SSRC |
 | D-06 | P3 | `killAll()` JSDoc said "force-kills"; it sends SIGTERM without escalation. | Fixed (comment corrected) |
-| D-07 | P2 | Over IPC, a `ShardBus` message to a shard in the same worker is never delivered: the parent does not relay back to the sending cluster and `IpcTransport` does not deliver locally; a broadcast skips the sender's own cluster. | Open — documented as a limitation on the ShardBus page |
+| D-07 | P2 | Over IPC, a `ShardBus` message to a shard in the same worker is never delivered: the parent does not relay back to the sending cluster and `IpcTransport` does not deliver locally; a broadcast skips the sender's own cluster. | **Fixed** — `IpcTransport`s on one process endpoint deliver to each other locally (`tests/sharding.transport.test.ts`, "IPC buses in the same worker") |
 | D-08 | P3 | `ShardBus.respond()` handlers cannot be removed with `off()` (the wrapper is not returned); they stay until `close()`. | Open |
 | D-09 | P3 | `ShardManager` with `shardCount: "auto"` creates its Gateways inside `connect()`, so dispatch listeners attached afterwards can miss the first events. | Open — workaround documented |
 | D-10 | P3 | The local session-budget check reads the remembered `/gateway/bot` answer and does not count down as shards start. | Open |

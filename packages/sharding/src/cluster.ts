@@ -738,7 +738,7 @@ export class ClusterManager {
         this.#announceDown(info.id, info.shards);
         if (this.#options.restartOnExit === false) {
             info.state = "failed";
-            this.#checkReady();
+            this.#rejectReady(info, "restartOnExit is false");
             return;
         }
         const delay = this.#supervisor.next(info.id);
@@ -750,8 +750,8 @@ export class ClusterManager {
                 // A faulty consumer callback must not break supervision.
             }
             this.#emit("clusterGiveUp", info);
-            this.#checkReady();
             if (this.#options.reassignOnGiveUp) void this.#reassign(info);
+            else this.#rejectReady(info, "restarts exhausted");
             return;
         }
         info.state = "restarting";
@@ -790,6 +790,7 @@ export class ClusterManager {
                     `No ready cluster can take over shards [${shardIds}] of cluster ${failed.id}.`,
                 ),
             );
+            this.#rejectReady(failed, "no ready cluster to take them");
             return;
         }
         try {
@@ -806,6 +807,7 @@ export class ClusterManager {
                     `Cluster ${target.id} could not take over shards [${shardIds}]: ${error instanceof Error ? error.message : String(error)}`,
                 ),
             );
+            this.#rejectReady(failed, "reassignment failed");
             return;
         }
         if (this.#stopping || failed.state !== "failed") return;
@@ -817,6 +819,7 @@ export class ClusterManager {
             from: failed.id,
             to: target.id,
         });
+        this.#checkReady();
     }
 
     #clearStartTimer(id: number): void {
@@ -1254,11 +1257,32 @@ export class ClusterManager {
         });
     }
 
+    /**
+     * Every shard of the deployment is served by a ready cluster. A failed
+     * cluster whose shards were reassigned no longer counts.
+     */
     #isReady(): boolean {
-        if (this.#infos.size === 0) return false;
-        for (const cluster of this.#infos.values())
-            if (cluster.state !== "ready") return false;
-        return true;
+        let ready = 0;
+        for (const cluster of this.#infos.values()) {
+            if (cluster.state === "ready") ready++;
+            else if (!(
+                cluster.state === "failed" && cluster.shards.length === 0
+            ))
+                return false;
+        }
+        return ready > 0;
+    }
+
+    /**
+     * Rejects pending `ready()` calls: a failed cluster's shards have no owner
+     * and nothing will give them one, so waiting longer would never end.
+     */
+    #rejectReady(failed: ClusterInfo, why: string): void {
+        if (failed.shards.length === 0) return;
+        const error = new Error(
+            `Cluster ${failed.id} failed and shards [${failed.shards}] have no owner (${why}).`,
+        );
+        for (const waiter of [...this.#readyWaiters]) waiter.reject(error);
     }
 
     #checkReady(): void {
