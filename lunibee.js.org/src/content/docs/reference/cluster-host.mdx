@@ -1,0 +1,329 @@
+---
+title: ClusterHost
+description: Run one bot's clusters across several machines — coordinator options, the ClusterHost agent, authentication, lease fencing, placement and security defaults.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+A deployment on several machines has one **coordinator** and one **host agent** per machine that runs workers:
+
+- The coordinator is a [`ClusterManager`](/reference/cluster-manager/) with the `remote` option. It keeps everything a `ClusterManager` does: the shard-to-cluster map, IDENTIFY slots, routing, health and recovery. It listens for hosts on a WebSocket.
+- A host runs `ClusterHost`. It connects to the coordinator, starts its own worker script for each cluster placed on it, and relays the workers' IPC frames both ways.
+
+A cluster on another machine therefore behaves like a local one: the coordinator supervises it, routes [`ShardBus`](/reference/shard-bus/) messages to it, and paces its IDENTIFYs together with every other cluster. The [sharding guide](/core-concepts/sharding/#multiple-hosts) has the overview.
+
+```text
+coordinator (ClusterManager + remote)          host "eu-1" (ClusterHost)
+ ├─ shard → cluster map, IDENTIFY slots  ◀─wss─▶ ├─ worker.ts  cluster 0
+ ├─ routing, health, restarts                    └─ worker.ts  cluster 2
+ └─ listener on remote.port              ◀─wss─▶ host "eu-2": cluster 1, cluster 3
+```
+
+## Import
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+import { ClusterManager, ClusterHost, RemoteClose, REMOTE_PROTOCOL_VERSION } from "lunibee";
+import type { RemoteOptions, HostStatus, ClusterHostOptions, ClusterHostEvents } from "lunibee";
+// or the package on its own:
+import { ClusterManager, ClusterHost } from "@lunibee/sharding";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ClusterManager, ClusterHost, RemoteClose, REMOTE_PROTOCOL_VERSION } from "lunibee";
+// or the package on its own:
+import { ClusterManager, ClusterHost } from "@lunibee/sharding";
+```
+</TabItem>
+</Tabs>
+
+## Quick start
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+// coordinator.ts
+import { ClusterManager } from "lunibee";
+
+const clusters = new ClusterManager({
+  token: process.env.DISCORD_TOKEN!,
+  script: "./worker.ts",                 // only used for clusters on this machine (remote.local)
+  shardCount: "auto",
+  clusterCount: 6,
+  waitForReady: true,
+  remote: {
+    port: 7070,
+    hostname: "0.0.0.0",                 // the default, 127.0.0.1, is reachable from this machine only
+    tls: { cert: process.env.TLS_CERT!, key: process.env.TLS_KEY! },
+    secret: process.env.CLUSTER_SECRET!, // 16+ characters, shared with every host
+    hosts: ["eu-1", "eu-2", "us-1"],     // clusters are placed on these, in this order
+  },
+});
+
+clusters.on("hostJoin", (id) => console.log(`host ${id} joined`));
+clusters.on("hostLeave", (id, reason) => console.warn(`host ${id} left: ${reason}`));
+
+await clusters.spawn();                  // waits for the hosts, then places clusters on them
+```
+
+```ts
+// host.ts, on each machine
+import { ClusterHost } from "lunibee";
+
+const host = new ClusterHost({
+  url: "wss://coordinator.example.com:7070",
+  secret: process.env.CLUSTER_SECRET!,
+  id: "eu-1",
+  script: "./worker.ts",                 // the host decides what runs; the coordinator cannot
+});
+
+host.on("disconnected", ({ code, reason }) => console.warn(`lost coordinator: ${code} ${reason}`));
+host.on("error", (error) => console.error(error));
+
+await host.connect();                    // rejects if the first attempt fails; reconnects by itself later
+process.on("SIGTERM", () => void host.close());
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// coordinator.js
+import { ClusterManager } from "lunibee";
+
+const clusters = new ClusterManager({
+  token: process.env.DISCORD_TOKEN,
+  script: "./worker.js",
+  shardCount: "auto",
+  clusterCount: 6,
+  waitForReady: true,
+  remote: {
+    port: 7070,
+    hostname: "0.0.0.0",
+    tls: { cert: process.env.TLS_CERT, key: process.env.TLS_KEY },
+    secret: process.env.CLUSTER_SECRET,
+    hosts: ["eu-1", "eu-2", "us-1"],
+  },
+});
+
+await clusters.spawn();
+```
+
+```js
+// host.js, on each machine
+import { ClusterHost } from "lunibee";
+
+const host = new ClusterHost({
+  url: "wss://coordinator.example.com:7070",
+  secret: process.env.CLUSTER_SECRET,
+  id: "eu-1",
+  script: "./worker.js",
+});
+
+await host.connect();
+process.on("SIGTERM", () => void host.close());
+```
+</TabItem>
+</Tabs>
+
+The worker script is the same as for local clusters (a [`ShardManager`](/reference/shard-manager/) that reads the worker contract). The bot token is never sent to a host: each worker reads it from its host's own environment.
+
+## Coordinator options
+
+`remote` on [`ClusterManagerOptions`](/reference/cluster-manager/#constructor) is a `RemoteOptions`. It is validated in the `ClusterManager` constructor; the listener opens in `spawn()`.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `port` | `number` | — | TCP port. Required; integer from 0 to 65535. `0` picks a free port; read it from `clusters.remotePort` after `spawn()` started. |
+| `hostname` | `string` | `"127.0.0.1"` | Interface to bind. The default is reachable from this machine only. Any non-loopback address needs `tls` or `allowInsecure`. |
+| `secret` | `string` | — | Shared secret, at least 16 characters. Required. Hosts prove they know it; it never crosses the wire. |
+| `tls` | `{ cert: string; key: string }` | none | Serve `wss://`. Both must be non-empty strings (PEM contents, as `Bun.serve` takes them). |
+| `allowInsecure` | `boolean` | `false` | Listen on a non-loopback address without TLS. Frames travel unencrypted and unsigned: only for a network you fully trust, or behind a TLS proxy. |
+| `hosts` | `string[]` | the hosts joined at `spawn()` | The host IDs of the deployment, in placement order. A host not listed is refused. Must be non-empty, unique and valid [host IDs](#host-ids). |
+| `minHosts` | `number` | `1` | Without `hosts`: how many hosts must join before clusters are placed. Positive integer. |
+| `joinTimeout` | `number` | `60000` | Ms `spawn()` waits for the hosts before it rejects. |
+| `lease` | `number` | `15000` | Fencing lease in ms; at least 30. See [Lease fencing](#lease-fencing). |
+| `helloTimeout` | `number` | `10000` | Ms a new connection has to authenticate before it is closed with `4408`. |
+| `maxUnauthenticated` | `number` | `16` | Connections that may be waiting to authenticate at once. More are closed with `4429`. |
+| `local` | `boolean` | `false` | Also run clusters on the coordinator's machine (with `script`). |
+
+| Condition | Error |
+|---|---|
+| `secret` not a string of at least 16 characters | `RangeError` |
+| `port` not an integer from 0 to 65535 | `RangeError` |
+| `tls` without a non-empty `cert` and `key` | `TypeError` |
+| non-loopback `hostname` without `tls` or `allowInsecure` | `RangeError` |
+| `lease` below 30 or not finite | `RangeError` |
+| an invalid ID in `hosts`, or `hosts` empty or with duplicates | `RangeError` |
+| `minHosts` not a positive integer | `RangeError` |
+
+`remote` needs Bun on the coordinator: it listens with `Bun.serve`. A plain HTTP request to the port gets `426` with the body `Lunibee cluster coordinator`.
+
+### Coordinator members
+
+These are `ClusterManager` members; the rest of the API is on the [ClusterManager](/reference/cluster-manager/) page.
+
+| Member | Description |
+|---|---|
+| `remotePort` | The port hosts connect to, once the listener is open; `undefined` before. |
+| `hosts()` | Every declared or connected host with its clusters, sorted by ID. See [`HostStatus`](#hosts-and-hoststatus). Empty without `remote`. |
+| `health().clusters[].host` | Where each cluster runs: `"local"` or a host ID. |
+| `hostJoin` event | `(hostId: string)` — a host authenticated, also on every reconnect. |
+| `hostLeave` event | `(hostId: string, reason: string)` — a host disconnected, was lost or the coordinator stopped. Its clusters exit with signal `SIGHUP` and are handled as crashes (outside a shutdown). |
+| `error` event | Also emitted when a host reports it could not start a worker (`Host eu-1 could not run cluster 2: …`). |
+
+## Placement
+
+When `spawn()` runs, the coordinator opens its listener and waits for the hosts:
+
+- with `hosts`, until every listed host has joined;
+- without it, until `minHosts` hosts have joined, then it uses the hosts connected at that moment, sorted by ID.
+
+If they do not join within `joinTimeout`, `spawn()` rejects (`Hosts did not join within 60000ms: [us-1].` or `Only 1 of 2 hosts joined within 60000ms.`) and the listener is closed again. A shutdown during the wait ends it without an error.
+
+The placement list is those host IDs, with `"local"` in front when `remote.local` is true. Cluster `n` runs on `placement[n % placement.length]`. A cluster keeps its place for the life of the spawn: when it crashes it restarts on the same host. `respawn()` keeps the hosts connected and places again.
+
+When a host is away, its clusters' restarts fail at once (the worker "exits" with `SIGHUP`) and are retried after the [restart delay](/reference/cluster-manager/#restarts); when the host reconnects with the same ID, the next restart starts them on it. These failed attempts count towards `supervisor.maxRestarts`. Clusters move to another host only through [`reassignOnGiveUp`](/reference/cluster-manager/#reassignment), which hands a failed cluster's shards to a ready cluster on any host.
+
+## `ClusterHost`
+
+The agent that makes a machine part of a deployment.
+
+```ts
+new ClusterHost(options: ClusterHostOptions)
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `url` | `string` | — | The coordinator's address, `wss://host:port`. `ws://` is accepted for this machine (`localhost`, `127.x.x.x`, `::1`), or for another one with `allowInsecure`. Must not contain credentials. |
+| `allowInsecure` | `boolean` | `false` | Connect with `ws://` to a coordinator on another machine, over a network you fully trust. |
+| `secret` | `string` | — | The coordinator's shared secret, at least 16 characters. |
+| `id` | `string` | — | This host's [ID](#host-ids). Must be unique in the deployment. |
+| `script` | `string` | — | The worker script this host runs for every cluster. The coordinator cannot choose it. |
+| `fork` | `(script, env) => ChildProcess` | `child_process.fork(script, [], { env })` | Starts a worker. `env` is the host's environment plus the [worker contract](/reference/cluster-manager/#environment-variables). |
+| `reconnectDelay` | `number` | `1000` | First delay before reconnecting, in ms. |
+| `maxReconnectDelay` | `number` | `30000` | Longest delay between reconnect attempts, in ms. |
+
+The constructor throws a `RangeError` for an invalid `id` or a `secret` under 16 characters, and a `TypeError` for a missing `script`, a URL that is not absolute `ws://` or `wss://`, a URL with a user name or password, or `ws://` to another machine without `allowInsecure`. It does not connect.
+
+### Members
+
+| Member | Description |
+|---|---|
+| `connect()` | Connects and resolves once the coordinator accepted this host. Rejects with `The coordinator refused this host (<code>: <reason>).` if the first attempt fails for any reason (bad secret, unknown or duplicate ID, version mismatch, or no coordinator at the address); the host is then closed and `connect()` can be called again. After a successful first connect, a lost connection is retried with backoff until `close()`. Called again while connecting or connected, it resolves at once. |
+| `close()` | Kills every worker (SIGKILL), closes the connection with `1000` and stops reconnecting. Resolves when the socket has closed. A pending `connect()` rejects with `The host was closed.` |
+| `connected` | Whether the coordinator has accepted this host and the link is open. |
+| `clusters()` | Cluster IDs running on this host, sorted. |
+| `on(event, listener)`, `off(event, listener)` | Add or remove a listener. Return the host. A listener that throws is ignored. |
+
+### Events
+
+`ClusterHostEvents`:
+
+| Event | Arguments | When |
+|---|---|---|
+| `connected` | — | The coordinator accepted this host (also after each reconnect). |
+| `disconnected` | `{ code: number; reason: string }` | An accepted connection ended. Every worker was killed first. |
+| `clusterSpawn` | `cluster: number` | A worker started for a cluster. |
+| `clusterExit` | `cluster: number`, `code: number \| null`, `signal: string \| null` | A worker exited. |
+| `error` | `error: Error` | A malformed frame from the coordinator (ignored), a worker process error, or a refusal after the first connect (`The coordinator refused this host (4401: …)`; the host keeps retrying). |
+
+### Reconnecting
+
+After an accepted connection is lost, the host kills its workers, emits `disconnected` and reconnects after `reconnectDelay × (1 + 0–20 % jitter)`. Each failed attempt doubles the delay up to `maxReconnectDelay`; an accepted connection resets it. The host keeps retrying until `close()`, also when the coordinator refuses it; each refusal (`4401`, `4409`, `4410`, `4426`) is reported as an `error` event.
+
+### What a host runs
+
+- Only its own `script`. The coordinator sends a cluster ID and an environment, never a path or code.
+- The environment is the host's own `process.env` plus at most the seven worker-contract variables (`SHARD_LIST`, `SHARD_COUNT`, `CLUSTER_ID`, `CLUSTER_COUNT`, `LUNIBEE_SHARD_BUS`, `LUNIBEE_CLUSTER_WORKER`, `LUNIBEE_IDENTIFY`). A spawn request with any other variable (`NODE_OPTIONS`, `LD_PRELOAD`, a token) is rejected whole as a malformed frame.
+- The coordinator can send only `SIGTERM`, `SIGKILL` or `SIGINT` to a worker.
+- One worker per cluster: a second spawn for a cluster that is still running is refused, and the coordinator reports it as an `error` and handles it as a crash. So is a worker that fails to fork.
+
+The worker's IPC parent is the `ClusterHost` process. `ClusterWorker` exits a worker whose parent goes away (`exitOnParentLoss`), so killing the agent also stops its workers.
+
+## Authentication
+
+Every connection is authenticated before it can do anything:
+
+1. The coordinator sends `{ t: "challenge", nonce, version }` with a fresh random 16-byte nonce.
+2. The host checks `version` against its own `REMOTE_PROTOCOL_VERSION` (`4426` on mismatch) and answers `{ t: "hello", id, mac, version }`, where `mac` is `HMAC-SHA256(secret, "<nonce>:<id>")` in hex. The secret itself never travels.
+3. The coordinator checks, in order: the version (`4426`), the ID format and the MAC in constant time (`4401` for either, with the same reason, so a failure never says which), that the ID is in `hosts` when `hosts` is set (`4410`), and that no host with that ID is connected (`4409`).
+4. It answers `{ t: "welcome", leaseMs, pingMs }` and emits `hostJoin`.
+
+A connection that sends anything but a text `hello` first, or does not send it within `helloTimeout`, is closed (`4400`, `4408`). At most `maxUnauthenticated` connections may wait at once.
+
+The HMAC proves who a host is. It does not encrypt or sign later frames: that is TLS's job.
+
+## Lease fencing
+
+A shard must never run in two places, or Discord sees two sessions for it. The lease enforces that without a shared clock:
+
+| Side | Rule |
+|---|---|
+| Coordinator | Pings every host every `max(10, floor(lease / 3))` ms. Treats a host as lost only after **two** leases without any frame from it: closes it with `4504`, emits `hostLeave` and lets its clusters restart. |
+| Host | Kills every worker (SIGKILL) **as soon as** its connection closes, when the coordinator sends `bye`, and after **one** lease without any frame from the coordinator; then closes with `4504` and reconnects. |
+
+The host has always fenced itself before the coordinator lets anything restart, so a cluster is never running on a host that has been written off. The lease comes from the coordinator (`welcome.leaseMs`), so both sides use the same value.
+
+Every worker start has an epoch number. Frames and exits from an earlier process of the same cluster are ignored on both sides, so a late message from a replaced worker never reaches its successor.
+
+## Hosts and `HostStatus`
+
+```ts
+clusters.hosts(); // HostStatus[]
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | Host ID. |
+| `connected` | `boolean` | Whether its socket is open and authenticated. |
+| `lastSeen` | `number` | When it last sent anything (epoch ms); `0` when not connected. |
+| `clusters` | `number[]` | Clusters running on it now, sorted. |
+
+The list holds every host in `remote.hosts` and every connected host, sorted by ID.
+
+### Host IDs
+
+1 to 64 characters: letters, digits, `.`, `_` and `-`.
+
+## `RemoteClose`
+
+WebSocket close codes between a coordinator and a host:
+
+| Code | Name | Meaning |
+|---|---|---|
+| `4400` | `BadRequest` | A binary frame, a malformed frame, or something other than `hello` first. Also for an authenticated host that sends a malformed frame. |
+| `4401` | `AuthFailed` | Invalid host ID or wrong MAC. |
+| `4408` | `HelloTimeout` | No `hello` within `helloTimeout`. |
+| `4409` | `DuplicateHost` | A host with this ID is already connected. |
+| `4410` | `UnknownHost` | The ID is not in `remote.hosts`. |
+| `4426` | `VersionMismatch` | The two sides speak different protocol versions. |
+| `4429` | `TooManyConnections` | `maxUnauthenticated` connections are already waiting. |
+| `4500` | `Shutdown` | The coordinator stopped (`shutdownAll()`, `killAll()`). |
+| `4504` | `HostLost` | Sent by the coordinator after two silent leases, or by the host after one. |
+
+`REMOTE_PROTOCOL_VERSION` is `1`. A coordinator and a host must have the same version; upgrade both together.
+
+## Security defaults
+
+- **Loopback by default.** The coordinator binds `127.0.0.1` unless `hostname` says otherwise.
+- **Encryption off this machine.** Listening on any other address needs `tls`, or an explicit `allowInsecure: true`. Behind a TLS-terminating proxy, bind `127.0.0.1` and let the proxy forward. A `ClusterHost` likewise refuses `ws://` to another machine without `allowInsecure`.
+- **No secret on the wire.** Hosts answer an HMAC challenge; the secret is at least 16 characters on both sides.
+- **Bounded input.** Frames are text only and at most 8 MiB in UTF-8 bytes on both sides (`maxPayloadLength` on the listener, and checked again when parsed). `maxMessageBytes` on the `ClusterManager` (default 8 MiB) bounds what the coordinator relays from any worker, local or remote. Unauthenticated connections are capped and timed out.
+- **Host-owned execution.** The host chooses the script; the coordinator can set only the worker-contract variables and send three signals.
+- **No token transfer.** Workers read the bot token from their host's environment.
+
+## Limits
+
+- The coordinator is a single process and a single point of failure. If it stops, hosts fence their workers. Run it under a process supervisor.
+- Hosts do not take over for a lost coordinator, and a lost host's clusters do not move to other hosts unless `reassignOnGiveUp` is on.
+- The coordinator needs Bun (`Bun.serve`). A `ClusterHost` needs a global `WebSocket` and `child_process.fork` (Bun, or Node.js 22 or later).
+
+## See also
+
+- [ClusterManager](/reference/cluster-manager/)
+- [Sharding guide: multiple hosts](/core-concepts/sharding/#multiple-hosts)
+- [ShardManager](/reference/shard-manager/)
+- [ShardBus](/reference/shard-bus/)

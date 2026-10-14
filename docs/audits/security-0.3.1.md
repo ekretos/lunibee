@@ -268,3 +268,14 @@ GitHub repository settings (branch protection, secret scanning) remain unverifie
 - **Fix:** move `description` (and `spoiler`) beside `media`; align the type.
 - **Regression test:** assert the exact `toJSON()` shape.
 - **Status:** Fixed — `description` and `spoiler` sit beside `media` (the unconfirmed "dropped silently" claim is moot); exact-shape test in `tests/components-v2.test.ts`.
+
+## Found while writing the 0.3.2 reference docs
+
+| ID | Sev | Finding | Status |
+| --- | --- | --- | --- |
+| D-01 | P2 | `ClusterManager` readiness requires every cluster to be `ready`, so one `failed` cluster keeps `ready()`, `waitForReady` and the `ready` event pending forever, even after `reassignOnGiveUp` moved its shards (`#isReady()` in `cluster.ts`). | Open — documented on the ClusterManager page; check `health().missingShards` meanwhile |
+| D-02 | P3 | Shard-bus messages relayed between clusters do not check `source` against the sending cluster (answers to the parent are checked). Workers are trusted code. | Open |
+| D-03 | P3 | A spawn frame with an environment variable outside the host's whitelist is dropped as malformed; the coordinator's cluster stays `starting` until `startTimeout`. A stock coordinator never sends one. | Open |
+| D-04 | P3 | `joinVoiceChannel()` with an empty `channelId` registers the new connection before `setChannel` throws, leaving a `disconnected` entry in the registry. | Open |
+| D-05 | P3 | `VoiceConnection.setSpeaking()` always sends `ssrc: 0`. | Open — documented; send your own op 5 for the real SSRC |
+| D-06 | P3 | `killAll()` JSDoc said "force-kills"; it sends SIGTERM without escalation. | Fixed (comment corrected) |

@@ -1471,7 +1471,7 @@ export class ClusterManager {
         });
     }
 
-    /** Immediately force-kills all active cluster processes and clears the cluster map. Prefer {@link shutdownAll} for a graceful stop. */
+    /** Immediately sends SIGTERM to every cluster process (no grace period, no SIGKILL escalation) and clears the cluster map. Prefer {@link shutdownAll} for a graceful stop. */
     public killAll(): void {
         this.#stopping = true;
         this.#halt();

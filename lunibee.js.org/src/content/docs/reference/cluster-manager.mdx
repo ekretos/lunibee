@@ -1,110 +1,737 @@
 ---
 title: ClusterManager
-description: Forks cluster workers, assigns shards, coordinates IDENTIFY, routes requests and reports health.
+description: Forks cluster workers, assigns shards, coordinates IDENTIFY across processes, routes shard-bus messages and requests, reports health and recovers crashed clusters.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`ClusterManager` runs a bot as several processes. It owns the shard-to-cluster map and the worker processes; a [`ShardManager`](/reference/shard-manager/) inside each worker runs that cluster's Gateways. The [sharding guide](/core-concepts/sharding/#shardmanager-and-clustermanager-together-031) explains how the two fit together.
+`ClusterManager` (from `@lunibee/sharding`) runs a bot as several processes. It:
+
+- splits the shards across clusters and forks one worker process per cluster;
+- hands out IDENTIFY slots for the whole deployment, so Discord's limit holds across processes;
+- routes [`ShardBus`](/reference/shard-bus/) messages to the cluster that owns the target shard;
+- answers requests, broadcasts and health queries for the whole deployment;
+- restarts crashed clusters with backoff, and can move a failed cluster's shards to a healthy one;
+- with `remote`, places clusters on other machines (see [ClusterHost](/reference/cluster-host/)).
+
+**`ClusterManager` orchestrates processes; [`ShardManager`](/reference/shard-manager/) runs shards.** The manager owns the shard-to-cluster map and keeps the workers alive; a `ShardManager` inside each worker opens the Gateways for that cluster's shards. A shard is never owned by two clusters at once. The [sharding guide](/core-concepts/sharding/#shardmanager-and-clustermanager-together-031) explains how the two fit together.
+
+Works under Bun and Node.js (`child_process.fork()` with IPC). The `remote` option needs Bun on the coordinator.
 
 ## Import
 
+<Tabs>
+<TabItem label="TypeScript">
 ```ts
 import { ClusterManager, ClusterWorker, readClusterContext } from "lunibee";
+// or the package on its own:
+import { ClusterManager, ClusterWorker, readClusterContext } from "@lunibee/sharding";
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+import { ClusterManager, ClusterWorker, readClusterContext } from "lunibee";
+// or the package on its own:
+import { ClusterManager, ClusterWorker, readClusterContext } from "@lunibee/sharding";
+```
+</TabItem>
+</Tabs>
+
+## Quick start
+
+Two scripts: the parent, which runs the `ClusterManager`, and the worker, which the parent forks once per cluster.
+
+<Tabs>
+<TabItem label="TypeScript">
+```ts
+// index.ts (parent)
+import { ClusterManager } from "lunibee";
+
+const clusters = new ClusterManager({
+  token: process.env.DISCORD_TOKEN!,
+  script: "./worker.ts",
+  shardCount: "auto",
+  shardsPerCluster: 4,
+  waitForReady: true,
+  startTimeout: 120_000,
+  supervisor: { restartDelay: 1000, backoff: 2, jitter: 0.2, maxRestarts: 5 },
+  reassignOnGiveUp: true,
+});
+
+clusters.on("clusterReady", (cluster) => console.log(`cluster ${cluster.id} ready`));
+clusters.on("clusterRestart", (cluster, { delay, attempt }) =>
+  console.warn(`cluster ${cluster.id} restarts in ${delay}ms (#${attempt})`),
+);
+clusters.on("error", (error) => console.error(error));
+
+await clusters.spawn();
+
+process.on("SIGTERM", () => void clusters.shutdownAll());
 ```
 
-## Options
+```ts
+// worker.ts (one process per cluster)
+import { ShardManager, ShardBus, GatewayIntentBits } from "lunibee";
+
+// Inside a cluster, ShardManager reads the worker contract from the
+// environment: it runs only this cluster's shards, asks the parent for every
+// IDENTIFY, and reports ready and health to the parent.
+const shards = new ShardManager({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [GatewayIntentBits.Guilds],
+});
+
+for (const id of shards.shardIds)
+  new ShardBus(id, "my-bot").respond("guildCount", () => 42);
+
+await shards.connect();
+```
+</TabItem>
+<TabItem label="JavaScript">
+```js
+// index.js (parent)
+import { ClusterManager } from "lunibee";
+
+const clusters = new ClusterManager({
+  token: process.env.DISCORD_TOKEN,
+  script: "./worker.js",
+  shardCount: "auto",
+  shardsPerCluster: 4,
+  waitForReady: true,
+  startTimeout: 120_000,
+  supervisor: { restartDelay: 1000, backoff: 2, jitter: 0.2, maxRestarts: 5 },
+  reassignOnGiveUp: true,
+});
+
+clusters.on("clusterReady", (cluster) => console.log(`cluster ${cluster.id} ready`));
+clusters.on("error", (error) => console.error(error));
+
+await clusters.spawn();
+
+process.on("SIGTERM", () => void clusters.shutdownAll());
+```
+
+```js
+// worker.js (one process per cluster)
+import { ShardManager, ShardBus, GatewayIntentBits } from "lunibee";
+
+const shards = new ShardManager({
+  token: process.env.DISCORD_TOKEN,
+  intents: [GatewayIntentBits.Guilds],
+});
+
+for (const id of shards.shardIds)
+  new ShardBus(id, "my-bot").respond("guildCount", () => 42);
+
+await shards.connect();
+```
+</TabItem>
+</Tabs>
+
+The worker inherits the parent's environment, so it reads the same `DISCORD_TOKEN`.
+
+## Constructor
+
+```ts
+new ClusterManager(options: ClusterManagerOptions)
+```
+
+The constructor validates the options and throws; it does not fork or call Discord. `spawn()` does that.
+
+### Shards and clusters
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `token` | `string` | Required | Bot token. |
-| `script` | `string` | Required | Worker script, run once per cluster. |
-| `shardCount` | `number \| "auto"` | `"auto"` | Total shards. |
-| `guildsPerShard` | `number` | none | With `"auto"`, size by guilds: `ceil(guilds / guildsPerShard)` shards, 1 to 2500. Discord recommends about 1000. |
-| `guildCount` | `number` | asked from Discord | The guild count for `guildsPerShard`, to skip the request. |
-| `shardIds` | `number[]` | all | The slice of `shardCount` this deployment runs (several hosts). |
-| `clusterCount` | `number` | logical CPUs | Clusters to start. Clusters without shards are not forked. |
-| `shardsPerCluster` | `number` | none | Alternative to `clusterCount`; setting both throws. |
-| `maxConcurrency` | `number` | `1`, or Discord's with `"auto"` | IDENTIFY keys. May only lower Discord's value. |
-| `fetchLimits` | `boolean` | `false` | Read `max_concurrency` and the budget from `/gateway/bot` even with a fixed count. |
-| `identify` | `{ coordinate?, interval?, holdTimeout? }` | `{ coordinate: true, interval: 5000, holdTimeout: 60000 }` | Cross-cluster IDENTIFY slots. |
-| `spawnInterval` | `number` | `500` | Milliseconds between forks. |
-| `startTimeout` | `number` | off | Kill a cluster that has not reported ready this long after its fork. |
-| `waitForReady` | `boolean` | `false` | `spawn()` waits for every cluster to be ready. |
-| `reassignOnGiveUp` | `boolean` | `false` | Move a failed cluster's shards to another cluster. |
-| `requestTimeout` | `number` | `5000` | Default for `request()`, `requestCluster()` and `broadcast()`. |
-| `maxPendingRequests` | `number` | `10000` | Requests that may wait for answers at once. |
-| `maxMessageBytes` | `number` | `8388608` | Largest worker message, worker reply or request payload (as JSON text). Bigger ones from a worker are dropped with an `error` event; bigger ones passed to `request()`, `broadcast()` or `requestCluster()` throw a `RangeError`. |
-| `restartOnExit`, `restartDelay`, `supervisor` | | restart every crash after 5 s | Restart policy: exponential backoff, jitter, `maxRestarts` per `window`. |
-| `shutdownTimeout` | `number` | `5000` | SIGTERM grace before SIGKILL. |
-| `autoScaleInterval`, `onAutoScaleError` | | off | Re-check Discord's recommended shard count. |
-| `remote` | `RemoteOptions` | off | Accept `ClusterHost` agents on other machines; see below. |
-| `fork` | `(script, env) => ChildProcess` | `child_process.fork` | Replace the launcher (tests, custom runtimes). |
-| `onClusterExit`, `onGiveUp` | | none | Callbacks, kept for compatibility; the events below carry the same information. |
+| `token` | `string` | — | Bot token. Required; an empty one throws a `TypeError`. |
+| `script` | `string` | — | Worker script, forked once per cluster on this machine. Required (also with `remote`, where it is used only for clusters on this machine); an empty one throws a `TypeError`. |
+| `shardCount` | `number \| "auto"` | unset | Total shards. `"auto"` asks `/gateway/bot`. When unset, `spawn()` also asks Discord, but `autoScaleInterval` only acts with an explicit `"auto"`. |
+| `guildsPerShard` | `number` | unset | With `"auto"`, size by guilds instead of Discord's recommendation: `ceil(guilds / guildsPerShard)` shards, at least one. Integer from 1 to 2500 (Discord's limit); Discord recommends about 1000. Throws with a numeric `shardCount`. |
+| `guildCount` | `number` | asked from Discord | The guild count for `guildsPerShard`, instead of reading `approximate_guild_count` from `/applications/@me`. |
+| `shardIds` | `number[]` | every shard | The shards this deployment runs, out of `shardCount`. Must be unique integers in `[0, shardCount)`; checked in the constructor when `shardCount` is a number, otherwise in `spawn()`. |
+| `clusterCount` | `number` | logical CPUs (`os.cpus().length`) | Clusters to split the shards across. Positive integer. Clusters that would get no shard are not forked. |
+| `shardsPerCluster` | `number` | unset | Shards per cluster; the cluster count is `ceil(shards / shardsPerCluster)`. Positive integer. Setting it together with `clusterCount` throws a `RangeError`. |
+
+### IDENTIFY
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `maxConcurrency` | `number` | Discord's value when fetched, else `1` | Discord's `max_concurrency`: how many IDENTIFY rate-limit keys there are. Positive integer. When `/gateway/bot` was read, this can only lower Discord's value. |
+| `fetchLimits` | `boolean` | `false` | Read `max_concurrency` and the session-start budget from `/gateway/bot` even with a numeric `shardCount`. A failed request is reported as an `error` event and the start continues without them. |
+| `identify.coordinate` | `boolean` | `true` | Hand out IDENTIFY slots from the parent for every cluster. `false` lets each cluster pace its own IDENTIFYs (`LUNIBEE_IDENTIFY=local`). |
+| `identify.interval` | `number` | `5000` | Milliseconds between two IDENTIFYs on one key. |
+| `identify.holdTimeout` | `number` | `60000` | A granted slot that a worker never gives back is released after this many ms. |
+| `spawnInterval` | `number` | `500` | Milliseconds between forking two clusters, to spread the CPU cost of starting. IDENTIFY pacing does not depend on it. Cannot be negative. |
+
+### Readiness, requests and limits
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `waitForReady` | `boolean` | `false` | Make `spawn()` resolve only once every cluster reported ready. |
+| `startTimeout` | `number` | off | A cluster that has not reported ready this many ms after its fork is killed (SIGKILL) and restarted like a crash. Off by default, because a worker that never reports ready would be killed. Cannot be negative. Also the timeout of the take-over request in [reassignment](#reassignment) (120000 when unset). |
+| `requestTimeout` | `number` | `5000` | Default timeout of `request()`, `broadcast()` and `requestCluster()`, in ms. Cannot be negative. |
+| `maxPendingRequests` | `number` | `10000` | Most requests that may wait for answers at once. Positive integer. Beyond it, a new request throws. |
+| `maxMessageBytes` | `number` | `8388608` (8 MiB) | Largest payload the manager handles, in UTF-8 bytes. See [Payload limits](#payload-limits). Positive integer. |
+
+### Supervision
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `restartOnExit` | `boolean` | `true` | Re-fork a cluster that exits unexpectedly, with the same shards. `false` leaves it `failed`. |
+| `restartDelay` | `number` | `5000` | Delay before the first restart, in ms. `supervisor.restartDelay` wins when both are set. |
+| `supervisor` | `SupervisorOptions` | fixed 5 s delay, no limit | Backoff, jitter and a give-up limit. See [Restarts](#restarts). |
+| `reassignOnGiveUp` | `boolean` | `false` | When a cluster gives up, move its shards to the ready cluster that owns the fewest. See [Reassignment](#reassignment). |
+| `shutdownTimeout` | `number` | `5000` | Grace period after SIGTERM before SIGKILL, in ms, for `shutdownAll()` and `respawn()`. |
+| `onClusterExit` | `(cluster, code, signal) => void` | none | Called whenever a cluster process exits, before any restart. The `clusterExit` event carries the same and more. |
+| `onGiveUp` | `(cluster) => void` | none | Called when a cluster will not be restarted. Same as the `clusterGiveUp` event. |
+
+A callback or listener that throws is ignored; it cannot break supervision.
+
+### Scaling, launching and hosts
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `autoScaleInterval` | `number` | off | With `shardCount: "auto"`, check the recommended count every this many ms and `respawn()` when it changed. Integer of at least 1000. |
+| `onAutoScaleError` | `(error: Error) => void` | none | Called when a background auto-scale check fails. The next tick retries. |
+| `fork` | `(script, env) => ChildProcess` | `child_process.fork(script, [], { env })` | Starts a local worker. `env` is the parent's environment plus the [worker contract](#environment-variables). Replace it for tests or a custom launcher; the returned process needs IPC (`send()`, `message`, `exit`). |
+| `remote` | `RemoteOptions` | off | Accept [`ClusterHost`](/reference/cluster-host/) agents on other machines and place clusters on them. |
+
+### Validation
+
+| Condition | Error |
+|---|---|
+| `token` or `script` missing or blank | `TypeError` |
+| `clusterCount` and `shardsPerCluster` both set | `RangeError` |
+| `clusterCount`, `shardsPerCluster` or `maxConcurrency` not a positive integer | `RangeError` |
+| `maxMessageBytes` or `maxPendingRequests` not a positive integer | `RangeError` |
+| `spawnInterval`, `startTimeout` or `requestTimeout` negative | `RangeError` |
+| `autoScaleInterval` not an integer of at least 1000 | `RangeError` |
+| `guildsPerShard` outside 1–2500, or set with a numeric `shardCount` | `RangeError` |
+| `shardIds` duplicate or outside `[0, shardCount)` | `RangeError` |
+| `supervisor` values out of range | `RangeError` (see [Restarts](#restarts)) |
+| invalid `remote` options | `RangeError` / `TypeError` (see [ClusterHost](/reference/cluster-host/#coordinator-options)) |
+
+## Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `clusters` | `Map<number, ClusterInfo>` | Live clusters (`starting` or `ready`) by ID. A crashed cluster leaves the map until it is restarted. |
+| `shardCount` | `number` | Total shards of the deployment. `0` before the first `spawn()`. |
+| `remotePort` | `number \| undefined` | The port hosts connect to, once the listener is open. Useful with `remote.port: 0`. |
 
 ## Methods
 
-| Method | Description |
-|---|---|
-| `spawn()` | Starts every cluster. Idempotent; concurrent calls share one start. Throws inside a worker. |
-| `ready(timeoutMs?)` | Resolves when every cluster is ready. |
-| `shutdownAll(timeoutMs?)` / `killAll()` | Graceful (SIGTERM, then SIGKILL) or immediate stop. Idempotent; never restarts. |
-| `respawn(shardCount)` | Stops the fleet and starts it again with a new total. |
-| `clusterForShard(id)` / `assignments()` | Who owns a shard / the whole shard-to-cluster map. |
-| `request(shardId, type, data, options?)` | Request to one shard, routed to its cluster. Rejects on timeout, a down cluster or a handler error. |
-| `broadcast(type, data, options?)` | Request to every shard of the live clusters. Resolves `{ replies, missing }`. |
-| `requestCluster(clusterId, type, data, options?)` | Request to a worker, answered by `ClusterWorker.onRequest()`. |
-| `health()` / `refreshHealth({ metrics?, timeoutMs? })` | Last known health / ask every worker. |
-| `hosts()` / `remotePort` | Hosts and their clusters / the port the coordinator listens on (needed with `remote.port: 0`). |
-| `on(event, listener)` / `off(...)` | Events below. |
+### `spawn()`
 
-`options` is `{ timeoutMs?, signal? }`.
+```ts
+spawn(): Promise<void>
+```
+
+Resolves the shard count, allocates shards, waits for hosts (with `remote`) and forks every cluster, `spawnInterval` apart. With `waitForReady` it then waits for [readiness](#readiness).
+
+- Calling it again while clusters run, or while the first call is still starting, returns the same promise.
+- Called during a shutdown, it waits for the shutdown and then starts.
+- A failed start (Discord unreachable, hosts that did not join) rejects and can be retried.
+- Inside a cluster worker it rejects: a worker must never fork the fleet again.
+
+### `ready(timeoutMs?)`
+
+```ts
+ready(timeoutMs?: number): Promise<void>
+```
+
+Resolves when every cluster is `ready`. Rejects after `timeoutMs` if given, or when the manager starts stopping. There is no timeout by default.
+
+### `shutdownAll(timeoutMs?)`
+
+```ts
+shutdownAll(timeoutMs = shutdownTimeout): Promise<void>
+```
+
+Graceful stop. Cancels restart timers, start timers, pending requests, IDENTIFY waits and `ready()` waiters; sends SIGTERM to every cluster, and SIGKILL to those still running after `timeoutMs`; closes the host listener. Safe to call twice or concurrently. Exits during a shutdown are never restarted. Every cluster ends `stopped`.
+
+### `killAll()`
+
+```ts
+killAll(): void
+```
+
+Immediate stop. Cancels the same work as `shutdownAll()`, calls `kill()` (SIGTERM) on every cluster process without waiting, closes the host listener (hosts then kill their own workers), and marks every cluster `stopped`. Prefer `shutdownAll()`.
+
+### `respawn(shardCount)`
+
+```ts
+respawn(newShardCount: number): Promise<void>
+```
+
+Shuts the clusters down gracefully, forgets their crash history and spawns again with the new total. Hosts stay connected.
+
+### `checkAutoScale()` and `fetchRecommendedShardCount()`
+
+```ts
+checkAutoScale(): Promise<void>
+fetchRecommendedShardCount(): Promise<number>
+```
+
+`checkAutoScale()` runs one auto-scale check: with `shardCount: "auto"` it compares Discord's count (or the `guildsPerShard` count) with `shardCount` and calls `respawn()` when they differ. It does nothing otherwise, and passes failures to `onAutoScaleError` instead of throwing. `fetchRecommendedShardCount()` returns that count.
+
+### `clusterForShard(shardId)` and `assignments()`
+
+```ts
+clusterForShard(shardId: number): ClusterInfo | undefined
+assignments(): ReadonlyMap<number, number>
+```
+
+The cluster that owns a shard (whatever its state), or `undefined` when the shard is not part of the deployment; and a copy of the whole shard → cluster map. Ownership changes only through [reassignment](#reassignment).
+
+### `request(shardId, type, data, options?)`
+
+```ts
+request<R = unknown, T = unknown>(shardId: number, type: string, data: T, options?: RequestOptions): Promise<R>
+```
+
+Sends a request to one shard, routed to the cluster that owns it, and resolves with the result of that shard's `ShardBus.respond()` handler.
+
+| Rejects with | When |
+|---|---|
+| `RangeError` | `data` is larger than `maxMessageBytes`, or the shard is not part of the deployment. |
+| `Error("Shard 3 is down: cluster 1 is restarting.")` | The owning cluster is not running. Fails at once. |
+| `Error("Cluster 1 exited.")` | The owning cluster exited while the request waited. |
+| `Error(<handler message>)` | The handler threw. |
+| `Error('Shard 3 did not reply to "stats" in time.')` | No answer within the timeout, or `signal` aborted. |
+
+### `broadcast(type, data, options?)`
+
+```ts
+broadcast<R = unknown, T = unknown>(type: string, data: T, options?: RequestOptions): Promise<BroadcastResult<R>>
+```
+
+Asks every shard of every live cluster. It never rejects for a slow, failed or down shard (only a `RangeError` for oversized `data`, or when `maxPendingRequests` is reached). It settles as soon as every expected shard answered, or at the timeout.
+
+```ts
+const { replies, missing } = await clusters.broadcast<number>("guildCount", null, { timeoutMs: 5000 });
+const total = replies.reduce((sum, r) => sum + (r.result ?? 0), 0);
+```
+
+### `requestCluster(clusterId, type, data, options?)`
+
+```ts
+requestCluster<R = unknown, T = unknown>(clusterId: number, type: string, data: T, options?: RequestOptions): Promise<R>
+```
+
+Sends a request to a worker process (not a shard), answered by a [`ClusterWorker.onRequest()`](#members) handler. Rejects with a `RangeError` for an unknown cluster or oversized `data`; with `Error("Cluster 1 is restarting.")` when it is not running; with the handler's error message; or with `Error('Cluster 1 did not reply to "flush" in time.')`.
+
+```ts
+await clusters.requestCluster(1, "flushCaches", null);
+```
+
+### `health()` and `refreshHealth(options?)`
+
+```ts
+health(): ClusterManagerHealth
+refreshHealth(options?: { metrics?: boolean; timeoutMs?: number }): Promise<ClusterManagerHealth>
+```
+
+`health()` returns what the workers last reported; nothing is sent. `refreshHealth()` asks every live cluster for a fresh report first (timeout `2000` ms per cluster; process metrics only with `metrics: true`). A cluster that does not answer keeps its last report and is not treated as failed. See [Health](#health).
+
+### `hosts()`
+
+```ts
+hosts(): HostStatus[]
+```
+
+The hosts of the deployment, declared or connected, with the clusters on each. Empty without `remote`. See [ClusterHost](/reference/cluster-host/#hosts-and-hoststatus).
+
+### `on(event, listener)` and `off(event, listener)`
+
+Add or remove a listener for one of the [events](#events). Both return the manager.
+
+## Types
+
+### `RequestOptions`
+
+| Field | Type | Description |
+|---|---|---|
+| `timeoutMs` | `number` | Milliseconds to wait. Defaults to `requestTimeout` (5000). |
+| `signal` | `AbortSignal` | Stops waiting. An aborted request settles like a timeout. |
+
+### `BroadcastResult<R>`
+
+| Field | Type | Description |
+|---|---|---|
+| `replies` | `ShardReply<R>[]` | One entry per shard that answered or failed: `{ shardId, result }` or `{ shardId, error }`. A shard whose cluster exited (or could not be sent to) during the broadcast is here with an `error`. |
+| `missing` | `number[]` | Shards that did not answer, sorted: their cluster was not running when the broadcast started, or they did not answer before the timeout or abort. |
+
+### `ClusterInfo`
+
+The object is live: the manager updates it as the cluster changes.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `number` | Cluster ID. |
+| `process` | `ChildProcess` | The current process (the last one while a restart is pending). For a cluster on another host it is a proxy whose `pid` is the pid on that host. |
+| `host` | `string` | `"local"` or the ID of the host it runs on. |
+| `shards` | `number[]` | Shards it owns. |
+| `state` | `ClusterState` | See [Cluster states](#cluster-states). |
+| `restarts` | `number` | Restarts after a crash since `spawn()`. |
+| `startedAt` | `number` | When the current process was forked (epoch ms). |
+| `readyAt` | `number?` | When the current process reported ready. |
+| `lastReadyAt` | `number?` | When any process of this cluster last reported ready. |
+| `report` | `WorkerReport?` | The worker's last health report. |
+
+### Cluster states
+
+`ClusterState` is one of:
+
+| State | Meaning |
+|---|---|
+| `starting` | Forked; has not reported ready. |
+| `ready` | The worker reported its shards ready. |
+| `restarting` | Exited unexpectedly; a restart is scheduled. |
+| `stopping` | A deliberate shutdown is in progress. |
+| `stopped` | Stopped on purpose (`shutdownAll()`, `killAll()`, `respawn()`). Final. |
+| `failed` | Crashed too often (or `restartOnExit: false`) and will not be restarted. |
+
+```text
+starting ──ready──▶ ready
+    │                 │
+    └──── crash ──────┴──▶ restarting ──delay──▶ starting
+                                │
+                        limit reached ──▶ failed
+any live state ── shutdownAll()/killAll() ──▶ stopping ──▶ stopped
+```
+
+A `startTimeout` that passes while `starting` kills the process; its exit is handled as a crash.
 
 ## Events
 
-`clusterSpawn`, `clusterReady`, `ready` (all clusters), `clusterExit` (`expected` is true for a deliberate stop), `clusterRestart` (`{ delay, attempt }`), `clusterUnstable` (third and later restart), `clusterStartTimeout`, `clusterGiveUp`, `shardsReassigned` (`{ shardIds, from, to }`), `hostJoin` (`hostId`), `hostLeave` (`hostId`, `reason`), `identifyWait` (`{ shardId, waitMs }`) and `error` (a malformed frame, a failed recovery, a failed `fetchLimits`). A faulty listener cannot disturb supervision.
+| Event | Arguments | When |
+|---|---|---|
+| `clusterSpawn` | `cluster: ClusterInfo` | A cluster process was forked (also for each restart). |
+| `clusterReady` | `cluster: ClusterInfo` | A cluster's worker reported ready. |
+| `ready` | — | Every cluster is ready. Emitted again after a recovery brings them all back. |
+| `clusterExit` | `cluster`, `code: number \| null`, `signal: NodeJS.Signals \| null`, `expected: boolean` | A cluster process exited. `expected` is `true` for a deliberate shutdown. |
+| `clusterRestart` | `cluster`, `{ delay: number; attempt: number }` | A restart was scheduled `delay` ms from now; `attempt` is the cluster's `restarts` count. |
+| `clusterUnstable` | `cluster`, `{ attempt: number; delay: number }` | Emitted with every restart once the cluster has been restarted three or more times since `spawn()`. |
+| `clusterStartTimeout` | `cluster: ClusterInfo` | The cluster did not report ready within `startTimeout` and is being killed. |
+| `clusterGiveUp` | `cluster: ClusterInfo` | The cluster exceeded `supervisor.maxRestarts` and will not be restarted. |
+| `shardsReassigned` | `{ shardIds: number[]; from: number; to: number }` | A failed cluster's shards were moved to another cluster. |
+| `hostJoin` | `hostId: string` | A host authenticated (also when it reconnects). |
+| `hostLeave` | `hostId: string`, `reason: string` | A host disconnected or was lost. Its clusters exit and are handled as crashes. |
+| `identifyWait` | `{ shardId: number; waitMs: number }` | An IDENTIFY waits for the session-start budget to reset. Repeated waits for the same shard and second are not re-emitted. |
+| `error` | `error: Error` | Something went wrong that did not stop the deployment. See below. |
 
-## Cluster states
+`error` is emitted for: a malformed control frame from a worker; a `ready` report naming shards the cluster does not own; an oversized shard-bus message or health report; an asynchronous IPC send failure of a worker process; a failed `fetchLimits` request; a [reassignment](#reassignment) that found no target or was refused; and, with `remote`, a host that could not start a worker. With no `error` listener these are dropped.
 
-`starting` → `ready` → (`restarting` → `starting`) … → `stopping` → `stopped`, or `failed` when it will not be restarted.
+## Readiness
+
+A cluster is `starting` until its worker sends a `ready` frame, which a `ShardManager` does once every one of its shards finished its handshake (and again after a shard dropped and recovered). Workers without a `ShardManager` call [`ClusterWorker.ready()`](#ready) themselves. A `ready` frame that names a shard the cluster does not own is rejected with an `error` event.
+
+When every cluster in the deployment is `ready`, `ready()` waiters resolve and the `ready` event is emitted. A crash clears that state, so `ready` is emitted again after recovery. A `failed` cluster keeps the deployment from being ready, even after its shards were reassigned; watch `health().missingShards` in that case.
+
+## IDENTIFY coordination
+
+Discord allows one IDENTIFY per rate-limit key (`shard_id % max_concurrency`) every five seconds, for the whole bot, and a daily session-start budget. With `identify.coordinate` on (the default), the parent holds both rules for every cluster, local or remote:
+
+1. Before a worker connects a shard, it asks the parent for a slot (`ClusterWorker.identifyGate.acquire(shardId)`). `ShardManager` does this for you.
+2. The parent grants one slot per key at a time, at least `identify.interval` apart, in request order.
+3. Once the IDENTIFY went out, the worker gives the slot back (`release(shardId)`) and the key rests for one interval. A slot not given back within `identify.holdTimeout` is released for the worker.
+
+The parent denies a request for a shard the cluster does not own, and a second request for a shard that is already waiting, so a worker cannot queue more requests than it has shards. When a cluster exits, its waiting requests are dropped and the slots it held are freed.
+
+The budget is known when `/gateway/bot` was read (`shardCount: "auto"`, unset, or `fetchLimits: true`). Each grant spends one session; when none are left, requests wait for Discord's `reset_after` (an `identifyWait` event says so) instead of failing, and the budget refills every 24 hours after that. Without a known budget the parent paces but never blocks.
+
+With `identify.coordinate: false`, workers get `LUNIBEE_IDENTIFY=local` and pace themselves; a request for a slot is denied with `"IDENTIFY coordination is off."`. A RESUME, or a reconnect handled inside one `Gateway`, does not use a slot.
+
+`IdentifyCoordinator` is the class the parent uses. It is exported for custom orchestrators:
+
+```ts
+import { IdentifyCoordinator, IDENTIFY_INTERVAL } from "lunibee";
+
+const slots = new IdentifyCoordinator({ maxConcurrency: 16, interval: IDENTIFY_INTERVAL });
+await slots.acquire(/* owner */ 0, /* shardId */ 5);
+// ...send IDENTIFY...
+slots.release(0, 5);
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `maxConcurrency` | `1` | Number of keys. Positive integer. |
+| `interval` | `5000` | Ms between two IDENTIFYs on one key. Cannot be negative. |
+| `budget` | none | `{ total, remaining, resetAfter, period? }`; `period` defaults to 24 h. |
+| `holdTimeout` | `60000` | Ms after which an unreleased grant is released. Must be positive. |
+| `onBudgetWait` | none | `({ shardId, waitMs }) => void` when a request waits for the budget. |
+| `now`, `schedule`, `cancel` | `Date.now`, `setTimeout`, `clearTimeout` | Clock and timer, for tests. |
+
+Members: `acquire(owner, shardId)`, `release(owner, shardId)` (ignored unless `owner` holds that slot), `drop(owner, reason?)` (rejects the owner's waiters and frees its slots), `close()`, `pump()`, and the read-only `maxConcurrency`, `remaining`, `waiting` and `holding`.
+
+## Routing and payloads
+
+Workers send [`ShardBus`](/reference/shard-bus/) messages to the parent over IPC (the worker contract sets `LUNIBEE_SHARD_BUS=ipc`). The parent relays only between clusters; shards in the same worker do not go through it.
+
+| Target | What the parent does |
+|---|---|
+| A shard ID | Sends it only to the cluster that owns the shard. If the target is in the sender's own cluster, or not part of the deployment, nothing is relayed. If the owner is not running, the sender gets a peer-down notice and its pending request to that shard fails at once. |
+| `null` (broadcast) | Sends it to every other live cluster. |
+| the parent (`-1`) | Consumed as an answer to `request()` or `broadcast()`. Answers count only from the cluster that owns the answering shard, once per shard. |
+
+### Envelope validation
+
+A bus frame from a worker is dropped silently unless:
+
+- `type` is a string of 1 to 256 characters;
+- `id` is a string of at most 256 characters;
+- `source` is an integer;
+- `target` is an integer or `null`.
+
+Only the documented envelope is relayed (`type`, `id`, `source`, `target`, `data` and `expectsReply` when present); other fields are stripped. Anything on the IPC channel that is not a bus or cluster control frame is the bot's own `process.send()` traffic and is ignored. A control frame that does not parse is reported as an `error` event.
+
+### Payload limits
+
+`maxMessageBytes` (default 8 MiB, the same as the host link) is measured in UTF-8 bytes: a string as it is, anything else as its JSON text. A value that cannot be serialized (a cycle) counts as oversized.
+
+| Payload | Over the limit |
+|---|---|
+| `data` of a shard-bus message from a worker | Dropped, not relayed; an `error` event says so. A request waiting for it times out as usual. |
+| A worker's answer to `requestCluster()` | The request settles at once with an error. |
+| A health report from a worker | Ignored; an `error` event says so. The previous report is kept. |
+| `data` passed to `request()`, `broadcast()` or `requestCluster()` | The call rejects with a `RangeError`; nothing is sent. |
+
+### `RequestTracker`
+
+The parent's table of pending requests, exported for custom orchestrators. Each request waits for a set of keys, each owned by one cluster, and settles when all answered, at its timeout, or when its signal aborts. An answer is accepted only from the key's owner and only once; late, duplicate and unknown answers are ignored. A timer per request guarantees the entry is removed.
+
+```ts
+import { RequestTracker } from "lunibee";
+
+const tracker = new RequestTracker("parent", 10_000);          // id prefix, maxPending
+const { id, done } = tracker.begin({ keys: new Map([["c:1", 1]]), timeoutMs: 5000 });
+tracker.answer(id, "c:1", 1, { result: "ok" });                 // true when accepted
+const { replies, missing } = await done;                        // [{ key, result?, error? }], ["..."]
+```
+
+`failOwner(owner, error)` settles every unanswered key of a cluster with `error`; `close()` settles everything with what it has; `size` is the number of waiting requests. `begin()` throws when `maxPending` requests are already waiting.
+
+## Health
+
+### `ClusterManagerHealth`
+
+| Field | Type | Description |
+|---|---|---|
+| `state` | `"idle" \| "starting" \| "ready" \| "degraded" \| "stopping" \| "stopped"` | `idle` before the first `spawn()`; `stopping` during a shutdown; `stopped` when every cluster is stopped; `ready` when all are ready; `degraded` when any is `restarting` or `failed`; otherwise `starting`. |
+| `totalShards` | `number` | `shardCount`. |
+| `clusters` | `ClusterHealth[]` | Every cluster of the deployment, sorted by ID, whatever its state. |
+| `readyClusters` | `number` | Clusters in `ready`. |
+| `missingShards` | `number[]` | Shards whose owning cluster is not `ready`, sorted. |
+
+### `ClusterHealth`
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `number` | Cluster ID. |
+| `state` | `ClusterState` | Lifecycle state. |
+| `pid` | `number?` | Process ID (on its host, for a remote cluster); only while `starting` or `ready`. |
+| `host` | `string` | `"local"` or the host ID. |
+| `shardIds` | `number[]` | Shards it owns now. |
+| `uptimeMs` | `number` | Ms since the current process was forked; `0` when it is not running. |
+| `restarts` | `number` | Restarts after a crash. |
+| `startedAt` | `number?` | When the current process was forked. |
+| `readyAt` | `number?` | When the current process reported ready. |
+| `lastReadyAt` | `number?` | When any process of this cluster last reported ready. |
+| `shards` | `ShardHealth[]` | Per-shard health from the last report; empty until the worker reports. |
+| `metrics` | `WorkerMetrics?` | `{ rssBytes, heapUsedBytes, cpuUserMicros, cpuSystemMicros }`, when requested with `refreshHealth({ metrics: true })` and the worker answered. |
+| `reportedAt` | `number?` | When `shards` and `metrics` were reported (epoch ms). |
+
+`ShardHealth` is `{ id, state, ping, status, readyAt?, disconnectedAt? }`, where `state` is the Gateway state and `status` the shard lifecycle (`idle`, `connecting`, `ready`, `disconnected`, `unstable`, `destroyed`). See [ShardManager](/reference/shard-manager/).
+
+A worker's `ShardManager` pushes a report each time all its shards become ready, and answers `refreshHealth()`. Cluster health follows the process: a Gateway problem in one shard, a reconnect storm included, never restarts a healthy cluster. Only an exited process (or a missed `startTimeout`) is restarted.
+
+## Recovery
+
+### Restarts
+
+When a cluster exits outside a shutdown, the parent:
+
+1. drops its IDENTIFY requests and frees its slots;
+2. settles its pending requests with `"Cluster <id> exited."`;
+3. tells the other clusters its shards are down, so their pending requests to those shards fail at once;
+4. emits `clusterExit` and calls `onClusterExit`;
+5. schedules a restart with the same shards (`clusterRestart`), or gives up.
+
+The `supervisor` option (`SupervisorOptions`) decides the delay:
+
+| Option | Default | Description |
+|---|---|---|
+| `restartDelay` | `restartDelay`, else `5000` | Delay before the first restart, in ms. Cannot be negative. |
+| `backoff` | `1` | Each further crash inside `window` multiplies the delay by this. At least 1; `1` is a fixed delay. |
+| `maxDelay` | `300000` | Longest delay, in ms. Cannot be negative. |
+| `jitter` | `0` | Random spread added to each delay, as a fraction of it (0–1). Applied after `maxDelay`. |
+| `maxRestarts` | unlimited | Give up after this many restarts inside `window`. `0` gives up on the first crash. |
+| `window` | `60000` | The time, in ms, over which restarts are counted. A cluster that stays up longer is forgiven. Must be positive. |
+
+The delay of the *n*-th restart inside the window is `min(maxDelay, restartDelay × backoff^(n−1)) × (1 + jitter × random)`. When the limit is reached the cluster becomes `failed`, `onGiveUp` is called and `clusterGiveUp` is emitted. With `restartOnExit: false` an exit makes the cluster `failed` straight away, without `clusterGiveUp`.
+
+A restarted process is a new one: late messages and the exit of the process it replaced are ignored.
+
+`ShardSupervisor` is the class behind this, exported for custom orchestrators: `new ShardSupervisor(options?, random?)`, `next(id, now?)` returns the delay in ms or `null` to give up, and `reset(id?)` forgets crashes.
+
+### Reassignment
+
+With `reassignOnGiveUp: true`, a cluster that gives up hands its shards to the `ready` cluster that owns the fewest:
+
+1. The parent asks that cluster's worker to start them (a built-in `requestCluster()` request that `ShardManager` answers with `addShards()`), with a timeout of `startTimeout`, or 120000 ms.
+2. Only after the worker confirms does ownership move: `clusterForShard()` returns the new owner, the target's `shards` grows, the failed cluster's `shards` becomes empty and `shardsReassigned` is emitted.
+
+The failed process is already dead and ownership moves only after confirmation, so no shard ever has two owners. If no cluster is `ready`, or the worker refuses or times out, an `error` event says so and the shards stay down. Reassignment does not happen for `restartOnExit: false`.
 
 ## Worker side
 
-| Export | Description |
+### Environment variables
+
+`ClusterManager` sets these in every worker, on top of the parent's environment (local clusters) or the host's environment (remote clusters):
+
+| Variable | Value |
 |---|---|
-| `ClusterWorker.current()` | The worker of this process, or `undefined` outside a cluster. `ready()`, `reportHealth()`, `onRequest(type, handler)` and `identifyGate`. |
-| `readClusterContext()` / `isClusterWorker()` | Parse the worker contract from the environment. |
-| `ShardManager` | Uses all of the above by itself inside a cluster. |
+| `LUNIBEE_CLUSTER_WORKER` | `1`. Marks a worker. A `ClusterManager` refuses to `spawn()` in such a process. |
+| `CLUSTER_ID` | This cluster's ID. |
+| `CLUSTER_COUNT` | How many clusters the deployment started (clusters with shards). |
+| `SHARD_COUNT` | Total shards of the deployment (Discord's `num_shards`). |
+| `SHARD_LIST` | Comma-separated shard IDs this cluster owns. |
+| `LUNIBEE_SHARD_BUS` | `ipc`: `ShardBus` uses the IPC channel instead of a `BroadcastChannel`. |
+| `LUNIBEE_IDENTIFY` | `coordinated` when the parent hands out IDENTIFY slots, otherwise `local`. |
 
-`allocateShards(ids, clusterCount)`, `assertCompleteAllocation()` and `validateShardIds()` are the pure helpers the manager uses; `IdentifyCoordinator` and `RequestTracker` are exported for custom orchestrators.
+These seven are the only variables a coordinator can set in a worker on another host.
 
-## Multiple hosts
-
-`remote` turns the manager into a coordinator for `ClusterHost` agents on other machines. See [Multiple hosts](/core-concepts/sharding/#multiple-hosts) for placement, security and fencing.
-
-| `remote` option | Type | Default | Description |
-|---|---|---|---|
-| `port` | `number` | Required | TCP port; `0` picks a free one. |
-| `hostname` | `string` | `127.0.0.1` | Interface to bind. Any other address needs `tls` or `allowInsecure`, otherwise the constructor throws. |
-| `secret` | `string` | Required | Shared secret, at least 16 characters. |
-| `tls` | `{ cert, key }` | none | Serve `wss://`. Both must be non-empty strings. |
-| `allowInsecure` | `boolean` | `false` | Listen on a non-loopback address without TLS, for a network you fully trust or behind a TLS proxy. |
-| `maxUnauthenticated` | `number` | `16` | Connections that may be waiting to authenticate at once; more are closed with 4429. |
-| `hosts` | `string[]` | joined hosts | The host IDs of the deployment, in placement order. Others are refused. |
-| `minHosts` | `number` | `1` | Hosts to wait for when `hosts` is not set. |
-| `joinTimeout` | `number` | `60000` | How long `spawn()` waits for the hosts. |
-| `lease` | `number` | `15000` | Fencing lease in ms (at least 30). |
-| `helloTimeout` | `number` | `10000` | Time a new connection has to authenticate. |
-| `local` | `boolean` | `false` | Also run clusters on the coordinator's machine. |
-
-### ClusterHost
+### `readClusterContext(env?)` and `isClusterWorker(env?)`
 
 ```ts
-const host = new ClusterHost({ url, secret, id, script, allowInsecure?, reconnectDelay?, maxReconnectDelay?, fork? });
-await host.connect();   // resolves once accepted; rejects if refused
-host.clusters();        // cluster IDs running here
-host.on("connected" | "disconnected" | "clusterSpawn" | "clusterExit" | "error", listener);
-await host.close();     // kills the workers, closes the link, stops reconnecting
+readClusterContext(env = process.env): ClusterContext | null
+isClusterWorker(env = process.env): boolean
 ```
 
-`url` must be `wss://`; `ws://` is accepted for this machine, or for another one with `allowInsecure: true`. `script` is what this host runs for every cluster; the coordinator cannot choose it. After a lost connection the host reconnects with exponential backoff and jitter. A refused first attempt (bad secret, unknown or duplicate ID, protocol mismatch) rejects `connect()` instead of retrying.
+`isClusterWorker()` is `true` when `LUNIBEE_CLUSTER_WORKER` is `1`. `readClusterContext()` parses the variables above into a `ClusterContext`, returns `null` outside a worker, and throws a `RangeError` when they are present but malformed (not non-negative integers, or shard IDs outside `SHARD_COUNT` or repeated).
+
+| `ClusterContext` field | Type | From |
+|---|---|---|
+| `clusterId` | `number` | `CLUSTER_ID` |
+| `clusterCount` | `number` | `CLUSTER_COUNT` |
+| `shardCount` | `number` | `SHARD_COUNT` |
+| `shardIds` | `number[]` | `SHARD_LIST` |
+| `coordinatedIdentify` | `boolean` | `LUNIBEE_IDENTIFY === "coordinated"` |
+
+### `ClusterWorker`
+
+The worker side of the contract: it reports readiness and health to the parent, answers the parent's requests, and asks the parent for IDENTIFY slots. A `ShardManager` inside a cluster uses it automatically. Use it directly when a worker runs its own Gateways, or to answer `requestCluster()`.
+
+```ts
+import { ClusterWorker } from "lunibee";
+
+const worker = ClusterWorker.current();       // undefined outside a cluster
+worker?.onRequest("flushCaches", async () => {
+  await cache.flush();
+  return { ok: true };
+});
+```
+
+#### Getting one
+
+```ts
+static current(): ClusterWorker | undefined
+new ClusterWorker(context: ClusterContext, endpoint?: WorkerEndpoint, options?: { exitOnParentLoss?: boolean; exit?: (code: number) => void })
+```
+
+`current()` returns this process's worker, creating it on first use, or `undefined` when the process was not forked by a `ClusterManager` (or has no IPC channel). It throws when the contract variables are malformed. `ClusterWorker.reset()` closes and forgets it (tests).
+
+The constructor takes a context, an endpoint (`process` by default: anything with `send`, `on` and `off`) and options. It throws if the endpoint has no `send()`.
+
+| Option | Default | Description |
+|---|---|---|
+| `exitOnParentLoss` | `true` for the real `process`, `false` for an injected endpoint | Exit with code 1 when the parent's IPC channel disconnects. Without a parent nothing coordinates IDENTIFY or fences the process, and its Gateway sessions would keep running beside the replacement the parent starts. A closed worker never exits this way. |
+| `exit` | `process.exit` | Replaces the exit call; for tests. |
+
+Losing the parent always rejects pending IDENTIFY requests, whatever this option says.
+
+#### Members
+
+| Member | Description |
+|---|---|
+| `context` | The `ClusterContext` it was built with. |
+| `identifyGate` | An `IdentifyGate` (`acquire(shardId): Promise<void>`, `release(shardId): void`) when `context.coordinatedIdentify` is true, otherwise `undefined`. `acquire()` resolves when the shard may IDENTIFY and rejects when the parent denies it, the parent goes away, or the worker is closed. Call `release()` once the IDENTIFY was sent. |
+| <span id="ready">`ready(shardIds?)`</span> | Tells the parent the cluster is ready. Defaults to all of `context.shardIds`. The parent marks the cluster ready on any `ready` frame whose shards it owns, so call it once all of them are ready. |
+| `reportHealth(report)` | Pushes a `WorkerReport` (`{ shards: ShardHealth[], metrics?, reportedAt }`) to the parent without being asked. |
+| `onRequest(type, handler)` | Answers `requestCluster()` requests of `type`. The handler gets `data`; its return value (awaited) or thrown error message goes back. Returns the worker. Throws a `TypeError` for a blank type or a non-function. A request with no handler is answered with `No handler for "<type>".` |
+| `close()` | Stops listening, rejects pending IDENTIFY requests, and turns off `exitOnParentLoss`. |
+
+Request types starting with `__lunibee:` are reserved: `ShardManager` registers the built-in health and shard-assignment handlers under them.
+
+#### Own Gateways
+
+```ts
+import { Gateway, GatewayIntentBits, ClusterWorker, readClusterContext } from "lunibee";
+
+const token = process.env.DISCORD_TOKEN!;
+const intents = [GatewayIntentBits.Guilds];
+const context = readClusterContext()!;
+const worker = ClusterWorker.current()!;
+for (const shardId of context.shardIds) {
+  const gateway = new Gateway({ token, intents, shardId, shardCount: context.shardCount });
+  await worker.identifyGate?.acquire(shardId);
+  try {
+    const identified = new Promise<void>((resolve) =>
+      gateway.on("stateChange", (change) => {
+        const { next } = change as { next: string };
+        if (next !== "CONNECT" && next !== "HELLO") resolve();
+      }),
+    );
+    await gateway.connect();
+    await identified; // release only once IDENTIFY went out
+  } finally {
+    worker.identifyGate?.release(shardId);
+  }
+}
+worker.ready();
+```
+
+Gateways created outside `ShardManager` and without the gate are not paced by the parent.
+
+## Shard allocation helpers
+
+The pure functions the manager uses, exported for custom orchestrators and tests.
+
+### `allocateShards(shardIds, clusterCount)`
+
+```ts
+allocateShards(shardIds: readonly number[], clusterCount: number): number[][]
+```
+
+Splits shard IDs round-robin: the *i*-th ID goes to cluster `i % clusterCount`. The same input always gives the same output. Some lists are empty when there are more clusters than shards. Throws a `RangeError` unless `clusterCount` is a positive integer.
+
+```ts
+allocateShards([0, 1, 2, 3, 4, 5], 4); // [[0, 4], [1, 5], [2], [3]]
+```
+
+### `assertCompleteAllocation(chunks, expected)`
+
+```ts
+assertCompleteAllocation(chunks: readonly (readonly number[])[], expected: readonly number[]): void
+```
+
+Throws an `Error` naming the duplicate, missing and unexpected shard IDs unless the chunks cover `expected` exactly once.
+
+### `validateShardIds(shardIds, total)`
+
+```ts
+validateShardIds(shardIds: readonly number[], total: number): void
+```
+
+Throws a `RangeError` unless `total` is a positive integer and every ID is a unique integer in `[0, total)`.
+
+## Several hosts
+
+`remote` turns the manager into a coordinator for `ClusterHost` agents on other machines. Clusters on a host are supervised, routed, paced and health-checked like local ones. Options, placement, authentication and fencing are on the [ClusterHost](/reference/cluster-host/) page.
+
+## See also
+
+- [Sharding guide](/core-concepts/sharding/)
+- [ShardManager](/reference/shard-manager/)
+- [ShardBus](/reference/shard-bus/)
+- [ClusterHost](/reference/cluster-host/)

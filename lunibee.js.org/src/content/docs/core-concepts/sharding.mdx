@@ -378,7 +378,7 @@ await host.connect();
 </TabItem>
 </Tabs>
 
-**Placement.** Cluster `n` goes to host `n % hosts.length`, in the order of `remote.hosts` (or, without it, the hosts that had joined at `spawn()`, sorted by ID; `minHosts` says how many to wait for). `remote.local: true` adds the coordinator's own machine as the first place. A cluster stays on its host for the life of the spawn: when it crashes it restarts there, and while the host is away it is `restarting`. With `reassignOnGiveUp`, its shards move to a ready cluster on any host after `supervisor.maxRestarts`.
+**Placement.** Cluster `n` goes to host `n % hosts.length`, in the order of `remote.hosts` (or, without it, the hosts that had joined at `spawn()`, sorted by ID; `minHosts` says how many to wait for). `remote.local: true` adds the coordinator's own machine as the first place. A cluster stays on its host for the life of the spawn: when it crashes it restarts there. While the host is away, each restart attempt fails at once and counts toward `supervisor.maxRestarts`, so a long outage can take the cluster to `failed`; set `maxRestarts` and `window` with that in mind. With `reassignOnGiveUp`, its shards move to a ready cluster on any host after `supervisor.maxRestarts`.
 
 **Security.**
 - A host proves it knows `remote.secret` by answering a random challenge with an HMAC (the secret never travels), and the coordinator checks it in constant time. Unknown IDs (when `hosts` is set), duplicates, protocol mismatches, malformed or binary frames and a missing hello are closed with codes `4401`, `4410`, `4409`, `4426`, `4400` and `4408` (`RemoteClose`).
