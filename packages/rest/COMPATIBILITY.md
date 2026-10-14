@@ -11,7 +11,7 @@ its **positional** REST design as canonical; Discord.js familiarity is added **a
 |---|---|---|---|
 | `new REST().setToken(token)` | `new REST({ token })` / `setToken(token)` | ✅ | `setToken` throws `TypeError` on empty token. |
 | `rest.get/post/patch/put/delete(path, { body })` | positional `post(path, body)` **+ `{ body }` overload** | ⚑→🔧 | Positional stays canonical; `verb(path, { body, query, headers, reason, files })` now also works. |
-| `rest.request(options)` (single object) | `request(method, path, body?, options?)` | ⚑ | Single-object form **not** added: it is incompatible with `MockREST extends REST` (Priya's `testing` pkg) override checking. Option **names** aligned instead (see below). |
+| `rest.request(options)` (single object) | `request({ method, path \| fullRoute, body, ... })` **+** `request(method, path, body?, options?)` | 🔧 | Both forms work; `MockREST` declares both overloads. |
 | per-request `body` | positional body **or** `options.body` via wrapper | 🔧 | |
 | per-request `query` | `options.query` (`URLSearchParams` / record / string) | 🔧 | `undefined`/`null` record values are skipped. |
 | per-request `headers` | `options.headers` | 🔧 | Merged first; library `Authorization`/`User-Agent`/`Content-Type` win. |
@@ -21,7 +21,7 @@ its **positional** REST design as canonical; Discord.js familiarity is added **a
 | `DiscordAPIError` | `RESTError` **+ `export { RESTError as DiscordAPIError }`** | 🔀 | One class, one alias. `status`/`code`/`errors`/`method`/`path` carried. |
 | `HTTPError` / transport failure | `RESTError` with `status: 0`, `cause` set | ⚑ | Lunibee folds transport + timeout errors into `RESTError`. |
 | `Routes` | `Routes` map | ✅ | Broad coverage; snowflake-validated params. |
-| `WebhookClient` | `WebhookClient` | ✅ | See gap below re: camelCase option aliases. |
+| `WebhookClient` | `WebhookClient` | ✅ | Accepts `avatarURL`, `threadId`, `allowedMentions` beside the wire names; `fetchMessage`/`editMessage`/`deleteMessage` take `threadId`. |
 | rate-limit buckets / retries / global | `RateLimitStore` (memory + Redis) + `RetryPolicy` | ✅ | Server `X-RateLimit-Bucket` hash adopted per normalized route; global 429 tracked. |
 
 ## Auth, headers & serialization
@@ -54,4 +54,9 @@ None open. Both earlier gaps closed in 0.3.1:
 - `tests/rest.test.ts` — JSON, retry, multipart, 429, abort (pre-existing).
 - `tests/rest.compat.test.ts` — DiscordAPIError alias, `{ body }` overload, query/headers/
   reason/auth, multipart via `options.files`, rate-limit hook + bucket-hash adoption (new).
-- `tests/routes.test.ts`, `tests/webhook.test.ts` — route builders + webhook client.
+- `tests/routes.test.ts`, `tests/webhook.test.ts` — route builders + webhook client (aliases,
+  threads, single-object `request`).
+- `tests/rest.security.test.ts` — base URL rules, secret redaction, retry safety, bounded
+  backoff (`maxBackoff`), multipart names, encoded path segments, store bounds.
+- `tests/rest.coverage-complete.test.ts` — the remaining branches; every file in
+  `packages/rest/src` is at 100% function and line coverage.
