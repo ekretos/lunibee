@@ -31,6 +31,7 @@ export class BaseStructure {
     }
 }
 
+/** What a structure uses to act on Discord (send, edit, fetch, compute permissions). `Client` supplies it; tests can supply their own. */
 export interface ResourceContext {
     sendMessage(
         channelId: string,

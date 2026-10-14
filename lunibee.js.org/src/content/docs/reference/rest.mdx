@@ -365,6 +365,8 @@ try {
 
 `AbortSignal.timeout(ms)` works too. One signal can be reused for many requests: the client removes its listener from the signal on every path.
 
+`abortError(path, reason)` builds the same `RESTError` (kind `"aborted"`), for custom transports or stores that need to report a cancellation the same way.
+
 ## Errors
 
 ### `RESTError`

@@ -155,6 +155,7 @@ export type ClientListener<K extends ClientEventName> = (
 // Uses string literal keys so client.on("ready", ...) works without using
 // the ClientEvent enum explicitly.
 
+/** Every `Client` event name mapped to its listener arguments. */
 export type ClientEvents = {
     // ── Lifecycle ──────────────────────────────────────────────────────────────
     ready: [user: ClientUser];

@@ -71,3 +71,13 @@ const older = await bot.api.channels(channelId).messages.all({ max: 300, start: 
 | anything else | 100 | after the last `id` |
 
 `pages()` yields one array per request and stops at a short or empty page. `all()` collects them and stops after `max` items (10,000 by default), shrinking the last request so it never asks for more than it will keep. Settings for both: `limit` (per request), `cursor` (`"after"` or `"before"`), `start` (an id to begin from), `query` (sent with every request), `signal`, and `idOf(item)` for items whose id is not `id` or `user.id`.
+
+## `createApi(rest)`
+
+`bot.api` is `createApi(bot.rest)`. Call it yourself to get the same chained API over any `REST` instance, for example in a script without a `Client`:
+
+```ts
+import { REST, createApi } from "lunibee";
+const api = createApi(new REST({ token }));
+const me = await api.users("@me").get();
+```

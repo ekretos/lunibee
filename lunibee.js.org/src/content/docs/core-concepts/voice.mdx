@@ -13,7 +13,10 @@ lifecycle, speaking state and audio routing.
 ## Joining a channel
 
 `joinVoiceChannel` keeps one connection per guild: calling it again moves the existing
-connection instead of creating a second one.
+connection instead of creating a second one. It only updates local state: it does not tell
+Discord to join. Send the voice state update yourself with `bot.sendVoiceState()` (see
+[Voice integration](/core-concepts/voice-integration/)), and attach your transports once they
+have completed the voice handshake.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -21,9 +24,10 @@ connection instead of creating a second one.
 import {
   joinVoiceChannel,
   getVoiceConnection,
-  entersState,
   VoiceConnectionState,
 } from "lunibee";
+
+bot.sendVoiceState("123456789012345678", "987654321098765432", { selfDeaf: true });
 
 const connection = joinVoiceChannel({
   guildId: "123456789012345678",
@@ -31,7 +35,7 @@ const connection = joinVoiceChannel({
   selfDeaf: true,
 });
 connection.attachTransports(myVoiceGatewayTransport, myUdpTransport);
-await entersState(connection, VoiceConnectionState.Connected, 5_000);
+connection.state === VoiceConnectionState.Connected; // true: joinVoiceChannel() connects synchronously
 
 getVoiceConnection("123456789012345678") === connection; // true
 ```
@@ -41,9 +45,10 @@ getVoiceConnection("123456789012345678") === connection; // true
 import {
   joinVoiceChannel,
   getVoiceConnection,
-  entersState,
   VoiceConnectionState,
 } from "lunibee";
+
+bot.sendVoiceState("123456789012345678", "987654321098765432", { selfDeaf: true });
 
 const connection = joinVoiceChannel({
   guildId: "123456789012345678",
@@ -51,7 +56,7 @@ const connection = joinVoiceChannel({
   selfDeaf: true,
 });
 connection.attachTransports(myVoiceGatewayTransport, myUdpTransport);
-await entersState(connection, VoiceConnectionState.Connected, 5_000);
+connection.state === VoiceConnectionState.Connected; // true: joinVoiceChannel() connects synchronously
 
 getVoiceConnection("123456789012345678") === connection; // true
 ```
@@ -59,7 +64,8 @@ getVoiceConnection("123456789012345678") === connection; // true
 </Tabs>
 
 You can also construct `new VoiceConnection({ guildId, channelId, selfMute, selfDeaf })`
-directly and call `connect()`.
+directly and call `connect()`; such a connection is not tracked by `getVoiceConnection()`.
+`connect()` performs no handshake: it moves through `connecting` to `connected` at once.
 
 ## Lifecycle
 
@@ -90,7 +96,8 @@ connection.on("error", (error) => console.error(error));
 ## Playing audio
 
 `AudioPlayer` reads an `AudioStream` and passes each chunk to `onChunk()`. Override it to
-send audio to your UDP transport. `AudioPlayer`'s `stateChange` passes the **old** state
+send audio to your UDP transport. The player does no encoding or pacing: the stream should
+yield encoded frames at the rate they should be sent. `AudioPlayer`'s `stateChange` passes the **old** state
 first: `(from, to)`.
 
 <Tabs>
@@ -130,8 +137,10 @@ player.on("finish", () => connection.setSpeaking(0));
 
 ## Receiving audio
 
-Feed incoming UDP packets to `connection.receiver.onPacket(packet)`, map SSRCs to users
-with `mapSsrc(ssrc, userId)`, then `subscribe(userId)` for that user's `AudioStream`.
+A UDP transport with `onMessage` feeds `connection.receiver` automatically; otherwise call
+`connection.receiver.onPacket(packet)` yourself. Packets must already be decrypted. Map SSRCs
+to users with `mapSsrc(ssrc, userId)`, then `subscribe(userId)` for that user's `AudioStream`
+of RTP payloads (normally Opus).
 
 See the [VoiceConnection & AudioPlayer reference](/reference/voice-connection/) for
 every method.

@@ -36,20 +36,24 @@ const BULK_DELETE_MAX_AGE_MS = 14 * 24 * 60 * 60_000;
 function snowflakeTime(id: string): number {
     return Number((BigInt(id) >> 22n) + 1_420_070_400_000n);
 }
+/** Options for fetching one message; `cache: false` skips storing it. */
 export interface MessageFetchOptions {
     cache?: boolean;
 }
+/** Pagination for fetching a channel's messages: `before`, `after` or `around` an ID, and a `limit`. */
 export interface MessageQueryOptions {
     before?: string;
     after?: string;
     around?: string;
     limit?: number;
 }
+/** Options for starting a thread from a message. */
 export interface MessageThreadOptions {
     name: string;
     autoArchiveDuration?: 60 | 1440 | 4320 | 10080;
     rateLimitPerUser?: number;
 }
+/** Pagination for listing the users who reacted with an emoji. */
 export interface ReactionFetchOptions {
     limit?: number;
     after?: string;
@@ -643,6 +647,7 @@ function isMessageQuery(
         !(Symbol.iterator in value)
     );
 }
+/** Discord.js-familiar name for `MessageCreateOptions`. */
 export type CreateMessageOptions = MessageCreateOptions;
 export {
     MessageManager,

@@ -490,3 +490,18 @@ const updated = await componentInteraction.update({ content: "Saved", withRespon
 
 The result is a `Message`, or `null` if Discord sent no message. Without
 `withResponse` the methods behave exactly as before. `fetchReply()` still works.
+
+## `InteractionResponse` and `createInteraction`
+
+`reply()`, `deferReply()` and the other response methods build an `InteractionResponse` for you. Build one directly only when answering Discord's HTTP interactions endpoint yourself, where the response is the HTTP body:
+
+| Member | Description |
+|---|---|
+| `new InteractionResponse(type, data?)` | A callback of `type` (Discord's `InteractionCallbackType`) with optional message data. |
+| `InteractionResponse.message(options)` | Type 4: reply with a message. |
+| `InteractionResponse.defer(ephemeral?)` | Type 5: acknowledge now, edit the reply later. |
+| `InteractionResponse.pong()` | Type 1: answer a ping. |
+| `withResponse` | Ask Discord to return the created message (`?with_response=true`). |
+| `toJSON()` | The callback body. |
+
+`createInteraction(client, data)` turns a raw interaction payload into the matching class (`CommandInteraction`, `ComponentInteraction`, `ModalSubmitInteraction`, `AutocompleteInteraction`…). `Client` calls it for every `INTERACTION_CREATE`; use it when you receive interactions some other way, such as over HTTP.

@@ -297,3 +297,11 @@ perms.missing("sendMessages", "embedLinks");
 Permission names Discord has since renamed still resolve: `ManageEmojisAndStickers` and `ManageEmojis` (now `ManageGuildExpressions`), and `UseSlashCommands` (now `UseApplicationCommands`).
 
 `GuildMember.permissions` is computed from the cached roles for members that did not come with permissions from Discord (see [GuildMember](/reference/guild-member/)).
+
+## `PermissionFlagsBits`
+
+Discord's permission bits as `bigint`s, under Discord.js's name: `PermissionFlagsBits.BanMembers`, `PermissionFlagsBits.ManageMessages` and so on. It is the same object as `Permissions`, and every method on this page accepts its values.
+
+```ts
+member.permissions.has(PermissionFlagsBits.BanMembers);
+```

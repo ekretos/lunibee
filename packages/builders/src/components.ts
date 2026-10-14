@@ -4,11 +4,13 @@ export { ButtonType, ComponentEnum };
 export const TextInputType = { Short: 1, Paragraph: 2 } as const;
 /** One {@link TextInputType} value, usable as a type. */
 export type TextInputType = (typeof TextInputType)[keyof typeof TextInputType];
+/** An emoji on a button or select option: a custom emoji `id`, or a Unicode `name`. */
 export interface APIComponentEmoji {
     id?: string | null;
     name?: string | null;
     animated?: boolean;
 }
+/** A button as a builder sends it. Exported from `lunibee` as `APIButtonPayload`. */
 export interface APIButtonComponent {
     type: typeof ComponentEnum.Button;
     style: 1 | 2 | 3 | 4 | 5 | 6;
@@ -20,6 +22,7 @@ export interface APIButtonComponent {
     sku_id?: string;
     disabled?: boolean;
 }
+/** One option of a string select menu. */
 export interface APISelectOption {
     label: string;
     value: string;
@@ -27,6 +30,7 @@ export interface APISelectOption {
     emoji?: APIComponentEmoji;
     default?: boolean;
 }
+/** A string select menu (component type 3) as Discord receives it. */
 export interface APIStringSelectComponent {
     type: typeof ComponentEnum.StringSelect;
     custom_id?: string;
@@ -37,6 +41,7 @@ export interface APIStringSelectComponent {
     disabled?: boolean;
     options?: APISelectOption[];
 }
+/** A user, role, mentionable or channel select menu as Discord receives it. */
 export interface APIEntitySelectComponent {
     type:
         | typeof ComponentEnum.UserSelect
@@ -51,6 +56,7 @@ export interface APIEntitySelectComponent {
     disabled?: boolean;
     default_values?: APISelectDefaultValue[];
 }
+/** A modal text input as a builder sends it. Exported from `lunibee` as `APITextInputPayload`. */
 export interface APITextInputComponent {
     type: typeof ComponentEnum.TextInput;
     style: typeof TextInputType.Short | typeof TextInputType.Paragraph;
@@ -62,30 +68,36 @@ export interface APITextInputComponent {
     required?: boolean;
     value?: string;
 }
+/** A modal (callback type 9 data): title, custom ID and its components. */
 export interface APIModalComponent {
     type: 9;
     custom_id: string;
     title: string;
     components: APIActionRowComponent[];
 }
+/** Any component an action row can hold: a button, a select menu or a text input. */
 export type APIActionRowChild =
     | APIButtonComponent
     | APIStringSelectComponent
     | APIEntitySelectComponent
     | APITextInputComponent;
+/** An action row as a builder sends it: up to five buttons, or one select menu or text input. Exported from `lunibee` as `APIActionRowPayload`. */
 export interface APIActionRowComponent {
     type: typeof ComponentEnum.ActionRow;
     components: APIActionRowChild[];
 }
+/** A Components V2 section: up to three text displays with an accessory. */
 export interface APISectionComponent {
     type: typeof ComponentEnum.Section;
     components?: APIComponent[]; // text displays
     accessory?: APIComponent; // buttons, thumbnails, etc.
 }
+/** A Components V2 text display (Markdown content). */
 export interface APITextDisplayComponent {
     type: typeof ComponentEnum.TextDisplay;
     content: string;
 }
+/** A Components V2 media gallery; each item is `{ media: { url }, description?, spoiler? }`. */
 export interface APIMediaGalleryComponent {
     type: typeof ComponentEnum.MediaGallery;
     items: {
@@ -99,32 +111,38 @@ export interface APISelectDefaultValue {
     id: string;
     type: "user" | "role" | "channel";
 }
+/** A Components V2 file display for an uploaded attachment. */
 export interface APIFileComponent {
     type: typeof ComponentEnum.File;
     file: { url: string };
     spoiler?: boolean;
 }
+/** A Components V2 separator, with optional divider line and spacing. */
 export interface APISeparatorComponent {
     type: typeof ComponentEnum.Separator;
     spacing?: 1 | 2;
     divider?: boolean;
 }
+/** A Components V2 thumbnail: `{ type: 11, media: { url }, description?, spoiler? }`. */
 export interface APIThumbnailComponent {
     type: typeof ComponentEnum.Thumbnail;
     media: { url: string };
     description?: string;
     spoiler?: boolean;
 }
+/** A Components V2 content inventory entry. */
 export interface APIContentInventoryEntryComponent {
     type: typeof ComponentEnum.ContentInventoryEntry;
     id: string;
 }
+/** A Components V2 container: a box around other components, with an optional accent colour. */
 export interface APIContainerComponent {
     type: typeof ComponentEnum.Container;
     components: APIComponent[];
     accent_color?: number;
     spoiler?: boolean;
 }
+/** Any top-level message component: an action row or a Components V2 layout component. */
 export type APIComponent =
     | APIActionRowComponent
     | APIButtonComponent

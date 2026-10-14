@@ -1,6 +1,6 @@
 {
   "name": "lunibee",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A lightweight, Bun-first Discord API library.",
   "type": "module",
   "main": "./dist/index.js",
@@ -102,6 +102,7 @@
     "bench": "bun benchmarks/parity.ts",
     "bench:compare": "bun scripts/bench-compare.mjs",
     "build:all": "bun run build && bun run build:dts",
+    "docs:types": "bun scripts/docs-types.ts",
     "publish:all": "bun run scripts/publish.ts",
     "audit:security": "bun scripts/security-scan.ts && bun audit",
     "smoke:install": "bun scripts/smoke-install.ts"

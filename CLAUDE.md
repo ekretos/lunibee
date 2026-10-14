@@ -19,7 +19,17 @@ future sessions should pick up.
   examples use the new names only. `PermissionFlagsBits`, `GatewayIntentBits`, `Routes`,
   `MessageFlags` and the Gateway code sets keep their names.
 
-## Next release: 0.3.1
+## Next release: 0.3.2
+
+Fixes from the fifth security audit of 0.3.1 (status of every finding in
+`docs/audits/security-0.3.1.md`, "Fifth pass"), the `CreateThumbnail` / `CreateMediaGallery`
+payload bugs, the REST compatibility gaps (`request(options)`, `WebhookClient` aliases),
+100% REST coverage, and complete reference pages for REST, Gateway, sharding and voice. All in the
+changelog's "v0.3.2 (unreleased)". Versions are already 0.3.2 and the 0.3.1 docs are archived in
+the version picker. Left for the maintainer: the `0.3.2` tag, `publish:all`, and removing
+"(unreleased)" from the changelog heading.
+
+## 0.3.1 (shipped)
 
 The workflow release: handles (`bot.guild(id)`, `peek` / `get` / `fetch`), `bot.api`, channel
 `kind`, `command()` with `option.*`, the CLI's `create command --slash|--prefix|--both` and
@@ -27,10 +37,8 @@ The workflow release: handles (`bot.guild(id)`, `peek` / `get` / `fetch`), `bot.
 `ShardSupervisor`, IDENTIFY buckets; `ShardManager` + `ClusterManager` as one system (worker contract, cross-cluster IDENTIFY coordination, readiness, routing, health, recovery); Gateway health and storm backoff; concurrent REST buckets by
 default; the REST coverage audit and its gaps; structure polish. The 0.2.x deprecations are
 removed. Everything is in `.roadmap/0.3.1.md` (the unticked items there are not done: Bun 1.4 as
-the minimum and the pass-through event profiling) and the changelog's "v0.3.1 (unreleased)".
-Left for the maintainer: the final smoke test (`examples/basic` sharded across two forked
-clusters), the `0.2.4` and `0.3.1` tags, `publish:all`, and removing "(unreleased)" from the
-changelog heading. Versions are already 0.3.1 and the 0.2.4 docs are archived in the version picker.
+the minimum and the pass-through event profiling) and the changelog's "v0.3.1".
+Tagged `0.3.1`.
 
 ## 0.2.4 (shipped)
 

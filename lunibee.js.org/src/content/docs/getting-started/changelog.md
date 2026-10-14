@@ -3,13 +3,70 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
-## v0.3.1 (unreleased)
+## v0.3.2 (unreleased)
+
+Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1.md), "Fifth pass"), two Components V2 payload bugs, the last REST compatibility gaps, and complete reference pages for REST, Gateway, sharding and voice.
+
+### ⚠️ Changed
+
+- **`CreateThumbnail` and `CreateMediaGallery` now emit the payload Discord accepts.** A thumbnail is `{ type: 11, media: { url } }` (it was `{ type: 11, url }`, which Discord rejected with `Invalid Form Body`, 50035), and a gallery item is `{ media: { url }, description?, spoiler? }` (`description` was inside `media`). `APIThumbnailComponent` and `APIMediaGalleryComponent` changed to match, and `addItems()` accepts `spoiler`. Code that read `.url` from a thumbnail's `toJSON()`, or built `APIThumbnailComponent` by hand, must use `media.url`. Remove any workaround helper for these two components.
+- **Input Discord would reject now throws before sending:**
+    - embed, link-button and `link()` URLs must be `http` or `https` (embeds also `attachment`, buttons also `discord`);
+    - `allowed_mentions` with a kind both in `parse` and listed by ID, an unknown `parse` value, or non-string IDs;
+    - option choices must be finite numbers or non-empty strings, and `setMinValue()` above an existing maximum throws;
+    - `spliceFields()` validates fields like `addFields()`; `link()` titles cannot contain `)`; `timestamp()` rejects values outside the safe integer range.
+- **`Client.destroy()`** stops collectors and empties the caches.
+- **A forked `ClusterWorker` exits when its parent's IPC channel closes** (`exitOnParentLoss`, on by default for the real process), so its shards cannot keep running beside a replacement.
+- **`HandlerRegistry.dispatch`** runs every handler before rethrowing (one error, or an `AggregateError`).
+- **Voice subscriber streams** hold at most 50 packets; a reader that falls behind loses the newest ones.
+- **Gateway:** `reconnectBaseDelay`, `reconnectMaxDelay` and `connectTimeout` must be greater than 0; dispatch names that are not UPPER_SNAKE_CASE are not re-emitted as events; `ownsGuild()` returns `false` for a non-numeric id.
+
+### 🔒 Security
+
+- **Server-controlled backoff is bounded.** A `Retry-After` or rate-limit reset above `maxBackoff` (new REST option, default 10 minutes) fails the request with a `RESTError` instead of sleeping, and stored bucket and global limits are capped to it. `sleep()` clamps to the 32-bit timer limit.
+- **A custom `transport`'s thrown error is sanitised** before it becomes a `RESTError`'s `cause`.
+- **Multipart file names** have CR, LF, `"` and `\` replaced; **`baseURL`** is normalised and a bare `?` or `#` is refused; **encoded path segments** that decode to `..` are refused.
+- **The memory rate-limit store is bounded** (10,000 buckets and 10,000 route mappings, oldest dropped first).
+- **The cluster relay** checks `type`, `id` and `source` and forwards only the documented envelope fields.
+- **The voice receiver** ignores datagrams that are not RTP version 2.
+- **CI and release:** every workflow checkout sets `persist-credentials: false`; the Pages grants moved from the workflow to the deploy job; the secret scan covers `.pem`, `.key`, `.env*`, `.npmrc` and `.bat` files, finds Discord webhook URLs and scans merge commits; `publish.bat` (an unguarded second release path) was removed — use `bun run publish:all`; `@lunibee/testing` pins `@types/bun`.
+
+### 🐛 Fixed
+
+- **`ClusterManager` listens for each worker's `error` event**, so an `EPIPE` from `send()` to a dying worker is emitted as `error` instead of crashing the manager.
+- **`IdentifyBudget` refills after a long idle gap** (new `period` option, default 24 h) instead of staying empty.
+- **`AudioPlayer.play()`** called while an earlier `play()` is still stopping the previous stream no longer starts two pumps.
+- **A Gateway decoder failure** (a corrupt compressed frame) closes the socket with `4000` so the session resumes, instead of leaving it open and deaf. `compress: true` joins a query-less connect URL with `?`.
+- **A socket stuck connecting** is closed and retried after `connectTimeout` (new Gateway option, default 30 s).
+- **A partial member** (the one on a message) no longer clears a cached timeout; **a `MESSAGE_UPDATE` without an author** patches the cached message instead of throwing.
+- **`parsePrefixArgs`** returns a null-prototype `values` object, so an option named `__proto__` works.
+- **Voice:** re-attaching the same transport pair no longer delivers each datagram twice; `entersState(…, Infinity)` waits instead of rejecting at once.
+- **CLI:** `lunibee create component` refuses inherited names such as `constructor`; the generated handler binder escapes file paths.
+- **Attachments:** a missing `root` gives a clear error, and a file named like `..dotfile` inside the root is accepted.
+
+### ✨ Added
+
+- **`cache.maxMembers`** bounds the members kept per guild (least recently used leave first).
+- **`rest.request({ method, path | fullRoute, body, ... })`** — the single-object form from `@discordjs/rest`, beside the positional one. `MockREST` supports both.
+- **`WebhookClient`:** `avatarURL`, `threadId` and `allowedMentions` aliases; `editMessage()` takes the full message options (components, files, `threadId`); new `fetchMessage()`; `deleteMessage()` accepts `threadId`.
+- **`maxBackoff`** (REST) and **`connectTimeout`** (Gateway) options.
+
+### 📚 Documentation
+
+- Complete reference pages for [REST](/reference/rest/), [Gateway](/reference/gateway/), sharding ([ShardManager](/reference/shard-manager/), [ShardBus](/reference/shard-bus/), [ClusterManager](/reference/cluster-manager/), [ClusterHost](/reference/cluster-host/)) and [voice](/reference/voice-connection/). Corrected examples that used `Routes.user("@me")`, `error.name === "AbortError"` and Gateway properties that do not exist.
+- `packages/rest/COMPATIBILITY.md` lists no open gaps.
+
+### 🧪 Testing
+
+- Every file in `packages/rest/src` is at 100% function and line coverage.
+- A regression test for each audit fix.
+
+## v0.3.1
 
 A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3-workflow.md`](https://github.com/ekretos/lunibee/blob/0.3.1/docs/lunibee-3-workflow.md).
 
 ### ⚠️ Changed
 
-- **`CreateThumbnail` and `CreateMediaGallery` now emit the payload Discord accepts.** A thumbnail is `{ type: 11, media: { url } }` (it was `{ type: 11, url }`, which Discord rejected with `Invalid Form Body`, 50035), and a gallery item is `{ media: { url }, description?, spoiler? }` (`description` was inside `media`). `APIThumbnailComponent` and `APIMediaGalleryComponent` changed to match, and `addItems()` accepts `spoiler`. Code that read `.url` from a thumbnail's `toJSON()`, or built `APIThumbnailComponent` by hand, must use `media.url`. Remove any workaround helper for these two components.
 - **`Gateway.connect()` rejects instead of throwing** when the Gateway was permanently closed. It returns a promise, so `.catch()`, `Promise.allSettled()` and `await` in a `try` now see the error; code that relied on a synchronous throw from a non-awaited call must handle the rejection.
 - **`CreateEmbed.toJSON()` throws a `RangeError` when the embed's text adds up to more than Discord's 6000 characters** (title, description, footer text, author name, field names and values), instead of leaving Discord to answer 400.
 - **`ClusterManager` runs under Bun** (Bun 1.4's `child_process.fork()` with IPC is supported and tested); the Node-only guard is gone.
@@ -34,24 +91,10 @@ The findings, with severity and status, are in [`docs/audits/security-0.3.1.md`]
 - **Message and frame limits are counted in UTF-8 bytes.** `maxMessageBytes` and the 8 MiB host-link frame limit counted UTF-16 characters, so non-ASCII payloads could exceed the byte limit by up to three times. A string is measured as it travels, anything else as its JSON text.
 - **Security-scan exceptions are narrower.** An exception is now `// security-ok(<rule>): <reason>` (or `#`, `<!-- -->`, `/* */`): it must name the rule, give a reason, sit in a comment, and covers only that rule on that line and only matches before the comment. The old `security-ok: <reason>` form no longer suppresses anything.
 - **Workflow triggers** for CI and Security are `master` and `dev` (push and pull request); `tests/workflows.test.ts` checks the triggers, read-only permissions and SHA-pinned Actions.
-- **A fifth audit pass** (`docs/audits/security-0.3.1.md`, "Fifth pass") fixed:
-    - `ClusterManager` listens for the worker's `error` event, so an `EPIPE` from `send()` is emitted as an `error` instead of crashing the manager.
-    - `IdentifyBudget` refills every 24 h after a long idle gap (new `period` option) instead of staying empty.
-    - `AudioPlayer.play()` called while another `play()` is still stopping the previous stream no longer starts two pumps.
-    - **Server-controlled backoff is bounded.** A `Retry-After` or rate-limit reset above `maxBackoff` (new REST option, default 10 minutes) fails the request with a `RESTError` instead of sleeping, and bucket and global limits are capped to it. `sleep()` clamps to the 32-bit timer limit.
-    - A custom `transport`'s thrown error is sanitised before it becomes the `cause`.
-    - Multipart file names have CR, LF, `"` and `\` replaced; `baseURL` is normalised (`url.href`) and a bare `?` or `#` is refused.
-    - A Gateway decoder failure (corrupt compressed frame) closes the socket with 4000 so the session resumes, instead of leaving it open and deaf; `compress: true` joins a query-less URL with `?`; `reconnectBaseDelay` and `reconnectMaxDelay` must be greater than 0.
-    - `spliceFields` validates fields like `addFields`; `link()` titles can no longer contain `)`; `parsePrefixArgs` returns a null-prototype `values` object so an option named `__proto__` works.
-    - The cluster relay checks `type`, `id` and `source` and forwards only the documented envelope; the memory rate-limit store keeps at most 10,000 buckets; Gateway dispatch names that are not UPPER_SNAKE_CASE are not re-emitted; `ownsGuild` returns false for a non-numeric id; `HandlerRegistry.dispatch` runs every handler before rethrowing; `timestamp()` rejects out-of-range values; the voice receiver ignores non-RTP-v2 datagrams and `entersState(…, Infinity)` waits.
-    - **Backlog behaviour changes:** `cache.maxMembers` (new) bounds members per guild; `Client.destroy()` stops collectors and empties the caches; a partial member no longer clears a cached timeout; a `MESSAGE_UPDATE` without an author patches the cached message instead of throwing; `connectTimeout` (new, default 30 s) closes a Gateway socket stuck connecting; a forked `ClusterWorker` exits when its parent goes away (`exitOnParentLoss`); voice subscriber streams hold at most 50 packets; embed, link-button and `link()` URLs must be `http`, `https` (embeds also `attachment`, buttons also `discord`); `allowed_mentions` that Discord would reject (`parse` plus the same list, unknown `parse` values, non-string IDs) throws before sending; option choices must be finite numbers or non-empty strings; encoded path separators that form `..` are refused.
-    - Every workflow checkout sets `persist-credentials: false`, and the Pages grants moved from the workflow to the deploy job. The scan covers `.pem`, `.key`, `.env*`, `.npmrc` and `.bat` files, finds Discord webhook URLs, and scans merge commits. `publish.bat` (an unguarded second release path) was removed; use `bun run publish:all`. `@lunibee/testing` pins `@types/bun`.
 - **`SECURITY.md`** (disclosure policy), a **Security workflow** (`bun audit`, a secret and risky-API scan of the tree and history, dependency review on pull requests, CodeQL), least-privilege workflow permissions, GitHub Actions pinned to commit SHAs, and a release **package smoke test** (`bun run smoke:install` packs every package and installs `lunibee` into an empty project). New scripts: `audit:security`, `smoke:install`.
 
 ### ✨ Added
 
-- **`rest.request({ method, path | fullRoute, body, ... })`** — the single-object form from `@discordjs/rest`, beside the positional one. `MockREST` supports both.
-- **`WebhookClient`:** `avatarURL`, `threadId` and `allowedMentions` aliases; `editMessage()` takes the full message options (components, files, `threadId`); new `fetchMessage()`; `deleteMessage()` accepts `threadId`.
 
 - **`guildsPerShard`** (with `guildCount`) on `ClusterManager` and `ShardManager`: with `shardCount: "auto"`, the shard count is `ceil(guilds / guildsPerShard)` from the guild count Discord reports, instead of Discord's recommendation (1 to 2500; `autoScaleInterval` follows it). Together with `shardsPerCluster` this fixes how many guilds a shard and how many shards a cluster hold. New helpers `shardsForGuilds()`, `fetchGuildCount()`, `MAX_GUILDS_PER_SHARD`.
 - **Multi-host clusters.** `ClusterManager({ remote })` is a coordinator that accepts `ClusterHost` agents on other machines over an authenticated WebSocket (HMAC challenge, optional `wss://`). Clusters are placed on hosts round-robin and supervised like local ones, so IDENTIFY slots, routing, `request()` / `broadcast()`, health and recovery work across hosts. A host kills its workers when the link closes or after one `lease` without the coordinator, and the coordinator waits two leases before it treats the host as lost, so a shard never runs in two places. Remote workers get only the worker-contract variables and the host's own script. New: `ClusterHost`, `hosts()`, `remotePort`, the `hostJoin` / `hostLeave` events, `ClusterInfo.host`, `ClusterHealth.host`, `RemoteClose`. See [Multiple hosts](/core-concepts/sharding/#multiple-hosts).

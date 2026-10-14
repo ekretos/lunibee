@@ -257,3 +257,44 @@ const settings = new CreateSlashCommand()
 ```
 </TabItem>
 </Tabs>
+
+## Option builder classes
+
+Each `addXOption(fn)` callback receives one of these classes. They can also be built on their own and passed to `addXOption(option)`.
+
+| Class | Option type | Extra methods |
+|---|---|---|
+| `CreateStringOption` | 3 | `addChoices({ name, value })`, `setMinLength`, `setMaxLength`, `setAutocomplete` |
+| `CreateIntegerOption` | 4 | `addChoices`, `setMinValue`, `setMaxValue`, `setAutocomplete` (integers only) |
+| `CreateNumberOption` | 10 | `addChoices`, `setMinValue`, `setMaxValue`, `setAutocomplete` |
+| `CreateBooleanOption` | 5 | — |
+| `CreateUserOption` | 6 | — |
+| `CreateChannelOption` | 7 | `addChannelTypes(...types)` |
+| `CreateRoleOption` | 8 | — |
+| `CreateMentionableOption` | 9 | — |
+| `CreateAttachmentOption` | 11 | — |
+
+All of them have `setName`, `setDescription` and `setRequired`. Choices must be strings of 1-100 characters or finite numbers (at most 25), an option with choices cannot use autocomplete, and `setMinValue` / `setMaxValue` throw a `RangeError` if the minimum would exceed the maximum.
+
+## Subcommands
+
+`addSubcommand(fn)` adds a `CreateSubcommand` (type 1), which takes the same `addXOption` methods. `addSubcommandGroup(fn)` adds a `CreateSubcommandGroup` (type 2), whose only children are subcommands.
+
+```ts
+const config = new CreateSlashCommand()
+  .setName("config")
+  .setDescription("Bot settings")
+  .addSubcommandGroup((group) =>
+    group
+      .setName("prefix")
+      .setDescription("Prefix settings")
+      .addSubcommand((sub) =>
+        sub
+          .setName("set")
+          .setDescription("Change the prefix")
+          .addStringOption((o) => o.setName("value").setDescription("New prefix").setRequired(true)),
+      ),
+  );
+```
+
+In the handler, `interaction.options.getSubcommandGroup()` and `getSubcommand()` tell you which one ran.

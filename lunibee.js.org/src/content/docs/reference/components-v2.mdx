@@ -376,3 +376,11 @@ await channel.send(componentsV2Message(
   { allowed_mentions: { parse: [] } },
 ));
 ```
+
+## `CreateContentInventoryEntry`
+
+Shows an entry from Discord's content inventory (type `ContentInventoryEntry`). `setId(id)` sets the entry id; `toJSON()` returns `{ type, id }`.
+
+```ts
+new CreateContentInventoryEntry().setId("123456");
+```

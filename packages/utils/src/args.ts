@@ -35,8 +35,10 @@ export interface MentionableArg {
     type: "user" | "role";
 }
 
+/** A parsed prefix-command argument: a string, number, boolean or mention. */
 export type PrefixArgValue = string | number | boolean | MentionableArg;
 
+/** The result of `parsePrefixArgs`: the parsed values, or the argument that failed and why. */
 export type PrefixArgsResult =
     | { ok: true; values: Record<string, PrefixArgValue | undefined> }
     | { ok: false; arg: string; error: string };

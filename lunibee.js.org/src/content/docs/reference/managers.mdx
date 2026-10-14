@@ -89,3 +89,7 @@ The application's own emojis belong to the bot, not to a guild, so any server ca
 | `create({ name, image })` | Uploads an emoji. `name` is 2-32 letters, digits or underscores; `image` is a data URI (PNG, JPEG, GIF or WebP, up to 256 KB). |
 | `edit(emojiId, options)` | Renames an emoji. |
 | `remove(emojiId)` | Deletes an emoji. |
+
+## Helpers
+
+`toRequest(options, allowedMentions?)` turns message options into a REST request: it splits `files` out into a multipart upload, applies the client's default `allowedMentions` when the message has none, and throws a `TypeError` for an `allowed_mentions` object Discord would reject. The managers use it for every message they send.

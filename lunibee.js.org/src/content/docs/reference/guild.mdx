@@ -273,3 +273,35 @@ const rename = entry?.change("nick");                                           
 `find` returns the newest match; `filter` returns all. `type` takes one action or an array, `since` a `Date`, ISO string or milliseconds. `entry.options` stays Discord's raw object; `entry.info` is the parsed one.
 
 `new Sticker(apiSticker)` wraps a raw sticker and adds `url({ size })` (PNG, APNG, GIF, or the Lottie `.json`), `animated` and `toItem()`; `stickerURL(id, formatType)` builds the URL from a message's `stickers` items.
+
+## Guild constants
+
+`VerificationLevel` and `PremiumTier` name the numbers in `guild.verificationLevel` and `guild.premiumTier`:
+
+| `VerificationLevel` | | `PremiumTier` | |
+|---|---|---|---|
+| `None` | 0 | `None` | 0 |
+| `Low` | 1 | `Tier1` | 1 |
+| `Medium` | 2 | `Tier2` | 2 |
+| `High` | 3 | `Tier3` | 3 |
+| `VeryHigh` | 4 | | |
+
+```ts
+if (guild.premiumTier >= PremiumTier.Tier2) { /* 50 MB uploads */ }
+```
+
+## `AutoModerationRule`
+
+`client.guilds.fetchAutoModerationRules(guildId)`, `fetchAutoModerationRule(guildId, ruleId)` and `createAutoModerationRule(guildId, data)` return `AutoModerationRule` objects:
+
+| Property | Description |
+|---|---|
+| `id`, `guildId`, `name`, `creatorId` | Identity. |
+| `eventType`, `triggerType`, `triggerMetadata` | When the rule fires (Discord's numbers and metadata). |
+| `actions` | What Discord does when it fires. |
+| `enabled` | Whether the rule is on. |
+| `exemptRoles`, `exemptChannels` | IDs the rule ignores. |
+
+## `BaseStructure`
+
+Every structure with an id (`Guild`, `Channel`, `User`, `Role`, `Message`, `AutoModerationRule`…) extends `BaseStructure`. It provides `id`, `createdAt` and `createdTimestamp` (read from the snowflake), and `toString()`.

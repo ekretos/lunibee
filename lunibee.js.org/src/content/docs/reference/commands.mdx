@@ -90,3 +90,7 @@ Prefix commands need the `MessageContent` intent and `GuildMessages` or `DirectM
 | `listen({ prefix? })` | Starts answering slash commands and, with `prefix` (text or a list), prefix commands. Call it once. |
 
 An error thrown by a handler goes to the client's `error` listeners, or prints as a warning when there are none, like any other listener error.
+
+## `CommandRegistry`
+
+`bot.commands` is a `CommandRegistry`. Besides `add()`, `deploy()` and `listen()`, it has `get(name)` (a command by name or prefix alias) and `list()` (every command, in the order added). `deploy({ guildId? })` resolves to the number of commands registered.

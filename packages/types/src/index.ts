@@ -799,6 +799,7 @@ export const ActivityEnum = {
 /** One {@link ActivityEnum} value, usable as a type. */
 export type ActivityEnum = (typeof ActivityEnum)[keyof typeof ActivityEnum];
 
+/** An activity in a presence (playing, streaming, listening, a custom status…). */
 export interface APIActivity {
     name: string;
     type: number;

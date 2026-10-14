@@ -3,6 +3,7 @@ import { GuildMember, type ResourceContext } from "@lunibee/structures";
 import { ResourceManager, splitReason } from "./base.js";
 import type { APIGuildMember } from "@lunibee/types";
 
+/** Fields that can change when editing a guild member (nickname, roles, voice state, timeout). */
 export interface MemberEditOptions {
     /** Audit-log reason. */
     reason?: string;
@@ -14,6 +15,7 @@ export interface MemberEditOptions {
     communication_disabled_until?: string | null;
 }
 
+/** Options for banning a member: audit-log `reason` and how many seconds of their messages to delete. */
 export interface BanOptions {
     reason?: string;
     deleteMessageSeconds?: number;

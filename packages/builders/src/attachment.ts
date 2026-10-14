@@ -1,6 +1,7 @@
 import { readFile, realpath } from "node:fs/promises";
 import { basename, isAbsolute, relative, resolve } from "node:path";
 
+/** Options for `CreateAttachment`: file name, alt-text description, the contents or a file path, and an optional root folder the path must stay inside. */
 export interface AttachmentData {
     name: string;
     description?: string;

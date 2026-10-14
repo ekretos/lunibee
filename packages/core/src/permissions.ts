@@ -131,6 +131,7 @@ export const PermissionFlagsBits = Permissions;
 export type PermissionFlagsBits =
     (typeof PermissionFlagsBits)[keyof typeof PermissionFlagsBits];
 
+/** A permission flag name, such as `"BanMembers"`, accepted wherever a permission can be given by name. */
 export type PermissionName =
     | keyof typeof Permission
     | keyof typeof Permissions

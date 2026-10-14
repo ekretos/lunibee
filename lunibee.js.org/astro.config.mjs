@@ -191,7 +191,9 @@ export default defineConfig({
               label: "Sharding",
               items: [
                 { label: "ShardManager", link: "/reference/shard-manager" },
+                { label: "ShardBus", link: "/reference/shard-bus" },
                 { label: "ClusterManager", link: "/reference/cluster-manager" },
+                { label: "ClusterHost", link: "/reference/cluster-host" },
               ],
             },
             {
@@ -206,6 +208,10 @@ export default defineConfig({
                 { label: "Formatters", link: "/reference/formatters" },
                 { label: "Utils", link: "/reference/utils" },
               ],
+            },
+            {
+              label: "Types",
+              items: [{ label: "All exported types", link: "/reference/types" }],
             },
           ],
         },

@@ -94,3 +94,5 @@ const text = bot.guild(guildId).channels.find(c => c.name === "general");
 ```
 
 The managers (`bot.guilds`, `bot.channels`, `bot.users`) are still there, and are what handles use underneath.
+
+`channelCreatePayload(options)` is the function that turns these `createChannel()` options into Discord's request body. It is exported for code that sends the request itself; it throws for a name or number Discord would refuse.
