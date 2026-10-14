@@ -12,6 +12,8 @@ export class RequestScheduler {
     /** Maximum times a request may be moved to a different bucket queue. */
     public static readonly MAX_REMAPS = 2;
     readonly #queues = new Map<string, Promise<void>>();
+    /** Creates an empty instance. */
+    public constructor() {}
 
     /** Number of bucket keys currently holding a queue slot. */
     public get size(): number {

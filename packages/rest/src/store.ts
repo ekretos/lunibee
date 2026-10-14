@@ -64,6 +64,9 @@ export class MemoryRateLimitStore implements RateLimitStore {
     /** Most entries either map keeps; the oldest are dropped first. */
     static readonly #MAX_ENTRIES = 10_000;
 
+    /** Creates an empty instance. */
+    public constructor() {}
+
     static #evict(map: Map<string, unknown>): void {
         while (map.size > MemoryRateLimitStore.#MAX_ENTRIES)
             map.delete(map.keys().next().value as string);

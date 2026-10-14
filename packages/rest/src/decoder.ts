@@ -8,6 +8,9 @@ export interface DecodedError {
 
 /** Turns a raw {@link Response} into a payload and the error metadata retries need. */
 export class ResponseDecoder {
+    /** Creates an empty instance. */
+    public constructor() {}
+
     /** Reads a Discord response payload as JSON, text, or nothing for 204. */
     public async read(response: Response): Promise<unknown> {
         if (response.status === 204) return undefined;
