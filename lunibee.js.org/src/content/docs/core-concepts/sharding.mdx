@@ -267,7 +267,7 @@ With a fixed `shardCount` the parent does not call Discord: pass `maxConcurrency
 
 ### Readiness and lifecycle
 
-A cluster is `starting` until its `ShardManager` reports every shard ready, then `ready`; a crash makes it `restarting` (or `failed` once `supervisor.maxRestarts` is exceeded). `ready(timeoutMs?)` resolves when all clusters are ready, `waitForReady` makes `spawn()` do that, and `startTimeout` turns a cluster that never reports ready into a crash. Workers that do not use `ShardManager` can call `ClusterWorker.current()?.ready()` themselves. `spawn()` and `shutdownAll()` are idempotent and safe to call concurrently; shutdown cancels restarts and pending requests, sends SIGTERM and escalates to SIGKILL after `shutdownTimeout`. A deliberate shutdown, including `killAll()`, is never restarted.
+A cluster is `starting` until its `ShardManager` reports every shard ready, then `ready`; a crash makes it `restarting` (or `failed` once `supervisor.maxRestarts` is exceeded). `ready(timeoutMs?)` resolves when every shard is served by a ready cluster (a failed cluster whose shards were reassigned no longer counts) and rejects if a failure leaves shards with no owner, `waitForReady` makes `spawn()` do that, and `startTimeout` turns a cluster that never reports ready into a crash. Workers that do not use `ShardManager` can call `ClusterWorker.current()?.ready()` themselves. `spawn()` and `shutdownAll()` are idempotent and safe to call concurrently; shutdown cancels restarts and pending requests, sends SIGTERM and escalates to SIGKILL after `shutdownTimeout`. A deliberate shutdown, including `killAll()`, is never restarted.
 
 ### Requests, broadcasts and routing
 
@@ -301,7 +301,7 @@ A shard's lifecycle `status` (`connecting`, `ready`, `disconnected`, `unstable`)
 
 ### When a cluster keeps crashing
 
-By default a cluster that exceeds `supervisor.maxRestarts` stays down (`clusterGiveUp`, `onGiveUp`). With `reassignOnGiveUp: true` the parent asks the ready cluster that owns the fewest shards to start them; ownership moves only after that worker confirms, and the failed process is already dead, so no shard has two owners. If no cluster is ready or the worker refuses, an `error` event says so and the shards stay down.
+By default a cluster that exceeds `supervisor.maxRestarts` stays down (`clusterGiveUp`, `onGiveUp`). With `reassignOnGiveUp: true` the parent asks the ready cluster that owns the fewest shards to start them; ownership moves only after that worker confirms, and the failed process is already dead, so no shard has two owners. If no cluster is ready or the worker refuses, an `error` event says so, the shards stay down, and pending `ready()` calls reject.
 
 ### Multiple hosts
 

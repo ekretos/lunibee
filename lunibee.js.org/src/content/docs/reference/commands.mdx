@@ -76,7 +76,7 @@ An option is always present when it has `required: true` or a `default`; otherwi
 
 ## Prefix commands
 
-The same options are read from the message text: `!timeout @ann 5 being loud`. A user, role or channel can be a mention or an id; the last text option takes the rest of the message. A missing or invalid argument replies with the problem and the usage line, for example `` `minutes` must be at most 60. Usage: `!timeout <user> [minutes] [reason]` ``. An attachment option takes the message's attachments in order.
+The same options are read from the message text: `!timeout @ann 5 being loud`. A user, role or channel can be a mention or an id; when the last option is a text option, it takes the rest of the message. A missing or invalid argument replies with the problem and the usage line, for example `` `minutes` must be at most 40320. Usage: `!timeout <user> [minutes] [reason]` ``. An attachment option takes the message's attachments in order.
 
 Prefix commands need the `MessageContent` intent and `GuildMessages` or `DirectMessages`. `listen({ prefix })` prints a `LunibeeWarning` (code `LUNIBEE_MESSAGE_CONTENT_INTENT`) at startup when they are missing, since Discord then sends empty message content and nothing would match.
 
@@ -86,8 +86,8 @@ Prefix commands need the `MessageContent` intent and `GuildMessages` or `DirectM
 |---|---|
 | `add(...commands)` | Adds commands; one with the same name replaces it. Throws if a name or alias is used by another command. |
 | `get(name)`, `list()` | Look commands up. `get` also finds aliases. |
-| `deploy({ guildId? })` | Registers the slash commands, replacing the ones registered before; with `guildId` for one guild (instant) instead of globally. Returns how many. Call it once the client is ready. |
-| `listen({ prefix? })` | Starts answering slash commands and, with `prefix` (text or a list), prefix commands. Call it once. |
+| `deploy({ guildId? })` | Registers the slash commands, replacing the ones registered before; with `guildId` for one guild (instant) instead of globally. Returns how many. Call it once the client is ready; before that it throws. |
+| `listen({ prefix? })` | Starts answering slash commands and, with `prefix` (text or a list), prefix commands. Call it once; a second call (or an empty prefix) throws a `TypeError`. |
 
 An error thrown by a handler goes to the client's `error` listeners, or prints as a warning when there are none, like any other listener error.
 

@@ -34,6 +34,8 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 
 ### 🐛 Fixed
 
+- **A `failed` cluster no longer keeps `ClusterManager.ready()` pending forever.** Readiness now means every shard is served by a ready cluster, so a failed cluster whose shards were reassigned does not block it, and when a failure leaves shards with no owner, pending `ready()` calls reject with an error naming them.
+- **`ShardBus` over IPC reaches shards in the same worker.** The parent relays only between clusters, so a `send()` to a shard of the same cluster (and that part of a `broadcast()`) was never delivered; `IpcTransport`s on one process now deliver to each other locally.
 - **`ClusterManager` listens for each worker's `error` event**, so an `EPIPE` from `send()` to a dying worker is emitted as `error` instead of crashing the manager.
 - **`IdentifyBudget` refills after a long idle gap** (new `period` option, default 24 h) instead of staying empty.
 - **`AudioPlayer.play()`** called while an earlier `play()` is still stopping the previous stream no longer starts two pumps.

@@ -28,7 +28,7 @@ All methods return `this` for chaining.
 
 ### `setCustomId(id)`
 
-Sets the custom ID for this select menu.
+Sets the custom ID for this select menu (max 100 characters). Required: `toJSON()` throws without it.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -62,7 +62,7 @@ select.setPlaceholder("Choose a color…");
 
 ### `setMinValues(min)`
 
-Sets the minimum number of values the user must select (default: 1).
+Sets the minimum number of values the user must select (default: 1; an integer from 0 to 25).
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -79,7 +79,7 @@ select.setMinValues(1);
 
 ### `setMaxValues(max)`
 
-Sets the maximum number of values the user can select (default: 1, max: 25).
+Sets the maximum number of values the user can select (default: 1, an integer from 1 to 25). `toJSON()` throws when it exceeds the number of options or is below `min_values`.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -94,9 +94,13 @@ select.setMaxValues(3);
 </TabItem>
 </Tabs>
 
+### `setRequired(required?)`
+
+Marks the select as required (`required` defaults to `true`).
+
 ### `setDisabled(disabled?)`
 
-Disables the select menu.
+Disables the select menu (`disabled` defaults to `true`).
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -113,14 +117,14 @@ select.setDisabled(true);
 
 ### `addOptions(...options)`
 
-Adds one or more options (max 25 total). Each option has:
+Adds one or more options (max 25 total; calling it with none throws). Each option has:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `label` | `string` | ✅ | Visible text (max 100 chars). |
 | `value` | `string` | ✅ | Submitted value (max 100 chars). |
 | `description` | `string` | — | Subtitle text (max 100 chars). |
-| `emoji` | `string \| object` | — | Emoji to display. |
+| `emoji` | `{ id?, name?, animated? }` | — | Emoji to display. |
 | `default` | `boolean` | — | Pre-selected state. |
 
 <Tabs>
@@ -146,7 +150,7 @@ select.addOptions(
 
 ### `toJSON()`
 
-Serializes to a raw Discord API-compatible component object.
+Serializes to a raw Discord API-compatible component object. Throws when there is no custom ID or no option.
 
 ## Full Example
 
@@ -210,7 +214,7 @@ client.on("interactionCreate", async (interaction) => {
   const selected = interaction.values; // e.g. ["announcements", "gaming"]
   await interaction.reply({
     content: `✅ Subscribed to: ${selected.join(", ")}`,
-    ephemeral ,
+    ephemeral: true,
   });
 });
 ```

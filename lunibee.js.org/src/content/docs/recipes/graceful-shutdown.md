@@ -17,7 +17,7 @@ const client = new Client({
 await client.login();
 async function handleShutdown(signal: string) {
   console.log(`\nReceived ${signal}. Shutting down Lunibee gracefully...`);
-  // Closes WebSocket Gateway, clears heartbeat timers, and settles pending requests
+  // Closes the Gateway and its heartbeat timers, stops collectors, and clears the caches
   client.destroy();
   console.log("Client destroyed. Process exiting.");
   process.exit(0);

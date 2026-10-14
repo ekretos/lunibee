@@ -47,6 +47,14 @@ import {
 
 The top-level V2 component that wraps other components. Set `IS_COMPONENTS_V2` flag when sending.
 
+### Methods
+
+| Method | Description |
+|---|---|
+| `addComponents(...components)` | Adds child components (throws a `TypeError` when called with none). |
+| `setAccentColor(color)` | Sets the accent colour, an integer from `0` to `0xFFFFFF` (anything else throws a `RangeError`). |
+| `setSpoiler(spoiler?)` | Marks the whole container as a spoiler (`spoiler` defaults to `true`). |
+
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
@@ -132,7 +140,7 @@ Renders markdown text in a V2 layout.
 
 | Method | Description |
 |---|---|
-| `setContent(text)` | Sets the markdown text content. |
+| `setContent(text)` | Sets the markdown text content (1-4000 characters). |
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -161,7 +169,7 @@ Displays a grid of images.
 
 | Method | Description |
 |---|---|
-| `addItems(...items)` | Adds media items. Each item: `{ url, description? }`. |
+| `addItems(...items)` | Adds media items (at most 10 per gallery). Each item: `{ url, description?, spoiler? }`. |
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -193,8 +201,8 @@ A small image accessory used in `CreateSection`.
 | Method | Description |
 |---|---|
 | `setUrl(url)` | Sets the image URL. |
-| `setDescription(text)` | Sets alt text for accessibility. |
-| `setSpoiler(spoiler)` | Marks as a spoiler image. |
+| `setDescription(text)` | Sets alt text for accessibility (max 1024 characters). |
+| `setSpoiler(spoiler?)` | Marks as a spoiler image (`spoiler` defaults to `true`). |
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -224,7 +232,7 @@ Renders a visual divider between components.
 | Method | Description |
 |---|---|
 | `setSpacing(spacing)` | Sets the spacing size (`1` = small, `2` = large). |
-| `setDivider(show)` | Whether to show a visible line (default: `true`). |
+| `setDivider(show?)` | Whether to show a visible line (`show` defaults to `true`). |
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -249,8 +257,8 @@ Attaches an uploaded file component to the layout.
 
 | Method | Description |
 |---|---|
-| `setUrl(url)` | Sets the attachment URL (`attachment://filename`). |
-| `setSpoiler(spoiler)` | Marks as spoiler. |
+| `setUrl(url)` | Sets the attachment URL (`attachment://filename`, max 2048 characters). Required: `toJSON()` throws without it. |
+| `setSpoiler(spoiler?)` | Marks as spoiler (`spoiler` defaults to `true`). |
 
 <Tabs>
 <TabItem label="TypeScript">

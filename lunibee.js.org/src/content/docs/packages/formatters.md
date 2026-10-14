@@ -43,12 +43,12 @@ Discord renders the timestamp according to each user's locale and timezone.
 
 ## Markdown Helpers
 
-The formatter package also provides helpers for common Discord markdown styles. Prefer these when building long messages dynamically so formatting stays readable in your source code.
+The formatter package also provides helpers for common Discord markdown styles: `bold`, `italic`, `underline`, `strikethrough`, `spoiler`, `inlineCode`, `codeBlock`, `link`, `blockQuote`, `heading`, `subtext`, `orderedList`, `bulletList` and `escapeMarkdown`. Prefer these when building long messages dynamically so formatting stays readable in your source code.
 
 ## Putting it together
 
 ```ts
 await channel.send({
-  content: `${userMention(userId)} — your ticket was created ${timestamp(new Date(), "R")}.`,
+  content: `${userMention(userId)} — your ticket was created ${timestamp(Math.floor(Date.now() / 1000), "R")}.`,
 });
 ```

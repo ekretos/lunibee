@@ -47,7 +47,7 @@ await bot.api.to("guilds", guildId, "stage-instances").get();
 await bot.api.to("channels", channelId, "pins", messageId).put();
 ```
 
-`to(...segments)` takes any path words and ids.
+`to(...segments)` takes any path words and ids. Each segment may only use letters, digits and `_ @ . % -`; anything else (or no segment at all) throws a `TypeError`.
 
 ## Paging
 

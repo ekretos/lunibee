@@ -60,7 +60,7 @@ modal.setTitle("Open a Support Ticket");
 
 ### `addComponents(...rows)`
 
-Adds `CreateActionRow<CreateTextInput>` rows to the modal (1–5).
+Adds `CreateActionRow<CreateTextInput>` rows to the modal (1–5). Throws a `TypeError` when called with none and a `RangeError` past five rows.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -93,7 +93,7 @@ modal.addComponents(
 
 ### `toJSON()`
 
-Serializes to a raw Discord API-compatible modal object.
+Serializes to a raw Discord API-compatible modal object. Throws when the custom ID or title is missing, or when the modal has no components.
 
 ---
 
@@ -103,14 +103,15 @@ Serializes to a raw Discord API-compatible modal object.
 
 | Method | Description |
 |---|---|
-| `setCustomId(id)` | Unique ID for this field (used in `getRequiredInputValue()`). |
+| `setCustomId(id)` | Unique ID for this field (used in `getRequiredInputValue()`; max 100 chars). Required: `toJSON()` throws without it. |
 | `setLabel(label)` | The visible field label (max 45 chars). |
-| `setStyle(style)` | `TextInputType.Short` (single line) or `TextInputType.Paragraph` (multi-line). |
-| `setRequired(required)` | Whether the field is required. |
-| `setValue(value)` | Pre-filled default value. |
+| `setStyle(style)` | `TextInputType.Short` (single line, the default) or `TextInputType.Paragraph` (multi-line). |
+| `setRequired(required?)` | Whether the field is required (`required` defaults to `true`). |
+| `setValue(value)` | Pre-filled default value (max 4000 chars). |
 | `setPlaceholder(text)` | Placeholder text (max 100 chars). |
-| `setMinLength(min)` | Minimum character length. |
-| `setMaxLength(max)` | Maximum character length. |
+| `setMinLength(min)` | Minimum character length (0–4000). |
+| `setMaxLength(max)` | Maximum character length (0–4000). `toJSON()` throws when `min_length` exceeds `max_length`. |
+| `toJSON()` | Serializes the text input. |
 
 ## Full Example
 
@@ -208,7 +209,7 @@ client.on("interactionCreate", async (interaction) => {
   const reason = interaction.getRequiredInputValue("reason");
   await interaction.reply({
     content: `📨 Report filed for **${userId}**: ${reason}`,
-    ephemeral ,
+    ephemeral: true,
   });
 });
 ```

@@ -426,7 +426,7 @@ A `startTimeout` that passes while `starting` kills the process; its exit is han
 
 A cluster is `starting` until its worker sends a `ready` frame, which a `ShardManager` does once every one of its shards finished its handshake (and again after a shard dropped and recovered). Workers without a `ShardManager` call [`ClusterWorker.ready()`](#ready) themselves. A `ready` frame that names a shard the cluster does not own is rejected with an `error` event.
 
-When every cluster in the deployment is `ready`, `ready()` waiters resolve and the `ready` event is emitted. A crash clears that state, so `ready` is emitted again after recovery. A `failed` cluster keeps the deployment from being ready, even after its shards were reassigned; watch `health().missingShards` in that case.
+When every cluster in the deployment is `ready`, `ready()` waiters resolve and the `ready` event is emitted. A crash clears that state, so `ready` is emitted again after recovery. Readiness means every shard is served by a ready cluster: a `failed` cluster whose shards were reassigned no longer counts. When a cluster fails and its shards are left with no owner (no `reassignOnGiveUp`, `restartOnExit: false`, no ready cluster to take them, or the takeover failed), pending `ready()` calls reject with an error naming the cluster and its shards instead of waiting forever.
 
 ## IDENTIFY coordination
 
@@ -466,7 +466,7 @@ Members: `acquire(owner, shardId)`, `release(owner, shardId)` (ignored unless `o
 
 ## Routing and payloads
 
-Workers send [`ShardBus`](/reference/shard-bus/) messages to the parent over IPC (the worker contract sets `LUNIBEE_SHARD_BUS=ipc`). The parent relays only between clusters; shards in the same worker do not go through it.
+Workers send [`ShardBus`](/reference/shard-bus/) messages to the parent over IPC (the worker contract sets `LUNIBEE_SHARD_BUS=ipc`). The parent relays only between clusters; buses in the same worker deliver to each other directly (`IpcTransport` delivers locally as well as sending to the parent).
 
 | Target | What the parent does |
 |---|---|

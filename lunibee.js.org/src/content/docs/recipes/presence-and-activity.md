@@ -27,7 +27,7 @@ await bot.login();
 | Option | Meaning |
 | --- | --- |
 | `type` | An `ActivityEnum`: `Playing` (default), `Streaming`, `Listening`, `Watching`, `Custom`, `Competing`. |
-| `status` | `"online"` (default), `"idle"`, `"dnd"`, `"invisible"`. |
+| `status` | `"online"` (default), `"idle"`, `"dnd"`, `"invisible"`, `"offline"`. |
 | `url` | Only used by `Streaming`. |
 | `state` | The text of a `Custom` status. It defaults to `name`. |
 

@@ -63,7 +63,7 @@ new Gateway(options: GatewayOptions)
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `token` | `string` | — | Bot token. Required. |
-| `intents` | `GatewayIntentResolvable` | — | Required. An array of `GatewayIntentBits`, or the bitfield number. The old `A \| B` form is not accepted. |
+| `intents` | `GatewayIntentResolvable` | — | Required. An array of `GatewayIntentBits` values or names. A single number or the old `A \| B` bitfield is not accepted. |
 | `shardId` | `number` | `0` | This connection's shard. Must be below `shardCount`. |
 | `shardCount` | `number` | `1` | Total shards. |
 | `compress` | `boolean` | `false` | zlib-stream compression: about a tenth of the inbound bandwidth for some CPU. See [Compression](#compression). |
@@ -77,7 +77,7 @@ new Gateway(options: GatewayOptions)
 | `reconnectStormWindow` | `number` | `60000` | The window, in ms, over which reconnects are counted. |
 | `connectTimeout` | `number` | `30000` | How long a socket may stay connecting (for example a TLS handshake that never answers) before it is closed and retried, in ms. Must be above 0. |
 | `heartbeatAckTimeout` | `number` | `10000` | How long to wait for a heartbeat acknowledgement before the connection is treated as dead, in ms. |
-| `zombieTimeout` | `number` | `30000` | How long the connection may receive nothing at all before it is treated as dead, in ms. Must be greater than `heartbeatAckTimeout`. |
+| `zombieTimeout` | `number` | `30000` | How long the connection may receive nothing at all before it is treated as dead, in ms; the effective deadline is never shorter than one heartbeat interval plus `heartbeatAckTimeout`. Must be greater than `heartbeatAckTimeout`. |
 | `createSocket` | `SocketFactory` | the global `WebSocket` | Builds the socket; inject a fake in tests. |
 
 The constructor throws a `TypeError` for a missing token or invalid intents, and a `RangeError` for a `shardId` outside `shardCount`, a delay of 0 or less, or a `zombieTimeout` not above `heartbeatAckTimeout`.
@@ -198,7 +198,7 @@ Each listener receives one argument.
 | `stateChange` | `{ previous, next }` | `state` changed. |
 | `heartbeatAck` | the acknowledgement payload | Discord acknowledged a heartbeat; `ping` is updated. |
 | `invalidSession` | `boolean` (resumable) | Discord invalidated the session (opcode 9). The Gateway reconnects on its own. |
-| `zombie` | `{ silentFor, timeout }` | Nothing was received for `zombieTimeout`; the connection is closed and resumed. |
+| `zombie` | `{ silentFor, timeout }` | Nothing was received for the staleness deadline (`timeout`); the connection is closed and resumed. |
 | `unstable` | `{ reconnects, delay }` | More than `reconnectStormLimit` reconnects in `reconnectStormWindow`; the delay is being raised. |
 | `error` | `Error` (usually `GatewayError`) | Something failed. The Gateway keeps running unless it is a fatal close. |
 
@@ -278,7 +278,7 @@ After `maxReconnectAttempts` failures in a row the Gateway stops trying, and a p
 ### Heartbeats and zombie connections
 
 - **Acknowledgement timeout.** If a heartbeat is not acknowledged within `heartbeatAckTimeout`, `error` is emitted and the connection is closed for a resume.
-- **Zombie detection.** If nothing at all arrives for `zombieTimeout` (measured from the socket opening, so a connection that never gets HELLO is caught too), `zombie` and `error` are emitted and the connection is closed for a resume.
+- **Zombie detection.** If nothing at all arrives for `zombieTimeout`, or for one heartbeat interval plus `heartbeatAckTimeout` when that is longer (measured from the socket opening, so a connection that never gets HELLO is caught too), `zombie` and `error` are emitted and the connection is closed for a resume.
 
 Every message from Discord counts as a sign of life, not just acknowledgements.
 

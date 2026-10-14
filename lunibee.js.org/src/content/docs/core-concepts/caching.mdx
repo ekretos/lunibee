@@ -10,25 +10,25 @@ Lunibee manages Discord resources (Users, Guilds, Channels, Roles, Messages) usi
 
 ## Canonical Identity Guarantee
 
-When a resource is received via Gateway event or fetched via REST, the resource manager checks if an existing instance already exists in memory.
+When a resource is received via a Gateway event (or a channel is fetched via REST), the resource manager checks if an existing instance already exists in memory.
 
-If it exists, Lunibee mutates the existing structure in place and returns the same object reference. This prevents subtle desynchronization bugs where two parts of your application hold different versions of the same guild or user.
+If it exists, Lunibee mutates the existing structure in place and returns the same object reference. (`fetch()` on the user, member and role managers currently stores the fetched object in place of the cached one instead of merging into it.) This prevents subtle desynchronization bugs where two parts of your application hold different versions of the same guild or user.
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-const userA = client.users.cache.get("123456789012345678");
-const userB = await client.users.fetch("123456789012345678");
+const channelA = client.channels.cache.get("123456789012345678");
+const channelB = await client.channels.fetch("123456789012345678");
 
-console.log(userA === userB); // true! Exact same instance
+console.log(channelA === channelB); // true! Exact same instance
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const userA = client.users.cache.get("123456789012345678");
-const userB = await client.users.fetch("123456789012345678");
+const channelA = client.channels.cache.get("123456789012345678");
+const channelB = await client.channels.fetch("123456789012345678");
 
-console.log(userA === userB); // true Exact same instance
+console.log(channelA === channelB); // true Exact same instance
 ```
 </TabItem>
 </Tabs>
@@ -38,7 +38,8 @@ console.log(userA === userB); // true Exact same instance
 Every manager cache is a `Collection`. Managers store Discord resources with
 `setWithoutTTL()`, so a guild, channel, role, member or user leaves the cache
 only through an explicit delete — a Gateway `*_DELETE` event or your own
-`manager.delete(id)` — never because nobody read it.
+`manager.delete(id)` — never because nobody read it. The one opt-in exception
+is `cache.maxMembers`, which evicts each guild's least recently used members.
 
 Gateway events keep the caches current: `GUILD_CREATE` fills roles, emojis,
 members and channels; updates merge into the cached object; `GUILD_DELETE`
@@ -51,7 +52,8 @@ client.guilds.emojis(guildId).cache.size;
 ```
 
 A REST fetch that finishes after a Gateway update (or delete) for the same
-resource is returned to you but not cached, so it cannot overwrite newer state.
+resource is not cached, so it cannot overwrite newer state: you get the cached
+object (or the fetched one if the resource was deleted).
 Concurrent fetches of one resource share a single request.
 
 ## TTL & LRU Collections for Your Own Data
@@ -149,9 +151,9 @@ Every channel has `isThread()`, `isTextBased()`, `isVoiceBased()` and `isDMBased
 
 | Access | Manager | Covers |
 |---|---|---|
-| `client.guilds.bans(guildId)` | `GuildBanManager` | `fetch`, `fetchAll`, `create`, `remove` |
+| `client.guilds.bans(guildId)` | `GuildBanManager` | `fetch`, `fetchAll`, `create`, `bulk`, `remove` |
 | `client.guilds.scheduledEvents(guildId)` | `GuildScheduledEventManager` | `fetch`, `fetchAll`, `create`, `edit`, `remove`, `fetchSubscribers` |
-| `client.channels.permissionOverwrites(channelId)` | `PermissionOverwriteManager` | `edit`, `remove` |
+| `client.channels.permissionOverwrites(channelId)` | `PermissionOverwriteManager` | `update`, `edit`, `remove` |
 | `client.stageInstances` | `StageInstanceManager` | `create`, `fetch`, `edit`, `remove` |
 
 ```ts
@@ -161,4 +163,4 @@ await client.guilds.bans(guildId).create(userId, {
 });
 ```
 
-These managers cache raw Discord payloads. `CachedManager` is an alias of `ResourceManager`.
+The ban, scheduled-event and stage-instance managers cache raw Discord payloads. `CachedManager` is an alias of `ResourceManager`.

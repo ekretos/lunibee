@@ -83,7 +83,7 @@ new ShardManager(options: ShardManagerOptions)
 | `guildCount` | `number` | asked from Discord | The guild count for `guildsPerShard`, so no extra request is made. A non-negative integer. |
 | `shardIds` | `number[]` | every shard, or the cluster's own list | The shards this manager runs, out of `shardCount`. Unique integers in `[0, shardCount)`. |
 | `reconnect` | `boolean` | `true` | Passed to every `Gateway`: reconnect automatically after a close that is not fatal. |
-| `spawnDelay` | `number` | `5000` | Milliseconds between startup rounds when pacing locally. `0` starts every round at once. See [IDENTIFY pacing](#identify-pacing). |
+| `spawnDelay` | `number` | `5000` | Milliseconds between startup rounds when pacing locally. `0` drops the handshake wait and the delay, so each round starts as soon as the previous round's sockets are open. See [IDENTIFY pacing](#identify-pacing). |
 | `maxConcurrency` | `number` | Discord's `max_concurrency` if known, else `1` | Shards per startup round when pacing locally. Capped at Discord's value when it is known. |
 | `handshakeTimeout` | `number` | `15000` | How long a startup round waits for its shards to send IDENTIFY or RESUME before the next `spawnDelay` starts, in ms. With an IDENTIFY gate, how long a shard holds its slot waiting for the handshake. |
 | `autoScaleInterval` | `number` | — | With `shardCount: "auto"`: re-check the shard count this often, in ms, and reshard when it changes. An integer of at least `1000`. |

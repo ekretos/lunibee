@@ -49,7 +49,7 @@ const selectRow = new CreateActionRow();
 
 ### `addComponents(...components)`
 
-Adds one or more components to the row (max 5 buttons or 1 select menu per row).
+Adds one or more components to the row (max 5 buttons or 1 select menu per row). Throws a `TypeError` when called with no components and a `RangeError` when the row would hold more than 5.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -70,9 +70,13 @@ const row = new CreateActionRow().addComponents(
 </TabItem>
 </Tabs>
 
+### `clearComponents()`
+
+Removes every component from the row.
+
 ### `toJSON()`
 
-Serializes to a raw Discord API-compatible action row object.
+Serializes to a raw Discord API-compatible action row object. Throws a `RangeError` when the row is empty, or when a select menu or text input shares the row with another component.
 
 ## Examples
 

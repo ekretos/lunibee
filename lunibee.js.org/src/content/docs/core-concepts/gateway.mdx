@@ -16,6 +16,8 @@ stateDiagram-v2
     Connecting --> Handshaking: Socket Open
     Handshaking --> Identifying: Opcode 10 (Hello)
     Identifying --> Ready: Opcode 0 (Ready)
+    Handshaking --> Resuming: Opcode 10 (Hello), session to resume
+    Resuming --> Ready: Opcode 0 (Resumed)
     Ready --> Reconnecting: Network Drop / Recoverable Close
     Ready --> Disconnected: Fatal Close
     Reconnecting --> Connecting: Exponential Backoff
@@ -23,7 +25,7 @@ stateDiagram-v2
 
 ## Health and reconnect storms
 
-`gateway.health()` returns `{ state, latency, silentFor, reconnects }`: the connection state, the last heartbeat round trip in milliseconds (`-1` before the first), how long Discord has been silent, and how many reconnects were scheduled. `ShardManager.health()` reports the state and latency of every shard.
+`gateway.health()` returns `{ state, latency, silentFor, reconnects }`: the connection state, the last heartbeat round trip in milliseconds (`-1` before the first), how long Discord has been silent, and how many reconnects were scheduled. `ShardManager.health()` reports the state, ping and lifecycle status of every shard.
 
 A link that connects and drops again resets the usual backoff every time, which would loop at the base delay. Lunibee also counts reconnects over a window (`reconnectStormLimit`, default 5 per `reconnectStormWindow`, default 60 s): beyond it the wait doubles for each further reconnect, up to `reconnectMaxDelay`, and the Gateway emits `unstable` with `{ reconnects, delay }`. A `ShardManager` re-emits it as `shardUnstable`.
 

@@ -347,9 +347,9 @@ Inside workers forked by `ClusterManager`, every bus uses `IpcTransport` and the
 - When a cluster exits, the parent tells every other cluster that its shards are gone, so pending `request()`s to them reject.
 - A message to a shard that is not part of the deployment is dropped (a request to it times out).
 - The parent relays only the documented envelope fields (`source`, `target`, `type`, `data`, `id`, `expectsReply`), and drops an envelope whose `type` or `id` is not a string of the allowed length or whose `source` or `target` is not an integer (or a `null` target).
-- A message whose `data` is larger than `maxMessageBytes` (8 MiB by default, measured as JSON text) is not relayed; the parent emits `error`, and a request waiting for it times out.
+- A message whose `data` is larger than `maxMessageBytes` (8 MiB by default, in UTF-8 bytes: a string as it is, anything else as its JSON text) is not relayed; the parent emits `error`, and a request waiting for it times out.
 
-The parent only relays to **other** clusters. Two buses in the same worker process do not reach each other over IPC: a `send()` to a shard of the same cluster, and the part of a `broadcast()` meant for it, are not delivered. Within one process, call your code directly, or give those buses a second, `BroadcastChannelTransport` bus.
+The parent only relays to **other** clusters. Buses in the same worker process reach each other directly: every `IpcTransport` on one process endpoint delivers its messages to the others locally (a copy, on a microtask), and each bus drops what is not addressed to it. So `send()`, `broadcast()` and `request()` work the same whether the target shard is in this worker or another.
 
 `ClusterManager` can also ask shards itself: `request(shardId, type, data)` and `broadcast(type, data)` in the parent reach the same `respond()` handlers, with `source` set to `-1`. Its `broadcast()` expects one answer per shard of the deployment, so register the handler on a bus for every shard the worker owns:
 

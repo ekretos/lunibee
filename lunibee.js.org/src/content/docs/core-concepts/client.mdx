@@ -171,7 +171,7 @@ client.setPresence({
 ## Client Properties
 
 ### `ping`
-Returns the current WebSocket ping in milliseconds. This value is updated continuously as heartbeats are exchanged with the gateway.
+Returns the current WebSocket ping in milliseconds. This value is updated on every heartbeat acknowledgement from the gateway, and is `-1` until the first one.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -201,7 +201,7 @@ The client exposes several top-level methods to fetch resources without needing 
 - `fetchGuildTemplate(code)`: Fetches a guild template by its code.
 
 ### `sendVoiceState`
-Joins, moves between, or leaves (`channelId: null`) a voice channel. Returns `false` without sending when disconnected or when the guild belongs to another shard. `setVoiceState(payload)` sends a raw opcode 4 payload (`{ guild_id, channel_id, self_mute, self_deaf }`) instead.
+Joins, moves between, or leaves (`channelId: null`) a voice channel. Returns `false` without sending when disconnected, rate limited, or when the guild belongs to another shard. `setVoiceState(payload)` sends a raw opcode 4 payload (`{ guild_id, channel_id, self_mute, self_deaf }`) instead.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -240,7 +240,7 @@ client.requestGuildMembers({
 client.requestGuildMembers({
   guild_id: guildId,
   query: "",
-  limit ,
+  limit: 0,
 });
 ```
 </TabItem>

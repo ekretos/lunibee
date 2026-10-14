@@ -160,7 +160,7 @@ Lunibee sends it as the `X-Audit-Log-Reason` header, never in the request body. 
 | `rest.post(Routes.channelMessages(c), body)` | `channels.send(c, body)` |
 | `rest.delete(Routes.message(c, m))` | `channels.deleteMessage(c, m, reason)` |
 | `rest.put` / `rest.delete(Routes.channelMessagesPin(c, m))` | `channels.pinMessage(c, m, reason)` / `channels.unpinMessage(c, m, reason)` |
-| `rest.put` / `rest.delete(Routes.messageReactions(c, m, e))` | `channels.addReaction(c, m, e)` / `channels.removeAllReactions(c, m)` |
+| `rest.put(Routes.messageReactionMe(c, m, e))` / `rest.delete(Routes.messageReactionsAll(c, m))` | `channels.addReaction(c, m, e)` / `channels.removeAllReactions(c, m)` |
 | `rest.post(Routes.messageThread(c, m), body)` | `channels.createThreadFromMessage(c, m, body)` |
 | `rest.put(Routes.channelPermission(c, id), body)` | `channels.permissionOverwrites(c).edit(id, { ...body, reason })` |
 | `rest.post(Routes.channelWebhooks(c), body)` | `channels.createWebhook(c, { ...body, reason })` |

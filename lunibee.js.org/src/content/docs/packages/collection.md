@@ -29,16 +29,14 @@ users.set("1003", { id: "1003", username: "ZedBot", bot: true });
 
 ### Methods Reference
 
-#### `first()` / `first(amount)`
-- **Parameters**: `amount?: number`
-- **Returns**: `V | V[] | undefined`
+#### `first()`
+- **Returns**: `V | undefined`
 ```ts
 const firstUser = users.first();
-const firstTwo = users.first(2);
 ```
 
-#### `firstKey()` / `firstKey(amount)`
-- **Returns**: `K | K[] | undefined`
+#### `firstKey()`
+- **Returns**: `K | undefined`
 ```ts
 const firstId = users.firstKey();
 ```
@@ -52,7 +50,7 @@ const botUser = users.find(u => u.bot === true);
 
 #### `filter(predicate)`
 - **Parameters**: `predicate: (value: V, key: K, collection: this) => boolean`
-- **Returns**: `Collection<K, V>`
+- **Returns**: a new collection of the same type (`this`)
 ```ts
 const humans = users.filter(u => !u.bot);
 ```
@@ -86,6 +84,8 @@ const cache = new Cache<string, UserData>({
 cache.set("1001", userData);
 const user = cache.get("1001");
 ```
+
+Expired entries are dropped at their deadline, so `sweepInterval` is only accepted (and validated) for compatibility; reads promote an entry for LRU but do not extend its TTL.
 
 ## What's New in 0.2.0
 

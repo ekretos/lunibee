@@ -309,7 +309,7 @@ client.on("interactionCreate", async (interaction) => {
     const body = interaction.getRequiredInputValue("body");
     await interaction.reply({
       content: `📨 Feedback received!\n**${subject}**\n${body}`,
-      ephemeral ,
+      ephemeral: true,
     });
   }
 });
@@ -384,7 +384,7 @@ client.on("interactionCreate", async (interaction) => {
   if (focused.name === "tag") {
     const tags = ["typescript", "javascript", "bun", "discord"];
     const filtered = tags.filter(t => t.startsWith(String(focused.value ?? "").toLowerCase()));
-    await interaction.respond(filtered.map(t => ({ name , value: t })));
+    await interaction.respond(filtered.map(t => ({ name: t, value: t })));
   }
 });
 ```

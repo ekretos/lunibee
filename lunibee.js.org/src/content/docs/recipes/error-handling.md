@@ -11,7 +11,7 @@ Lunibee provides structured `RESTError` types with Discord API details.
 ```ts
 import { RESTError } from "lunibee";
 try {
-  await client.channels.send("invalid-id", { content: "Hello!" });
+  await client.channels.send("123456789012345678", { content: "Hello!" }); // a channel that does not exist
 } catch (error) {
   if (error instanceof RESTError) {
     console.error(`HTTP Status: ${error.status}`);
@@ -23,6 +23,8 @@ try {
   }
 }
 ```
+
+A malformed ID (not a snowflake) throws a `TypeError` before any request is sent, not a `RESTError`.
 
 ## Common Discord Error Codes
 

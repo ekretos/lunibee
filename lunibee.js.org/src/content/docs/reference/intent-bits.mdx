@@ -61,7 +61,7 @@ const client = new Client({
 </TabItem>
 </Tabs>
 
-### Bitwise OR form (works with either)
+### PascalCase form (`GatewayIntentBits`)
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -151,6 +151,6 @@ const bits = resolveGatewayIntents([IntentBits.guilds, IntentBits.guildMessages]
 
 Accepts an array whose items are:
 - A number (an intent bit).
-- A string key from either intent object (e.g. `"Guilds"`, `"guilds"`).
+- A string key from either intent object (e.g. `"Guilds"`, `"guilds"`), or a numeric string. An unknown name resolves to `0` (no bits) rather than throwing.
 
 Anything that is not an array throws a `TypeError`: a single number, a single name or an OR-ed bitfield (`GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages`) is no longer accepted by `Client`, `Gateway`, `ShardManager` or `resolveGatewayIntents`.

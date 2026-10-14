@@ -155,7 +155,7 @@ await rest.postWithFiles(
 | Field | Type | Description |
 |---|---|---|
 | `name` | `string` | File name. CR, LF, `"` and `\` are replaced with `_`, so a name cannot add headers to its part. |
-| `data` | `Blob \| Uint8Array \| ArrayBuffer` | Contents. |
+| `data` | `Blob \| Uint8Array \| ArrayBuffer`, or a promise of one | Contents. A promise is awaited just before the request is sent. |
 | `contentType` | `string` | MIME type. Default `application/octet-stream`. |
 
 Passing `files` in the options of any method does the same: `rest.post(path, body, { files })`.
@@ -398,7 +398,7 @@ try {
 | `errors` | `unknown` | Discord's raw error payload, including the field-by-field validation errors of a `400`. |
 | `method` | `string \| undefined` | Request method. |
 | `path` | `string \| undefined` | Request path, with webhook and interaction tokens replaced by `:token`. |
-| `hint` | `string \| undefined` | What to check, for common codes such as `50001` (Missing Access) and `50013` (Missing Permissions). |
+| `hint` | `string \| undefined` | What to check, for codes `50001` (Missing Access) and `50013` (Missing Permissions); `undefined` for any other code. |
 | `retryable` | `boolean` | Whether the same request could succeed later: `true` for `rateLimited`, `server`, `network` and `timeout`. |
 | `cause` | `unknown` | For network failures, a copy of the underlying error with tokens removed. |
 

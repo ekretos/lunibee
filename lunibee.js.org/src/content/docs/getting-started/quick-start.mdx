@@ -72,7 +72,7 @@ bot.commands.listen({ prefix: "!" });
 await bot.login();
 ```
 
-`prefix: true` needs the `MessageContent` intent; Lunibee warns at startup when it is missing.
+`prefix: true` needs the `MessageContent` intent (and `GuildMessages` or `DirectMessages`); `bot.commands.listen({ prefix })` warns when one is missing.
 
 ## 4. Run it
 
@@ -93,7 +93,7 @@ Send `!ping` or run `/ping` in a server the bot is in.
 Once the bot is running, these are the most useful next steps:
 
 As the bot grows, scaffold one file per command, event handler and component with the
-[CLI](/packages/cli/): `bunx lunibee create command ping --both`, then call
+[CLI](/packages/cli/) (`bun add -d @lunibee/cli`): `bunx lunibee create command ping --both`, then call
 `registerCommands(bot)` from the generated `src/commands/index.ts`.
 
 Reach Discord by ids, with one rule for every read: `peek()` is the cache, `get()` is the cache

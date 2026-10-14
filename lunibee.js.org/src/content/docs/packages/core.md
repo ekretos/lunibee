@@ -47,7 +47,11 @@ await client.login();
 | `token` | `string` | Required | Discord bot token. |
 | `intents` | `(number \| string)[]` | Required | Gateway intents to subscribe to. |
 | `rest` | `RESTOptions` | `{}` | REST configuration. |
-| `ws` | `GatewayOptions` | `{}` | Gateway configuration. |
+| `gateway` | `GatewayOptions` | `{}` | Gateway configuration. |
+| `compress` | `boolean` | `false` | zlib-stream Gateway transport compression. |
+| `messageCache` | `{ maxSize?, ttl? }` | off | Opt-in bounded per-channel message cache. |
+| `cache` | `{ users?, members?, roles?, emojis?, presences?, maxMembers? }` | all on, `presences` off | Which resources Gateway events cache. |
+| `allowedMentions` | `AllowedMentions` | none | Default `allowed_mentions` for every message the client sends. |
 
 ## Useful Client Properties
 
@@ -134,7 +138,7 @@ client.destroy();
 
 ---
 
-## `Collector<T>`
+## `Collector<K, V>`
 
 Collectors gather matching events for a period of time or until a limit is reached.
 
@@ -150,7 +154,7 @@ collector.on("collect", (message) => {
 });
 
 collector.on("end", (collected, reason) => {
-  console.log(`Finished: ${collected.length} items (${reason}).`);
+  console.log(`Finished: ${collected.size} items (${reason}).`);
 });
 ```
 

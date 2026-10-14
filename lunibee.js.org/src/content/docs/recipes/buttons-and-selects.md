@@ -4,7 +4,7 @@ description: Interactive components, custom IDs, and component interaction callb
 ---
 
 
-Discord components allow users to trigger bot actions directly from message attachments.
+Discord components allow users to trigger bot actions directly from messages.
 
 ## Sending Buttons
 

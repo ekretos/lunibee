@@ -10,6 +10,7 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 - **Gateway delays** (`reconnectBaseDelay`, `reconnectMaxDelay`, the new `connectTimeout`) must be above 0.
 - **`Client.destroy()`** now empties the caches and stops collectors; read what you need before destroying.
 - **Cluster workers exit when the parent goes away.** Pass `new ClusterWorker(context, process, { exitOnParentLoss: false })` to keep the old behaviour.
+- **`ClusterManager.ready()` can reject.** When a cluster fails and its shards are left with no owner, pending `ready()` calls (and `spawn()` with `waitForReady`) reject instead of hanging. Catch it if you call `ready()` without a timeout.
 - **REST waits are bounded** by `maxBackoff` (10 minutes): a longer `Retry-After` fails with a `RESTError` instead of sleeping. Raise `maxBackoff` if you really want longer waits.
 
 ## 0.2.x → 0.3.1

@@ -51,7 +51,7 @@ Handles lead to each other: `bot.guild(id).member(userId)`, `.role(roleId)`, `.c
 | `MessageHandle` | `edit(message)`, `delete(reason?)`, `reply(message)`, `react(emoji)`, `pin(reason?)`, `unpin(reason?)`, `crosspost()` |
 | `UserHandle` | `dm()`, `send(message)` |
 
-`bot.channel(id).as("voice")` gets the channel and returns it typed as that [kind](/reference/channel/#kinds-031), or rejects with a `TypeError`.
+`bot.channel(id).as("voice")` gets the channel and returns it typed as that [kind](/reference/channel/#kinds-031) (several kinds may be passed), or rejects with a `TypeError`.
 
 ## Creating channels
 

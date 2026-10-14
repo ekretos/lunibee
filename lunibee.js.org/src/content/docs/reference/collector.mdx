@@ -32,7 +32,7 @@ new Collector<K, V>(options?: CollectorOptions<V>)
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-new Collector<K, V>(options?: CollectorOptions<V>)
+new Collector(options)
 ```
 </TabItem>
 </Tabs>
@@ -50,14 +50,15 @@ new Collector<K, V>(options?: CollectorOptions<V>)
 |---|---|---|
 | `collected` | `Map<K, V>` | All collected key-value pairs. |
 | `ended` | `boolean` | Whether the collector has stopped. |
-| `endReason` | `string \| undefined` | Why the collector stopped: `"time"`, `"limit"`, `"user"`, `"processedLimit"`. |
+| `endReason` | `string \| undefined` | Why the collector stopped: `"time"`, `"limit"`, `"user"`, `"processedLimit"`, `"idle"`, `"abort"`, `"disposed"`, or the reason passed to `stop()`. |
 | `totalProcessed` | `number` | Total items seen (including rejected ones). |
+| `options` | `CollectorOptions<V>` | The options the collector was created with. |
 
 ## Methods
 
 ### `handle(key, item)`
 
-Presents a candidate item. If it passes the filter, it is added to `collected` and the `"collect"` event fires.
+Presents a candidate item. If it passes the filter, it is added to `collected` and the `"collect"` event fires. Resolves `true` when the item was collected, `false` otherwise (including after the collector has ended).
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -82,7 +83,7 @@ client.on("messageCreate", async (message) => {
 
 ### `stop(reason?)`
 
-Manually stops the collector. Fires the `"end"` event.
+Manually stops the collector (`reason` defaults to `"user"`). Fires the `"end"` event, then removes all listeners. Calling it again does nothing.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -192,16 +193,16 @@ async function confirmAction(channel, userId) {
   );
   const msg = await channel.send({ content: "Are you sure?", components: [row] });
 
-  const collector = new Collector<string, ComponentInteraction>({
+  const collector = new Collector({
     filter: (i) => i.customId === "confirm" || i.customId === "cancel",
-    time ,  // 30 seconds
-    max ,        // stop after one click
+    time: 30_000,  // 30 seconds
+    max: 1,        // stop after one click
   });
 
   // Feed interactions into the collector
-  const handler = async (interaction ) => {
+  const handler = async (interaction) => {
     if (interaction.isMessageComponent() && interaction.message?.id === msg.id) {
-      await collector.handle(interaction.id, interaction as ComponentInteraction);
+      await collector.handle(interaction.id, interaction);
     }
   };
   client.on("interactionCreate", handler);
@@ -248,10 +249,10 @@ collector.on("end", (collected, reason) => {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-const collector = new Collector<string, Message>({
+const collector = new Collector({
   filter: (msg) => msg.author.id === targetUserId,
-  max ,
-  time ,
+  max: 5,
+  time: 60_000,
 });
 
 client.on("messageCreate", async (message) => {
@@ -277,7 +278,7 @@ collector.on("end", (collected, reason) => {
 | `[Symbol.dispose]()` | Stops with reason `"disposed"`, so `using collector = ...` works. |
 
 `client.createCollector(event, options)` builds a collector on a client event
-and unsubscribes it when it ends:
+and unsubscribes it when it ends. Items are keyed by their `id` (or an optional `key(item)` function), and `client.destroy()` stops any still running (reason `"destroyed"`):
 
 ```ts
 const collector = client.createCollector("interactionCreate", {

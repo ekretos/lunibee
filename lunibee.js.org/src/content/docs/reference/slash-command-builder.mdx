@@ -26,7 +26,7 @@ import { CreateSlashCommand } from "lunibee";
 
 ### `setName(name)`
 
-Sets the command name (1–32 chars, lowercase, no spaces — use hyphens).
+Sets the command name (1–32 lowercase letters, numbers, underscores or hyphens; no spaces). Anything else throws a `RangeError`.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -60,7 +60,7 @@ command.setDescription("Bans a member from the server.");
 
 ### `setDefaultMemberPermissions(permissions)`
 
-Sets the default member permissions required to see and use the command.
+Sets the default member permissions required to see and use the command (a `bigint`, number or string, serialized as a string; `null` clears it).
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -94,13 +94,21 @@ command.setContexts(0); // guilds only
 </TabItem>
 </Tabs>
 
-### `setDMPermission(allowed)` (deprecated)
+### `setDMPermission(allowed)` (removed)
 
-Discord deprecated `dm_permission`. Use `setContexts()` instead: `setDMPermission(false)` becomes `setContexts(0)`, and, for a guild-installed bot, `setDMPermission(true)` becomes `setContexts(0, 1)`. Still works in 0.2.x; removed in 0.3.1.
+Removed in 0.3.1, as Discord deprecated `dm_permission`. Use `setContexts()` instead: `setDMPermission(false)` becomes `setContexts(0)`, and, for a guild-installed bot, `setDMPermission(true)` becomes `setContexts(0, 1)`.
+
+### `setIntegrationTypes(...types)`
+
+Where the command can be installed: `0` guild install, `1` user install.
+
+### `setNSFW(nsfw?)`
+
+Marks the command as age-restricted (`nsfw` defaults to `true`). `setNsfw()` is an alias.
 
 ## Option Builders
 
-Each option type has a corresponding method. All return `this`.
+Each option type has a corresponding method taking a configure callback. All return `this`. A command holds at most 25 options with unique names, and required options must come before optional ones (otherwise a `RangeError` is thrown).
 
 | Method | Option Type |
 |---|---|
@@ -145,7 +153,7 @@ command.addStringOption(option =>
 
 ### `toJSON()`
 
-Returns the Discord API-compatible command payload object.
+Returns the Discord API-compatible command payload object (`type: 1`).
 
 ## Examples
 
@@ -260,12 +268,12 @@ const settings = new CreateSlashCommand()
 
 ## Option builder classes
 
-Each `addXOption(fn)` callback receives one of these classes. They can also be built on their own and passed to `addXOption(option)`.
+Each `addXOption(fn)` callback receives a new instance of one of these classes and must return it.
 
 | Class | Option type | Extra methods |
 |---|---|---|
 | `CreateStringOption` | 3 | `addChoices({ name, value })`, `setMinLength`, `setMaxLength`, `setAutocomplete` |
-| `CreateIntegerOption` | 4 | `addChoices`, `setMinValue`, `setMaxValue`, `setAutocomplete` (integers only) |
+| `CreateIntegerOption` | 4 | `addChoices`, `setMinValue`, `setMaxValue` (integers only), `setAutocomplete` |
 | `CreateNumberOption` | 10 | `addChoices`, `setMinValue`, `setMaxValue`, `setAutocomplete` |
 | `CreateBooleanOption` | 5 | — |
 | `CreateUserOption` | 6 | — |
@@ -274,11 +282,11 @@ Each `addXOption(fn)` callback receives one of these classes. They can also be b
 | `CreateMentionableOption` | 9 | — |
 | `CreateAttachmentOption` | 11 | — |
 
-All of them have `setName`, `setDescription` and `setRequired`. Choices must be strings of 1-100 characters or finite numbers (at most 25), an option with choices cannot use autocomplete, and `setMinValue` / `setMaxValue` throw a `RangeError` if the minimum would exceed the maximum.
+All of them have `setName`, `setDescription` (1-100 characters), `setRequired(required = true)` and `setAutocomplete(enabled = true)`. Choices must be strings of 1-100 characters or finite numbers (at most 25), choices cannot be added to an autocomplete option (and integer/number options refuse autocomplete once they have choices), `setMinLength` / `setMaxLength` take 0-6000 / 1-6000, and `setMinValue` / `setMaxValue` throw a `RangeError` if the minimum would exceed the maximum.
 
 ## Subcommands
 
-`addSubcommand(fn)` adds a `CreateSubcommand` (type 1), which takes the same `addXOption` methods. `addSubcommandGroup(fn)` adds a `CreateSubcommandGroup` (type 2), whose only children are subcommands.
+`addSubcommand(fn)` adds a `CreateSubcommand` (type 1), which takes the same `addXOption` methods. `addSubcommandGroup(fn)` adds a `CreateSubcommandGroup` (type 2), whose only children are subcommands (at most 25, unique names).
 
 ```ts
 const config = new CreateSlashCommand()

@@ -44,7 +44,7 @@ client.on("interactionCreate", async (interaction) => {
     const body = interaction.getRequiredInputValue("feedback_body");
 
     await interaction.reply({
-      content: `Thanks for your feedback: **${title}**\n>${body}`,
+      content: `Thanks for your feedback: **${title}**\n> ${body}`,
       ephemeral: true,
     });
   }

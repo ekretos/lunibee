@@ -27,12 +27,12 @@ import { CreateAttachment } from "lunibee";
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-new CreateAttachment(data: Uint8Array | ArrayBuffer | Buffer, options?: AttachmentData)
+new CreateAttachment(data: Uint8Array | ArrayBuffer | Buffer | Blob | string, options?: { name?: string; description?: string; root?: string } | string)
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-new CreateAttachment(data: Uint8Array | ArrayBuffer | Buffer, options?: AttachmentData)
+new CreateAttachment(data: Uint8Array | ArrayBuffer | Buffer | Blob | string, options?: { name?: string; description?: string; root?: string } | string)
 ```
 </TabItem>
 </Tabs>
@@ -40,7 +40,8 @@ new CreateAttachment(data: Uint8Array | ArrayBuffer | Buffer, options?: Attachme
 | Parameter | Type | Description |
 |---|---|---|
 | `data` | `Uint8Array \| ArrayBuffer \| Buffer \| Blob \| string` | Raw file data, or a file path read when the message is sent. |
-| `options.name` | `string` | Filename including extension (e.g. `"image.png"`). |
+| `options` | `object \| string` | Options, or just the filename as a string. |
+| `options.name` | `string` | Filename including extension (e.g. `"image.png"`). Defaults to the path's basename, or `"file.bin"` for binary data. |
 | `options.description` | `string` | Alt text description for the file. |
 | `options.root` | `string` | For a path: the folder it must stay inside (symlinks resolved). Set it whenever the path comes from a user, e.g. a command option; otherwise any readable file could be uploaded. |
 
@@ -85,9 +86,15 @@ attachment.setDescription("A welcome banner for new members.");
 </TabItem>
 </Tabs>
 
-### `toJSON()`
+### `setFile(file)`
 
-Serializes to a REST-ready attachment object.
+Replaces the file contents (binary data or a path).
+
+### `toBuffer()`
+
+Resolves the contents to a `Promise<Uint8Array>`, reading a path from disk (and enforcing `root` when set). Throws when a rooted path resolves outside its root.
+
+The `name`, `description`, `file` and `root` fields are public properties.
 
 ## Examples
 

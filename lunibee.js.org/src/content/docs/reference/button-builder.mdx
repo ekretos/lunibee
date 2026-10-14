@@ -28,7 +28,7 @@ All methods return `this` for chaining.
 
 ### `setCustomId(id)`
 
-Sets the custom ID for interactive buttons (required for non-link buttons).
+Sets the custom ID for interactive buttons (required for non-link, non-premium buttons; max 100 characters). Throws on a link button.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -62,7 +62,7 @@ button.setLabel("Confirm");
 
 ### `setStyle(style)`
 
-Sets the button style. Use the `ButtonType` enum:
+Sets the button style (default `ButtonType.Secondary`). Use the `ButtonType` enum:
 
 | Constant | Value | Appearance |
 |---|---|---|
@@ -71,6 +71,7 @@ Sets the button style. Use the `ButtonType` enum:
 | `ButtonType.Success` | `3` | Green |
 | `ButtonType.Danger` | `4` | Red |
 | `ButtonType.Link` | `5` | URL link (gray, opens in browser) |
+| `ButtonType.Premium` | `6` | Purchase button for a SKU (see `setSKUId`) |
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -87,7 +88,7 @@ button.setStyle(ButtonType.Danger);
 
 ### `setURL(url)`
 
-Sets the URL for link buttons (`ButtonType.Link`). Link buttons cannot have a `customId`.
+Sets the URL for link buttons and switches the style to `ButtonType.Link` (dropping any custom ID). The URL must be valid, at most 512 characters, and use `http`, `https` or `discord`. Link buttons cannot have a `customId`.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -104,7 +105,7 @@ button.setStyle(ButtonType.Link).setURL("https://lunibee.js.org");
 
 ### `setEmoji(emoji)`
 
-Adds an emoji to the button.
+Adds an emoji to the button. A string becomes `{ name }`.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -123,7 +124,7 @@ button.setEmoji({ id: "123456789", name: "lunibee" });
 
 ### `setDisabled(disabled?)`
 
-Disables or enables the button.
+Disables or enables the button (`disabled` defaults to `true`).
 
 <Tabs>
 <TabItem label="TypeScript">

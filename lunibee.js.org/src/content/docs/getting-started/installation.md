@@ -64,5 +64,5 @@ Lunibee requires modern TypeScript settings. Create or update your `tsconfig.jso
 If you only need specific packages (for example, just the REST client or builders for edge serverless functions):
 
 ```bash
-bun add lunibee @lunibee/builders
+bun add @lunibee/rest @lunibee/builders
 ```
