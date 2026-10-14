@@ -41,7 +41,7 @@ Triggered when a user executes a Slash Command.
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { Client, CreateEmbed, MessageFlags } from "lunibee";
+import { Client, CreateEmbed, MessageFlags, User } from "lunibee";
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
@@ -49,7 +49,10 @@ client.on("interactionCreate", async (interaction) => {
   const { commandName, options } = interaction;
 
   if (commandName === "userinfo") {
-    const targetUser = options.getUser("target") ?? interaction.user;
+    // getUser() returns Discord's raw user data; wrap it in User for the helpers.
+    const picked = options.getUser("target");
+    const targetUser = picked ? new User(picked) : interaction.user;
+    if (!targetUser) return;
 
     const embed = new CreateEmbed()
       .setTitle(`User Info - ${targetUser.username}`)
@@ -127,7 +130,7 @@ client.on("interactionCreate", async (interaction) => {
     await interaction.deferReply({ ephemeral: true });
 
     // Assign verified role
-    await interaction.member?.roles.add("123456789012345678");
+    await interaction.member?.addRole("123456789012345678");
 
     await interaction.editReply({
       content: "✅ You have been verified and granted access!",
@@ -243,7 +246,8 @@ client.on("interactionCreate", async (interaction) => {
 
   if (focusedOption.name === "tag") {
     const allTags = ["javascript", "typescript", "bun", "discord", "rust"];
-    const filtered = allTags.filter(t => t.startsWith(focusedOption.value.toLowerCase()));
+    const typed = String(focusedOption.value ?? "").toLowerCase();
+    const filtered = allTags.filter(t => t.startsWith(typed));
 
     await interaction.respond(
       filtered.map(tag => ({ name: tag, value: tag }))

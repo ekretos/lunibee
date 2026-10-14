@@ -227,6 +227,8 @@ process.on("SIGINT", () => {
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
+import { Cache } from "lunibee";
+
 const guildPreviewCache = new Cache<string, Record<string, unknown>>({
   maxSize: 100,
   ttl: 10 * 60 * 1000, // 10 minutes
@@ -264,6 +266,8 @@ async function getGuildPreview(guildId) {
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
+import { Cache, type Message } from "lunibee";
+
 const messageCache = new Cache<string, Message>({
   maxSize: 1000,
   ttl: 60 * 1000,   // 60 seconds

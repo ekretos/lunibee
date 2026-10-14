@@ -117,8 +117,8 @@ const row = new CreateActionRow<CreateStringSelect>().addComponents(
     .setCustomId("pick_role")
     .setPlaceholder("Pick a role…")
     .addOptions(
-      { label: "Developer", value: "dev", emoji: "💻" },
-      { label: "Designer", value: "design", emoji: "🎨" },
+      { label: "Developer", value: "dev", emoji: { name: "💻" } },
+      { label: "Designer", value: "design", emoji: { name: "🎨" } },
     ),
 );
 await channel.send({ content: "Choose your role:", components: [row] });
@@ -133,8 +133,8 @@ const row = new CreateActionRow().addComponents(
     .setCustomId("pick_role")
     .setPlaceholder("Pick a role…")
     .addOptions(
-      { label: "Developer", value: "dev", emoji: "💻" },
-      { label: "Designer", value: "design", emoji: "🎨" },
+      { label: "Developer", value: "dev", emoji: { name: "💻" } },
+      { label: "Designer", value: "design", emoji: { name: "🎨" } },
     ),
 );
 await channel.send({ content: "Choose your role:", components: [row] });

@@ -307,6 +307,14 @@ export interface MessageFile {
     name: string;
     data: Blob | Uint8Array | ArrayBuffer | string;
     contentType?: string;
+    /** Alt text, sent as the attachment's `description`. */
+    description?: string;
+}
+/** A file whose bytes are read when the message is sent, such as a `CreateAttachment`. */
+export interface MessageFileSource {
+    name: string;
+    description?: string;
+    toBuffer(): Promise<Uint8Array>;
 }
 
 /** A poll to send; Discord fills in `results` and `expiry` when it is read back. */
@@ -322,7 +330,7 @@ export interface MessagePoll {
 /** What `send()` takes. */
 export interface MessageCreateOptions extends MessagePayload {
     /** Files to upload; the message is sent as multipart. */
-    files?: MessageFile[];
+    files?: (MessageFile | MessageFileSource)[];
     /** Reply to or forward another message. */
     message_reference?: APIMessageReference;
     poll?: MessagePoll;
@@ -334,14 +342,14 @@ export interface MessageCreateOptions extends MessagePayload {
 
 /** What `edit()` takes: the fields Discord lets you change after sending. */
 export interface MessageEditOptions extends MessagePayload {
-    files?: MessageFile[];
+    files?: (MessageFile | MessageFileSource)[];
 }
 
 /** What a reply, edit-reply, follow-up or update to an interaction takes. */
 export interface InteractionReplyOptions extends MessagePayload {
     /** Only the person who ran the command sees it. */
     ephemeral?: boolean;
-    files?: MessageFile[];
+    files?: (MessageFile | MessageFileSource)[];
     poll?: MessagePoll;
     /** On `reply()` / `update()`: return the created message (one request, no `fetchReply()`). */
     withResponse?: boolean;
@@ -1100,7 +1108,8 @@ export interface APIApplicationCommand {
 /** Data for creating/overwriting an application command. */
 export interface ApplicationCommandData {
     name: string;
-    description: string;
+    /** Required for slash commands; user and message context-menu commands have none. */
+    description?: string;
     type?: number;
     options?: APIApplicationCommandOption[];
     default_member_permissions?: string | null;

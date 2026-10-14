@@ -56,7 +56,12 @@ function assertSafePath(path: string): void {
 /** A file attachment sent as part of a multipart REST request. */
 export interface RESTFileAttachment {
     name: string;
-    data: Blob | Uint8Array | ArrayBuffer;
+    /** The bytes, or a promise of them (read just before the request is sent). */
+    data:
+        | Blob
+        | Uint8Array
+        | ArrayBuffer
+        | PromiseLike<Blob | Uint8Array | ArrayBuffer>;
     contentType?: string;
 }
 
@@ -356,7 +361,15 @@ export class REST {
         // Upgrade to multipart when file attachments are supplied via options.
         const files = options.files;
         if (files && files.length > 0 && !(body instanceof FormData))
-            body = this.#fileForm(body, files);
+            body = this.#fileForm(
+                body,
+                await Promise.all(
+                    files.map(async (file) => ({
+                        ...file,
+                        data: await file.data,
+                    })),
+                ),
+            );
         const query = serializeQuery(options.query);
         const requestPath = query ? `${path}${query}` : path;
 
@@ -629,7 +642,12 @@ export class REST {
     /**
      * Builds a multipart form with a JSON payload and file attachments.
      */
-    #fileForm(payload: unknown, files: RESTFileAttachment[]): FormData {
+    #fileForm(
+        payload: unknown,
+        files: (RESTFileAttachment & {
+            data: Blob | Uint8Array | ArrayBuffer;
+        })[],
+    ): FormData {
         const form = new FormData();
         form.append("payload_json", JSON.stringify(payload));
         for (let i = 0; i < files.length; i++) {
@@ -665,12 +683,7 @@ export class REST {
         files: RESTFileAttachment[],
         options?: RESTRequestOptions,
     ): Promise<T> {
-        return this.request<T>(
-            "POST",
-            path,
-            this.#fileForm(payload, files),
-            options,
-        );
+        return this.request<T>("POST", path, payload, { ...options, files });
     }
 
     /**
@@ -688,12 +701,7 @@ export class REST {
         files: RESTFileAttachment[],
         options?: RESTRequestOptions,
     ): Promise<T> {
-        return this.request<T>(
-            "PATCH",
-            path,
-            this.#fileForm(payload, files),
-            options,
-        );
+        return this.request<T>("PATCH", path, payload, { ...options, files });
     }
     /** Dispatches a lifecycle hook in isolation: deferred to a microtask so it
      * cannot block the request path, with any thrown error swallowed so a faulty

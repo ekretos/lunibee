@@ -1,3 +1,5 @@
+import type { UserData } from "@lunibee/types";
+
 // ─── Raw option type from Discord ────────────────────────────────────────────
 
 /** Raw Discord application command interaction data option. */
@@ -185,12 +187,15 @@ export class CommandOptions {
     public getUser(
         name: string,
         required?: false,
-    ): Record<string, unknown> | null;
-    public getUser(name: string, required: true): Record<string, unknown>;
+    ): (UserData & Record<string, unknown>) | null;
+    public getUser(
+        name: string,
+        required: true,
+    ): UserData & Record<string, unknown>;
     public getUser(
         name: string,
         required = false,
-    ): Record<string, unknown> | null {
+    ): (UserData & Record<string, unknown>) | null {
         const opt = this.#get(name);
         if (!opt || opt.type !== OptionType.User) {
             if (required)
@@ -205,7 +210,7 @@ export class CommandOptions {
             throw new TypeError(
                 `Resolved user for option "${name}" is missing.`,
             );
-        return resolved;
+        return resolved as (UserData & Record<string, unknown>) | null;
     }
 
     /** Gets the raw resolved channel data for a channel option. @param name Option name. @param required If true, throws when missing. */

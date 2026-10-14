@@ -110,6 +110,8 @@ const connection = joinVoiceChannel({ guildId, channelId, selfDeaf: true });
 connection.attachTransports(voiceGateway, udp);
 
 // 4. Play.
+import { AudioPlayer } from "lunibee";
+
 class UdpPlayer extends AudioPlayer {
   protected override onChunk(chunk: Uint8Array): void {
     void udp.send(chunk, host, port); // your transport frames and encrypts it
@@ -332,6 +334,8 @@ const audio = new AudioStream(file.stream(), { title: "Track", duration: 180 });
 Reads an `AudioStream` chunk by chunk and calls `onChunk(chunk)` for each one. The base `onChunk()` does nothing: subclass `AudioPlayer` and override it to send audio.
 
 ```ts
+import { AudioPlayer } from "lunibee";
+
 class UdpPlayer extends AudioPlayer {
   protected override onChunk(chunk: Uint8Array): void {
     void udp.send(chunk, host, port);

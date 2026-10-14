@@ -138,9 +138,14 @@ console.log(`Hello ${user}!`); // → "Hello <@123456789>!"
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
+import { CreateEmbed, User } from "lunibee";
+
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "whois") return;
-  const target = interaction.options.getUser("user") ?? interaction.user;
+  // getUser() returns Discord's raw user data; wrap it in User for the helpers.
+  const picked = interaction.options.getUser("user");
+  const target = picked ? new User(picked) : interaction.user;
+  if (!target) return;
   const embed = new CreateEmbed()
     .setTitle(target.displayName)
     .setThumbnail(target.displayAvatarURL({ size: 256 }))

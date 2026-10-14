@@ -127,18 +127,18 @@ Adds one or more options (max 25 total). Each option has:
 <TabItem label="TypeScript">
 ```ts
 select.addOptions(
-  { label: "Red", value: "red", emoji: "🔴", description: "Bold and passionate" },
-  { label: "Blue", value: "blue", emoji: "🔵", description: "Calm and collected" },
-  { label: "Green", value: "green", emoji: "🟢", description: "Fresh and energetic" },
+  { label: "Red", value: "red", emoji: { name: "🔴" }, description: "Bold and passionate" },
+  { label: "Blue", value: "blue", emoji: { name: "🔵" }, description: "Calm and collected" },
+  { label: "Green", value: "green", emoji: { name: "🟢" }, description: "Fresh and energetic" },
 );
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
 select.addOptions(
-  { label: "Red", value: "red", emoji: "🔴", description: "Bold and passionate" },
-  { label: "Blue", value: "blue", emoji: "🔵", description: "Calm and collected" },
-  { label: "Green", value: "green", emoji: "🟢", description: "Fresh and energetic" },
+  { label: "Red", value: "red", emoji: { name: "🔴" }, description: "Bold and passionate" },
+  { label: "Blue", value: "blue", emoji: { name: "🔵" }, description: "Calm and collected" },
+  { label: "Green", value: "green", emoji: { name: "🟢" }, description: "Fresh and energetic" },
 );
 ```
 </TabItem>
@@ -164,10 +164,10 @@ const row = new CreateActionRow<CreateStringSelect>().addComponents(
     .setMinValues(1)
     .setMaxValues(2)
     .addOptions(
-      { label: "Announcements", value: "announcements", emoji: "📢" },
-      { label: "Updates", value: "updates", emoji: "🔔" },
-      { label: "Gaming", value: "gaming", emoji: "🎮" },
-      { label: "Art", value: "art", emoji: "🎨" },
+      { label: "Announcements", value: "announcements", emoji: { name: "📢" } },
+      { label: "Updates", value: "updates", emoji: { name: "🔔" } },
+      { label: "Gaming", value: "gaming", emoji: { name: "🎮" } },
+      { label: "Art", value: "art", emoji: { name: "🎨" } },
     ),
 );
 
@@ -195,10 +195,10 @@ const row = new CreateActionRow().addComponents(
     .setMinValues(1)
     .setMaxValues(2)
     .addOptions(
-      { label: "Announcements", value: "announcements", emoji: "📢" },
-      { label: "Updates", value: "updates", emoji: "🔔" },
-      { label: "Gaming", value: "gaming", emoji: "🎮" },
-      { label: "Art", value: "art", emoji: "🎨" },
+      { label: "Announcements", value: "announcements", emoji: { name: "📢" } },
+      { label: "Updates", value: "updates", emoji: { name: "🔔" } },
+      { label: "Gaming", value: "gaming", emoji: { name: "🎮" } },
+      { label: "Art", value: "art", emoji: { name: "🎨" } },
     ),
 );
 

@@ -98,11 +98,12 @@
     "ci:deps": "bun run check:deps",
     "ci:typecheck": "bun run typecheck",
     "ci:test": "bun test --coverage && bun test ./packages/testing/src",
-    "ci": "bun run ci:deps && bun run audit:api && bun run audit:coverage && bun run audit:security && bun run format:check && bun run ci:typecheck && bun run ci:test",
+    "ci": "bun run ci:deps && bun run audit:api && bun run audit:coverage && bun run audit:security && bun run format:check && bun run ci:typecheck && bun run docs:check && bun run ci:test",
     "bench": "bun benchmarks/parity.ts",
     "bench:compare": "bun scripts/bench-compare.mjs",
     "build:all": "bun run build && bun run build:dts",
     "docs:types": "bun scripts/docs-types.ts",
+    "docs:check": "bun scripts/check-doc-examples.ts",
     "publish:all": "bun run scripts/publish.ts",
     "audit:security": "bun scripts/security-scan.ts && bun audit",
     "smoke:install": "bun scripts/smoke-install.ts"

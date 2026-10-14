@@ -160,7 +160,7 @@ const ping = new CreateSlashCommand()
   .setName("ping")
   .setDescription("Replies with Pong!");
 
-await client.application.commands.create(ping.toJSON());
+await client.application.commands.create(ping); // builders are accepted as they are
 ```
 </TabItem>
 <TabItem label="JavaScript">
@@ -171,7 +171,7 @@ const ping = new CreateSlashCommand()
   .setName("ping")
   .setDescription("Replies with Pong!");
 
-await client.application.commands.create(ping.toJSON());
+await client.application.commands.create(ping); // builders are accepted as they are
 ```
 </TabItem>
 </Tabs>

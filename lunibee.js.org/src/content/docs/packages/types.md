@@ -22,8 +22,8 @@ import {
   MessageFlags,
   ApplicationCommandEnum,
   ApplicationCommandOptionEnum,
-  InteractionEnum,
 } from "@lunibee/types";
+// InteractionEnum lives in @lunibee/structures (also exported from "lunibee").
 
 const intents = [IntentBits.guilds, IntentBits.guildMessages];
 const channelType = ChannelEnum.GuildText;

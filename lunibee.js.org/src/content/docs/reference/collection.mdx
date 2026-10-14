@@ -399,6 +399,8 @@ There is no in-place `sort()` or `reverse()`: reordering a collection that track
 `filter()`, `clone()`, `sorted()`, `partition()`, `union()`, `intersection()` and `difference()` return an instance of the same class (`Symbol.species`), built with no constructor arguments and without any `ttl` or `maxSize`. Override `static get [Symbol.species]()` to return `Collection` (or another class) instead.
 
 ```ts
+import { Collection, type User } from "lunibee";
+
 class Users extends Collection<string, User> {}
 const bots = new Users().filter(u => u.bot); // Users
 ```

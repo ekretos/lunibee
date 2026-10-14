@@ -19,6 +19,7 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **A forked `ClusterWorker` exits when its parent's IPC channel closes** (`exitOnParentLoss`, on by default for the real process), so its shards cannot keep running beside a replacement.
 - **`HandlerRegistry.dispatch`** runs every handler before rethrowing (one error, or an `AggregateError`).
 - **Voice subscriber streams** hold at most 50 packets; a reader that falls behind loses the newest ones.
+- **Types:** `options.getUser()` is typed `UserData & Record<string, unknown>` (it was `Record<string, unknown>`), so `new User(options.getUser("x")!)` type-checks; `ApplicationCommandData.description` is optional, since context-menu commands have none.
 - **Gateway:** `reconnectBaseDelay`, `reconnectMaxDelay` and `connectTimeout` must be greater than 0; dispatch names that are not UPPER_SNAKE_CASE are not re-emitted as events; `ownsGuild()` returns `false` for a non-numeric id.
 
 ### 🔒 Security
@@ -43,6 +44,7 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **Voice:** re-attaching the same transport pair no longer delivers each datagram twice; `entersState(…, Infinity)` waits instead of rejecting at once.
 - **CLI:** `lunibee create component` refuses inherited names such as `constructor`; the generated handler binder escapes file paths.
 - **Attachments:** a missing `root` gives a clear error, and a file named like `..dotfile` inside the root is accepted.
+- **`files: [new CreateAttachment(...)]` sent an empty file.** `toAttachments` read `file.data`, which a `CreateAttachment` does not have, so the example the docs have shown since 0.2.0 uploaded nothing. A file with `toBuffer()` is now read when the request is sent, and its `description` (and a plain file's new `description`) is sent as the attachment's alt text in `attachments`.
 
 ### ✨ Added
 
@@ -50,11 +52,14 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **`rest.request({ method, path | fullRoute, body, ... })`** — the single-object form from `@discordjs/rest`, beside the positional one. `MockREST` supports both.
 - **`WebhookClient`:** `avatarURL`, `threadId` and `allowedMentions` aliases; `editMessage()` takes the full message options (components, files, `threadId`); new `fetchMessage()`; `deleteMessage()` accepts `threadId`.
 - **`maxBackoff`** (REST) and **`connectTimeout`** (Gateway) options.
+- **Command managers accept builders.** `commands.create()`, `set()`, `edit()` and their guild versions take a `CreateSlashCommand` / context-menu builder as it is (its `toJSON()` is sent), next to plain data. New type `ApplicationCommandInput`.
+- **`MessageFileSource`** (anything with `name` and `toBuffer()`) is accepted in `files`; `RESTFileAttachment.data` may be a promise.
 
 ### 📚 Documentation
 
 - Complete reference pages for [REST](/reference/rest/), [Gateway](/reference/gateway/), sharding ([ShardManager](/reference/shard-manager/), [ShardBus](/reference/shard-bus/), [ClusterManager](/reference/cluster-manager/), [ClusterHost](/reference/cluster-host/)) and [voice](/reference/voice-connection/). Corrected examples that used `Routes.user("@me")`, `error.name === "AbortError"` and Gateway properties that do not exist.
 - `packages/rest/COMPATIBILITY.md` lists no open gaps.
+- **Every TypeScript example in the docs is type-checked** against the real API (`bun run docs:check`, part of `bun run ci`): 502 examples, with the names examples use without declaring (`client`, `interaction`, `message`…) given their real types. It found and fixed examples that used methods or fields that do not exist (`member.roles.add`, `error.url`, `error.rawError`, `client.setVoiceState(guildId, …)`, `Routes.user("@me")`, `timestamp(new Date())`, `iconURL` in embeds, string select-option emoji, `ChatInputCommandInteraction`, `InteractionEnum` from `@lunibee/types`) and raw Gateway payloads used as structures.
 - A [Types](/reference/types/) page lists every exported interface and type alias with a description (`bun run docs:types` regenerates it), and every public export is now described on a hand-written page.
 - The 0.3.1 docs are archived in the version picker.
 - Issues found while writing the reference pages are tracked as D-01 to D-13 in the audit report.
@@ -108,7 +113,7 @@ The findings, with severity and status, are in [`docs/audits/security-0.3.1.md`]
 - **Handles.** `bot.guild(id)`, `bot.channel(id)`, `bot.member(guildId, userId)`, `bot.role(guildId, roleId)`, `bot.person(id)` and `bot.message(channelId, messageId)` name a thing by its ids. Every handle reads the same way (`peek()` cache only, `get()` cache then Discord, `fetch()` Discord now) and carries the actions Discord offers on it (`kick`, `timeout("10m")`, `send`, `reply`, `react`, …). `bot.guild(id).members`, `.roles` and `.channels` are collections. See [Handles](/reference/handles/).
 - **`bot.api`**, Discord's REST API as a chained path: `bot.api.guilds(id).members(userId).patch({ nick }, { reason })`. Typed results for the common routes, `bot.api.to(...)` for the rest, and `pages()` / `all({ max })` that follow Discord's cursors for members, bans, messages, guilds and other lists. See [bot.api](/reference/api/).
 - **`command()` and `option.*`.** One definition, typed options (`option.user({ required: true })`, `option.integer({ min, max, default })`, `option.channel({ kinds })`, `option.choice([...])`…), run as a slash command, a prefix command (`prefix: true`), or both. `bot.commands.add()`, `.deploy()` and `.listen({ prefix })` register and route them. Prefix commands read the same options from the message, check `permissions`, answer a bad argument with the usage line, and warn at startup when the `MessageContent` intent is missing. See [Commands](/reference/commands/).
-- **Channel kinds.** `channel.kind` is `"text"`, `"voice"`, `"thread"`, `"forum"`… in place of the numeric `type`; `channel.is(...kinds)` narrows the type and `channel.as(...kinds)` asserts it; `bot.channel(id).as("voice")` fetches and narrows. `channelKindOf()`, `channelTypesOf()` and `ChannelKinds` convert to and from Discord's numbers. See [Channel](/reference/channel/#kinds-030).
+- **Channel kinds.** `channel.kind` is `"text"`, `"voice"`, `"thread"`, `"forum"`… in place of the numeric `type`; `channel.is(...kinds)` narrows the type and `channel.as(...kinds)` asserts it; `bot.channel(id).as("voice")` fetches and narrows. `channelKindOf()`, `channelTypesOf()` and `ChannelKinds` convert to and from Discord's numbers. See [Channel](/reference/channel/#kinds-031).
 - **`bot.guild(id).createChannel({ kind, … })`** creates text, announcement, voice, stage, category, forum and media channels with the options each kind accepts, and returns the right class.
 - **`parseDuration()`** turns `"90s"`, `"10m"`, `"1h30m"` into milliseconds.
 - **CLI: `create command --slash|--prefix|--both`** writes a `command()` file (slash by default, `--prefix` for prefix-only, `--both` for one file answering both) and **`lunibee sync commands`** regenerates `src/commands/index.ts` with `registerCommands(bot)`. `create command` now emits the `command()` form instead of `data` + `execute()`; existing command files keep working.

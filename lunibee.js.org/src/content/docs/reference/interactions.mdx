@@ -340,6 +340,8 @@ Sends up to 25 autocomplete choice objects:
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
+// inside `if (interaction.isAutocomplete()) { … }`
+if (!interaction.isAutocomplete()) return;
 await interaction.respond([
   { name: "Option A", value: "a" },
   { name: "Option B", value: "b" },
@@ -367,7 +369,7 @@ client.on("interactionCreate", async (interaction) => {
   const focused = interaction.options.getFocused(true);
   if (focused.name === "tag") {
     const tags = ["typescript", "javascript", "bun", "discord"];
-    const filtered = tags.filter(t => t.startsWith(focused.value.toLowerCase()));
+    const filtered = tags.filter(t => t.startsWith(String(focused.value ?? "").toLowerCase()));
     await interaction.respond(filtered.map(t => ({ name: t, value: t })));
   }
 });
@@ -381,7 +383,7 @@ client.on("interactionCreate", async (interaction) => {
   const focused = interaction.options.getFocused(true);
   if (focused.name === "tag") {
     const tags = ["typescript", "javascript", "bun", "discord"];
-    const filtered = tags.filter(t => t.startsWith(focused.value.toLowerCase()));
+    const filtered = tags.filter(t => t.startsWith(String(focused.value ?? "").toLowerCase()));
     await interaction.respond(filtered.map(t => ({ name , value: t })));
   }
 });

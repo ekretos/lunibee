@@ -217,7 +217,7 @@ Only UPPER_SNAKE_CASE names are emitted this way, so a payload can never pose as
 `RAW` receives `{ event, data }` for every dispatch, before the named event:
 
 ```ts
-gateway.on("RAW", ({ event, data }) => metrics.inc(`gateway.${event}`));
+gateway.on("RAW", (raw) => metrics.inc(`gateway.${(raw as { event: string }).event}`));
 ```
 
 ## States
@@ -237,7 +237,10 @@ gateway.on("RAW", ({ event, data }) => metrics.inc(`gateway.${event}`));
 | `Closed` (`"CLOSED"`) | `close()` was called or a fatal close happened. Final. |
 
 ```ts
-gateway.on("stateChange", ({ previous, next }) => console.log(previous, "→", next));
+gateway.on("stateChange", (change) => {
+  const { previous, next } = change as { previous: GatewayState; next: GatewayState };
+  console.log(previous, "→", next);
+});
 ```
 
 ## Connection lifecycle
@@ -303,7 +306,8 @@ Every message from Discord counts as a sign of life, not just acknowledgements.
 "resume" means resume when the session allows it and identify otherwise. `classifyCloseCode(code, canResume)` returns the same answer, and `FATAL_CLOSE_CODES` / `IDENTIFY_CLOSE_CODES` list the codes.
 
 ```ts
-gateway.on("close", ({ code, action }) => {
+gateway.on("close", (event) => {
+  const { code, action } = event as { code: number; action: "resume" | "identify" | "stop" };
   if (action === "stop") console.error(`Gateway stopped for good (code ${code}).`);
 });
 ```
@@ -338,6 +342,8 @@ See [Sharding](/core-concepts/sharding/) and [ShardManager](/reference/shard-man
 `GatewayError` extends `Error` with an optional `code` (a close code where one applies). It is what `connect()` rejects with and what most `error` events carry. Socket and decoder failures keep their original error as `cause`.
 
 ```ts
+import { GatewayCloseCodes, GatewayError } from "@lunibee/ws";
+
 gateway.on("error", (error) => {
   if (error instanceof GatewayError && error.code === GatewayCloseCodes.DisallowedIntents) process.exit(1);
   console.error(error);

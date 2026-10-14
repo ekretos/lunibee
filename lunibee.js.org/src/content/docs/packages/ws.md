@@ -29,11 +29,11 @@ const gateway = new Gateway({
 });
 
 gateway.on("open", () => console.log("WebSocket connection open."));
-gateway.on("ready", (data) => console.log("Gateway ready:", data.user.username));
+gateway.on("ready", (data) => console.log("Gateway ready:", (data as { user: { username: string } }).user.username));
 // Every dispatch, with its event name: emitted as "RAW".
-gateway.on("RAW", ({ event, data }) => console.log("Received event:", event));
+gateway.on("RAW", (raw) => console.log("Received event:", (raw as { event: string }).event));
 // Or listen for one Discord event by name.
-gateway.on("MESSAGE_CREATE", (message) => console.log(message.content));
+gateway.on("MESSAGE_CREATE", (message) => console.log((message as { content: string }).content));
 
 await gateway.connect();
 ```

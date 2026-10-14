@@ -160,7 +160,10 @@ Returns the guild name.
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-client.on("guildCreate", (guild) => {
+client.on("guildCreate", (data) => {
+  // guildCreate passes Discord's raw payload; the Guild structure is in the cache.
+  const guild = client.guilds.get(data.id);
+  if (!guild) return;
   console.log(`Joined: ${guild.name} (${guild.id}) — ${guild.memberCount} members`);
   if (guild.isCommunity) console.log("  → Community server");
   if (guild.isBoosted) console.log(`  → Boost Level ${guild.boostLevel}`);

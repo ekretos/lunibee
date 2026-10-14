@@ -349,6 +349,8 @@ Every HTTP attempt has its own `timeout` (default 15 s). When it fires the attem
 An `AbortSignal` cancels a request wherever it is: queued behind its bucket, waiting for a rate limit, between retries, or in flight. The promise rejects with a `RESTError` of kind `"aborted"` (status `0`), whose `cause` is the signal's reason.
 
 ```ts
+import { RESTError } from "lunibee";
+
 const controller = new AbortController();
 setTimeout(() => controller.abort(), 5_000);
 

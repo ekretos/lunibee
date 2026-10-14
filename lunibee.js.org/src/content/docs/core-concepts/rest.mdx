@@ -24,7 +24,7 @@ Discord groups routes into rate-limit buckets. `lunibee` (rest) tracks bucket he
 import { REST, Routes } from "lunibee";
 const rest = new REST({ token: process.env.DISCORD_TOKEN! });
 // Fetch current bot user
-const me = await rest.get(Routes.user("@me"));
+const me = await rest.get(Routes.user());
 // Send a message
 const message = await rest.post(Routes.channelMessages("123456789012345678"), {
   body: {
@@ -38,7 +38,7 @@ const message = await rest.post(Routes.channelMessages("123456789012345678"), {
 import { REST, Routes } from "lunibee";
 const rest = new REST({ token: process.env.DISCORD_TOKEN });
 // Fetch current bot user
-const me = await rest.get(Routes.user("@me"));
+const me = await rest.get(Routes.user());
 // Send a message
 const message = await rest.post(Routes.channelMessages("123456789012345678"), {
   body: {
@@ -56,6 +56,8 @@ Every REST method accepts standard `fetch` options, including `AbortSignal`:
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
+import { RESTError } from "lunibee";
+
 const controller = new AbortController();
 
 const timeout = setTimeout(() => controller.abort(), 5000);
@@ -65,7 +67,7 @@ try {
     signal: controller.signal,
   });
 } catch (error) {
-  if (error.name === "AbortError") {
+  if (error instanceof RESTError && (error.kind === "aborted" || error.kind === "timeout")) {
     console.warn("Request timed out or was cancelled.");
   }
 } finally {
@@ -114,6 +116,8 @@ Every `RESTError` has a `kind` and a `retryable` flag, so handlers do not need
 to match status codes:
 
 ```ts
+import { RESTError } from "lunibee";
+
 try {
   await client.channels.send(channelId, { content: "hi" });
 } catch (error) {

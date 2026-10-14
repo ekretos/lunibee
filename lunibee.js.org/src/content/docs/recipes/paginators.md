@@ -7,8 +7,8 @@ description: Building an interactive embed paginator with buttons.
 Here is a clean pattern for an interactive embed paginator using `CreateEmbed` and `CreateButton`:
 
 ```ts
-import { CreateEmbed, CreateActionRow, CreateButton, ButtonType, type ChatInputCommandInteraction } from "lunibee";
-export async function sendPaginator(interaction: ChatInputCommandInteraction, pages: string[]) {
+import { CreateEmbed, CreateActionRow, CreateButton, ButtonType, type CommandInteraction } from "lunibee";
+export async function sendPaginator(interaction: CommandInteraction, pages: string[]) {
   let currentIndex = 0;
   const buildEmbed = (index: number) => {
     return new CreateEmbed()

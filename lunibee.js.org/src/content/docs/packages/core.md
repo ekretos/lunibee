@@ -139,9 +139,7 @@ client.destroy();
 Collectors gather matching events for a period of time or until a limit is reached.
 
 ```ts
-import { Collector } from "@lunibee/core";
-
-const collector = new Collector(client, "messageCreate", {
+const collector = client.createCollector("messageCreate", {
   filter: (message) => message.author.id === targetUserId,
   max: 5,
   time: 30_000,

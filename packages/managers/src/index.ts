@@ -666,7 +666,10 @@ export {
     type MemberEditOptions,
     type BanOptions,
 } from "./member.js";
-export { ApplicationCommandManager } from "./application.js";
+export {
+    ApplicationCommandManager,
+    type ApplicationCommandInput,
+} from "./application.js";
 export {
     GuildBanManager,
     GuildScheduledEventManager,

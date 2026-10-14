@@ -98,8 +98,8 @@ const select = new CreateStringSelect()
   .setCustomId("select_role")
   .setPlaceholder("Select a role...")
   .addOptions(
-    { label: "Developer", value: "dev", emoji: "💻" },
-    { label: "Designer", value: "designer", emoji: "🎨" }
+    { label: "Developer", value: "dev", emoji: { name: "💻" } },
+    { label: "Designer", value: "designer", emoji: { name: "🎨" } }
   );
 const row = new CreateActionRow().addComponents(select);
 ```
@@ -111,8 +111,8 @@ const select = new CreateStringSelect()
   .setCustomId("select_role")
   .setPlaceholder("Select a role...")
   .addOptions(
-    { label: "Developer", value: "dev", emoji: "💻" },
-    { label: "Designer", value: "designer", emoji: "🎨" }
+    { label: "Developer", value: "dev", emoji: { name: "💻" } },
+    { label: "Designer", value: "designer", emoji: { name: "🎨" } }
   );
 const row = new CreateActionRow().addComponents(select);
 ```

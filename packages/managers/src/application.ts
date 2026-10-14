@@ -4,6 +4,19 @@ import type {
     ApplicationCommandData,
 } from "@lunibee/types";
 
+/** Command data, or a builder such as `CreateSlashCommand` (its `toJSON()` is sent). */
+export type ApplicationCommandInput =
+    ApplicationCommandData | { toJSON(): Record<string, unknown> };
+
+/** The payload for one command input. */
+function commandPayload(
+    command: ApplicationCommandInput | Partial<ApplicationCommandData>,
+): unknown {
+    return "toJSON" in command && typeof command.toJSON === "function"
+        ? command.toJSON()
+        : command;
+}
+
 /** Manages global and guild-scoped application commands for a Discord application. */
 export class ApplicationCommandManager {
     readonly #rest: REST;
@@ -26,32 +39,32 @@ export class ApplicationCommandManager {
 
     /** Creates a single global application command. @param data Command data. @returns Created command. */
     public create(
-        data: ApplicationCommandData,
+        data: ApplicationCommandInput,
     ): Promise<APIApplicationCommand> {
         return this.#rest.post<APIApplicationCommand>(
             Routes.applicationCommands(this.#applicationId),
-            data,
+            commandPayload(data),
         );
     }
 
     /** Overwrites all global application commands atomically. @param commands Array of command data. @returns New full command list. */
     public set(
-        commands: ApplicationCommandData[],
+        commands: readonly ApplicationCommandInput[],
     ): Promise<APIApplicationCommand[]> {
         return this.#rest.put<APIApplicationCommand[]>(
             Routes.applicationCommands(this.#applicationId),
-            commands,
+            commands.map(commandPayload),
         );
     }
 
     /** Edits a global application command. @param commandId Command identifier. @param data Partial command data. @returns Updated command. */
     public edit(
         commandId: string,
-        data: Partial<ApplicationCommandData>,
+        data: Partial<ApplicationCommandData> | ApplicationCommandInput,
     ): Promise<APIApplicationCommand> {
         return this.#rest.patch<APIApplicationCommand>(
             Routes.applicationCommand(this.#applicationId, commandId),
-            data,
+            commandPayload(data),
         );
     }
 
@@ -74,22 +87,22 @@ export class ApplicationCommandManager {
     /** Creates a single guild-scoped application command. @param guildId Guild identifier. @param data Command data. @returns Created command. */
     public createGuild(
         guildId: string,
-        data: ApplicationCommandData,
+        data: ApplicationCommandInput,
     ): Promise<APIApplicationCommand> {
         return this.#rest.post<APIApplicationCommand>(
             Routes.guildApplicationCommands(this.#applicationId, guildId),
-            data,
+            commandPayload(data),
         );
     }
 
     /** Overwrites all guild-scoped application commands atomically. @param guildId Guild identifier. @param commands Array of command data. @returns New full command list. */
     public setGuild(
         guildId: string,
-        commands: ApplicationCommandData[],
+        commands: readonly ApplicationCommandInput[],
     ): Promise<APIApplicationCommand[]> {
         return this.#rest.put<APIApplicationCommand[]>(
             Routes.guildApplicationCommands(this.#applicationId, guildId),
-            commands,
+            commands.map(commandPayload),
         );
     }
 
@@ -97,7 +110,7 @@ export class ApplicationCommandManager {
     public editGuild(
         guildId: string,
         commandId: string,
-        data: Partial<ApplicationCommandData>,
+        data: Partial<ApplicationCommandData> | ApplicationCommandInput,
     ): Promise<APIApplicationCommand> {
         return this.#rest.patch<APIApplicationCommand>(
             Routes.guildApplicationCommand(
@@ -105,7 +118,7 @@ export class ApplicationCommandManager {
                 guildId,
                 commandId,
             ),
-            data,
+            commandPayload(data),
         );
     }
 

@@ -13,16 +13,14 @@ import { CreateMessageCommand, CreateUserCommand } from "lunibee";
 const commands = [
   new CreateUserCommand()
     .setName("View Profile")          // mixed case and spaces are allowed
-    .setContexts(0)                   // 0 guilds, 1 the bot's DMs, 2 other DMs
-    .toJSON(),
+    .setContexts(0),                  // 0 guilds, 1 the bot's DMs, 2 other DMs
   new CreateMessageCommand()
     .setName("Report Message")
     .setNameLocalizations({ "es-ES": "Reportar mensaje" })
-    .setDefaultMemberPermissions(0n)  // hidden from everyone but admins by default
-    .toJSON(),
+    .setDefaultMemberPermissions(0n), // hidden from everyone but admins by default
 ];
 
-await client.application.commands.set(commands);
+await client.application.commands.set(commands); // builders are sent with toJSON()
 ```
 
 ## Handling them

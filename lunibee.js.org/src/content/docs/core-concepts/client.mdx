@@ -94,7 +94,7 @@ const intents = new IntentsBitField([
 intents.has("Guilds");  // true
 intents.toArray();      // ["Guilds", "GuildMessages", "MessageContent"]
 
-const client = new Client({ token: process.env.DISCORD_TOKEN!, intents });
+const client = new Client({ token: process.env.DISCORD_TOKEN!, intents: intents.toArray() });
 ```
 
 ## Gateway Intents Reference
@@ -200,13 +200,13 @@ The client exposes several top-level methods to fetch resources without needing 
 - `fetchPremiumStickerPacks()`: Fetches the list of premium sticker packs.
 - `fetchGuildTemplate(code)`: Fetches a guild template by its code.
 
-### `setVoiceState`
-Updates the client's voice state in a guild. Used to connect to, move between, or disconnect from voice channels.
+### `sendVoiceState`
+Joins, moves between, or leaves (`channelId: null`) a voice channel. Returns `false` without sending when disconnected or when the guild belongs to another shard. `setVoiceState(payload)` sends a raw opcode 4 payload (`{ guild_id, channel_id, self_mute, self_deaf }`) instead.
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-client.setVoiceState(guildId, channelId, {
+client.sendVoiceState(guildId, channelId, {
   selfDeaf: false,
   selfMute: true,
 });
@@ -214,9 +214,9 @@ client.setVoiceState(guildId, channelId, {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-client.setVoiceState(guildId, channelId, {
-  selfDeaf ,
-  selfMute ,
+client.sendVoiceState(guildId, channelId, {
+  selfDeaf: false,
+  selfMute: true,
 });
 ```
 </TabItem>
@@ -228,7 +228,8 @@ Requests offline or all members for a guild. This requires the `GuildMembers` in
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-client.requestGuildMembers(guildId, {
+client.requestGuildMembers({
+  guild_id: guildId,
   query: "",
   limit: 0,
 });
@@ -236,7 +237,8 @@ client.requestGuildMembers(guildId, {
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-client.requestGuildMembers(guildId, {
+client.requestGuildMembers({
+  guild_id: guildId,
   query: "",
   limit ,
 });

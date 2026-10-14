@@ -32,7 +32,7 @@ Use these helpers instead of manually assembling mention strings when you alread
 ```ts
 import { timestamp } from "@lunibee/formatters";
 
-const now = new Date();
+const now = Math.floor(Date.now() / 1000); // Unix seconds
 
 console.log(timestamp(now));
 console.log(timestamp(now, "R"));

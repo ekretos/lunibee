@@ -16,8 +16,8 @@ try {
   if (error instanceof RESTError) {
     console.error(`HTTP Status: ${error.status}`);
     console.error(`Discord Code: ${error.code}`);
-    console.error(`Endpoint: ${error.method} ${error.url}`);
-    console.error(`Details:`, error.rawError);
+    console.error(`Endpoint: ${error.method} ${error.path}`);
+    console.error(`Details:`, error.errors);
   } else {
     console.error("Unknown error:", error);
   }

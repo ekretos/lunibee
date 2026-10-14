@@ -14,23 +14,36 @@ import type {
     MessageCreateOptions,
     MessageEditOptions,
     MessageFile,
+    MessageFileSource,
 } from "@lunibee/types";
 import { Message, type ResourceContext } from "@lunibee/structures";
 
-export type { MessageCreateOptions, MessageEditOptions, MessageFile };
+export type {
+    MessageCreateOptions,
+    MessageEditOptions,
+    MessageFile,
+    MessageFileSource,
+};
 
-/** Turns message files into REST uploads, encoding string data as UTF-8. */
+/**
+ * Turns message files into REST uploads, encoding string data as UTF-8. A file
+ * with `toBuffer()` (such as a `CreateAttachment`) is read when the request is sent.
+ */
 export function toAttachments(
-    files: readonly MessageFile[],
+    files: readonly (MessageFile | MessageFileSource)[],
 ): RESTFileAttachment[] {
-    return files.map((file) => ({
-        name: file.name,
-        data:
-            typeof file.data === "string"
-                ? new TextEncoder().encode(file.data)
-                : file.data,
-        contentType: file.contentType,
-    }));
+    return files.map((file) =>
+        "toBuffer" in file
+            ? { name: file.name, data: file.toBuffer() }
+            : {
+                  name: file.name,
+                  data:
+                      typeof file.data === "string"
+                          ? new TextEncoder().encode(file.data)
+                          : file.data,
+                  contentType: file.contentType,
+              },
+    );
 }
 
 /**
@@ -84,6 +97,11 @@ export function toRequest(
         body.allowed_mentions = allowedMentions;
     if (body.allowed_mentions) assertAllowedMentions(body.allowed_mentions);
     if (!files?.length) return body;
+    // Alt text travels in the payload's `attachments`, matched by index.
+    if (body.attachments === undefined && files.some((f) => f.description))
+        body.attachments = files.map((file, id) =>
+            file.description ? { id, description: file.description } : { id },
+        );
     return {
         body,
         files: toAttachments(files),
