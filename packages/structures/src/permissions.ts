@@ -137,6 +137,7 @@ export type PermissionName =
     | keyof typeof Permissions
     | keyof typeof PermissionFlagsBits;
 
+/** Anything accepted as permissions: a bit, a name, a `PermissionSet`, or an array of these. */
 export type PermissionResolvable =
     | bigint
     | number

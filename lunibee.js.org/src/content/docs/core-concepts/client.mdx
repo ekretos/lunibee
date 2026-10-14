@@ -268,7 +268,7 @@ const collector = client.createCollector("interactionCreate", {
 });
 
 for await (const interaction of collector) {
-  await interaction.deferUpdate();
+  if (interaction.isButton()) await interaction.deferUpdate();
 }
 const collected = await collector.wait();
 ```

@@ -338,7 +338,7 @@ export class Channel extends BaseStructure {
 
     /**
      * Whether this channel is one of `kinds`, narrowing its type to match.
-     * @example if (channel.is("text", "announcement")) await channel.send("hi");
+     * @example if (channel.is("text", "announcement")) await channel.send({ content: "hi" });
      */
     public is<K extends ChannelKind | UnknownChannelKind>(
         ...kinds: K[]

@@ -105,7 +105,7 @@ await bot.member(guildId, userId).timeout("10m", "spam");
 await bot.channel(channelId).send("Hello!");
 
 const channel = await bot.channel(channelId).get();
-if (channel.is("text")) await channel.send("Typed as a text channel.");
+if (channel.is("text")) await channel.send({ content: "Typed as a text channel." });
 
 await bot.api.guilds(guildId).members(userId).patch({ nick: "x" }, { reason: "rename" });
 ```

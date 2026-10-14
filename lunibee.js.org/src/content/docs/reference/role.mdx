@@ -110,6 +110,7 @@ await channel.send({ content: `Welcome You've been assigned ${role}.` });
 ```ts
 client.on("guildMemberAdd", async (memberData) => {
   const WELCOME_ROLE_ID = "123456789012345678";
+  if (!memberData.guild_id) return;
   const guild = client.guilds.get(memberData.guild_id);
   if (!guild) return;
   await client.guilds.members(memberData.guild_id).addRole(memberData.user.id, WELCOME_ROLE_ID);

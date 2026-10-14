@@ -229,8 +229,9 @@ Returns the key at a numeric index.
 Returns one random value (or `undefined` when empty). With `amount`, returns that many **different** values as an array; asking for more than the size returns all of them, shuffled, and `0` returns `[]`. Throws a `RangeError` for a negative or fractional `amount`. Uses `Math.random()`, so do not use it for tokens or secrets.
 
 ```ts
-const winner = guild.members.cache.random();
-const winners = guild.members.cache.random(3);
+const members = client.guilds.members(guildId).cache;
+const winner = members.random();
+const winners = members.random(3);
 ```
 
 ### `randomKey(amount?)`

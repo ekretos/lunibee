@@ -226,10 +226,12 @@ console.log(`Check out ${channel}`); // → "Check out <#123456789>"
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "ticket") return;
 
+  const user = interaction.user;
+  if (!user) return;
   const guild = client.guilds.get(interaction.guildId!);
   const channel = await client.channels.create(interaction.guildId!, {
-    name: `ticket-${interaction.user.id}`,
-    topic: `Support ticket for ${interaction.user.username}`,
+    name: `ticket-${user.id}`,
+    topic: `Support ticket for ${user.username}`,
     type: 0, // text
     parent_id: TICKET_CATEGORY_ID,
   });
@@ -271,7 +273,7 @@ client.on("interactionCreate", async (interaction) => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand() || interaction.commandName !== "rename") return;
   const name = interaction.options.getString("name", true);
-  const channel = client.channels.get(interaction.channelId);
+  const channel = interaction.channelId ? client.channels.get(interaction.channelId) : undefined;
   if (!channel) return interaction.reply({ content: "Channel not found.", ephemeral: true });
   await channel.editName(name);
   await interaction.reply({ content: `✅ Renamed to **${name}**` });

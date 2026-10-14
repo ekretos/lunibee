@@ -7,7 +7,7 @@ description: Every type the lunibee package exports, grouped by package, with a 
 
 Every interface and type alias that `lunibee` exports, with what it is for. Each name links to its full definition in the generated API reference. The classes and functions that use these types are described on the other reference pages.
 
-312 types in 12 packages.
+313 types in 12 packages.
 
 ## `@lunibee/builders`
 
@@ -76,9 +76,6 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`NumberConfig`](/api/interfaces/numberconfig/) | interface | An integer or number option. |
 | [`OptionDef`](/api/interfaces/optiondef/) | interface | One option of a command. |
 | [`PageOptions`](/api/interfaces/pageoptions/) | interface | How a list is paged. |
-| [`PermissionContext`](/api/interfaces/permissioncontext/) | interface | Everything needed to resolve a member's permissions. |
-| [`PermissionOverwrite`](/api/interfaces/permissionoverwrite/) | interface | A channel permission overwrite (Discord's `permission_overwrites` entry). |
-| [`PermissionRole`](/api/interfaces/permissionrole/) | interface | A role as needed for permission resolution. |
 | [`Route`](/api/interfaces/route/) | interface | A place in Discord's REST API. |
 | [`RouteOptions`](/api/interfaces/routeoptions/) | interface | Extra settings for one request. |
 | [`StringConfig`](/api/interfaces/stringconfig/) | interface | A string option. |
@@ -92,8 +89,6 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`MessageInput`](/api/type-aliases/messageinput/) | type | Message text, or a full payload. |
 | [`OptionMap`](/api/type-aliases/optionmap/) | type | The options of a command, by name. |
 | [`OptionValues`](/api/type-aliases/optionvalues/) | type | The values a handler receives: required (or defaulted) options always, the rest possibly missing. |
-| [`PermissionFlagsBits`](/api/type-aliases/permissionflagsbits/) | type | Union of PermissionFlagsBits values (all bigint). |
-| [`PermissionName`](/api/type-aliases/permissionname/) | type | A permission flag name, such as `"BanMembers"`, accepted wherever a permission can be given by name. |
 | [`RouteId`](/api/type-aliases/routeid/) | type | What goes in a path where Discord wants an id: a snowflake, `"@me"`, an invite code, an emoji. |
 | [`WebhookNode`](/api/type-aliases/webhooknode/) | type | `webhooks(id)` is the webhook; `webhooks(id)(token)` is its execute route, with `messages(id)` inside. |
 
@@ -214,10 +209,16 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`ImageURLOptions`](/api/interfaces/imageurloptions/) | interface | Options for CDN image URLs. |
 | [`InteractionClient`](/api/interfaces/interactionclient/) | interface | Transport required by an interaction structure. |
 | [`InteractionData`](/api/interfaces/interactiondata/) | interface | Data shared by Discord interactions. |
+| [`PermissionContext`](/api/interfaces/permissioncontext/) | interface | Everything needed to resolve a member's permissions. |
+| [`PermissionOverwrite`](/api/interfaces/permissionoverwrite/) | interface | A channel permission overwrite (Discord's `permission_overwrites` entry). |
+| [`PermissionRole`](/api/interfaces/permissionrole/) | interface | A role as needed for permission resolution. |
 | [`ResourceContext`](/api/interfaces/resourcecontext/) | interface | What a structure uses to act on Discord (send, edit, fetch, compute permissions). |
 | [`AuditLogInfo`](/api/type-aliases/auditloginfo/) | type | The details object of an action type, or `undefined` when the type has none. |
 | [`ChannelOfKind`](/api/type-aliases/channelofkind/) | type | The channel class for a kind (or a union of them). |
 | [`InteractionEnum`](/api/type-aliases/interactionenum/) | type | One InteractionEnum value, usable as a type. |
+| [`PermissionFlagsBits`](/api/type-aliases/permissionflagsbits/) | type | Union of PermissionFlagsBits values (all bigint). |
+| [`PermissionName`](/api/type-aliases/permissionname/) | type | A permission flag name, such as `"BanMembers"`, accepted wherever a permission can be given by name. |
+| [`PermissionResolvable`](/api/type-aliases/permissionresolvable/) | type | Anything accepted as permissions: a bit, a name, a `PermissionSet`, or an array of these. |
 | [`WebhookEnum`](/api/type-aliases/webhookenum/) | type | One WebhookEnum value, usable as a type. |
 
 ## `@lunibee/types`

@@ -82,7 +82,16 @@ function ambient(code: string): string {
     const lines: string[] = [];
     for (const [name, type] of Object.entries(AMBIENT)) {
         if (!new RegExp(`\\b${name}\\b`).test(code)) continue;
-        if (new RegExp(`\\b(const|let|var|function|class|import)\\b[^\\n]*\\b${name}\\b`).test(code)) continue;
+        // Declared by the example itself: `const name`, `function name`, a
+        // destructured binding, or an import. A mere use on a declaring line
+        // (`const guild = client.guilds…`) does not count.
+        const declared = [
+            `\\b(const|let|var|function|class)\\s+${name}\\b`,
+            `\\b(const|let|var)\\s*[{[][^=]*\\b${name}\\b[^=]*[}\\]]\\s*=`,
+            `\\bimport\\s+(type\\s+)?${name}\\b`,
+            `\\bimport\\s*(type\\s*)?\\{[^}]*\\b${name}\\b[^}]*\\}`,
+        ];
+        if (declared.some((re) => new RegExp(re).test(code))) continue;
         lines.push(`declare const ${name}: ${type};`);
     }
     return lines.join("\n");

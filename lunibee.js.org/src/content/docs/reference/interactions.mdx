@@ -290,6 +290,7 @@ Triggered when a user submits a modal form.
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
+if (!interaction.isModalSubmit()) return;
 const value = interaction.getRequiredInputValue("field_custom_id");
 ```
 </TabItem>

@@ -295,3 +295,7 @@ GitHub repository settings (branch protection, secret scanning) remain unverifie
 | D-20 | P3 | `ShardManager` in a cluster worker cannot be re-initialised after `destroy()` / `reshard()` when `shardCount` is omitted (`#ensureInitialized` uses `shardCount ?? 1`, not the worker context). | Open |
 | D-21 | P3 | `Collector` events are untyped (`EventEmitter`), so `collect` / `end` handler arguments are `any`. | Open |
 | D-22 | P3 | `benchmarks/rest-buckets.ts` is cited by `scripts/bench-docs.ts` but does not exist. | Open — the docs no longer cite it |
+| D-23 | P3 | `CreateStringOption` uses the base `setAutocomplete`, so `addChoices()` then `setAutocomplete(true)` does not throw (the numeric options and the reverse order do). | Open |
+| D-24 | P3 | `PermissionSet` has no boolean getters for `setVoiceChannelStatus`, `pinMessages` and `bypassSlowmode` (`has()` works). | Open |
+| D-25 | P3 | The `Channel.is()` JSDoc example passed a string to `Channel.send()`, which takes a payload. | Fixed (example corrected) |
+| D-26 | P2 | `docs:check` treated a name as declared whenever it appeared on any declaring line, leaving `client` untyped in most examples. | Fixed — only real declarations count; the 10 examples it then caught are corrected |
