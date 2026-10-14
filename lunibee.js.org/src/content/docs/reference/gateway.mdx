@@ -1,244 +1,378 @@
 ---
 title: Gateway
-description: Discord WebSocket Gateway client handling heartbeats, sessions, resume, reconnect, and sequence tracking.
+description: Discord WebSocket Gateway connection — identify, resume, heartbeats, reconnect with backoff, compression, send limits and health.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`Gateway` is Lunibee's low-level Discord WebSocket client. It is automatically managed by `Client`. You can also use it directly for advanced use cases like custom event routing.
+`Gateway` (from `@lunibee/ws`) is one connection to Discord's WebSocket Gateway: one shard. It handles:
+
+- IDENTIFY and RESUME, and switching between them correctly;
+- heartbeats, acknowledgement timeouts and zombie (silent) connection detection;
+- reconnects with exponential backoff, jitter and storm detection;
+- zlib-stream compression;
+- Discord's outbound limit of 120 messages per 60 s;
+- emitting every dispatch as a raw event.
+
+Most bots never build one. `Client` creates and drives its own Gateway (`client.ws`, also available as `client.gateway`) and `ShardManager` runs one per shard. Use `Gateway` directly for a raw-event bot, a custom framework, or tests.
 
 ## Import
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { Gateway } from "@lunibee/ws";
-// or via the main package:
-import { Client } from "lunibee"; // access as client.gateway / client.ws
+import { Gateway, GatewayState, GatewayError } from "@lunibee/ws";
+// also re-exported:
+import { Gateway, GatewayIntentBits } from "lunibee";
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { Gateway } from "@lunibee/ws";
-// or via the main package:
-import { Client } from "lunibee"; // access as client.gateway / client.ws
+import { Gateway, GatewayState, GatewayError } from "@lunibee/ws";
+// also re-exported:
+import { Gateway, GatewayIntentBits } from "lunibee";
 ```
 </TabItem>
 </Tabs>
+
+The examples below are TypeScript; the JavaScript is the same without type annotations.
+
+## Quick start
+
+```ts
+import { Gateway, GatewayIntentBits } from "lunibee";
+
+const gateway = new Gateway({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+});
+
+gateway.on("ready", (data) => console.log("ready as", (data as { user: { username: string } }).user.username));
+gateway.on("MESSAGE_CREATE", (message) => console.log("message:", (message as { content: string }).content));
+gateway.on("error", (error) => console.error(error));
+
+await gateway.connect();
+```
 
 ## Constructor
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
 new Gateway(options: GatewayOptions)
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-new Gateway(options )
-```
-</TabItem>
-</Tabs>
 
-| Option | Type | Description |
-|---|---|---|
-| `token` | `string` | Discord bot token. |
-| `intents` | `GatewayIntentResolvable` (array) | Gateway intents, e.g. `[GatewayIntentBits.Guilds]`. |
-| `presence` | `GatewayPresence` | Initial presence/status. |
-| `properties` | `GatewayProperties` | OS/browser/device identification. |
-| `compress` | `boolean` | Enable WebSocket compression. |
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `token` | `string` | — | Bot token. Required. |
+| `intents` | `GatewayIntentResolvable` | — | Required. An array of `GatewayIntentBits`, or the bitfield number. The old `A \| B` form is not accepted. |
+| `shardId` | `number` | `0` | This connection's shard. Must be below `shardCount`. |
+| `shardCount` | `number` | `1` | Total shards. |
+| `compress` | `boolean` | `false` | zlib-stream compression: about a tenth of the inbound bandwidth for some CPU. See [Compression](#compression). |
+| `presence` | `GatewayPresence` | online, no activities | Presence sent with IDENTIFY. |
+| `properties` | `GatewayProperties` | `{ os: process.platform, browser: "Lunibee", device: "Lunibee" }` | Identify properties. |
+| `reconnect` | `boolean` | `true` | Reconnect automatically after a close that is not fatal. |
+| `maxReconnectAttempts` | `number` | `Infinity` | Reconnects in a row before giving up. A READY or RESUMED resets the count. |
+| `reconnectBaseDelay` | `number` | `1000` | First reconnect delay, in ms. Must be above 0. |
+| `reconnectMaxDelay` | `number` | `30000` | Longest reconnect delay, in ms. Must be above 0. |
+| `reconnectStormLimit` | `number` | `5` | Reconnects inside `reconnectStormWindow` before the link counts as unstable. |
+| `reconnectStormWindow` | `number` | `60000` | The window, in ms, over which reconnects are counted. |
+| `connectTimeout` | `number` | `30000` | How long a socket may stay connecting (for example a TLS handshake that never answers) before it is closed and retried, in ms. Must be above 0. |
+| `heartbeatAckTimeout` | `number` | `10000` | How long to wait for a heartbeat acknowledgement before the connection is treated as dead, in ms. |
+| `zombieTimeout` | `number` | `30000` | How long the connection may receive nothing at all before it is treated as dead, in ms. Must be greater than `heartbeatAckTimeout`. |
+| `createSocket` | `SocketFactory` | the global `WebSocket` | Builds the socket; inject a fake in tests. |
+
+The constructor throws a `TypeError` for a missing token or invalid intents, and a `RangeError` for a `shardId` outside `shardCount`, a delay of 0 or less, or a `zombieTimeout` not above `heartbeatAckTimeout`.
+
+With `Client`, pass these as `ClientOptions.gateway` (token and intents come from the client):
+
+```ts
+const client = new Client({
+  token,
+  intents: [GatewayIntentBits.Guilds],
+  compress: true,                                  // shorthand for gateway.compress
+  gateway: { reconnectMaxDelay: 60_000, presence: { status: "idle" } },
+});
+```
 
 ## Properties
 
 | Property | Type | Description |
 |---|---|---|
-| `ping` | `number` | Latest heartbeat round-trip latency in ms. |
-| `state` | `GatewayState` | Current connection state. |
-| `sessionId` | `string \| undefined` | Active session ID. |
-| `resumeURL` | `string \| undefined` | Discord's recommended resume URL. |
-| `sequence` | `number \| null` | Latest event sequence number. |
+| `state` | `GatewayState` | The connection's current state. See [States](#states). |
+| `ping` | `number` | Round trip of the last acknowledged heartbeat, in ms; `-1` before the first. |
 
 ## Methods
 
-### `connect()`
+### `connect(url?)`
 
-Establishes the WebSocket connection and identifies with Discord.
+Opens the connection. Returns a promise that resolves when the socket is open; listen for `ready` to know when the session is identified.
 
-<Tabs>
-<TabItem label="TypeScript">
+- `url` defaults to `wss://gateway.discord.gg/?v=10&encoding=json`. With `compress`, `compress=zlib-stream` is added (with `?` or `&` as needed).
+- Calling it while a connection is open, or an attempt is in flight, joins that attempt instead of opening a second socket.
+- A manual `connect()` cancels a scheduled reconnect.
+- After `close()` it rejects with a `GatewayError`.
+- With `reconnect: false`, a failure to open rejects; otherwise it keeps retrying under the reconnect rules.
+
 ```ts
 await gateway.connect();
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-await gateway.connect();
-```
-</TabItem>
-</Tabs>
+
+To use the URL Discord recommends, take it from `GET /gateway/bot` (`Routes.gatewayBot()`).
 
 ### `close()`
 
-Closes the WebSocket connection cleanly.
+Closes the connection for good: timers stop, nothing reconnects, and `state` becomes `Closed`. A pending `connect()` rejects. A closed Gateway cannot be reopened; build a new one.
 
-<Tabs>
-<TabItem label="TypeScript">
+### `send(payload)`
+
+Sends a raw payload `{ op, d, s, t }`. Returns `true` if it was written, or `false` if the socket is not open or the [send budget](#send-limits) is spent (an `error` is emitted in that case). Throws a `TypeError` if `op` is not an integer.
+
 ```ts
-gateway.close();
+import { GatewayOpcodes } from "@lunibee/ws";
+gateway.send({ op: GatewayOpcodes.PresenceUpdate, d: { status: "dnd", activities: [], afk: false, since: null }, s: null, t: null });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-gateway.close();
-```
-</TabItem>
-</Tabs>
 
 ### `setPresence(data)`
 
-Sends an opcode 3 Presence Update.
+Merges `data` into the stored presence and sends it (opcode 3). The merged presence is also what the next IDENTIFY uses, so it survives reconnects. Returns whether it was sent.
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
 gateway.setPresence({
   status: "dnd",
-  activities: [{ name: "Maintenance Mode", type: 0 }],
+  activities: [{ name: "maintenance", type: 0 }],
 });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-gateway.setPresence({
-  status: "dnd",
-  activities: [{ name: "Maintenance Mode", type: 0 }],
-});
-```
-</TabItem>
-</Tabs>
 
-### `setVoiceState(data)`
+`GatewayPresence`: `status` (`"online" | "dnd" | "idle" | "invisible" | "offline"`), `activities` (`{ name, type?, url?, state? }[]`), `afk`, `since`.
 
-Sends an opcode 4 Voice State Update.
+### `sendVoiceState(guildId, channelId, options?)`
 
-<Tabs>
-<TabItem label="TypeScript">
+Joins, moves to, or leaves (`channelId: null`) a voice channel (opcode 4). `options` takes `selfMute` and `selfDeaf`, both `false` by default. Returns `false` without sending when the guild belongs to another shard.
+
 ```ts
-gateway.setVoiceState({ guild_id: guildId, channel_id: channelId, self_mute: false, self_deaf: false });
+gateway.sendVoiceState(guildId, channelId, { selfDeaf: true });
+gateway.sendVoiceState(guildId, null); // leave
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-gateway.setVoiceState({ guild_id , channel_id , self_mute , self_deaf: false });
-```
-</TabItem>
-</Tabs>
+
+`setVoiceState(data)` sends a raw opcode 4 payload (`{ guild_id, channel_id, self_mute, self_deaf }`) with no shard check.
 
 ### `requestGuildMembers(data)`
 
-Sends an opcode 8 Request Guild Members.
+Sends opcode 8. Members arrive as `GUILD_MEMBERS_CHUNK` events.
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-gateway.requestGuildMembers({ guild_id: guildId, query: "", limit: 0 });
+gateway.requestGuildMembers({ guild_id: guildId, query: "", limit: 0 });            // all members (needs GuildMembers)
+gateway.requestGuildMembers({ guild_id: guildId, user_ids: ["123"], presences: true });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-gateway.requestGuildMembers({ guild_id , query: "", limit: 0 });
-```
-</TabItem>
-</Tabs>
 
-### `on(event, listener)` / `off(event, listener)`
+### `ownsGuild(guildId)`
 
-Subscribes to raw Gateway dispatch events:
+Whether a guild belongs to this shard: `(guildId >> 22) % shardCount === shardId`. Always `true` with one shard, and `false` for an id that is not a snowflake.
 
-<Tabs>
-<TabItem label="TypeScript">
-```ts
-gateway.on("MESSAGE_CREATE", (data) => {
-  console.log("Raw message:", data);
-});
+### `health()`
 
-gateway.on("READY", (data) => {
-  console.log("Session:", data.session_id);
-});
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-gateway.on("MESSAGE_CREATE", (data) => {
-  console.log("Raw message:", data);
-});
+A snapshot for dashboards and health checks:
 
-gateway.on("READY", (data) => {
-  console.log("Session:", data.session_id);
-});
-```
-</TabItem>
-</Tabs>
-
-## `GatewayState`
-
-| Value | Description |
+| Field | Description |
 |---|---|
-| `GatewayState.Connect` | Initial connection attempt. |
-| `GatewayState.Hello` | HELLO received, heartbeating. |
-| `GatewayState.Identify` | IDENTIFY in progress. |
-| `GatewayState.Resume` | RESUME in progress. |
-| `GatewayState.Ready` | Fully connected. |
-| `GatewayState.Reconnect` | Reconnecting after disconnect. |
-| `GatewayState.Closed` | Permanently closed. |
+| `state` | Current `GatewayState`. |
+| `latency` | Last heartbeat round trip in ms, `-1` before the first. |
+| `silentFor` | Ms since the last message from Discord, `0` before any. |
+| `reconnects` | Reconnects scheduled since the Gateway was created. |
 
-## Direct Usage Example
+### `on(event, listener)`, `off(event, listener)`, `emit(event, data?)`
 
-<Tabs>
-<TabItem label="TypeScript">
+Add or remove a listener (both return `this`). A listener that throws does not break the connection; its error is emitted as `error`. `emit` calls listeners directly; it is useful for tests.
+
+## Events
+
+Each listener receives one argument.
+
+### Lifecycle events
+
+| Event | Argument | When |
+|---|---|---|
+| `open` | — | The socket opened. |
+| `ready` | the `READY` payload | The session is identified. |
+| `resumed` | the `RESUMED` payload | A resume succeeded; missed events are replayed before it. |
+| `close` | `{ code, action }` | The socket closed. `action` is `"resume"`, `"identify"` or `"stop"`. See [Close codes](#close-codes). |
+| `stateChange` | `{ previous, next }` | `state` changed. |
+| `heartbeatAck` | the acknowledgement payload | Discord acknowledged a heartbeat; `ping` is updated. |
+| `invalidSession` | `boolean` (resumable) | Discord invalidated the session (opcode 9). The Gateway reconnects on its own. |
+| `zombie` | `{ silentFor, timeout }` | Nothing was received for `zombieTimeout`; the connection is closed and resumed. |
+| `unstable` | `{ reconnects, delay }` | More than `reconnectStormLimit` reconnects in `reconnectStormWindow`; the delay is being raised. |
+| `error` | `Error` (usually `GatewayError`) | Something failed. The Gateway keeps running unless it is a fatal close. |
+
+Always add an `error` listener: problems such as a heartbeat timeout or a spent send budget are reported there.
+
+### Dispatch events
+
+Every dispatch is emitted under its Discord name with its `d` payload: `READY`, `GUILD_CREATE`, `MESSAGE_CREATE`, `INTERACTION_CREATE` and so on.
+
 ```ts
-import { Gateway } from "@lunibee/ws";
-import { IntentBits } from "lunibee";
-
-const gateway = new Gateway({
-  token: process.env.DISCORD_TOKEN!,
-  intents: [IntentBits.guilds, IntentBits.guildMessages],
-});
-
-gateway.on("READY", (data) => {
-  console.log(`Connected as ${(data as any).user.username}`);
-});
-
-gateway.on("MESSAGE_CREATE", (data) => {
-  console.log("Message received:", (data as any).content);
-});
-
-await gateway.connect();
+gateway.on("GUILD_CREATE", (guild) => { /* raw APIGuild */ });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { Gateway } from "@lunibee/ws";
-import { IntentBits } from "lunibee";
 
-const gateway = new Gateway({
-  token: process.env.DISCORD_TOKEN,
-  intents: [IntentBits.guilds, IntentBits.guildMessages],
-});
+Only UPPER_SNAKE_CASE names are emitted this way, so a payload can never pose as a lifecycle event such as `close` or `ready`.
 
-gateway.on("READY", (data) => {
-  console.log(`Connected as ${(data as any).user.username}`);
-});
+`RAW` receives `{ event, data }` for every dispatch, before the named event:
 
-gateway.on("MESSAGE_CREATE", (data) => {
-  console.log("Message received:", (data as any).content);
-});
-
-await gateway.connect();
+```ts
+gateway.on("RAW", ({ event, data }) => metrics.inc(`gateway.${event}`));
 ```
-</TabItem>
-</Tabs>
 
-> [!TIP]
-> Most bots should use the higher-level `Client` class instead of `Gateway` directly. `Client` handles structure creation, caching, and event dispatch automatically.
+## States
+
+`GatewayState` (also exported as `Status`, for Discord.js users) is a string enum:
+
+| State | Meaning |
+|---|---|
+| `Connect` (`"CONNECT"`) | Not connected, or opening a socket. |
+| `Hello` (`"HELLO"`) | HELLO received; heartbeating has started. |
+| `Identify` (`"IDENTIFY"`) | IDENTIFY sent. |
+| `Resume` (`"RESUME"`) | RESUME sent. |
+| `Ready` (`"READY"`) | Identified or resumed and receiving events. |
+| `Dispatch` (`"DISPATCH"`) | Handling a dispatch. |
+| `Heartbeat` (`"HEARTBEAT"`) | Answering Discord's request for a heartbeat. |
+| `Reconnect` (`"RECONNECT"`) | Waiting to reconnect. |
+| `Closed` (`"CLOSED"`) | `close()` was called or a fatal close happened. Final. |
+
+```ts
+gateway.on("stateChange", ({ previous, next }) => console.log(previous, "→", next));
+```
+
+## Connection lifecycle
+
+1. **Open.** The socket opens (or is closed and retried after `connectTimeout`).
+2. **HELLO.** Discord sends the heartbeat interval. The first heartbeat goes out after a random fraction of it, then every interval.
+3. **IDENTIFY or RESUME.** With a resumable session (a session id and sequence from before), the Gateway sends RESUME to the `resume_gateway_url` Discord gave it; otherwise IDENTIFY with token, intents, shard, properties and presence.
+4. **READY / RESUMED.** `state` becomes `Ready`, and the reconnect backoff resets.
+5. **Events.** Each dispatch records its sequence number, which the next RESUME uses.
+
+### Resume and reconnect
+
+When the connection drops, the Gateway decides how to come back:
+
+| Situation | What happens |
+|---|---|
+| Network drop, `1006`, `4000`, server restart, Discord's RECONNECT (opcode 7), heartbeat timeout, zombie | RESUME if the session is resumable, otherwise IDENTIFY. |
+| Invalid session (opcode 9), resumable | RESUME. |
+| Invalid session, not resumable | The session is dropped; IDENTIFY. |
+| `4007` (invalid sequence), `4009` (session timed out) | The session and its resume URL are dropped; IDENTIFY on the main Gateway. |
+| Fatal codes (`4004`, `4010`, `4011`, `4012`, `4013`, `4014`) | No reconnect; `state` becomes `Closed`. |
+
+When the Gateway closes a connection it means to resume, it uses close code `4900`, because Discord invalidates a session closed with `1000` or `1001`.
+
+A `resume_gateway_url` is only used if it is a `wss:` URL on `discord.gg` (or a subdomain) or on the host of the URL you connected to; otherwise the Gateway reconnects to the main URL. A forged READY therefore cannot send your token elsewhere.
+
+### Backoff
+
+The delay before reconnect attempt *n* is `min(reconnectMaxDelay, reconnectBaseDelay × 2^n)`, plus jitter of up to 25% of the delay. Jitter keeps shards from reconnecting in lockstep after a Discord-wide restart. The attempt count resets on READY or RESUMED.
+
+**Storm detection.** A connection that keeps succeeding and then dropping would always reconnect after the base delay. So past `reconnectStormLimit` reconnects inside `reconnectStormWindow`, each further reconnect doubles the delay (up to `reconnectMaxDelay`) and `unstable` is emitted.
+
+After `maxReconnectAttempts` failures in a row the Gateway stops trying, and a pending `connect()` rejects with `"Gateway reconnect attempts exhausted."`.
+
+### Heartbeats and zombie connections
+
+- **Acknowledgement timeout.** If a heartbeat is not acknowledged within `heartbeatAckTimeout`, `error` is emitted and the connection is closed for a resume.
+- **Zombie detection.** If nothing at all arrives for `zombieTimeout` (measured from the socket opening, so a connection that never gets HELLO is caught too), `zombie` and `error` are emitted and the connection is closed for a resume.
+
+Every message from Discord counts as a sign of life, not just acknowledgements.
+
+## Close codes
+
+`GatewayCloseCodes`:
+
+| Code | Name | Action |
+|---|---|---|
+| 4000 | `UnknownError` | resume |
+| 4001 | `UnknownOpcode` | resume |
+| 4002 | `DecodeError` | resume |
+| 4003 | `NotAuthenticated` | resume |
+| 4004 | `AuthenticationFailed` | **stop**: the token is wrong |
+| 4005 | `AlreadyAuthenticated` | resume |
+| 4007 | `InvalidSeq` | identify |
+| 4008 | `RateLimited` | resume |
+| 4009 | `SessionTimedOut` | identify |
+| 4010 | `InvalidShard` | **stop** |
+| 4011 | `ShardingRequired` | **stop**: use more shards |
+| 4012 | `InvalidAPIVersion` | **stop** |
+| 4013 | `InvalidIntents` | **stop** |
+| 4014 | `DisallowedIntents` | **stop**: enable the privileged intent in the Developer Portal, or remove it |
+
+"resume" means resume when the session allows it and identify otherwise. `classifyCloseCode(code, canResume)` returns the same answer, and `FATAL_CLOSE_CODES` / `IDENTIFY_CLOSE_CODES` list the codes.
+
+```ts
+gateway.on("close", ({ code, action }) => {
+  if (action === "stop") console.error(`Gateway stopped for good (code ${code}).`);
+});
+```
+
+## Compression
+
+With `compress: true` the Gateway asks for `zlib-stream` and inflates frames with one persistent inflater. Frames are assembled at Discord's flush boundaries.
+
+- An inflated frame may be at most 64 MiB. Past that, the stream is treated as corrupt.
+- A corrupt stream (bad data or an oversize frame) emits `error` and closes the socket with `4000`, so the session resumes on a fresh inflater instead of staying open and deaf.
+
+Text frames on a compressed connection are accepted as they are.
+
+## Send limits
+
+Discord allows 120 Gateway messages per 60 seconds per connection, and closes a connection that exceeds it (`4008`). The Gateway holds application sends (`send`, `setPresence`, voice states, member requests) to 115 per 60 seconds, leaving the rest for heartbeats, which are always sent. A send over budget returns `false` and emits `error` rather than risk the close. Heartbeats still count toward the 120.
+
+IDENTIFY has its own limit (`max_concurrency` and the daily session budget), which `ShardManager` and `ClusterManager` enforce across shards.
+
+## Sharding
+
+One Gateway is one shard. To shard by hand, set `shardId` and `shardCount` and use `ownsGuild()` to route voice and member requests. `ShardManager` does this for you, including spacing IDENTIFYs:
+
+```ts
+import { ShardManager } from "@lunibee/sharding";
+```
+
+See [Sharding](/core-concepts/sharding/) and [ShardManager](/reference/shard-manager/).
+
+## Errors
+
+`GatewayError` extends `Error` with an optional `code` (a close code where one applies). It is what `connect()` rejects with and what most `error` events carry. Socket and decoder failures keep their original error as `cause`.
+
+```ts
+gateway.on("error", (error) => {
+  if (error instanceof GatewayError && error.code === GatewayCloseCodes.DisallowedIntents) process.exit(1);
+  console.error(error);
+});
+```
+
+The token is sent only in IDENTIFY and RESUME, and the Gateway never logs it.
+
+## Testing
+
+`createSocket` replaces the `WebSocket`, so a Gateway can be driven entirely in memory:
+
+```ts
+const gateway = new Gateway({
+  token: "test",
+  intents: [GatewayIntentBits.Guilds],
+  createSocket: (url) => new FakeWebSocket(url),
+});
+```
+
+The repository's `tests/helpers/fake-websocket.ts` shows a fake that can `open()`, `receive(payload)`, `dispatch(event, data, seq)` and record what was sent.
+
+## Building blocks
+
+The Gateway is assembled from exported parts you can use or test on their own:
+
+| Export | Role |
+|---|---|
+| `WebSocketTransport` | Owns the socket: creation, replacement, decoding, and dropping frames from a replaced socket. |
+| `createDecoder(compress)`, `PlainTextDecoder`, `ZlibStreamDecoder` | Turn raw frames into JSON text. |
+| `classifyFrame`, `classifyPayload` | Parse a frame and decide what it means (dispatch, hello, heartbeat request, ack, reconnect, invalid session, protocol violation). |
+| `identifyPayload`, `resumePayload`, `heartbeatPayload` | Build those payloads. |
+| `GatewaySession` | Session id, sequence, resume URL and the IDENTIFY-or-RESUME decision. |
+| `GatewayHeartbeat` | Heartbeat timer, acknowledgement deadline and zombie watch. |
+| `GatewayReconnect` | Close classification, backoff, storm detection and the single in-flight attempt. |
+| `GatewaySendLimiter`, `SendBudget` | The 115-per-60 s application budget. |
+| `GatewayDispatcher` | The listener registry. |
+| `GatewayOpcodes`, `GatewayCloseCodes` | Protocol constants. |
