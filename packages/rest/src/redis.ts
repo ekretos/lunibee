@@ -60,6 +60,7 @@ export interface MinimalRedisClient {
     ): Promise<unknown>;
 }
 
+/** Options for `RedisRateLimitStore`: the Redis client, a key prefix, and an error callback. */
 export interface RedisRateLimitStoreOptions {
     /** The Redis client instance (e.g. ioredis). */
     client: MinimalRedisClient;

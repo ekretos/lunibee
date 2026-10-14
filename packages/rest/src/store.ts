@@ -1,3 +1,4 @@
+/** A rate-limit bucket as stored: units `remaining` in the window and when it resets (`resetAt`, ms since the epoch). */
 export interface BucketState {
     remaining: number;
     resetAt: number;

@@ -7,12 +7,14 @@ import type {
     APIMessageComponent,
 } from "@lunibee/types";
 
+/** Where a `WebhookClient` sends: a Discord webhook `url`, or its `id` and `token`. */
 export interface WebhookClientOptions {
     id?: string;
     token?: string;
     url?: string;
 }
 
+/** A webhook message for `send()` and `editMessage()`; camelCase aliases (`avatarURL`, `threadId`, `allowedMentions`) are accepted beside the wire names. */
 export interface WebhookMessageOptions {
     content?: string;
     username?: string;

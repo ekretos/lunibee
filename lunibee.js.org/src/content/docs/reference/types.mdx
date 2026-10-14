@@ -13,27 +13,27 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 
 | Type | Kind | Description |
 |---|---|---|
-| [`APIActionRowPayload`](/api/interfaces/apiactionrowpayload/) | interface |  |
-| [`APIButtonPayload`](/api/interfaces/apibuttonpayload/) | interface |  |
-| [`APIComponentEmoji`](/api/interfaces/apicomponentemoji/) | interface |  |
-| [`APIContainerComponent`](/api/interfaces/apicontainercomponent/) | interface |  |
-| [`APIContentInventoryEntryComponent`](/api/interfaces/apicontentinventoryentrycomponent/) | interface |  |
-| [`APIEntitySelectComponent`](/api/interfaces/apientityselectcomponent/) | interface |  |
-| [`APIFileComponent`](/api/interfaces/apifilecomponent/) | interface |  |
-| [`APIMediaGalleryComponent`](/api/interfaces/apimediagallerycomponent/) | interface |  |
-| [`APIModalComponent`](/api/interfaces/apimodalcomponent/) | interface |  |
-| [`APISectionComponent`](/api/interfaces/apisectioncomponent/) | interface |  |
+| [`APIActionRowPayload`](/api/interfaces/apiactionrowpayload/) | interface | An action row as a builder sends it: up to five buttons, or one select menu or text input. |
+| [`APIButtonPayload`](/api/interfaces/apibuttonpayload/) | interface | A button as a builder sends it. |
+| [`APIComponentEmoji`](/api/interfaces/apicomponentemoji/) | interface | An emoji on a button or select option: a custom emoji `id`, or a Unicode `name`. |
+| [`APIContainerComponent`](/api/interfaces/apicontainercomponent/) | interface | A Components V2 container: a box around other components, with an optional accent colour. |
+| [`APIContentInventoryEntryComponent`](/api/interfaces/apicontentinventoryentrycomponent/) | interface | A Components V2 content inventory entry. |
+| [`APIEntitySelectComponent`](/api/interfaces/apientityselectcomponent/) | interface | A user, role, mentionable or channel select menu as Discord receives it. |
+| [`APIFileComponent`](/api/interfaces/apifilecomponent/) | interface | A Components V2 file display for an uploaded attachment. |
+| [`APIMediaGalleryComponent`](/api/interfaces/apimediagallerycomponent/) | interface | A Components V2 media gallery; each item is `&#123; media: &#123; url &#125;, description?, spoiler? |
+| [`APIModalComponent`](/api/interfaces/apimodalcomponent/) | interface | A modal (callback type 9 data): title, custom ID and its components. |
+| [`APISectionComponent`](/api/interfaces/apisectioncomponent/) | interface | A Components V2 section: up to three text displays with an accessory. |
 | [`APISelectDefaultValue`](/api/interfaces/apiselectdefaultvalue/) | interface | Default values accepted by an auto-populated entity select. |
-| [`APISelectOption`](/api/interfaces/apiselectoption/) | interface |  |
-| [`APISeparatorComponent`](/api/interfaces/apiseparatorcomponent/) | interface |  |
-| [`APIStringSelectComponent`](/api/interfaces/apistringselectcomponent/) | interface |  |
-| [`APITextDisplayComponent`](/api/interfaces/apitextdisplaycomponent/) | interface |  |
-| [`APITextInputPayload`](/api/interfaces/apitextinputpayload/) | interface |  |
-| [`APIThumbnailComponent`](/api/interfaces/apithumbnailcomponent/) | interface |  |
-| [`AttachmentData`](/api/interfaces/attachmentdata/) | interface |  |
+| [`APISelectOption`](/api/interfaces/apiselectoption/) | interface | One option of a string select menu. |
+| [`APISeparatorComponent`](/api/interfaces/apiseparatorcomponent/) | interface | A Components V2 separator, with optional divider line and spacing. |
+| [`APIStringSelectComponent`](/api/interfaces/apistringselectcomponent/) | interface | A string select menu (component type 3) as Discord receives it. |
+| [`APITextDisplayComponent`](/api/interfaces/apitextdisplaycomponent/) | interface | A Components V2 text display (Markdown content). |
+| [`APITextInputPayload`](/api/interfaces/apitextinputpayload/) | interface | A modal text input as a builder sends it. |
+| [`APIThumbnailComponent`](/api/interfaces/apithumbnailcomponent/) | interface | A Components V2 thumbnail: `&#123; type: 11, media: &#123; url &#125;, description?, spoiler? |
+| [`AttachmentData`](/api/interfaces/attachmentdata/) | interface | Options for `CreateAttachment`: file name, alt-text description, the contents or a file path, and an optional root folder the path must stay inside. |
 | [`EmbedField`](/api/interfaces/embedfield/) | interface | Discord API embed field payload. |
-| [`APIActionRowChild`](/api/type-aliases/apiactionrowchild/) | type |  |
-| [`APIComponent`](/api/type-aliases/apicomponent/) | type |  |
+| [`APIActionRowChild`](/api/type-aliases/apiactionrowchild/) | type | Any component an action row can hold: a button, a select menu or a text input. |
+| [`APIComponent`](/api/type-aliases/apicomponent/) | type | Any top-level message component: an action row or a Components V2 layout component. |
 | [`TextInputType`](/api/type-aliases/textinputtype/) | type | One TextInputType value, usable as a type. |
 
 ## `@lunibee/collection`
@@ -84,7 +84,7 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`StringConfig`](/api/interfaces/stringconfig/) | interface | A string option. |
 | [`UserNode`](/api/interfaces/usernode/) | interface | A place in Discord's REST API. |
 | [`ClientEventName`](/api/type-aliases/clienteventname/) | type | Names of events emitted by a Lunibee client. |
-| [`ClientEvents`](/api/type-aliases/clientevents/) | type |  |
+| [`ClientEvents`](/api/type-aliases/clientevents/) | type | Every `Client` event name mapped to its listener arguments. |
 | [`ClientListener`](/api/type-aliases/clientlistener/) | type | Listener signature for a Lunibee client event. |
 | [`ClientState`](/api/type-aliases/clientstate/) | type | Lifecycle state of a client. |
 | [`CreateChannelOptions`](/api/type-aliases/createchanneloptions/) | type | The options for `guild.createChannel()`; `kind` decides which others apply. |
@@ -93,7 +93,7 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`OptionMap`](/api/type-aliases/optionmap/) | type | The options of a command, by name. |
 | [`OptionValues`](/api/type-aliases/optionvalues/) | type | The values a handler receives: required (or defaulted) options always, the rest possibly missing. |
 | [`PermissionFlagsBits`](/api/type-aliases/permissionflagsbits/) | type | Union of PermissionFlagsBits values (all bigint). |
-| [`PermissionName`](/api/type-aliases/permissionname/) | type |  |
+| [`PermissionName`](/api/type-aliases/permissionname/) | type | A permission flag name, such as `"BanMembers"`, accepted wherever a permission can be given by name. |
 | [`RouteId`](/api/type-aliases/routeid/) | type | What goes in a path where Discord wants an id: a snowflake, `"@me"`, an invite code, an emoji. |
 | [`WebhookNode`](/api/type-aliases/webhooknode/) | type | `webhooks(id)` is the webhook; `webhooks(id)(token)` is its execute route, with `messages(id)` inside. |
 
@@ -109,27 +109,27 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 |---|---|---|
 | [`APIBan`](/api/interfaces/apiban/) | interface | Raw Discord ban object. |
 | [`AuditLogResponse`](/api/interfaces/auditlogresponse/) | interface | Discord API audit log response payload. |
-| [`BanOptions`](/api/interfaces/banoptions/) | interface |  |
+| [`BanOptions`](/api/interfaces/banoptions/) | interface | Options for banning a member: audit-log `reason` and how many seconds of their messages to delete. |
 | [`ChannelCreateOptions`](/api/interfaces/channelcreateoptions/) | interface | - `Record`\&#60;`string`, `unknown`\&#62; |
 | [`EmojiCreateOptions`](/api/interfaces/emojicreateoptions/) | interface | Strict payload for creating a custom guild emoji. |
 | [`EmojiEditOptions`](/api/interfaces/emojieditoptions/) | interface | Strict payload for editing a custom guild emoji. |
 | [`EntitlementQuery`](/api/interfaces/entitlementquery/) | interface | Filters for MonetizationManager.fetchEntitlements. |
 | [`GuildBanCreateOptions`](/api/interfaces/guildbancreateoptions/) | interface | Options for GuildBanManager.create. |
 | [`GuildStickerCreateOptions`](/api/interfaces/guildstickercreateoptions/) | interface | Fields for GuildStickerManager.create. |
-| [`MemberEditOptions`](/api/interfaces/membereditoptions/) | interface |  |
+| [`MemberEditOptions`](/api/interfaces/membereditoptions/) | interface | Fields that can change when editing a guild member (nickname, roles, voice state, timeout). |
 | [`MessageCacheOptions`](/api/interfaces/messagecacheoptions/) | interface | Opt-in per-channel message cache. |
-| [`MessageFetchOptions`](/api/interfaces/messagefetchoptions/) | interface |  |
-| [`MessageQueryOptions`](/api/interfaces/messagequeryoptions/) | interface |  |
-| [`MessageThreadOptions`](/api/interfaces/messagethreadoptions/) | interface |  |
+| [`MessageFetchOptions`](/api/interfaces/messagefetchoptions/) | interface | Options for fetching one message; `cache: false` skips storing it. |
+| [`MessageQueryOptions`](/api/interfaces/messagequeryoptions/) | interface | Pagination for fetching a channel's messages: `before`, `after` or `around` an ID, and a `limit`. |
+| [`MessageThreadOptions`](/api/interfaces/messagethreadoptions/) | interface | Options for starting a thread from a message. |
 | [`PermissionOverwriteOptions`](/api/interfaces/permissionoverwriteoptions/) | interface | Permission values accepted by PermissionOverwriteManager.edit. |
 | [`PermissionOverwriteUpdate`](/api/interfaces/permissionoverwriteupdate/) | interface | Bits to change on one overwrite by PermissionOverwriteManager.update; bits in none of them keep their state. |
-| [`ReactionFetchOptions`](/api/interfaces/reactionfetchoptions/) | interface |  |
+| [`ReactionFetchOptions`](/api/interfaces/reactionfetchoptions/) | interface | Pagination for listing the users who reacted with an emoji. |
 | [`RoleCreateOptions`](/api/interfaces/rolecreateoptions/) | interface | - `RoleStyleOptions` |
 | [`RoleEditOptions`](/api/interfaces/roleeditoptions/) | interface | - `RoleStyleOptions` |
 | [`SoundboardSoundCreateOptions`](/api/interfaces/soundboardsoundcreateoptions/) | interface | Fields for GuildSoundboardManager.create. |
 | [`StageInstanceCreateOptions`](/api/interfaces/stageinstancecreateoptions/) | interface | Options for creating a stage instance. |
 | [`ChannelEditOptions`](/api/type-aliases/channeleditoptions/) | type | Audit-log reason. |
-| [`CreateMessageOptions`](/api/type-aliases/createmessageoptions/) | type |  |
+| [`CreateMessageOptions`](/api/type-aliases/createmessageoptions/) | type | Discord.js-familiar name for `MessageCreateOptions`. |
 | [`GuildScheduledEventOptions`](/api/type-aliases/guildscheduledeventoptions/) | type | Fields accepted when creating or editing a scheduled event. |
 | [`PermissionOverwriteTargetType`](/api/type-aliases/permissionoverwritetargettype/) | type | Overwrite target type: 0 = role, 1 = member. |
 
@@ -137,7 +137,7 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 
 | Type | Kind | Description |
 |---|---|---|
-| [`BucketState`](/api/interfaces/bucketstate/) | interface |  |
+| [`BucketState`](/api/interfaces/bucketstate/) | interface | A rate-limit bucket as stored: units `remaining` in the window and when it resets (`resetAt`, ms since the epoch). |
 | [`DecodedError`](/api/interfaces/decodederror/) | interface | Normalised shape of a Discord error payload. |
 | [`MinimalRedisClient`](/api/interfaces/minimalredisclient/) | interface | A Redis client interface that matches the subset of ioredis methods needed for the RedisRateLimitStore. |
 | [`RESTFileAttachment`](/api/interfaces/restfileattachment/) | interface | A file attachment sent as part of a multipart REST request. |
@@ -148,14 +148,14 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`RESTResponseContext`](/api/interfaces/restresponsecontext/) | interface | Context passed to `RESTHooks.onResponse`. |
 | [`RESTRetryContext`](/api/interfaces/restretrycontext/) | interface | Context passed to `RESTHooks.onRetry`. |
 | [`RateLimitStore`](/api/interfaces/ratelimitstore/) | interface | Interface for distributed or local rate limit synchronization. |
-| [`RedisRateLimitStoreOptions`](/api/interfaces/redisratelimitstoreoptions/) | interface |  |
+| [`RedisRateLimitStoreOptions`](/api/interfaces/redisratelimitstoreoptions/) | interface | Options for `RedisRateLimitStore`: the Redis client, a key prefix, and an error callback. |
 | [`RequestData`](/api/interfaces/requestdata/) | interface | Discord.js-familiar request payload. |
 | [`RequestOptionsObject`](/api/interfaces/requestoptionsobject/) | interface | The single-object form of REST.request, matching `@discordjs/rest`: the route is `path` (or its Discord.js name, `fullRoute`). |
 | [`RetryPolicy`](/api/interfaces/retrypolicy/) | interface | Configures which REST failures may be retried. |
 | [`RouteKey`](/api/interfaces/routekey/) | interface | Identity of a request as Discord's rate limiter sees it. |
 | [`TransportRequest`](/api/interfaces/transportrequest/) | interface | One HTTP attempt, fully resolved: no routing, retry or rate-limit concerns. |
-| [`WebhookClientOptions`](/api/interfaces/webhookclientoptions/) | interface |  |
-| [`WebhookMessageOptions`](/api/interfaces/webhookmessageoptions/) | interface |  |
+| [`WebhookClientOptions`](/api/interfaces/webhookclientoptions/) | interface | Where a `WebhookClient` sends: a Discord webhook `url`, or its `id` and `token`. |
+| [`WebhookMessageOptions`](/api/interfaces/webhookmessageoptions/) | interface | A webhook message for `send()` and `editMessage()`; camelCase aliases (`avatarURL`, `threadId`, `allowedMentions`) are accepted beside the wire names. |
 | [`FetchLike`](/api/type-aliases/fetchlike/) | type | Minimal fetch shape the transport depends on, so a stub needs no extras. |
 | [`RESTErrorCode`](/api/type-aliases/resterrorcode/) | type | One RESTErrorCode value, usable as a type. |
 | [`RESTErrorKind`](/api/type-aliases/resterrorkind/) | type | Why a REST request failed, for handling without matching on status codes. |
@@ -213,7 +213,7 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`ImageURLOptions`](/api/interfaces/imageurloptions/) | interface | Options for CDN image URLs. |
 | [`InteractionClient`](/api/interfaces/interactionclient/) | interface | Transport required by an interaction structure. |
 | [`InteractionData`](/api/interfaces/interactiondata/) | interface | Data shared by Discord interactions. |
-| [`ResourceContext`](/api/interfaces/resourcecontext/) | interface |  |
+| [`ResourceContext`](/api/interfaces/resourcecontext/) | interface | What a structure uses to act on Discord (send, edit, fetch, compute permissions). |
 | [`AuditLogInfo`](/api/type-aliases/auditloginfo/) | type | The details object of an action type, or `undefined` when the type has none. |
 | [`ChannelOfKind`](/api/type-aliases/channelofkind/) | type | The channel class for a kind (or a union of them). |
 | [`InteractionEnum`](/api/type-aliases/interactionenum/) | type | One InteractionEnum value, usable as a type. |
@@ -224,7 +224,7 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | Type | Kind | Description |
 |---|---|---|
 | [`APIActionRowComponent`](/api/interfaces/apiactionrowcomponent/) | interface | Raw Discord action row component. |
-| [`APIActivity`](/api/interfaces/apiactivity/) | interface |  |
+| [`APIActivity`](/api/interfaces/apiactivity/) | interface | An activity in a presence (playing, streaming, listening, a custom status…). |
 | [`APIApplicationCommand`](/api/interfaces/apiapplicationcommand/) | interface | Raw Discord application command object (from API). |
 | [`APIApplicationCommandOption`](/api/interfaces/apiapplicationcommandoption/) | interface | Raw Discord application command option. |
 | [`APIAttachment`](/api/interfaces/apiattachment/) | interface | Raw Discord attachment object. |
@@ -339,8 +339,8 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`MentionableArg`](/api/interfaces/mentionablearg/) | interface | A mentionable argument: which kind of mention it was. |
 | [`PrefixArgSpec`](/api/interfaces/prefixargspec/) | interface | One expected argument. |
 | [`PrefixArgType`](/api/type-aliases/prefixargtype/) | type | What an argument is read as. |
-| [`PrefixArgValue`](/api/type-aliases/prefixargvalue/) | type |  |
-| [`PrefixArgsResult`](/api/type-aliases/prefixargsresult/) | type |  |
+| [`PrefixArgValue`](/api/type-aliases/prefixargvalue/) | type | A parsed prefix-command argument: a string, number, boolean or mention. |
+| [`PrefixArgsResult`](/api/type-aliases/prefixargsresult/) | type | The result of `parsePrefixArgs`: the parsed values, or the argument that failed and why. |
 
 ## `@lunibee/voice`
 

@@ -1,0 +1,53 @@
+---
+title: Onboarding & Welcome Screen
+description: GuildOnboarding, OnboardingPrompt, OnboardingPromptOption,
+  GuildWelcomeScreen and WelcomeScreenChannel.
+slug: 0.3.1/reference/guild-onboarding
+---
+
+Structures for a guild's onboarding flow and welcome screen. Fetch the raw payloads with `client.guilds.fetchOnboarding(guildId)` and `client.guilds.fetchWelcomeScreen(guildId)`; edit them with `editOnboarding()` and `editWelcomeScreen()` (both need Manage Guild, and the welcome screen needs the Community feature).
+
+## GuildOnboarding
+
+| Property | Type | Description |
+|---|---|---|
+| `prompts` | `OnboardingPrompt[]` | The questions new members answer. |
+| `defaultChannelIds` | `string[]` | Channels every new member is given. |
+| `enabled` | `boolean` | Whether onboarding is on. |
+| `mode` | `number` | Discord's onboarding mode. |
+
+## OnboardingPrompt
+
+| Property | Type | Description |
+|---|---|---|
+| `type` | `number` | Prompt type (multiple choice or dropdown). |
+| `title` | `string` | The question. |
+| `options` | `OnboardingPromptOption[]` | The answers. |
+| `singleSelect` | `boolean` | Whether only one answer may be chosen. |
+| `required` | `boolean` | Whether the prompt must be answered. |
+| `inOnboarding` | `boolean` | Whether it is shown during onboarding, not only in Channels & Roles. |
+
+## OnboardingPromptOption
+
+| Property | Type | Description |
+|---|---|---|
+| `title` | `string` | The answer's label. |
+| `description` | `string \| null` | Optional description. |
+| `emoji` | `APIPartialEmoji \| undefined` | The answer's emoji. |
+| `channelIds` | `string[]` | Channels granted by this answer. |
+| `roleIds` | `string[]` | Roles granted by this answer. |
+
+## GuildWelcomeScreen
+
+| Property | Type | Description |
+|---|---|---|
+| `description` | `string \| null` | The welcome message. |
+| `channels` | `WelcomeScreenChannel[]` | The channels it recommends. |
+
+## WelcomeScreenChannel
+
+| Property | Type | Description |
+|---|---|---|
+| `channelId` | `string` | The recommended channel. |
+| `description` | `string` | Why it is recommended. |
+| `emojiId` / `emojiName` | `string \| null` | The channel's emoji. |

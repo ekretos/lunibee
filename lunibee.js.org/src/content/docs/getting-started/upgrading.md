@@ -1,9 +1,18 @@
 ---
 title: Upgrading
-description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.3.1.
+description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.3.2.
 ---
 
-## 0.2.x → 0.3.1 (unreleased)
+## 0.3.1 → 0.3.2 (unreleased)
+
+- **Thumbnails and media galleries.** `CreateThumbnail.toJSON()` returns `{ type: 11, media: { url } }` and gallery items are `{ media: { url }, description?, spoiler? }`. Read `media.url` instead of `url`, and delete any helper you wrote to work around the old shape.
+- **Stricter input.** Embed, link-button and `link()` URLs must be `http`/`https` (embeds also `attachment:`, buttons also `discord:`); an `allowed_mentions` Discord would reject, a non-finite choice value, or `setMinValue()` above the maximum now throws before sending. Fix the input the error names.
+- **Gateway delays** (`reconnectBaseDelay`, `reconnectMaxDelay`, the new `connectTimeout`) must be above 0.
+- **`Client.destroy()`** now empties the caches and stops collectors; read what you need before destroying.
+- **Cluster workers exit when the parent goes away.** Pass `new ClusterWorker(context, process, { exitOnParentLoss: false })` to keep the old behaviour.
+- **REST waits are bounded** by `maxBackoff` (10 minutes): a longer `Retry-After` fails with a `RESTError` instead of sleeping. Raise `maxBackoff` if you really want longer waits.
+
+## 0.2.x → 0.3.1
 
 Two parts. **Removed:** the APIs deprecated in 0.2.x are gone (see the changelog's Removed list); run `bunx lunibee migrate --fix` to rename the old names, then `bunx lunibee migrate` lists the calls to change by hand (`deleteRole` → `roles.remove`, `sendMessage` → `send`, `edit(id, options, reason)` → `edit(id, { ...options, reason })`…). **New workflow:** it sits beside the manager API, so move at your own pace.
 

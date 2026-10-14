@@ -1,0 +1,112 @@
+---
+title: ClusterManager
+description: Forks cluster workers, assigns shards, coordinates IDENTIFY, routes
+  requests and reports health.
+slug: 0.3.1/reference/cluster-manager
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`ClusterManager` runs a bot as several processes. It owns the shard-to-cluster map and the worker processes; a [`ShardManager`](/0.3.1/reference/shard-manager/) inside each worker runs that cluster's Gateways. The [sharding guide](/0.3.1/core-concepts/sharding/#shardmanager-and-clustermanager-together-031) explains how the two fit together.
+
+## Import
+
+```ts
+import { ClusterManager, ClusterWorker, readClusterContext } from "lunibee";
+```
+
+## Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `token` | `string` | Required | Bot token. |
+| `script` | `string` | Required | Worker script, run once per cluster. |
+| `shardCount` | `number \| "auto"` | `"auto"` | Total shards. |
+| `guildsPerShard` | `number` | none | With `"auto"`, size by guilds: `ceil(guilds / guildsPerShard)` shards, 1 to 2500. Discord recommends about 1000. |
+| `guildCount` | `number` | asked from Discord | The guild count for `guildsPerShard`, to skip the request. |
+| `shardIds` | `number[]` | all | The slice of `shardCount` this deployment runs (several hosts). |
+| `clusterCount` | `number` | logical CPUs | Clusters to start. Clusters without shards are not forked. |
+| `shardsPerCluster` | `number` | none | Alternative to `clusterCount`; setting both throws. |
+| `maxConcurrency` | `number` | `1`, or Discord's with `"auto"` | IDENTIFY keys. May only lower Discord's value. |
+| `fetchLimits` | `boolean` | `false` | Read `max_concurrency` and the budget from `/gateway/bot` even with a fixed count. |
+| `identify` | `{ coordinate?, interval?, holdTimeout? }` | `{ coordinate: true, interval: 5000, holdTimeout: 60000 }` | Cross-cluster IDENTIFY slots. |
+| `spawnInterval` | `number` | `500` | Milliseconds between forks. |
+| `startTimeout` | `number` | off | Kill a cluster that has not reported ready this long after its fork. |
+| `waitForReady` | `boolean` | `false` | `spawn()` waits for every cluster to be ready. |
+| `reassignOnGiveUp` | `boolean` | `false` | Move a failed cluster's shards to another cluster. |
+| `requestTimeout` | `number` | `5000` | Default for `request()`, `requestCluster()` and `broadcast()`. |
+| `maxPendingRequests` | `number` | `10000` | Requests that may wait for answers at once. |
+| `maxMessageBytes` | `number` | `8388608` | Largest worker message, worker reply or request payload (as JSON text). Bigger ones from a worker are dropped with an `error` event; bigger ones passed to `request()`, `broadcast()` or `requestCluster()` throw a `RangeError`. |
+| `restartOnExit`, `restartDelay`, `supervisor` | | restart every crash after 5 s | Restart policy: exponential backoff, jitter, `maxRestarts` per `window`. |
+| `shutdownTimeout` | `number` | `5000` | SIGTERM grace before SIGKILL. |
+| `autoScaleInterval`, `onAutoScaleError` | | off | Re-check Discord's recommended shard count. |
+| `remote` | `RemoteOptions` | off | Accept `ClusterHost` agents on other machines; see below. |
+| `fork` | `(script, env) => ChildProcess` | `child_process.fork` | Replace the launcher (tests, custom runtimes). |
+| `onClusterExit`, `onGiveUp` | | none | Callbacks, kept for compatibility; the events below carry the same information. |
+
+## Methods
+
+| Method | Description |
+|---|---|
+| `spawn()` | Starts every cluster. Idempotent; concurrent calls share one start. Throws inside a worker. |
+| `ready(timeoutMs?)` | Resolves when every cluster is ready. |
+| `shutdownAll(timeoutMs?)` / `killAll()` | Graceful (SIGTERM, then SIGKILL) or immediate stop. Idempotent; never restarts. |
+| `respawn(shardCount)` | Stops the fleet and starts it again with a new total. |
+| `clusterForShard(id)` / `assignments()` | Who owns a shard / the whole shard-to-cluster map. |
+| `request(shardId, type, data, options?)` | Request to one shard, routed to its cluster. Rejects on timeout, a down cluster or a handler error. |
+| `broadcast(type, data, options?)` | Request to every shard of the live clusters. Resolves `{ replies, missing }`. |
+| `requestCluster(clusterId, type, data, options?)` | Request to a worker, answered by `ClusterWorker.onRequest()`. |
+| `health()` / `refreshHealth({ metrics?, timeoutMs? })` | Last known health / ask every worker. |
+| `hosts()` / `remotePort` | Hosts and their clusters / the port the coordinator listens on (needed with `remote.port: 0`). |
+| `on(event, listener)` / `off(...)` | Events below. |
+
+`options` is `{ timeoutMs?, signal? }`.
+
+## Events
+
+`clusterSpawn`, `clusterReady`, `ready` (all clusters), `clusterExit` (`expected` is true for a deliberate stop), `clusterRestart` (`{ delay, attempt }`), `clusterUnstable` (third and later restart), `clusterStartTimeout`, `clusterGiveUp`, `shardsReassigned` (`{ shardIds, from, to }`), `hostJoin` (`hostId`), `hostLeave` (`hostId`, `reason`), `identifyWait` (`{ shardId, waitMs }`) and `error` (a malformed frame, a failed recovery, a failed `fetchLimits`). A faulty listener cannot disturb supervision.
+
+## Cluster states
+
+`starting` → `ready` → (`restarting` → `starting`) … → `stopping` → `stopped`, or `failed` when it will not be restarted.
+
+## Worker side
+
+| Export | Description |
+|---|---|
+| `ClusterWorker.current()` | The worker of this process, or `undefined` outside a cluster. `ready()`, `reportHealth()`, `onRequest(type, handler)` and `identifyGate`. |
+| `readClusterContext()` / `isClusterWorker()` | Parse the worker contract from the environment. |
+| `ShardManager` | Uses all of the above by itself inside a cluster. |
+
+`allocateShards(ids, clusterCount)`, `assertCompleteAllocation()` and `validateShardIds()` are the pure helpers the manager uses; `IdentifyCoordinator` and `RequestTracker` are exported for custom orchestrators.
+
+## Multiple hosts
+
+`remote` turns the manager into a coordinator for `ClusterHost` agents on other machines. See [Multiple hosts](/0.3.1/core-concepts/sharding/#multiple-hosts) for placement, security and fencing.
+
+| `remote` option | Type | Default | Description |
+|---|---|---|---|
+| `port` | `number` | Required | TCP port; `0` picks a free one. |
+| `hostname` | `string` | `127.0.0.1` | Interface to bind. Any other address needs `tls` or `allowInsecure`, otherwise the constructor throws. |
+| `secret` | `string` | Required | Shared secret, at least 16 characters. |
+| `tls` | `{ cert, key }` | none | Serve `wss://`. Both must be non-empty strings. |
+| `allowInsecure` | `boolean` | `false` | Listen on a non-loopback address without TLS, for a network you fully trust or behind a TLS proxy. |
+| `maxUnauthenticated` | `number` | `16` | Connections that may be waiting to authenticate at once; more are closed with 4429. |
+| `hosts` | `string[]` | joined hosts | The host IDs of the deployment, in placement order. Others are refused. |
+| `minHosts` | `number` | `1` | Hosts to wait for when `hosts` is not set. |
+| `joinTimeout` | `number` | `60000` | How long `spawn()` waits for the hosts. |
+| `lease` | `number` | `15000` | Fencing lease in ms (at least 30). |
+| `helloTimeout` | `number` | `10000` | Time a new connection has to authenticate. |
+| `local` | `boolean` | `false` | Also run clusters on the coordinator's machine. |
+
+### ClusterHost
+
+```ts
+const host = new ClusterHost({ url, secret, id, script, allowInsecure?, reconnectDelay?, maxReconnectDelay?, fork? });
+await host.connect();   // resolves once accepted; rejects if refused
+host.clusters();        // cluster IDs running here
+host.on("connected" | "disconnected" | "clusterSpawn" | "clusterExit" | "error", listener);
+await host.close();     // kills the workers, closes the link, stops reconnecting
+```
+
+`url` must be `wss://`; `ws://` is accepted for this machine, or for another one with `allowInsecure: true`. `script` is what this host runs for every cluster; the coordinator cannot choose it. After a lost connection the host reconnects with exponential backoff and jitter. A refused first attempt (bad secret, unknown or duplicate ID, protocol mismatch) rejects `connect()` instead of retrying.

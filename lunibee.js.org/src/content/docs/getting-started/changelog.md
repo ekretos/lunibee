@@ -55,6 +55,9 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 
 - Complete reference pages for [REST](/reference/rest/), [Gateway](/reference/gateway/), sharding ([ShardManager](/reference/shard-manager/), [ShardBus](/reference/shard-bus/), [ClusterManager](/reference/cluster-manager/), [ClusterHost](/reference/cluster-host/)) and [voice](/reference/voice-connection/). Corrected examples that used `Routes.user("@me")`, `error.name === "AbortError"` and Gateway properties that do not exist.
 - `packages/rest/COMPATIBILITY.md` lists no open gaps.
+- A [Types](/reference/types/) page lists every exported interface and type alias with a description (`bun run docs:types` regenerates it), and every public export is now described on a hand-written page.
+- The 0.3.1 docs are archived in the version picker.
+- Issues found while writing the reference pages are tracked as D-01 to D-13 in the audit report.
 
 ### 🧪 Testing
 
