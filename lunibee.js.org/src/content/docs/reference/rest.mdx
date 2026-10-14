@@ -232,6 +232,23 @@ await rest.postWithFiles(
 </TabItem>
 </Tabs>
 
+### `request<T>(options)`
+
+The single-object form, as in `@discordjs/rest`. It sends the same request as `request(method, path, body, options)`.
+
+```ts
+await rest.request({
+  method: "POST",
+  path: "/channels/123/messages", // or `fullRoute`
+  body: { content: "hi" },
+  query: new URLSearchParams({ wait: "true" }),
+});
+```
+
+### `WebhookClient`
+
+`send()` and `editMessage()` take the same options, files included. The Discord.js spellings `avatarURL`, `threadId` and `allowedMentions` work beside `avatar_url`, `thread_id` and `allowed_mentions` (the wire names win if both are given). `fetchMessage(id, { threadId? })` and `deleteMessage(id, { threadId? })` reach messages inside a thread.
+
 ### `setToken(token)`
 
 Updates the token used for subsequent requests.

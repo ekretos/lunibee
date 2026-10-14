@@ -92,6 +92,19 @@ export interface RequestData extends RESTRequestOptions {
     files?: RESTFileAttachment[];
 }
 
+/**
+ * The single-object form of {@link REST.request}, matching `@discordjs/rest`:
+ * the route is `path` (or its Discord.js name, `fullRoute`).
+ */
+export interface RequestOptionsObject extends RequestData {
+    /** HTTP method. */
+    method: string;
+    /** API path, starting with `/`. */
+    path?: string;
+    /** Alias of `path`, as `@discordjs/rest` names it. */
+    fullRoute?: string;
+}
+
 /** Keys recognised on a {@link RequestData} wrapper, used to disambiguate it from a raw body. */
 const REQUEST_DATA_KEYS = new Set([
     "body",
@@ -306,13 +319,35 @@ export class REST {
      * @returns Decoded response body.
      * @throws {RESTError} If Discord or transport rejects the request.
      */
-    public async request<T>(
+    public request<T>(options: RequestOptionsObject): Promise<T>;
+    public request<T>(
         method: string,
         path: string,
         body?: unknown,
-        options: RequestData = {},
+        options?: RequestData,
+    ): Promise<T>;
+    public async request<T>(
+        methodOrOptions: string | RequestOptionsObject,
+        pathArg?: string,
+        bodyArg?: unknown,
+        optionsArg: RequestData = {},
     ): Promise<T> {
-        if (!method.toUpperCase())
+        // Discord.js-familiar form: request({ method, path, body, ... }).
+        let method: string;
+        let path: string;
+        let body = bodyArg;
+        let options = optionsArg;
+        if (typeof methodOrOptions === "object" && methodOrOptions !== null) {
+            const { method: m, path: p, fullRoute, ...rest } = methodOrOptions;
+            method = m;
+            path = p ?? fullRoute ?? "";
+            body = rest.body;
+            options = rest;
+        } else {
+            method = methodOrOptions;
+            path = pathArg as string;
+        }
+        if (typeof method !== "string" || !method.toUpperCase())
             throw new TypeError("REST method is required.");
         if (!path.startsWith("/"))
             throw new TypeError("REST paths must start with '/'.");

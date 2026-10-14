@@ -38,13 +38,16 @@ its **positional** REST design as canonical; Discord.js familiarity is added **a
 - Default `RetryPolicy` retries 429 + idempotent 5xx (`GET/HEAD/PUT/DELETE`) with backoff.
 - `AbortSignal` cancels both in-flight requests and queued rate-limit waits.
 
-## Known gaps / follow-ups (not in this change)
+## Known gaps / follow-ups
 
-1. `request(options)` single-object form — blocked by subclass override compatibility;
-   revisit if `MockREST` is updated to declare the overload (coordinate via Arjun/Priya).
-2. `WebhookClient` message options use Discord wire names (`avatar_url`, `thread_id`);
-   Discord.js uses camelCase (`avatarURL`, `threadId`). Additive camelCase aliases are a
-   candidate follow-up (kept out here to stay within the sanctioned gap list).
+None open. Both earlier gaps closed in 0.3.1:
+
+1. `request({ method, path | fullRoute, body, ... })` — the single-object form works beside
+   `request(method, path, body, options)`; `MockREST` declares both.
+2. `WebhookClient` accepts the Discord.js spellings `avatarURL`, `threadId` and
+   `allowedMentions` beside the wire names (the wire names win if both are given).
+   `editMessage` takes the full message options, files included; `fetchMessage()` is new;
+   `fetchMessage()`, `editMessage()` and `deleteMessage()` accept `threadId`.
 
 ## Tests
 
