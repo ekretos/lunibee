@@ -553,8 +553,8 @@ When a cluster exits outside a shutdown, the parent:
 
 1. drops its IDENTIFY requests and frees its slots;
 2. settles its pending requests with `"Cluster <id> exited."`;
-3. tells the other clusters its shards are down, so their pending requests to those shards fail at once;
-4. emits `clusterExit` and calls `onClusterExit`;
+3. calls `onClusterExit` and emits `clusterExit`;
+4. tells the other clusters its shards are down, so their pending requests to those shards fail at once;
 5. schedules a restart with the same shards (`clusterRestart`), or gives up.
 
 The `supervisor` option (`SupervisorOptions`) decides the delay:

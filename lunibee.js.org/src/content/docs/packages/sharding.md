@@ -31,8 +31,9 @@ Use automatic shard counts unless you have a reason to control the count yoursel
 ### Shard start pacing
 
 Discord permits one IDENTIFY every 5 seconds, so `spawnDelay` defaults to
-`ShardManager.IDENTIFY_INTERVAL` (5000 ms). An *N*-shard bot therefore takes about
-`(N - 1) × 5s` to finish connecting; starting shards faster earns close code `4008`
+`ShardManager.IDENTIFY_INTERVAL` (5000 ms). With a `max_concurrency` of 1, an *N*-shard
+bot therefore takes about `(N - 1) × 5s` to finish connecting (larger `max_concurrency`
+values start that many shards per round); starting shards faster earns close code `4008`
 and invalid-session churn. Pass `spawnDelay: 0` only when something else already
 paces your handshakes.
 
@@ -56,8 +57,8 @@ const cluster = new ClusterManager({
 await cluster.spawn();
 ```
 
-Clustering needs Node's `child_process.fork()`, so run the manager under Node.js
-rather than Bun. See the [ShardManager reference](/reference/shard-manager/) for the
+Clustering uses `child_process.fork()` with IPC, which works under both Bun and
+Node.js. See the [ShardManager reference](/reference/shard-manager/) for the
 full option list.
 
 ## `ShardBus`

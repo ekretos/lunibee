@@ -92,7 +92,7 @@ client.on("interactionCreate", async (interaction) => {
 
     await interaction.reply({
       embeds: [embed],
-      ephemeral , // Visible only to the command runner
+      ephemeral: true, // Visible only to the command runner
     });
   }
 });
@@ -106,10 +106,12 @@ client.on("interactionCreate", async (interaction) => {
 - `options.getNumber(name, required?)`: Returns `number | null`
 - `options.getBoolean(name, required?)`: Returns `boolean | null`
 - `options.getUser(name, required?)`: Returns `APIUser | null`
-- `options.getChannel(name, required?)`: Returns `APIChannel | null`
-- `options.getRole(name, required?)`: Returns `APIRole | null`
-- `options.getAttachment(name, required?)`: Returns `APIAttachment | null`
-- `options.getSubcommand()`: Returns string name of the executed subcommand
+- `options.getChannel(name, required?)`: Returns the resolved channel data or `null`
+- `options.getRole(name, required?)`: Returns the resolved role data or `null`
+- `options.getAttachment(name, required?)`: Returns the resolved attachment data or `null`
+- `options.getSubcommand(required?)`: Returns the executed subcommand's name, or `null`
+
+With `required: true` a getter returns a non-null value and throws when the option is missing.
 
 ---
 
@@ -160,7 +162,7 @@ client.on("interactionCreate", async (interaction) => {
     await interaction.deferReply({ ephemeral: true });
 
     // Assign verified role
-    await interaction.member?.roles.add("123456789012345678");
+    await interaction.member?.addRole("123456789012345678");
 
     await interaction.editReply({
       content: "✅ You have been verified and granted access!",
@@ -172,7 +174,7 @@ client.on("interactionCreate", async (interaction) => {
     const selectedValues = interaction.values; // string[] array of selected choice values
     await interaction.reply({
       content: `Selected colors: ${selectedValues.join(", ")}`,
-      ephemeral ,
+      ephemeral: true,
     });
   }
 });
@@ -222,7 +224,7 @@ client.on("interactionCreate", async (interaction) => {
 
     await interaction.reply({
       content: `Ticket created **Subject:** ${subject}`,
-      ephemeral ,
+      ephemeral: true,
     });
   }
 });
@@ -265,10 +267,11 @@ client.on("interactionCreate", async (interaction) => {
 
   if (focusedOption.name === "tag") {
     const allTags = ["javascript", "typescript", "bun", "discord", "rust"];
-    const filtered = allTags.filter(t => t.startsWith(focusedOption.value.toLowerCase()));
+    const typed = String(focusedOption.value ?? "").toLowerCase();
+    const filtered = allTags.filter(t => t.startsWith(typed));
 
     await interaction.respond(
-      filtered.map(tag => ({ name , value: tag }))
+      filtered.map(tag => ({ name: tag, value: tag }))
     );
   }
 });

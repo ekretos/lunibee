@@ -68,7 +68,7 @@ client.on("ready", (user) => { ... });
 | `ClientEvent.MessageCreate` | `"messageCreate"` | `(message: Message)` |
 | `ClientEvent.MessageUpdate` | `"messageUpdate"` | `(message: Message, previous: Message \| null)` |
 | `ClientEvent.MessageDelete` | `"messageDelete"` | `(data: APIMessageDeleteEvent, message?: Message)` |
-| `ClientEvent.MessageDeleteBulk` | `"messageDeleteBulk"` | `(data: APIMessageDeleteBulkEvent)` |
+| `ClientEvent.MessageDeleteBulk` | `"messageDeleteBulk"` | `(data: APIMessageDeleteBulkEvent, messages: Message[])` |
 
 ### Reactions
 
@@ -76,8 +76,8 @@ client.on("ready", (user) => { ... });
 |---|---|---|
 | `ClientEvent.MessageReactionAdd` | `"messageReactionAdd"` | `(data: APIMessageReactionEvent)` |
 | `ClientEvent.MessageReactionRemove` | `"messageReactionRemove"` | `(data: APIMessageReactionEvent)` |
-| `ClientEvent.MessageReactionRemoveAll` | `"messageReactionRemoveAll"` | `(data: ...)` |
-| `ClientEvent.MessageReactionRemoveEmoji` | `"messageReactionRemoveEmoji"` | `(data: ...)` |
+| `ClientEvent.MessageReactionRemoveAll` | `"messageReactionRemoveAll"` | `(data: APIMessageDeleteEvent)` |
+| `ClientEvent.MessageReactionRemoveEmoji` | `"messageReactionRemoveEmoji"` | `(data: APIMessageReactionRemoveEmojiEvent)` |
 
 ### Guilds
 
@@ -85,9 +85,13 @@ client.on("ready", (user) => { ... });
 |---|---|---|
 | `ClientEvent.GuildCreate` | `"guildCreate"` | `(guild: APIGuild)` |
 | `ClientEvent.GuildUpdate` | `"guildUpdate"` | `(guild: APIGuild, previous: Guild \| null)` |
-| `ClientEvent.GuildDelete` | `"guildDelete"` | `(data: { id: string })` |
-| `ClientEvent.GuildAvailable` | `"guildAvailable"` | `(guild: APIGuild)` |
-| `ClientEvent.GuildUnavailable` | `"guildUnavailable"` | `(data: ...)` |
+| `ClientEvent.GuildDelete` | `"guildDelete"` | `(data: { id: string, unavailable?: boolean })` |
+| `ClientEvent.GuildAvailable` | `"guildAvailable"` | `(guild: APIGuild)`: a cached guild arriving again (e.g. after an outage) |
+| `ClientEvent.GuildUnavailable` | `"guildUnavailable"` | `(data: { id: string, unavailable?: boolean })` |
+| `ClientEvent.GuildBanAdd` / `GuildBanRemove` | `"guildBanAdd"` / `"guildBanRemove"` | `(data: APIGuildBanEvent)` |
+| `ClientEvent.GuildEmojisUpdate` | `"guildEmojisUpdate"` | `(data: APIGuildEmojisUpdateEvent, previous: Emoji[] \| null)` |
+| `ClientEvent.GuildStickersUpdate` | `"guildStickersUpdate"` | `(data: APIGuildStickersUpdateEvent, previous: APISticker[])` |
+| `ClientEvent.GuildIntegrationsUpdate` | `"guildIntegrationsUpdate"` | `(data: { guild_id: string })` |
 
 ### Guild Members
 
@@ -105,7 +109,7 @@ client.on("ready", (user) => { ... });
 | `ClientEvent.ChannelCreate` | `"channelCreate"` | `(channel: Channel)` |
 | `ClientEvent.ChannelUpdate` | `"channelUpdate"` | `(channel: Channel, previous: Channel \| null)` |
 | `ClientEvent.ChannelDelete` | `"channelDelete"` | `(data: APIChannel, removed: Channel \| null)` |
-| `ClientEvent.ChannelPinsUpdate` | `"channelPinsUpdate"` | `(data: ...)` |
+| `ClientEvent.ChannelPinsUpdate` | `"channelPinsUpdate"` | `(data: APIChannelPinsUpdate)` |
 
 ### Roles
 
@@ -135,7 +139,9 @@ client.on("ready", (user) => { ... });
 | `ClientEvent.ThreadCreate` | `"threadCreate"` | `(channel: Channel)` |
 | `ClientEvent.ThreadUpdate` | `"threadUpdate"` | `(channel: Channel, previous: Channel \| null)` |
 | `ClientEvent.ThreadDelete` | `"threadDelete"` | `(data: APIThreadEvent, removed: Channel \| null)` |
-| `ClientEvent.ThreadListSync` | `"threadListSync"` | `(data: ...)` |
+| `ClientEvent.ThreadListSync` | `"threadListSync"` | `(data: APIThreadListSync)` |
+| `ClientEvent.ThreadMembersUpdate` | `"threadMembersUpdate"` | `(data: APIThreadMembersUpdate)` |
+| `ClientEvent.ThreadMemberUpdate` | `"threadMemberUpdate"` | `(data: APIThreadMember)` |
 
 ### Presence & Typing
 
@@ -144,16 +150,20 @@ client.on("ready", (user) => { ... });
 | `ClientEvent.PresenceUpdate` | `"presenceUpdate"` | `(data: APIPresenceUpdate, previous: APIPresenceUpdate \| null)` |
 | `ClientEvent.TypingStart` | `"typingStart"` | `(data: APITypingStart)` |
 
-### Scheduled Events, AutoMod, Invites, Webhooks, Polls
+### Scheduled Events, AutoMod, Stages, Invites, Webhooks, Polls, Monetization, Soundboard
 
 | Event | Description |
 |---|---|
 | `GuildScheduledEventCreate/Update/Delete` | Guild scheduled event lifecycle. |
+| `GuildScheduledEventUserAdd` / `GuildScheduledEventUserRemove` | A user subscribed to or left a scheduled event. |
+| `StageInstanceCreate/Update/Delete` | Stage instance lifecycle. |
 | `AutoModerationRuleCreate/Update/Delete` | AutoMod rule changes. |
 | `AutoModerationActionExecution` | AutoMod action fired. |
 | `InviteCreate` / `InviteDelete` | Invite creation/deletion. |
 | `WebhooksUpdate` | Webhook updates. |
 | `MessagePollVoteAdd` / `MessagePollVoteRemove` | Poll vote events. |
+| `EntitlementCreate/Update/Delete` | Monetization entitlements. |
+| `SoundboardSoundCreate/Update/Delete`, `SoundboardSoundsUpdate` | Guild soundboard changes. |
 
 ## Examples
 

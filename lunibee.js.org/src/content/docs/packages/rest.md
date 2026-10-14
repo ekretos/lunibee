@@ -51,7 +51,8 @@ The REST client handles Discord response errors, route-aware rate limits, retrie
 
 Limits are keyed by Discord's `(bucket hash, major parameter)` pair, so two channels
 using the same endpoint never share a counter, while two routes Discord maps onto one
-bucket hash do. Requests are serialised per bucket, and a request that queued before
+bucket hash do. Requests on a bucket are serialised until its limits are known
+(see [Concurrent buckets](#concurrent-buckets)), and a request that queued before
 its route's bucket hash was known joins the shared queue once it is.
 
 State lives in a `RateLimitStore`. The default keeps it in memory, which is correct
@@ -109,7 +110,9 @@ but they still share the event loop, so keep them cheap.
 ### Concurrent buckets
 
 Since 0.3.1 requests on a known bucket run in parallel, up to its remaining
-allowance. Pass `concurrentBuckets: false` when per-bucket order matters. See
+allowance, when the store can reserve (the default memory store, or
+`RedisRateLimitStore` with an `eval`-capable client). Pass `concurrentBuckets: false`
+when per-bucket order matters. See
 [REST & Rate Limits](/core-concepts/rest/#concurrent-buckets).
 
 ## Routes

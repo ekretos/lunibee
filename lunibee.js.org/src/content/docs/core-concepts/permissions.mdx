@@ -203,7 +203,9 @@ Lunibee exposes the complete Discord permission set through the same camelCase s
 
 `computePermissions()` applies Discord's rules: `@everyone` and role
 permissions, owner and administrator shortcuts, then channel overwrites for
-`@everyone`, the member's roles and the member.
+`@everyone`, the member's roles and the member. A member whose timeout
+(`timedOutUntil`) has not ended keeps only View Channel and Read Message History
+(owners and administrators are not masked).
 
 ```ts
 import { computePermissions } from "lunibee";
@@ -219,5 +221,5 @@ perms.missing("sendMessages", "embedLinks"); // ["embedLinks"]
 ```
 
 With the client's caches, `client.permissionsFor(memberId, channelOrGuildId)`
-does the lookup for you and returns `null` when the guild or member is not
-cached.
+does the lookup for you (a thread uses its parent channel's overwrites) and
+returns `null` when the guild or member, or a thread's parent, is not cached.

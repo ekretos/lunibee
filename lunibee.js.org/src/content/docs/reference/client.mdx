@@ -30,10 +30,11 @@ new Client(options: ClientOptions)
 
 | Parameter | Type | Description |
 |---|---|---|
-| `options.token` | `string` | **Required.** Discord bot token. |
+| `options.token` | `string` | **Required.** Discord bot token (an empty token throws a `TypeError`). |
 | `options.intents` | `GatewayIntentResolvable` (array) | **Required.** Gateway intents to subscribe to, as an array: `[GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]`. An OR-ed number throws a `TypeError`. |
 | `options.rest` | `RESTOptions` | Optional REST client configuration. |
 | `options.gateway` | `GatewayOptions` | Optional Gateway configuration. |
+| `options.compress` | `boolean` | zlib-stream Gateway compression (off by default); shorthand for `gateway: { compress }`, which wins when both are set. |
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -68,6 +69,11 @@ const client = new Client({
 | `client.guilds` | `GuildManager` | Guild cache and fetcher. |
 | `client.channels` | `ChannelManager` | Channel cache and fetcher. |
 | `client.application.commands` | `ApplicationCommandManager` | Application command manager. |
+| `client.api` | `Api` | Chained REST API; see [bot.api](/reference/api/). |
+| `client.commands` | `CommandRegistry` | Commands made with `command()`; see [Commands](/reference/commands/). |
+| `client.stageInstances` | `StageInstanceManager` | Stage instances, cached by stage channel ID. |
+| `client.applicationEmojis` | `ApplicationEmojiManager \| undefined` | The application's own emojis; set on READY. |
+| `client.options` | `ClientOptions` | The options the client was created with. |
 | `client.user` | `ClientUser \| undefined` | Authenticated bot user (available after `ready`). |
 | `client.state` | `ClientState` | Current lifecycle state: `"idle"`, `"connecting"`, `"ready"`, or `"destroyed"`. |
 | `client.ping` | `number` | Current WebSocket heartbeat latency in ms. |
@@ -79,7 +85,7 @@ const client = new Client({
 
 ### `login(token?)`
 
-Connects to Discord.
+Connects to Discord. A `token` passed here replaces the one from the constructor. Resolves with the token used (do not log it); rejects on a destroyed client.
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -96,7 +102,7 @@ await client.login();
 
 ### `destroy()`
 
-Permanently closes the Gateway connection.
+Permanently closes the Gateway connection, stops running collectors and clears the user, guild and channel caches.
 
 ```ts
 client.destroy();
@@ -124,6 +130,8 @@ if (client.isReady()) {
 </Tabs>
 
 ### `setPresence(data)`
+
+Sends a presence update. Returns whether it was sent (`false` while the Gateway is not connected).
 
 <Tabs>
 <TabItem label="TypeScript">
@@ -282,6 +290,12 @@ await channel.send({ content: `<@${user.id}> welcome!`, allowed_mentions: { user
 |---|---|
 | `monetization` | `MonetizationManager` for SKUs, entitlements and subscriptions; set on READY. |
 | `permissionsFor(memberId, guildOrChannelId)` | Effective permissions from cached state; threads use their parent's overwrites. Returns `null` when the guild, member or thread parent is not cached. |
-| `createCollector(event, options)` | Collector over a client event. |
+| `createCollector(event, options)` | Collector over a client event; stopped by `destroy()`. |
 | `fetchDefaultSoundboardSounds()` | Discord's default soundboard sounds. |
+| `setActivity(name, { type?, url?, state?, status? })` | Sets one activity (`null` clears it); `type` defaults to Playing, `status` to `"online"`. Returns whether it was sent. |
+| `sendVoiceState(guildId, channelId, { selfMute?, selfDeaf? })` | Joins, moves or (with `null`) leaves a voice channel; returns `false` instead of throwing when it cannot send. `setVoiceState(data)` sends a raw payload. |
+| `requestGuildMembers(data)` | Sends a Gateway member request; returns whether it was sent. |
+| `guild(id)`, `channel(id)`, `person(id)`, `member(guildId, userId)`, `role(guildId, roleId)`, `message(channelId, messageId)` | [Handles](/reference/handles/). |
+| `generateInvite({ scopes?, permissions? })` | OAuth2 invite URL (scopes default to `["bot"]`); throws before `ready`. |
+| `fetchWebhook`, `fetchGuildPreview`, `fetchVoiceRegions`, `fetchInvite`, `fetchSticker`, `fetchPremiumStickerPacks`, `fetchGuildTemplate` | One-off REST fetches. |
 | `interactionWebhookMessage(method, appId, token, messageId, data?)` | Reads, edits or deletes an interaction reply or follow-up. |
