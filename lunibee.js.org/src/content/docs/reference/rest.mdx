@@ -1,425 +1,567 @@
 ---
 title: REST
-description: Bucket-aware Discord REST API client with rate limiting, retries, and AbortSignal support.
+description: Discord REST API client with bucket-aware rate limiting, retries, cancellation, a Redis-shareable rate-limit store and a webhook client.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`REST` is Lunibee's HTTP client for the Discord REST API. It handles per-route rate limiting, global rate limits, exponential backoff, and cancellation via `AbortSignal`.
+`@lunibee/rest` is Lunibee's HTTP client for the Discord REST API. It has no runtime dependencies and handles:
+
+- per-bucket and global rate limits (shared across processes with Redis if you want);
+- safe retries and a bounded server-controlled backoff;
+- per-request timeouts and `AbortSignal` cancellation;
+- token-safe errors, hooks and logs;
+- multipart file uploads;
+- typed route builders (`Routes`) and a standalone `WebhookClient`.
+
+A `Client` creates its own `REST` (`client.rest`), configured with `ClientOptions.rest`. You only build one yourself for scripts, workers without a Gateway, or tests.
 
 ## Import
 
 <Tabs>
 <TabItem label="TypeScript">
 ```ts
-import { REST, Routes } from "lunibee";
-// or directly:
-import { REST, Routes } from "@lunibee/rest";
+import { REST, Routes, RESTError } from "lunibee";
+// or the package on its own:
+import { REST, Routes, RESTError } from "@lunibee/rest";
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
-import { REST, Routes } from "lunibee";
-// or directly:
-import { REST, Routes } from "@lunibee/rest";
+import { REST, Routes, RESTError } from "lunibee";
+// or the package on its own:
+import { REST, Routes, RESTError } from "@lunibee/rest";
 ```
 </TabItem>
 </Tabs>
 
-## Constructor
+The examples below are TypeScript; the JavaScript is the same without the type arguments.
 
-<Tabs>
-<TabItem label="TypeScript">
+## Quick start
+
 ```ts
-new REST(options: RESTOptions)
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-new REST(options )
-```
-</TabItem>
-</Tabs>
+import { REST, Routes, type UserData, type APIMessage } from "lunibee";
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `token` | `string` | — | Discord bot token. |
-| `baseURL` | `string` | `https://discord.com/api/v10` | Override the Discord base URL, including the API version. The bot token is sent to it, so it must be `https:` (or `http:` on this machine) with no credentials, query or fragment; anything else throws a `TypeError`. |
-| `allowInsecureBaseURL` | `boolean` | `false` | Accept a cleartext `http://` `baseURL` on a network you trust, such as an internal REST proxy. |
-| `timeout` | `number` | `15000` | Per-attempt timeout in milliseconds. |
-| `retries` | `number` | `2` | Maximum retries for the default policy. |
-| `retryPolicy` | `RetryPolicy` | — | Replaces the default retry policy entirely. |
-| `hooks` | `RESTHooks` | `{}` | Lifecycle callbacks: `onRequest`, `onResponse`, `onRateLimit`, `onRetry`. |
-| `store` | `RateLimitStore` | `MemoryRateLimitStore` | Where rate-limit state lives. Use `RedisRateLimitStore` to share limits across workers. |
-| `transport` | `HttpTransport` | — | Replaces the HTTP stage, e.g. a recording transport in tests. |
-
-> [!NOTE]
-> There is no `apiVersion` option. The API version is part of `baseURL`, which
-> defaults to `https://discord.com/api/v10`.
-
-<Tabs>
-<TabItem label="TypeScript">
-```ts
 const rest = new REST({ token: process.env.DISCORD_TOKEN! });
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const rest = new REST({ token: process.env.DISCORD_TOKEN });
-```
-</TabItem>
-</Tabs>
 
-## Request pipeline
-
-A request passes through five stages, each separately constructible and exported
-from `@lunibee/rest`:
-
-```text
-Request → RouteKey → RequestScheduler → RateLimiter → HttpTransport → ResponseDecoder
-```
-
-| Stage | Responsibility |
-|---|---|
-| `createRouteKey()` | Normalises the route and extracts Discord's major parameter. |
-| `RequestScheduler` | Serialises requests per rate-limit bucket. |
-| `RateLimiter` | Waits for (or reserves) bucket and global allowance; records response headers. |
-| `HttpTransport` | Performs one HTTP attempt with timeout and cancellation. |
-| `ResponseDecoder` | Decodes the payload and Discord's error metadata. |
-
-You rarely need these directly, but they make REST behaviour testable without
-stubbing global `fetch`:
-
-```ts
-import { REST, HttpTransport } from "@lunibee/rest";
-
-const rest = new REST({
-  token: "test-token",
-  transport: new HttpTransport({
-    fetch: async () =>
-      new Response(JSON.stringify({ id: "1" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-  }),
+const me = await rest.get<UserData>(Routes.user());
+const message = await rest.post<APIMessage>(Routes.channelMessages("123456789012345678"), {
+  content: `Hello from ${me.username} 🐝`,
 });
 ```
 
-## Retries
+## Constructor
 
-The default policy retries:
+```ts
+new REST(options?: RESTOptions)
+```
 
-- any `429`, honouring `Retry-After` (falling back to one second when Discord
-  sends no usable value);
-- `5xx` responses for idempotent methods (`GET`, `HEAD`, `PUT`, `DELETE`);
-- transport failures — DNS errors, connection resets, TLS failures — for those
-  same idempotent methods.
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `token` | `string` | — | Bot token. Can be set later with `setToken()`. Requests without a token are sent without `Authorization`. |
+| `baseURL` | `string` | `https://discord.com/api/v10` | Base URL, including the API version. See [Base URL rules](#base-url-rules). |
+| `allowInsecureBaseURL` | `boolean` | `false` | Accept a cleartext `http://` `baseURL` that is not on this machine, such as an internal REST proxy on a network you trust. |
+| `timeout` | `number` | `15000` | Timeout for each HTTP attempt, in ms (minimum 1). |
+| `retries` | `number` | `2` | Most retries for the default retry policy. |
+| `retryPolicy` | `RetryPolicy` | `createRetryPolicy(retries)` | Replaces the retry policy. See [Retries](#retries). |
+| `maxBackoff` | `number` | `600000` | The longest a rate-limit header may make this client wait, in ms. See [Bounded backoff](#bounded-backoff). |
+| `concurrentBuckets` | `boolean` | `true` | Lets requests on a bucket whose limit is known run in parallel, up to its `remaining` allowance. Needs a store with `reserve()` (both built-in stores qualify when Redis has `eval`). Set `false` for strict one-at-a-time ordering per bucket. |
+| `store` | `RateLimitStore` | `MemoryRateLimitStore` | Where rate-limit state lives. `RedisRateLimitStore` shares it between processes. |
+| `hooks` | `RESTHooks` | `{}` | Lifecycle callbacks. See [Hooks](#hooks). |
+| `transport` | `HttpTransport` | an `HttpTransport` from `baseURL`, `allowInsecureBaseURL` and `timeout` | Replaces the HTTP stage, for example with a fake `fetch` in tests. When given, `baseURL`, `allowInsecureBaseURL` and `timeout` are ignored. |
 
-Unsafe methods (`POST`, `PATCH`) are never replayed after a transport failure,
-because the request may already have been delivered. A timeout is never retried.
+There is no `apiVersion` option: the version is part of `baseURL`.
 
-## Methods
+```ts
+const rest = new REST({
+  token: process.env.DISCORD_TOKEN!,
+  timeout: 10_000,
+  retries: 3,
+  maxBackoff: 60_000,
+});
+```
 
-All methods accept an optional `RESTRequestOptions` object as the last argument.
+### Instance members
+
+| Member | Description |
+|---|---|
+| `setToken(token)` | Sets the token for later requests. Throws a `TypeError` for an empty token. |
+| `setHooks(hooks)` | Replaces every hook. `setHooks({})` removes them. Returns `this`. |
+| `store` | The `RateLimitStore` in use (read-only). |
+
+## Making requests
+
+Every request method returns a promise of the decoded response: JSON as an object, other content as text, and `undefined` for `204 No Content`. Pass the expected type as the type argument, for example `rest.get<APIGuild>(…)`.
+
+Paths are relative to `baseURL`, start with `/`, and are usually built with [`Routes`](#routes).
 
 ### `get<T>(path, options?)`
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-const user = await rest.get<APIUser>(Routes.user("@me"));
+const guild = await rest.get<APIGuild>(Routes.guild(guildId), {
+  query: { with_counts: true },
+});
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const user = await rest.get<APIUser>(Routes.user("@me"));
-```
-</TabItem>
-</Tabs>
 
 ### `post<T>(path, body?, options?)`
 
-Accepts the body directly or as `{ body: ... }` (Discord.js-familiar form):
+The body comes second. You can also pass the Discord.js-style wrapper `{ body, query, headers, reason, files }`:
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-// Direct body (Lunibee canonical):
-const message = await rest.post(Routes.channelMessages(channelId), { content: "Hello!" });
+// Lunibee form:
+await rest.post(Routes.channelMessages(channelId), { content: "Hello!" });
 
-// Discord.js-familiar:
-const message = await rest.post(Routes.channelMessages(channelId), { body: { content: "Hello!" } });
+// Discord.js-style form:
+await rest.post(Routes.channelMessages(channelId), {
+  body: { content: "Hello!" },
+  reason: "Greeting",
+});
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-// Direct body (Lunibee canonical):
-const message = await rest.post(Routes.channelMessages(channelId), { content: "Hello!" });
 
-// Discord.js-familiar:
-const message = await rest.post(Routes.channelMessages(channelId), { body: { content: "Hello!" } });
-```
-</TabItem>
-</Tabs>
+A plain object is read as the wrapper only when all of its keys are wrapper keys (`body`, `files`, `query`, `headers`, `reason`, `auth`, `signal`). To send a body that has only such keys, such as `{ reason: "x" }`, wrap it: `post(path, { body: { reason: "x" } })`.
 
 ### `patch<T>(path, body?, options?)`
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-await rest.patch(Routes.channel(channelId), { name: "new-name" });
+await rest.patch(Routes.channel(channelId), { name: "new-name" }, { reason: "Rename" });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-await rest.patch(Routes.channel(channelId), { name: "new-name" });
-```
-</TabItem>
-</Tabs>
 
 ### `put<T>(path, body?, options?)`
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-await rest.put(Routes.guildBan(guildId, userId), { delete_message_seconds: 86400 });
+await rest.put(Routes.guildBan(guildId, userId), { delete_message_seconds: 86_400 });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-await rest.put(Routes.guildBan(guildId, userId), { delete_message_seconds: 86400 });
-```
-</TabItem>
-</Tabs>
 
 ### `delete<T>(path, options?)`
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
-await rest.delete(Routes.message(channelId, messageId));
+await rest.delete(Routes.message(channelId, messageId), { reason: "Spam" });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-await rest.delete(Routes.message(channelId, messageId));
-```
-</TabItem>
-</Tabs>
 
-### `postWithFiles<T>(path, body, files, options?)`
+### `postWithFiles<T>(path, body, files, options?)` and `patchWithFiles<T>(…)`
 
-Sends a multipart/form-data request with file attachments.
+Send a `multipart/form-data` request: the body goes in the `payload_json` field and the files in `files[0]`, `files[1]` and so on.
 
-<Tabs>
-<TabItem label="TypeScript">
 ```ts
 await rest.postWithFiles(
   Routes.channelMessages(channelId),
-  { content: "Here is your file!" },
-  [{ name: "report.csv", data: csvBuffer, contentType: "text/csv" }],
+  { content: "Here is your report", attachments: [{ id: 0, description: "CSV export" }] },
+  [{ name: "report.csv", data: csvBytes, contentType: "text/csv" }],
 );
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-await rest.postWithFiles(
-  Routes.channelMessages(channelId),
-  { content: "Here is your file!" },
-  [{ name: "report.csv", data , contentType: "text/csv" }],
-);
-```
-</TabItem>
-</Tabs>
 
-### `request<T>(options)`
+`RESTFileAttachment`:
 
-The single-object form, as in `@discordjs/rest`. It sends the same request as `request(method, path, body, options)`.
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | File name. CR, LF, `"` and `\` are replaced with `_`, so a name cannot add headers to its part. |
+| `data` | `Blob \| Uint8Array \| ArrayBuffer` | Contents. |
+| `contentType` | `string` | MIME type. Default `application/octet-stream`. |
+
+Passing `files` in the options of any method does the same: `rest.post(path, body, { files })`.
+
+### `request<T>(…)`
+
+Every helper above calls `request`. It has two forms:
 
 ```ts
+// Positional
+await rest.request("POST", Routes.channelMessages(channelId), { content: "hi" }, { reason: "Test" });
+
+// One object, as in @discordjs/rest (`fullRoute` is accepted as an alias of `path`)
 await rest.request({
   method: "POST",
-  path: "/channels/123/messages", // or `fullRoute`
+  path: Routes.channelMessages(channelId),
   body: { content: "hi" },
   query: new URLSearchParams({ wait: "true" }),
 });
 ```
 
-### `WebhookClient`
+### Request options
 
-`send()` and `editMessage()` take the same options, files included. The Discord.js spellings `avatarURL`, `threadId` and `allowedMentions` work beside `avatar_url`, `thread_id` and `allowed_mentions` (the wire names win if both are given). `fetchMessage(id, { threadId? })` and `deleteMessage(id, { threadId? })` reach messages inside a thread.
+`RESTRequestOptions` (and the `RequestData` wrapper, which adds `body` and `files`):
 
-### `setToken(token)`
+| Option | Type | Description |
+|---|---|---|
+| `signal` | `AbortSignal` | Cancels the request, including any wait for a rate limit. See [Cancellation](#cancellation). |
+| `query` | `URLSearchParams \| Record<string, string \| number \| boolean \| null \| undefined> \| string` | Query string. `null` and `undefined` values are skipped; a string may start with `?` or not. |
+| `headers` | `Record<string, string>` | Extra headers. The library's own `Authorization`, `User-Agent`, `X-Audit-Log-Reason` and `Content-Type` win, however you spell the name. |
+| `reason` | `string` | Audit-log reason, sent percent-encoded as `X-Audit-Log-Reason`. |
+| `auth` | `boolean` | `false` sends the request without `Authorization` (for example to a webhook or interaction route). Default `true`. |
+| `body` | `unknown` | `RequestData` only: the body. |
+| `files` | `RESTFileAttachment[]` | `RequestData` only: switches the request to multipart. |
 
-Updates the token used for subsequent requests.
+### Headers the client sends
 
-## `Routes` — Path Helpers
+| Header | When |
+|---|---|
+| `Authorization: Bot <token>` | A token is set and `auth` is not `false`. |
+| `User-Agent: DiscordBot (https://github.com/Ekretos/lunibee, <version>)` | Always. |
+| `Content-Type: application/json` | JSON bodies. Multipart bodies let `fetch` set the boundary. |
+| `X-Audit-Log-Reason` | `reason` is set. |
 
-`Routes` provides strongly-typed path builders for every Discord API endpoint:
+### Path safety
 
-<Tabs>
-<TabItem label="TypeScript">
+Before anything is sent, a path is refused with a `TypeError` if it:
+
+- does not start with `/`;
+- has a `.` or `..` segment, including percent-encoded forms such as `%2e%2e` and segments like `%2f..%2f` that decode to one;
+- contains a backslash;
+- has malformed percent-encoding.
+
+`Routes` also checks every id it is given, so a value like `../../channels/1` can never change which endpoint receives your token. Redirects are refused too (`fetch` runs with `redirect: "error"`).
+
+## Routes
+
+`Routes` builds API paths. Every id is checked to be a snowflake (decimal, up to 20 digits) and a `TypeError` is thrown otherwise; invite codes and emoji are percent-encoded.
+
 ```ts
-Routes.user("@me")                     // "/users/@me"
-Routes.channel(channelId)              // "/channels/{id}"
-Routes.channelMessages(channelId)      // "/channels/{id}/messages"
-Routes.message(channelId, messageId)   // "/channels/{id}/messages/{messageId}"
-Routes.guild(guildId)                  // "/guilds/{id}"
-Routes.guildChannels(guildId)          // "/guilds/{id}/channels"
-Routes.guildMember(guildId, userId)    // "/guilds/{id}/members/{userId}"
-Routes.guildBan(guildId, userId)       // "/guilds/{id}/bans/{userId}"
-Routes.guildRoles(guildId)             // "/guilds/{id}/roles"
-Routes.interactionCallback(id, token)  // "/interactions/{id}/{token}/callback"
+Routes.user()                              // "/users/@me"
+Routes.userById(userId)                    // "/users/{user}"
+Routes.channelMessages(channelId)          // "/channels/{channel}/messages"
+Routes.message(channelId, messageId)       // "/channels/{channel}/messages/{message}"
+Routes.guildMember(guildId, userId)        // "/guilds/{guild}/members/{user}"
+Routes.interactionCallback(id, token)      // "/interactions/{id}/{token}/callback"
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-Routes.user("@me")                     // "/users/@me"
-Routes.channel(channelId)              // "/channels/{id}"
-Routes.channelMessages(channelId)      // "/channels/{id}/messages"
-Routes.message(channelId, messageId)   // "/channels/{id}/messages/{messageId}"
-Routes.guild(guildId)                  // "/guilds/{id}"
-Routes.guildChannels(guildId)          // "/guilds/{id}/channels"
-Routes.guildMember(guildId, userId)    // "/guilds/{id}/members/{userId}"
-Routes.guildBan(guildId, userId)       // "/guilds/{id}/bans/{userId}"
-Routes.guildRoles(guildId)             // "/guilds/{id}/roles"
-Routes.interactionCallback(id, token)  // "/interactions/{id}/{token}/callback"
+
+| Area | Builders |
+|---|---|
+| Users | `user()`, `userById(userId)`, `userGuilds()`, `currentUserGuild(guildId)` |
+| Guilds | `guild`, `guildPreview`, `guildChannels`, `guildActiveThreads`, `guildAuditLog`, `guildPrune`, `guildVanity`, `guildWelcomeScreen`, `guildOnboarding`, `guildIntegration(guildId, integrationId)`, `guildVoiceState(guildId, userId)` |
+| Members | `guildMembers`, `guildMembersSearch`, `guildMember(guildId, userId)`, `guildMemberMe`, `guildMemberRole(guildId, userId, roleId)` |
+| Roles | `guildRoles`, `guildRole(guildId, roleId)` |
+| Bans | `guildBans`, `guildBan(guildId, userId)`, `guildBulkBan` |
+| Channels | `channel`, `channelPermission(channelId, overwriteId)`, `channelTyping`, `channelInvites`, `channelWebhooks` |
+| Messages | `channelMessages`, `message`, `crosspostMessage`, `channelBulkDelete`, `channelMessagesPins`, `channelMessagesPin` |
+| Reactions | `messageReactions(channelId, messageId, emoji)`, `messageReactionMe`, `messageReactionUser`, `messageReactionsAll` |
+| Threads | `channelThreads`, `messageThread`, `threadMembers`, `threadMember(threadId, userId)`, `channelPublicArchivedThreads`, `channelPrivateArchivedThreads`, `channelJoinedPrivateArchivedThreads` |
+| Polls | `pollExpire(channelId, messageId)`, `pollAnswerVoters(channelId, messageId, answerId)` |
+| Emojis and stickers | `guildEmoji(guildId, emojiId?)`, `applicationEmoji(applicationId, emojiId?)`, `guildSticker(guildId, stickerId?)`, `sticker(stickerId)`, `stickerPacks(packId?)` |
+| Soundboard | `sendSoundboardSound(channelId)`, `soundboardDefaultSounds()`, `guildSoundboardSound(guildId, soundId?)` |
+| Commands | `applicationCommands`, `applicationCommand`, `guildApplicationCommands(appId, guildId)`, `guildApplicationCommand(appId, guildId, commandId)` |
+| Interactions | `interactionCallback(id, token)`, `interactionOriginalResponse(applicationId, token)` |
+| Webhooks | `webhook(webhookId, token?)`, `webhookMessage(webhookId, token, messageId)`, `guildWebhooks` |
+| Invites | `invite(code)`, `guildInvites` |
+| Scheduled events | `guildScheduledEvents`, `guildScheduledEvent`, `guildScheduledEventUsers` |
+| Auto-moderation | `guildAutoModerationRules`, `guildAutoModerationRule` |
+| Stage instances | `stageInstances()`, `stageInstanceByChannel(channelId)` |
+| Monetisation | `applicationSkus`, `applicationEntitlement(appId, entitlementId?)`, `consumeEntitlement`, `skuSubscription(skuId, subscriptionId?)` |
+| Gateway and voice | `gateway()`, `gatewayBot()`, `voiceRegions()` |
+
+For a route without a builder, write the path yourself; the [path safety](#path-safety) checks still apply. `docs/audits/api-coverage.md` in the repository lists every Discord route and what covers it.
+
+## Rate limits
+
+Discord limits requests per **bucket**. A bucket is identified by the hash Discord returns in `X-RateLimit-Bucket`, scoped by the route's major parameter (channel, guild, or webhook id and token). Two channels on the same endpoint get separate limits, and two routes Discord maps to one hash share one.
+
+For each request the client:
+
+1. builds a route key: the method plus the path with ids replaced by `:id` and the query removed, plus the major parameter;
+2. looks up the bucket hash learned for that route, falling back to the route key until Discord sends one;
+3. queues behind earlier requests on that bucket, or, with `concurrentBuckets`, reserves one unit of the bucket's `remaining` allowance;
+4. waits while the bucket is exhausted or a global limit is active;
+5. records `X-RateLimit-Remaining`, `X-RateLimit-Reset-After` and `X-RateLimit-Bucket` from the response.
+
+A `429` is retried after `retry_after` (from the body) or the `Retry-After` header, or one second when neither is usable. A `429` with `global: true` (or `X-RateLimit-Global`) pauses every request until the global limit resets. The `onRateLimit` hook fires before each wait.
+
+### Bounded backoff
+
+The server decides how long the client waits, so a misbehaving proxy, or anyone who can answer in Discord's place, could send `Retry-After: 99999999` and stall the bot. `maxBackoff` (default ten minutes) caps every server-controlled wait:
+
+- A `Retry-After` longer than `maxBackoff` fails the request immediately with a `RESTError` (status `429`) instead of sleeping.
+- Bucket resets and global resets are stored no further than `maxBackoff` ahead.
+
+### Sharing limits between processes
+
+By default each process keeps its own limits in a `MemoryRateLimitStore`. Bots that send from several processes (clusters, workers, a dashboard) should share them with Redis:
+
+```ts
+import Redis from "ioredis";
+import { REST, RedisRateLimitStore } from "@lunibee/rest";
+
+const rest = new REST({
+  token: process.env.DISCORD_TOKEN!,
+  store: new RedisRateLimitStore({
+    client: new Redis(process.env.REDIS_URL!),
+    prefix: "mybot:rest:",              // default "lunibee:rest:"
+    onError: (operation, error) => console.warn("redis", operation, error),
+  }),
+});
 ```
-</TabItem>
-</Tabs>
 
-## AbortSignal & Cancellation
+| `RedisRateLimitStoreOptions` | Description |
+|---|---|
+| `client` | Any client with `get`, `mget`, `set` and `del` (ioredis and node-redis both fit). With `eval`, allowance is **reserved atomically** by a Lua script, so two workers can never spend the same unit. |
+| `prefix` | Key prefix. Default `lunibee:rest:`. |
+| `onError` | Called when a Redis operation fails. The store then falls back to local limiting for that call, so Redis being down slows nothing; `store.lastError` holds the latest error. |
 
-<Tabs>
-<TabItem label="TypeScript">
+The memory store keeps at most 10,000 bucket entries and 10,000 route-to-bucket mappings, dropping the oldest first, and prunes expired buckets once a minute.
+
+To write your own store, implement `RateLimitStore`:
+
+```ts
+interface RateLimitStore {
+  getBucketHash(route: string): Promise<string | undefined> | string | undefined;
+  setBucketHash(route: string, hash: string): Promise<void> | void;
+  getBucket(key: string): Promise<BucketState | undefined> | BucketState | undefined;
+  updateBucket(key: string, state: BucketState): Promise<void> | void;   // { remaining, resetAt }
+  getGlobalReset(): Promise<number> | number;
+  setGlobalReset(resetAt: number): Promise<void> | void;
+  reserve?(key: string): Promise<Reservation> | Reservation;             // enables concurrentBuckets
+  prune?(maxAge?: number): Promise<void> | void;
+}
+```
+
+## Retries
+
+The default policy is `createRetryPolicy(retries)`, with `retries` defaulting to 2. It retries:
+
+| Failure | Retried for | Delay |
+|---|---|---|
+| `429` | every method | the server's `retry_after` / `Retry-After` (bounded by `maxBackoff`) |
+| `5xx` | `GET`, `HEAD`, `PUT`, `DELETE` | `min(10 s, 500 ms × 2^attempt)` plus up to 250 ms of jitter |
+| network failure (DNS, reset, TLS) | `GET`, `HEAD`, `PUT`, `DELETE` | same as `5xx` |
+
+`POST` and `PATCH` are never replayed after a `5xx` or a network failure: Discord may already have acted on them, and a second message or a second ban is worse than an error. A timeout is never retried. The `onRetry` hook fires before each retry.
+
+A custom policy:
+
+```ts
+import { REST, type RetryPolicy } from "@lunibee/rest";
+
+const patient: RetryPolicy = {
+  maxRetries: 5,
+  shouldRetry: (method, status) => status === 429 || (status >= 500 && method === "GET"),
+  getDelay: (attempt, retryAfter) => (retryAfter ?? 2 ** attempt) * 1000,
+};
+
+const rest = new REST({ token, retryPolicy: patient });
+```
+
+`status` is `0` for a network failure. `retryAfter` is in seconds.
+
+## Timeouts
+
+Every HTTP attempt has its own `timeout` (default 15 s). When it fires the attempt is aborted and the request fails with a `RESTError` of kind `"timeout"`. Waiting for a rate limit does not count toward the timeout.
+
+## Cancellation
+
+An `AbortSignal` cancels a request wherever it is: queued behind its bucket, waiting for a rate limit, between retries, or in flight. The promise rejects with a `RESTError` of kind `"aborted"` (status `0`), whose `cause` is the signal's reason.
+
 ```ts
 const controller = new AbortController();
-setTimeout(() => controller.abort(), 5000); // cancel after 5s
+setTimeout(() => controller.abort(), 5_000);
 
 try {
-  const data = await rest.get(Routes.guild(guildId), { signal: controller.signal });
+  await rest.get(Routes.guild(guildId), { signal: controller.signal });
 } catch (error) {
-  if (error instanceof RESTError && error.name === "AbortError") {
+  if (error instanceof RESTError && error.kind === "aborted") {
     console.warn("Request was cancelled.");
+  } else {
+    throw error;
   }
 }
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-const controller = new AbortController();
-setTimeout(() => controller.abort(), 5000); // cancel after 5s
 
-try {
-  const data = await rest.get(Routes.guild(guildId), { signal: controller.signal });
-} catch (error) {
-  if (error instanceof RESTError && error.name === "AbortError") {
-    console.warn("Request was cancelled.");
-  }
-}
-```
-</TabItem>
-</Tabs>
+`AbortSignal.timeout(ms)` works too. One signal can be reused for many requests: the client removes its listener from the signal on every path.
 
-## `RESTError`
+## Errors
 
-Thrown when Discord returns a non-2xx response.
+### `RESTError`
 
-<Tabs>
-<TabItem label="TypeScript">
+Every failure rejects with a `RESTError`: a Discord error response, a network failure, a timeout, a cancellation, or an exhausted retry.
+
 ```ts
-import { RESTError } from "lunibee";
+import { RESTError, RESTErrorCode } from "lunibee";
 
 try {
   await rest.delete(Routes.message(channelId, messageId));
 } catch (error) {
-  if (error instanceof RESTError) {
-    console.error(`Discord API Error ${error.status}: ${error.message}`);
-    console.error("Code:", error.code);       // Discord error code
-    console.error("Method:", error.method);   // "DELETE"
-    console.error("Path:", error.path);       // "/channels/.../messages/..."
-  }
+  if (!(error instanceof RESTError)) throw error;
+  if (error.code === RESTErrorCode.UnknownMessage) return; // already gone
+  console.error(`${error.method} ${error.path} → ${error.status} (${error.kind})`);
+  if (error.hint) console.error(error.hint);
+  if (error.retryable) queueForLater();
 }
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { RESTError } from "lunibee";
-
-try {
-  await rest.delete(Routes.message(channelId, messageId));
-} catch (error) {
-  if (error instanceof RESTError) {
-    console.error(`Discord API Error ${error.status}: ${error.message}`);
-    console.error("Code:", error.code);       // Discord error code
-    console.error("Method:", error.method);   // "DELETE"
-    console.error("Path:", error.path);       // "/channels/.../messages/..."
-  }
-}
-```
-</TabItem>
-</Tabs>
-
-`DiscordAPIError` is an alias of `RESTError`, exported so Discord.js-shaped `catch (err) { if (err instanceof DiscordAPIError) … }` code works unchanged.
 
 | Property | Type | Description |
 |---|---|---|
-| `kind` | `RESTErrorKind` | Failure category (`"aborted"`, timeout, API rejection, and so on). |
-| `status` | `number` | HTTP status returned by Discord. |
-| `code` | `number \| undefined` | Discord error code, when provided. |
-| `errors` | `unknown` | Raw Discord validation payload. |
-| `method` / `path` | `string \| undefined` | The failed request. |
-| `hint` | `string \| undefined` | What to check next for common causes (missing access or permissions). |
+| `kind` | `RESTErrorKind` | The failure category; see the table below. |
+| `status` | `number` | HTTP status, or `0` for a network failure, timeout or cancellation. |
+| `code` | `number \| undefined` | Discord's JSON error code. Compare it with `RESTErrorCode`. |
+| `message` | `string` | Discord's message, or a description of the failure. |
+| `errors` | `unknown` | Discord's raw error payload, including the field-by-field validation errors of a `400`. |
+| `method` | `string \| undefined` | Request method. |
+| `path` | `string \| undefined` | Request path, with webhook and interaction tokens replaced by `:token`. |
+| `hint` | `string \| undefined` | What to check, for common codes such as `50001` (Missing Access) and `50013` (Missing Permissions). |
+| `retryable` | `boolean` | Whether the same request could succeed later: `true` for `rateLimited`, `server`, `network` and `timeout`. |
+| `cause` | `unknown` | For network failures, a copy of the underlying error with tokens removed. |
 
-## Full Example
+| `kind` | When |
+|---|---|
+| `aborted` | The signal fired. |
+| `timeout` | An attempt exceeded `timeout`. |
+| `network` | No response: DNS, connection reset, TLS, a refused redirect. |
+| `rateLimited` | `429` after retries, or a `Retry-After` beyond `maxBackoff`. |
+| `authentication` | `401`: the token is wrong or revoked. |
+| `permission` | `403`. |
+| `notFound` | `404`. |
+| `validation` | `400` or `422`: Discord refused the body. |
+| `server` | `5xx`. |
+| `client` | Any other `4xx`. |
 
-**Fetch a user and send a DM**
+`DiscordAPIError` is exported as an alias of `RESTError`, so Discord.js-style `instanceof DiscordAPIError` checks work.
 
-<Tabs>
-<TabItem label="TypeScript">
+### `RESTErrorCode`
+
+Names for the Discord error codes bots handle most, such as `UnknownMessage` (10008), `UnknownMember` (10007), `UnknownInteraction` (10062), `MissingAccess` (50001), `MissingPermissions` (50013) and `MaxPins` (30003). Any other code is still available as a number on `error.code`.
+
+### Token safety
+
+Tokens never appear in anything the client produces:
+
+- `error.path`, error messages and every hook context replace webhook and interaction tokens with `:token`.
+- A network error's `cause` is a sanitised copy, because runtimes put the request URL (with its token) in their error messages. That includes errors thrown by a custom transport.
+- Configuration errors never repeat the credentials in a bad `baseURL`.
+
+`redactPath(path)` applies the same rule to your own logs:
+
 ```ts
-import { REST, Routes } from "lunibee";
+import { redactPath } from "@lunibee/rest";
+redactPath("/webhooks/1/abcdef/messages/2"); // "/webhooks/1/:token/messages/2"
+```
 
-const rest = new REST({ token: process.env.DISCORD_TOKEN! });
+## Hooks
 
-// Fetch a user
-const user = await rest.get(Routes.user("123456789012345678"));
+Hooks let you observe traffic for metrics or logging. Each one runs on a microtask, apart from the request, and anything it throws is ignored, so a broken hook can never fail a request. Paths in hook contexts are already redacted. Keep hooks fast: work done in one still takes event-loop time from requests in flight.
 
-// Open a DM channel
-const dmChannel = await rest.post("/users/@me/channels", { recipient_id: "123456789012345678" });
-
-// Send a message
-await rest.post(Routes.channelMessages((dmChannel as any).id), {
-  content: "Hello from Lunibee REST! 🐝",
+```ts
+const rest = new REST({
+  token,
+  hooks: {
+    onRequest: ({ method, path, attempt }) => metrics.inc("rest.request"),
+    onResponse: ({ method, path, status, durationMs }) => metrics.observe("rest.latency", durationMs),
+    onRateLimit: ({ path, retryAfterMs, global, bucket }) => log.warn("rate limited", { path, retryAfterMs, global }),
+    onRetry: ({ path, attempt, status, delayMs }) => log.info("retry", { path, attempt, status }),
+  },
 });
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { REST, Routes } from "lunibee";
 
-const rest = new REST({ token: process.env.DISCORD_TOKEN });
+| Hook | Context |
+|---|---|
+| `onRequest` | `{ method, path, attempt }`, before every HTTP attempt. |
+| `onResponse` | `{ method, path, status, durationMs }`, after every response. |
+| `onRateLimit` | `{ method, path, retryAfterMs, global, bucket? }`, before waiting on a limit. |
+| `onRetry` | `{ method, path, attempt, status, delayMs }`, before a retry. |
 
-// Fetch a user
-const user = await rest.get(Routes.user("123456789012345678"));
+`rest.setHooks(hooks)` replaces all hooks at runtime.
 
-// Open a DM channel
-const dmChannel = await rest.post("/users/@me/channels", { recipient_id: "123456789012345678" });
+## Base URL rules
 
-// Send a message
-await rest.post(Routes.channelMessages((dmChannel as any).id), {
-  content: "Hello from Lunibee REST 🐝",
+The bot token is sent to `baseURL`, so the URL is checked when the client is built and a `TypeError` is thrown if:
+
+- it is not an absolute `https:` or `http:` URL;
+- it contains credentials (`user:pass@`), a query, or a fragment (a bare `?` or `#` included);
+- it is `http:` on a host other than this machine (`localhost`, `127.0.0.1`, `[::1]`) and `allowInsecureBaseURL` is not set.
+
+The URL is normalised, and a trailing `/` is removed.
+
+```ts
+new REST({ token, baseURL: "https://discord-proxy.internal/api/v10" });   // ok
+new REST({ token, baseURL: "http://localhost:8080/api/v10" });             // ok: this machine
+new REST({ token, baseURL: "http://rest-proxy:8080/api/v10", allowInsecureBaseURL: true }); // opt-in
+```
+
+## `WebhookClient`
+
+Sends to a webhook without a bot token. It accepts a webhook URL or an id and token.
+
+```ts
+import { WebhookClient, CreateEmbed } from "lunibee";
+
+const hook = new WebhookClient({ url: process.env.WEBHOOK_URL! });
+// or: new WebhookClient({ id: "123…", token: "abc…" })
+
+const sent = await hook.send({
+  content: "Deployed ✅",
+  username: "CI",
+  avatarURL: "https://example.com/ci.png",
+  allowedMentions: { parse: [] },
+  embeds: [new CreateEmbed().setTitle("v0.3.1")],
+});
+
+await hook.editMessage(sent.id, { content: "Deployed ✅ (verified)" });
+await hook.fetchMessage(sent.id);
+await hook.deleteMessage(sent.id);
+```
+
+The URL must be Discord's own webhook URL (`discord.com`, `discordapp.com`, `ptb.` or `canary.`); anything else throws.
+
+| Method | Description |
+|---|---|
+| `send(options)` | Sends a message and returns it (`?wait=true`). Takes a string or `WebhookMessageOptions`. |
+| `editMessage(messageId, options)` | Edits a message the webhook sent. Same options as `send`, files included. |
+| `fetchMessage(messageId, { threadId? })` | Fetches a message the webhook sent. |
+| `deleteMessage(messageId, { threadId? })` | Deletes a message the webhook sent. |
+
+`WebhookMessageOptions`: `content`, `username`, `avatar_url` / `avatarURL`, `tts`, `embeds` (objects or builders), `components` (objects or builders), `files`, `flags`, `allowed_mentions` / `allowedMentions`, `thread_id` / `threadId`. If both spellings are given, the Discord field name (`avatar_url`, `allowed_mentions`, `thread_id`) wins.
+
+The second constructor argument takes `{ timeout?, retries? }` for the webhook's own `REST`.
+
+## Advanced: the request pipeline
+
+A request passes through stages that are each exported, so you can test or reuse them:
+
+```text
+request → createRouteKey → RequestScheduler → RateLimiter → HttpTransport → ResponseDecoder
+```
+
+| Export | Responsibility |
+|---|---|
+| `createRouteKey(method, path)` | Returns `{ method, path, route, major }`: the normalised route (`GET:/channels/:id/messages`) and its major parameter. |
+| `normalizeRoutePath(path)`, `majorParameter(path)`, `scopeBucket(hash, major)`, `serializeQuery(query)` | The pieces `createRouteKey` and `request` use. |
+| `RequestScheduler` | Runs one request per bucket key at a time and frees the slot on every exit path, including an abort while queued. |
+| `RateLimiter` | Waits for or reserves bucket and global allowance, applies response headers, caps waits to `maxBackoff`. |
+| `HttpTransport` | One HTTP attempt with timeout, cancellation and `redirect: "error"`. Options: `baseURL`, `allowInsecureBaseURL`, `timeout`, `fetch`. |
+| `TransportError` | What `HttpTransport` throws for a failed attempt (`timedOut` tells a timeout apart). `REST` turns it into a `RESTError`. |
+| `ResponseDecoder` | Reads JSON, text or nothing (`204`), and Discord's error fields and `Retry-After`. |
+| `MemoryRateLimitStore`, `RedisRateLimitStore` | The built-in stores. |
+| `createRetryPolicy(maxRetries)` | The default retry policy. |
+
+### Testing without the network
+
+Give `REST` a transport with a fake `fetch`:
+
+```ts
+import { REST, HttpTransport } from "@lunibee/rest";
+
+const calls: string[] = [];
+const rest = new REST({
+  token: "test-token",
+  transport: new HttpTransport({
+    fetch: async (url, init) => {
+      calls.push(`${init.method} ${url}`);
+      return new Response(JSON.stringify({ id: "1" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  }),
 });
 ```
-</TabItem>
-</Tabs>
 
-## Error Classification and Redaction (0.2.0)
+`@lunibee/testing` also has `MockREST`, which records each call and answers from a path-to-response map.
 
-`RESTError.kind` is one of `aborted`, `timeout`, `network`, `rateLimited`,
-`authentication`, `permission`, `notFound`, `validation`, `server` or
-`client`; `RESTError.retryable` is `true` for `rateLimited`, `server`,
-`network` and `timeout`.
+## Compatibility with `@discordjs/rest`
 
-`RESTError.path` and REST hook contexts replace webhook and interaction tokens
-with `:token`. `redactPath(path)` applies the same rule to your own logs.
+| `@discordjs/rest` | Lunibee |
+|---|---|
+| `new REST().setToken(t)` | `new REST({ token })` or `setToken(t)` |
+| `rest.post(route, { body })` | the same, or `rest.post(route, body)` |
+| `rest.request({ method, fullRoute, body })` | the same (`path` also accepted) |
+| `query`, `headers`, `reason`, `auth: false`, `files` | the same |
+| `DiscordAPIError` | `RESTError` (also exported as `DiscordAPIError`) |
+| `HTTPError` | `RESTError` with `status: 0` and kind `network` or `timeout` |
+
+Details are in `packages/rest/COMPATIBILITY.md`.

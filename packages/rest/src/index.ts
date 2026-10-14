@@ -261,7 +261,7 @@ export class REST {
              * Lets requests on a bucket whose limit is known run concurrently, up
              * to its `remaining` allowance, instead of one at a time. Requires a
              * store with `reserve`. Requests on one bucket may then complete out
-             * of order (e.g. messages to one channel). Defaults to `false`.
+             * of order (e.g. messages to one channel). Defaults to `true`.
              */
             concurrentBuckets?: boolean;
             /**
