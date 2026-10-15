@@ -20,7 +20,10 @@ describe("Utils", () => {
     test("isSnowflake checks 16-22 digit numeric snowflakes", () => {
         expect(isSnowflake("123456789012345678")).toBe(true);
         expect(isSnowflake("1234567890123456")).toBe(true);
-        expect(isSnowflake("1234567890123456789012")).toBe(true);
+        // A snowflake is a uint64: at most 20 digits (D-19).
+        expect(isSnowflake("18446744073709551615")).toBe(true);
+        expect(isSnowflake("1234567890123456789012")).toBe(false);
+        expect(isSnowflake("123456789012345678901")).toBe(false);
         expect(isSnowflake("12345")).toBe(false);
         expect(isSnowflake("abc")).toBe(false);
         expect(isSnowflake("")).toBe(false);

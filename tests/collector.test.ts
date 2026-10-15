@@ -44,3 +44,23 @@ describe("Collector Coverage", () => {
         expect(collector.endReason).toBe("processedLimit");
     });
 });
+
+describe("typed collector events (D-21)", () => {
+    test("collect and end listeners get typed arguments", async () => {
+        const { Collector } = await import("../packages/core/src/collector.ts");
+        const collector = new Collector<string, number>({ max: 1 });
+        const seen: number[] = [];
+        let ended: [Map<string, number>, string] | undefined;
+        collector.on("collect", (item) => {
+            const n: number = item; // a type error if `item` were not typed
+            seen.push(n);
+        });
+        collector.once("end", (collected, reason) => {
+            ended = [collected, reason];
+        });
+        await collector.handle("a", 5);
+        expect(seen).toEqual([5]);
+        expect(ended?.[0].get("a")).toBe(5);
+        expect(ended?.[1]).toBe("limit");
+    });
+});

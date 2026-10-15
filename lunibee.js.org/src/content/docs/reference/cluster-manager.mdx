@@ -564,11 +564,11 @@ The `supervisor` option (`SupervisorOptions`) decides the delay:
 | `restartDelay` | `restartDelay`, else `5000` | Delay before the first restart, in ms. Cannot be negative. |
 | `backoff` | `1` | Each further crash inside `window` multiplies the delay by this. At least 1; `1` is a fixed delay. |
 | `maxDelay` | `300000` | Longest delay, in ms. Cannot be negative. |
-| `jitter` | `0` | Random spread added to each delay, as a fraction of it (0–1). Applied after `maxDelay`. |
+| `jitter` | `0` | Random spread added to each delay, as a fraction of it (0–1). The result is still capped at `maxDelay`. |
 | `maxRestarts` | unlimited | Give up after this many restarts inside `window`. `0` gives up on the first crash. |
 | `window` | `60000` | The time, in ms, over which restarts are counted. A cluster that stays up longer is forgiven. Must be positive. |
 
-The delay of the *n*-th restart inside the window is `min(maxDelay, restartDelay × backoff^(n−1)) × (1 + jitter × random)`. When the limit is reached the cluster becomes `failed`, `onGiveUp` is called and `clusterGiveUp` is emitted. With `restartOnExit: false` an exit makes the cluster `failed` straight away, without `clusterGiveUp`.
+The delay of the *n*-th restart inside the window is `min(maxDelay, restartDelay × backoff^(n−1)) × (1 + jitter × random)`, capped at `maxDelay`. When the limit is reached the cluster becomes `failed`, `onGiveUp` is called and `clusterGiveUp` is emitted. With `restartOnExit: false` an exit makes the cluster `failed` straight away, without `clusterGiveUp`.
 
 A restarted process is a new one: late messages and the exit of the process it replaced are ignored.
 

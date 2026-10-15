@@ -80,6 +80,8 @@ export class ShardBus {
     readonly #maxPending: number;
     /** Message handlers by message type. */
     readonly #handlers = new Map<string, Set<ShardMessageHandler>>();
+    /** `respond()` handlers by type, mapped to the wrappers actually registered. */
+    readonly #responders = new Map<string, Map<unknown, ShardMessageHandler>>();
     /** Handler error listeners. */
     readonly #errorHandlers = new Set<ShardBusErrorHandler>();
     /** Current shard ID. */
@@ -135,8 +137,20 @@ export class ShardBus {
         return this;
     }
     /** Removes a message handler. @param type Message type. @param handler Handler callback. @returns This bus. */
-    public off<T>(type: string, handler: ShardMessageHandler<T>): this {
-        this.#handlers.get(type)?.delete(handler as ShardMessageHandler);
+    public off<T>(
+        type: string,
+        handler:
+            | ShardMessageHandler<T>
+            | ((data: T, message: ShardMessage<T>) => unknown),
+    ): this {
+        const handlers = this.#handlers.get(type);
+        handlers?.delete(handler as ShardMessageHandler);
+        // A `respond()` handler is registered as a wrapper; find it by the original.
+        const responder = this.#responders.get(type)?.get(handler);
+        if (responder) {
+            handlers?.delete(responder);
+            this.#responders.get(type)!.delete(handler);
+        }
         return this;
     }
     /** Registers a listener for errors thrown or rejected by message handlers. Without one, handler errors are isolated and dropped. @param handler Error listener. @returns This bus. @throws {TypeError} If handler is invalid. */
@@ -173,7 +187,7 @@ export class ShardBus {
         type: string,
         handler: (data: T, message: ShardMessage<T>) => R | Promise<R>,
     ): this {
-        return this.on<T>(type, async (message) => {
+        const wrapper: ShardMessageHandler<T> = async (message) => {
             if (!message.expectsReply) return;
             const reply: ReplyPayload = { requestId: message.id };
             try {
@@ -183,7 +197,11 @@ export class ShardBus {
                     error instanceof Error ? error.message : String(error);
             }
             this.#publish(message.source, REPLY_TYPE, reply);
-        });
+        };
+        let byType = this.#responders.get(type);
+        if (!byType) this.#responders.set(type, (byType = new Map()));
+        byType.set(handler, wrapper as ShardMessageHandler);
+        return this.on<T>(type, wrapper);
     }
     /**
      * Sends a request to one shard and resolves with its handler's result.

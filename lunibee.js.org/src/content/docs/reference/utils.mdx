@@ -108,7 +108,7 @@ function randomInt(min, max)
 
 ## `isSnowflake(value)`
 
-Returns `true` if the string looks like a Discord snowflake: 16 to 22 decimal digits.
+Returns `true` if the string looks like a Discord snowflake: 16 to 20 decimal digits. A snowflake is an unsigned 64-bit number, so it never has more than 20 digits; the minimum keeps short numbers in text from being read as IDs (`Routes`, which only validates IDs it is given, accepts 1 to 20). Prefix-command argument parsing uses the same rule for mentions and IDs.
 
 <Tabs>
 <TabItem label="TypeScript">

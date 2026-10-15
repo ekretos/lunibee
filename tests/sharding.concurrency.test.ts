@@ -203,3 +203,102 @@ describe("ShardManager review fixes", () => {
         ).toThrow(RangeError);
     });
 });
+
+describe("backlog fixes (D-08, D-09, D-10, D-12, D-20)", () => {
+    test("shardCreate fires for each new Gateway before it connects (D-09)", async () => {
+        gatewayBot({
+            shards: 2,
+            session_start_limit: {
+                total: 1000,
+                remaining: 999,
+                reset_after: 1000,
+                max_concurrency: 2,
+            },
+        });
+        const order: string[] = [];
+        Gateway.prototype.connect = async function () {
+            order.push("connect");
+        };
+        const manager = new ShardManager({
+            token: "t",
+            intents: [],
+            shardCount: "auto",
+        });
+        const created: number[] = [];
+        manager.on("shardCreate", (id, gateway) => {
+            expect(gateway).toBeInstanceOf(Gateway);
+            created.push(id);
+            order.push("create");
+        });
+        await manager.connect();
+        expect(created).toEqual([0, 1]);
+        expect(order.slice(0, 2)).toEqual(["create", "create"]);
+        manager.destroy();
+    });
+
+    test("started shards count against the remembered IDENTIFY budget (D-10)", async () => {
+        gatewayBot({
+            shards: 4,
+            session_start_limit: {
+                total: 1000,
+                remaining: 3,
+                reset_after: 60_000,
+                max_concurrency: 4,
+            },
+        });
+        Gateway.prototype.connect = async function () {};
+        const manager = new ShardManager({
+            token: "t",
+            intents: [],
+            shardCount: 4,
+            shardIds: [0, 1],
+            spawnDelay: 0,
+        });
+        await manager.fetchGatewayInfo();
+        await manager.connect();
+        // 3 - 2 = 1 left: two more shards cannot start.
+        await expect(manager.addShards([2, 3])).rejects.toThrow(
+            /Session start limit exhausted: 1 of 1000/,
+        );
+        manager.destroy();
+    });
+
+    test("autoScaleInterval with a fixed shard count starts no timer (D-12)", async () => {
+        Gateway.prototype.connect = async function () {};
+        const manager = new ShardManager({
+            token: "t",
+            intents: [],
+            shardCount: 1,
+            autoScaleInterval: 1000,
+        });
+        let checks = 0;
+        manager.checkAutoScale = async () => void checks++;
+        await manager.connect();
+        await new Promise((r) => setTimeout(r, 1100));
+        expect(checks).toBe(0);
+        manager.destroy();
+    });
+
+    test("a worker's manager can be re-initialised without shardCount (D-20)", async () => {
+        Gateway.prototype.connect = async function () {};
+        const manager = new ShardManager({
+            token: "t",
+            intents: [],
+            cluster: {
+                clusterId: 0,
+                clusterCount: 2,
+                shardCount: 4,
+                shardIds: [0, 2],
+                coordinatedIdentify: false,
+            } as never,
+            worker: false,
+            spawnDelay: 0,
+        });
+        await manager.connect();
+        manager.destroy();
+        await manager.connect();
+        expect([...manager.shards.keys()]).toEqual([0, 2]);
+        expect(manager.shardCount).toBe(4);
+        manager.destroy();
+    });
+});

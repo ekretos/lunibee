@@ -28,6 +28,39 @@ export class Collector<K, V> extends EventEmitter {
     /** Cleanup hooks run once when the collector ends (e.g. event unsubscription). */
     readonly #cleanup: (() => void)[] = [];
 
+    /** `collect` receives each collected item; `end` the collected map and the reason. */
+    public override on(event: "collect", listener: (item: V) => void): this;
+    public override on(
+        event: "end",
+        listener: (collected: Map<K, V>, reason: string) => void,
+    ): this;
+    public override on(
+        event: string | symbol,
+        listener: (...args: never[]) => void,
+    ): this;
+    public override on(
+        event: string | symbol,
+        listener: (...args: never[]) => void,
+    ): this {
+        return super.on(event, listener as (...args: unknown[]) => void);
+    }
+    /** Like {@link Collector.on}, for one call. */
+    public override once(event: "collect", listener: (item: V) => void): this;
+    public override once(
+        event: "end",
+        listener: (collected: Map<K, V>, reason: string) => void,
+    ): this;
+    public override once(
+        event: string | symbol,
+        listener: (...args: never[]) => void,
+    ): this;
+    public override once(
+        event: string | symbol,
+        listener: (...args: never[]) => void,
+    ): this {
+        return super.once(event, listener as (...args: unknown[]) => void);
+    }
+
     public constructor(options: CollectorOptions<V> = {}) {
         super();
         this.options = options;

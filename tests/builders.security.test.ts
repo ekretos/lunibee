@@ -188,3 +188,42 @@ describe("option payloads Discord rejects (F-E7)", () => {
         ).toThrow(RangeError);
     });
 });
+
+describe("autocomplete and choices (D-23)", () => {
+    test("a string option with choices refuses autocomplete, in either order", async () => {
+        const { CreateStringOption } =
+            await import("../packages/builders/src/index.ts");
+        expect(() =>
+            new CreateStringOption()
+                .addChoices({ name: "a", value: "a" })
+                .setAutocomplete(true),
+        ).toThrow(RangeError);
+        expect(() =>
+            new CreateStringOption()
+                .setAutocomplete(true)
+                .addChoices({ name: "a", value: "a" }),
+        ).toThrow(RangeError);
+        expect(() =>
+            new CreateStringOption()
+                .addChoices({ name: "a", value: "a" })
+                .setAutocomplete(false),
+        ).not.toThrow();
+    });
+});
+
+describe("newer permission getters (D-24)", () => {
+    test("setVoiceChannelStatus, pinMessages and bypassSlowmode", async () => {
+        const { PermissionSet, Permission } =
+            await import("../packages/structures/src/permissions.ts");
+        const set = new PermissionSet(
+            Permission.pinMessages | Permission.bypassSlowmode,
+        );
+        expect(set.pinMessages).toBe(true);
+        expect(set.bypassSlowmode).toBe(true);
+        expect(set.setVoiceChannelStatus).toBe(false);
+        expect(
+            new PermissionSet(Permission.setVoiceChannelStatus)
+                .setVoiceChannelStatus,
+        ).toBe(true);
+    });
+});

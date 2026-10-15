@@ -174,8 +174,14 @@ export class CreateCommandOption {
         this.data.required = required;
         return this;
     }
-    /** Sets autocomplete. */
+    /** Sets autocomplete; options with choices cannot use it. */
     public setAutocomplete(enabled = true): this {
+        if (
+            enabled &&
+            Array.isArray(this.data.choices) &&
+            this.data.choices.length
+        )
+            throw new RangeError("Autocomplete options cannot define choices.");
         this.data.autocomplete = enabled;
         return this;
     }

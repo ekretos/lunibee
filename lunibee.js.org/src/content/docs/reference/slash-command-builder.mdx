@@ -282,7 +282,7 @@ Each `addXOption(fn)` callback receives a new instance of one of these classes a
 | `CreateMentionableOption` | 9 | — |
 | `CreateAttachmentOption` | 11 | — |
 
-All of them have `setName`, `setDescription` (1-100 characters), `setRequired(required = true)` and `setAutocomplete(enabled = true)`. Choices must be strings of 1-100 characters or finite numbers (at most 25), choices cannot be added to an autocomplete option (and integer/number options refuse autocomplete once they have choices), `setMinLength` / `setMaxLength` take 0-6000 / 1-6000, and `setMinValue` / `setMaxValue` throw a `RangeError` if the minimum would exceed the maximum.
+All of them have `setName`, `setDescription` (1-100 characters), `setRequired(required = true)` and `setAutocomplete(enabled = true)`. Choices must be strings of 1-100 characters or finite numbers (at most 25), choices cannot be added to an autocomplete option, and an option with choices refuses autocomplete, `setMinLength` / `setMaxLength` take 0-6000 / 1-6000, and `setMinValue` / `setMaxValue` throw a `RangeError` if the minimum would exceed the maximum.
 
 ## Subcommands
 

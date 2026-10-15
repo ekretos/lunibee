@@ -252,7 +252,7 @@ describe("ShardSupervisor", () => {
             () => 1,
         );
         expect([0, 1, 2, 3].map((t) => supervisor.next(7, t))).toEqual([
-            150, 300, 525, 525,
+            150, 300, 350, 350,
         ]);
     });
 

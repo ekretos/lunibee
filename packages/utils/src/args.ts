@@ -43,7 +43,7 @@ export type PrefixArgsResult =
     | { ok: true; values: Record<string, PrefixArgValue | undefined> }
     | { ok: false; arg: string; error: string };
 
-const SNOWFLAKE = /^\d{16,22}$/;
+const SNOWFLAKE = /^\d{16,20}$/;
 const TRUE_WORDS = new Set([
     "true",
     "yes",
@@ -103,25 +103,25 @@ export function tokenizeArgs(input: string): string[] {
 
 /** The user ID in `<@id>`, `<@!id>` or a bare ID; null otherwise. */
 export function parseUserMention(value: string): string | null {
-    const id = /^<@!?(\d{16,22})>$/.exec(value)?.[1] ?? value;
+    const id = /^<@!?(\d{16,20})>$/.exec(value)?.[1] ?? value;
     return SNOWFLAKE.test(id) ? id : null;
 }
 
 /** The role ID in `<@&id>` or a bare ID; null otherwise. */
 export function parseRoleMention(value: string): string | null {
-    const id = /^<@&(\d{16,22})>$/.exec(value)?.[1] ?? value;
+    const id = /^<@&(\d{16,20})>$/.exec(value)?.[1] ?? value;
     return SNOWFLAKE.test(id) ? id : null;
 }
 
 /** The channel ID in `<#id>` or a bare ID; null otherwise. */
 export function parseChannelMention(value: string): string | null {
-    const id = /^<#(\d{16,22})>$/.exec(value)?.[1] ?? value;
+    const id = /^<#(\d{16,20})>$/.exec(value)?.[1] ?? value;
     return SNOWFLAKE.test(id) ? id : null;
 }
 
 /** A user or role mention; a bare ID reads as a user. Null otherwise. */
 export function parseMentionable(value: string): MentionableArg | null {
-    const role = /^<@&(\d{16,22})>$/.exec(value)?.[1];
+    const role = /^<@&(\d{16,20})>$/.exec(value)?.[1];
     if (role) return { id: role, type: "role" };
     const user = parseUserMention(value);
     return user ? { id: user, type: "user" } : null;

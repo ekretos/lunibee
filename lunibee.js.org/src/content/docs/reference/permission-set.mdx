@@ -61,7 +61,7 @@ const perms = new PermissionSet(member.permissions.bitfield);
 | Property | Type | Description |
 |---|---|---|
 | `bitfield` | `bigint` | The raw bitfield as a BigInt. |
-| `kickMembers`, `banMembers`, `administrator`, … | `boolean` | One camelCase getter per permission (up to `useExternalApps`), true when the bit is set. |
+| `kickMembers`, `banMembers`, `administrator`, … | `boolean` | One camelCase getter per permission, including `setVoiceChannelStatus`, `pinMessages` and `bypassSlowmode`; true when the bit is set. |
 
 ## Methods
 

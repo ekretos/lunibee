@@ -79,3 +79,22 @@ describe("ShardBus", () => {
         for (const bus of [a, b, c]) bus!.close();
     });
 });
+
+describe("off() removes a respond() handler (D-08)", () => {
+    test("the responder stops answering", async () => {
+        const { ShardBus: Bus } =
+            await import("../packages/sharding/src/bus.ts");
+        const name = `d08-${Math.random()}`;
+        const a = new Bus(0, name);
+        const b = new Bus(1, name);
+        const handler = (n: number) => n * 2;
+        b.respond("double", handler);
+        expect(await a.request<number>(1, "double", 2, 500)).toBe(4);
+        b.off("double", handler);
+        await expect(a.request(1, "double", 2, 50)).rejects.toThrow(
+            /did not reply/,
+        );
+        a.close();
+        b.close();
+    });
+});

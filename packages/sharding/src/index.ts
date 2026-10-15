@@ -193,6 +193,12 @@ export interface ShardManagerEvents {
     shardError: [shardId: number, error: Error];
     /** Every shard this manager owns is ready. Emitted again after a shard drops and recovers. */
     ready: [];
+    /**
+     * A shard's `Gateway` was created and has not connected yet: attach dispatch
+     * listeners here so none of its events are missed. Fires again for the new
+     * Gateways after `destroy()` + `connect()` or `reshard()`.
+     */
+    shardCreate: [shardId: number, gateway: Gateway];
     /** A shard reconnected too often too fast and is backing off (see `Gateway` `unstable`). */
     shardUnstable: [
         shardId: number,
@@ -239,6 +245,8 @@ export class ShardManager {
     #destroyed = false;
     /** Whether the manager was created in auto shard-count mode. Preserved across reshards so auto-scaling keeps running. */
     readonly #auto: boolean;
+    /** The shard count when it is not "auto" (from the options or the cluster context). */
+    readonly #fixedCount: number;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
     /** The shard count of the current shard set; kept while a reshard has no shards so `getShardIdForGuild` stays right. */
     #total: number;
@@ -345,6 +353,7 @@ export class ShardManager {
                 "handshakeTimeout must be a non-negative number of milliseconds.",
             );
         this.#total = count;
+        this.#fixedCount = count;
         this.#auto = options.shardCount === "auto";
         // Discord allows one IDENTIFY per 5s per rate-limit key. Spawning
         // shards back-to-back trips that limit and the gateway answers with
@@ -398,7 +407,12 @@ export class ShardManager {
                 .filter(([, gateway]) => needsConnection(gateway))
                 .map(([id]) => id),
         );
-        if (this.#options.autoScaleInterval && !this.#autoScaleTimer) {
+        // Auto-scaling only means something when the count is "auto".
+        if (
+            this.#options.autoScaleInterval &&
+            this.#auto &&
+            !this.#autoScaleTimer
+        ) {
             this.#autoScaleTimer = setInterval(() => {
                 void this.checkAutoScale();
             }, this.#options.autoScaleInterval);
@@ -502,6 +516,14 @@ export class ShardManager {
             const failed = results.findIndex(
                 (result) => result.status === "rejected",
             );
+            // Each started shard spends one IDENTIFY of the remembered budget,
+            // so a later connect() checks against what is actually left.
+            if (limit)
+                limit.remaining = Math.max(
+                    0,
+                    limit.remaining -
+                        results.filter((r) => r.status === "fulfilled").length,
+                );
             if (failed !== -1) {
                 if (destroyOnFailure) this.destroy();
                 throw new Error(`Failed to connect shard ${round[failed]}.`, {
@@ -682,7 +704,7 @@ export class ShardManager {
         const count =
             this.#options.shardCount === "auto"
                 ? await this.fetchRecommendedShardCount()
-                : (this.#options.shardCount ?? 1);
+                : this.#fixedCount;
         this.#initialize(count);
     }
     /** Creates every shard for a resolved shard count. @param count Number of shards. @returns Nothing. */
@@ -730,6 +752,7 @@ export class ShardManager {
                 info as { reconnects: number; delay: number },
             );
         });
+        this.#emit("shardCreate", id, gateway);
         return gateway;
     }
 }

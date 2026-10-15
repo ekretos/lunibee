@@ -125,7 +125,7 @@ Registers a handler that answers requests of `type`. It receives the payload and
 bus.respond<{ guildId: string }, boolean>("hasGuild", ({ guildId }) => guildCache.has(guildId));
 ```
 
-It only answers messages sent with `request()` or `broadcastRequest()` (or by `ClusterManager.request()` / `broadcast()`); a plain `send()` or `broadcast()` of the same type does not trigger a reply. A `respond` handler cannot be removed with `off()`; it stays until `close()`.
+It only answers messages sent with `request()` or `broadcastRequest()` (or by `ClusterManager.request()` / `broadcast()`); a plain `send()` or `broadcast()` of the same type does not trigger a reply. `off(type, handler)` with the same handler removes a `respond()` handler.
 
 ### `request(target, type, data, timeoutMs?)`
 

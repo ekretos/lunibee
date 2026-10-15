@@ -451,6 +451,23 @@ export class PermissionSet {
             Permission.useExternalApps
         );
     }
+    public get setVoiceChannelStatus(): boolean {
+        return (
+            (this.bitfield & Permission.setVoiceChannelStatus) ===
+            Permission.setVoiceChannelStatus
+        );
+    }
+    public get pinMessages(): boolean {
+        return (
+            (this.bitfield & Permission.pinMessages) === Permission.pinMessages
+        );
+    }
+    public get bypassSlowmode(): boolean {
+        return (
+            (this.bitfield & Permission.bypassSlowmode) ===
+            Permission.bypassSlowmode
+        );
+    }
 
     /** Checks whether all supplied permissions are present (AND). @param permissions Permission names or raw bits. @returns True when every requested permission is present. */
     public has(...permissions: PermissionResolvable[]): boolean {

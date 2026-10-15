@@ -86,7 +86,7 @@ new ShardManager(options: ShardManagerOptions)
 | `spawnDelay` | `number` | `5000` | Milliseconds between startup rounds when pacing locally. `0` drops the handshake wait and the delay, so each round starts as soon as the previous round's sockets are open. See [IDENTIFY pacing](#identify-pacing). |
 | `maxConcurrency` | `number` | Discord's `max_concurrency` if known, else `1` | Shards per startup round when pacing locally. Capped at Discord's value when it is known. |
 | `handshakeTimeout` | `number` | `15000` | How long a startup round waits for its shards to send IDENTIFY or RESUME before the next `spawnDelay` starts, in ms. With an IDENTIFY gate, how long a shard holds its slot waiting for the handshake. |
-| `autoScaleInterval` | `number` | — | With `shardCount: "auto"`: re-check the shard count this often, in ms, and reshard when it changes. An integer of at least `1000`. |
+| `autoScaleInterval` | `number` | — | With `shardCount: "auto"`: re-check the shard count this often, in ms, and reshard when it changes. An integer of at least `1000`. With a fixed count no timer is started. |
 | `onAutoScaleError` | `(error: unknown) => void` | — | Called when a background auto-scale check fails. |
 | `cluster` | `ClusterContext \| false` | read from the environment | The worker contract. `false` ignores it; a `ClusterContext` overrides it. See [Inside a cluster worker](#inside-a-cluster-worker). |
 | `identify` | `IdentifyGate \| false` | the parent, inside a coordinated cluster | Where IDENTIFY slots come from. `false` paces locally with `spawnDelay`. |
@@ -119,7 +119,7 @@ Creates the shard set if it does not exist yet (resolving `"auto"` first; a dest
 - Without an IDENTIFY gate, shards start in rounds paced by `spawnDelay`. With a gate, every shard waits for its slot. See [IDENTIFY pacing](#identify-pacing).
 - When `/gateway/bot` was read (with `"auto"`, or after `fetchGatewayInfo()`) and the session budget has fewer IDENTIFYs left than shards to start, it throws before starting any and leaves running shards alone.
 - If a shard fails to connect, it destroys the whole shard set and throws `Error("Failed to connect shard N.")` with the shard's error as `cause`. With `reconnect: true` a Gateway keeps retrying instead of rejecting, so this is mostly seen with `reconnect: false` or a refused IDENTIFY slot.
-- Starts the `autoScaleInterval` timer. Calling `connect()` again replaces that timer instead of adding one.
+- With `shardCount: "auto"`, starts the `autoScaleInterval` timer. Calling `connect()` again replaces that timer instead of adding one.
 
 ```ts
 await manager.connect();
@@ -224,6 +224,7 @@ Add or remove a listener for one of the [events](#events). Both return the manag
 | `shardDisconnect` | `shardId: number, close: { code: number; action: string }` | The shard's socket closed. `action` is `"resume"`, `"identify"` or `"stop"`; the Gateway may reconnect by itself. See [close codes](/reference/gateway/#close-codes). |
 | `shardError` | `shardId: number, error: Error` | The shard's Gateway emitted `error`. |
 | `shardUnstable` | `shardId: number, info: { reconnects: number; delay: number }` | The shard reconnected too often too fast and is backing off (the Gateway's [`unstable`](/reference/gateway/#lifecycle-events) event). |
+| `shardCreate` | `shardId: number, gateway: Gateway` | A shard's `Gateway` was created and has not connected yet. Attach dispatch listeners here; fires again for new Gateways after `destroy()` + `connect()` or `reshard()`. |
 | `ready` | — | Every owned shard is ready. Emitted again each time all shards are ready after one dropped (disconnected or became unstable). |
 
 ```ts
@@ -256,13 +257,11 @@ const manager = new ShardManager({
 });
 ```
 
-With `"auto"`, the Gateways do not exist until `connect()` creates and connects them in one step, so a dispatch listener added after `await connect()` can miss early events. To attach listeners first, resolve the count yourself and pass the number:
+With `"auto"`, the Gateways do not exist until `connect()` creates them. Attach dispatch listeners in `shardCreate`, which fires for each new Gateway before it connects, so no event is missed. It also fires for the new Gateways after `destroy()` + `connect()` or `reshard()`:
 
 ```ts
-const shardCount = await new ShardManager({ token, intents, shardCount: "auto" })
-  .fetchRecommendedShardCount();
-const manager = new ShardManager({ token, intents, shardCount });
-for (const { gateway } of manager.values()) gateway.on("GUILD_CREATE", onGuild);
+const manager = new ShardManager({ token, intents, shardCount: "auto" });
+manager.on("shardCreate", (shardId, gateway) => gateway.on("GUILD_CREATE", onGuild));
 await manager.connect();
 ```
 
@@ -320,7 +319,7 @@ Discord allows one IDENTIFY per rate-limit key every 5 seconds. The key is `shar
 
 With concurrency 1 and the defaults, *N* shards take about `(N − 1) × (handshake + 5 s)` to start. `spawnDelay: 0` removes the wait between rounds; use it only when something else paces the handshakes.
 
-The budget check uses the answer remembered from the last `/gateway/bot` read; it is not counted down as shards start. Call `fetchGatewayInfo()` before `connect()` to check against a fresh value. Without a read (a fixed `shardCount` and no `fetchGatewayInfo()`), there is no budget check.
+The budget check uses the answer remembered from the last `/gateway/bot` read, counted down by one for each shard this manager starts (so `addShards()` after `connect()` checks against what is left). Call `fetchGatewayInfo()` to replace it with Discord's current value. Without a read (a fixed `shardCount` and no `fetchGatewayInfo()`), there is no budget check.
 
 ### An IDENTIFY gate
 
@@ -534,14 +533,14 @@ Invalid values throw `RangeError`. `random` defaults to `Math.random`; inject it
 | `next(id, now = Date.now())` | Records a crash of cluster `id`. Returns the delay before restarting it, or `null` to give up because it already restarted `maxRestarts` times inside `window`. Giving up clears its history. |
 | `reset(id?)` | Forgets one cluster's crashes, or every cluster's. |
 
-The delay for the *n*-th crash inside the window is `round(min(maxDelay, restartDelay × backoff^(n−1)) × (1 + jitter × random()))`. Jitter is added after the cap, so a delay can reach `maxDelay × (1 + jitter)`.
+The delay for the *n*-th crash inside the window is `min(maxDelay, round(min(maxDelay, restartDelay × backoff^(n−1)) × (1 + jitter × random())))`: jitter spreads the delay, and `maxDelay` stays the longest wait.
 
 ```ts
 const supervisor = new ShardSupervisor(
   { restartDelay: 100, backoff: 2, maxDelay: 350, jitter: 0.5 },
   () => 1,
 );
-[0, 1, 2, 3].map((t) => supervisor.next(7, t)); // [150, 300, 525, 525]
+[0, 1, 2, 3].map((t) => supervisor.next(7, t)); // [150, 300, 350, 350]
 ```
 
 ## Shutdown

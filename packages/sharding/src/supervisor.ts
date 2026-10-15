@@ -4,7 +4,7 @@ export interface SupervisorOptions {
     restartDelay?: number;
     /** Each further crash in the window multiplies the delay by this (default 1: a fixed delay). */
     backoff?: number;
-    /** The longest delay (default 5 minutes). */
+    /** The longest delay, jitter included (default 5 minutes). */
     maxDelay?: number;
     /** Random spread added to each delay, as a fraction of it (0-1, default 0). */
     jitter?: number;
@@ -72,7 +72,11 @@ export class ShardSupervisor {
             maxDelay,
             restartDelay * backoff ** (recent.length - 1),
         );
-        return Math.round(base * (1 + jitter * this.#random()));
+        // The cap applies after jitter: `maxDelay` is the longest wait, always.
+        return Math.min(
+            maxDelay,
+            Math.round(base * (1 + jitter * this.#random())),
+        );
     }
 
     /** Forgets a cluster's crashes, e.g. after a deliberate respawn. */
