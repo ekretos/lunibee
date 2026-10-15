@@ -7,7 +7,7 @@ description: Every type the lunibee package exports, grouped by package, with a 
 
 Every interface and type alias that `lunibee` exports, with what it is for. Each name links to its full definition in the generated API reference. The classes and functions that use these types are described on the other reference pages.
 
-332 types in 12 packages.
+334 types in 12 packages.
 
 ## `@lunibee/builders`
 
@@ -43,6 +43,9 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`CacheOptions`](/api/interfaces/cacheoptions/) | interface | Cache policy for bounded resource storage. |
 | [`CollectionOptions`](/api/interfaces/collectionoptions/) | interface | Retention policy for a Collection. |
 | [`CollectionStats`](/api/interfaces/collectionstats/) | interface | Cumulative counters from Collection.stats. |
+| [`RedisCollectionOptions`](/api/interfaces/rediscollectionoptions/) | interface | Options for RedisCollection. |
+| [`RedisCommandClient`](/api/interfaces/rediscommandclient/) | interface | Anything that runs one Redis command: `Bun.RedisClient` as it is, or an adapter. |
+| [`RedisSerializer`](/api/interfaces/redisserializer/) | interface | Turns values into strings for Redis and back. |
 | [`EvictionReason`](/api/type-aliases/evictionreason/) | type | Why an entry was removed automatically. |
 | [`Keep`](/api/type-aliases/keep/) | type | What `merge()` does with one entry: keep it with `value`, or drop it. |
 | [`ReadonlyCollection`](/api/type-aliases/readonlycollection/) | type | A `Collection` seen read-only: every method that does not change it. |
@@ -79,7 +82,6 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`RawDispatchSource`](/api/interfaces/rawdispatchsource/) | interface | What `attach()` listens to: a `Client` (its `raw` event) or a `Gateway` (`RAW`). |
 | [`RedisCacheDiagnostics`](/api/interfaces/rediscachediagnostics/) | interface | Health of a RedisCache. |
 | [`RedisCacheOptions`](/api/interfaces/rediscacheoptions/) | interface | Options for RedisCache. |
-| [`RedisCommandClient`](/api/interfaces/rediscommandclient/) | interface | Anything that runs one Redis command: `Bun.RedisClient` as it is, or an adapter. |
 | [`Route`](/api/interfaces/route/) | interface | A place in Discord's REST API. |
 | [`RouteOptions`](/api/interfaces/routeoptions/) | interface | Extra settings for one request. |
 | [`StringConfig`](/api/interfaces/stringconfig/) | interface | A string option. |

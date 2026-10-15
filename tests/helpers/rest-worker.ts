@@ -70,7 +70,10 @@ for (let b = 0; b < cfg.buckets; b++)
         work.push(
             rest.post(`/channels/${1000 + b}/messages`, { content: "x" }).then(
                 () => void latencies.push(performance.now() - t0),
-                () => void errors++,
+                (error: unknown) => {
+                    errors++;
+                    console.error("request failed:", String(error));
+                },
             ),
         );
     }

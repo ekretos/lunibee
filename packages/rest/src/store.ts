@@ -53,8 +53,28 @@ export interface ReserveOptions {
     globalLimit?: number;
 }
 
-/** Length of a proactive global-limit window (ms). */
-export const GLOBAL_WINDOW_MS = 1000;
+/**
+ * Span of the proactive global limit's sliding log (ms): at most the limit is
+ * sent in any span this long. A second plus a margin, so latency jitter
+ * cannot squeeze more than the limit into one second as Discord counts it.
+ */
+export const GLOBAL_WINDOW_MS = 1050;
+
+/**
+ * Takes one slot from a sliding log of send times, or says how long until
+ * one frees. `log` holds the send times still inside the window, oldest first.
+ */
+export function takeGlobalSlot(
+    log: number[],
+    now: number,
+    limit: number,
+    window = GLOBAL_WINDOW_MS,
+): number {
+    while (log.length > 0 && log[0]! <= now - window) log.shift();
+    if (log.length >= limit) return Math.max(1, log[0]! + window - now + 1);
+    log.push(now);
+    return 0;
+}
 
 /** What a response said about a bucket, for {@link RateLimitStore.reconcile}. */
 export interface BucketUpdate {
@@ -285,10 +305,7 @@ export class MemoryRateLimitStore implements RateLimitStore {
     readonly #buckets = new Map<string, BucketState>();
     readonly #routeBuckets = new Map<string, string>();
     readonly #globals = new Map<string, number>();
-    readonly #globalCounts = new Map<
-        string,
-        { start: number; count: number }
-    >();
+    readonly #globalLogs = new Map<string, number[]>();
     /** Minimum interval between automatic prunes, in ms. */
     static readonly #PRUNE_INTERVAL = 60_000;
     #lastPruneAt = 0;
@@ -334,30 +351,28 @@ export class MemoryRateLimitStore implements RateLimitStore {
         }
         const limit =
             options.global === undefined ? 0 : (options.globalLimit ?? 0);
-        let window =
-            limit > 0 ? this.#globalCounts.get(options.global!) : undefined;
-        if (window && now - window.start >= GLOBAL_WINDOW_MS)
-            window = undefined;
-        if (limit > 0 && window && window.count >= limit)
-            return {
-                granted: false,
-                retryAfterMs: window.start + GLOBAL_WINDOW_MS - now,
-                reason: "global",
-            };
+        let log: number[] | undefined;
+        if (limit > 0) {
+            log = this.#globalLogs.get(options.global!);
+            if (!log) {
+                this.#globalLogs.set(options.global!, (log = []));
+                MemoryRateLimitStore.#evict(this.#globalLogs);
+            }
+            // Check without taking: the slot is taken only with the bucket's.
+            const wait = takeGlobalSlot(log, now, limit);
+            if (wait > 0)
+                return { granted: false, retryAfterMs: wait, reason: "global" };
+            log.pop();
+        }
         const { reservation, next } = reserveState(
             this.#buckets.get(key),
             now,
             options.probeMs ?? DEFAULT_PROBE_MS,
         );
+        // Record the send first: the write below may prune, and a log still
+        // empty then would be dropped while this call holds it.
+        if (log && reservation.granted) log.push(now);
         if (next) this.#write(key, next);
-        if (limit > 0 && reservation.granted) {
-            if (!window) {
-                window = { start: now, count: 0 };
-                this.#globalCounts.set(options.global!, window);
-                MemoryRateLimitStore.#evict(this.#globalCounts);
-            }
-            window.count++;
-        }
         return reservation;
     }
     public reconcile(key: string, update: BucketUpdate): void {
@@ -404,9 +419,9 @@ export class MemoryRateLimitStore implements RateLimitStore {
         }
         for (const [scope, resetAt] of this.#globals)
             if (resetAt <= Date.now()) this.#globals.delete(scope);
-        for (const [scope, window] of this.#globalCounts)
-            if (Date.now() - window.start >= GLOBAL_WINDOW_MS)
-                this.#globalCounts.delete(scope);
+        for (const [scope, log] of this.#globalLogs)
+            if ((log.at(-1) ?? 0) <= Date.now() - GLOBAL_WINDOW_MS)
+                this.#globalLogs.delete(scope);
     }
     public getGlobalReset(scope = ""): number {
         return this.#globals.get(scope) ?? 0;

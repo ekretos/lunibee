@@ -7,10 +7,9 @@
  * a Gateway — can read any guild. It never replaces the synchronous cache.
  */
 
-/** Anything that runs one Redis command: `Bun.RedisClient` as it is, or an adapter. */
-export interface RedisCommandClient {
-    send(command: string, args: string[]): Promise<unknown>;
-}
+import type { RedisCommandClient } from "@lunibee/collection";
+
+export type { RedisCommandClient };
 
 /** What `attach()` listens to: a `Client` (its `raw` event) or a `Gateway` (`RAW`). */
 export interface RawDispatchSource {

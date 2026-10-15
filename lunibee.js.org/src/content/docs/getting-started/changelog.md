@@ -28,7 +28,7 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
     - A 429's wait is recorded in the store (on the bucket, or the bot's global limit) and the retry waits for it like every other request, instead of sleeping on its own.
     - `RedisRateLimitStore` warns once per state change instead of once per failed command.
     - New `RESTErrorKind`s `"coordination"` and `"overloaded"` (both retryable).
-    - **A proactive global limit of 50 requests per second per bot** (`globalLimit`), shared through the store; set `globalLimit: false` for the old behaviour (429s only), or the limit Discord granted a large bot.
+    - **A proactive global limit of 50 requests per second per bot** (`globalLimit`), a sliding log shared through the store; set `globalLimit: false` for the old behaviour (429s only), or the limit Discord granted a large bot.
     - **After a `401` on a bot route the token is not used again** until `setToken()` (`stopOnInvalidToken: false` restores sending).
 
 ### 🔒 Security
@@ -92,6 +92,7 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
     - `RESTMetrics`: counters, gauges and latency histograms from the telemetry events, with bounded route labels and a Prometheus text export.
     - `parseRateLimitHeaders()`, `headerNumber()`, `requestIdentity()`, `tokenFingerprint()`, `DEFAULT_MAX_BACKOFF_MS`, and the types `Grant`, `BucketUpdate`, `ReserveOptions`, `RateLimitHeaders`, `RateLimitScope`, `RequestIdentity`, `SchedulerOptions`, `ApplyResponseOptions`, `RESTDiagnostics`, `RESTTelemetry`, `RESTTelemetryEvent`, `RESTMetricsSnapshot`, `CoordinationMode`, `RedisFailurePolicy`, `RedisStoreDiagnostics`.
     - Reaction routes are keyed without the emoji (`/reactions/:emoji`), so they no longer create a key per emoji.
+- **`RedisCollection`** (`@lunibee/collection`, `lunibee`): a key-value collection kept in Redis and shared by every process that opens it by name, with `Collection`'s retention policy (sliding TTL, `maxSize` LRU across processes, `onEvict`), `ensure()` that agrees across racing processes, atomic Lua operations on Redis `TIME`, and a pluggable serializer. See [Collection](/reference/collection/#sharing-a-collection-between-processes-rediscollection).
 - **`RedisCache`** (`@lunibee/core`, `lunibee`): a shared cache in Redis beside the in-memory one. `attach(client)` mirrors guilds, channels, threads, roles, members and users from the Gateway as raw payloads, and any process reads them with `guild()`, `channels()`, `member()`… Works with `Bun.RedisClient` directly. See [Caching](/core-concepts/caching/#shared-cache-in-redis).
 - **`benchmarks/rest-distributed.ts`**: REST instances in separate processes sharing Redis, against a fake Discord HTTP server that counts every request over the limit.
 

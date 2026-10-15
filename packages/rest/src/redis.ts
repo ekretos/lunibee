@@ -56,20 +56,19 @@ if #KEYS > 1 then
   if g > now then return {0, math.ceil(g - now), 'global'} end
 end
 if #KEYS < 3 then glimit = 0 end
+-- A sliding log of send times: at most glimit in any gwindow span.
 if glimit > 0 then
-  local c = tonumber(redis.call('GET', KEYS[3]) or '0') or 0
-  if c >= glimit then
-    local ttl = redis.call('PTTL', KEYS[3])
-    if ttl < 0 then
-      redis.call('PEXPIRE', KEYS[3], gwindow)
-      ttl = gwindow
-    end
-    return {0, ttl, 'global'}
+  redis.call('ZREMRANGEBYSCORE', KEYS[3], '-inf', now - gwindow)
+  if redis.call('ZCARD', KEYS[3]) >= glimit then
+    local oldest = redis.call('ZRANGE', KEYS[3], 0, 0, 'WITHSCORES')
+    return {0, math.max(1, tonumber(oldest[2]) + gwindow - now + 1), 'global'}
   end
 end
 local function count()
   if glimit > 0 then
-    if redis.call('INCR', KEYS[3]) == 1 then redis.call('PEXPIRE', KEYS[3], gwindow) end
+    local seq = redis.call('ZCARD', KEYS[3])
+    redis.call('ZADD', KEYS[3], now, now .. ':' .. seq)
+    redis.call('PEXPIRE', KEYS[3], gwindow + 1000)
   end
 end
 local probe, poll, linger = tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3])
@@ -589,7 +588,7 @@ export class RedisRateLimitStore implements RateLimitStore {
         if (options.global !== undefined) {
             keys.push(this.#globalKey(options.global));
             if (options.globalLimit)
-                keys.push(`${this.#prefix}global-count:${options.global}`);
+                keys.push(`${this.#prefix}global-log:${options.global}`);
         }
         return this.#run(
             "reserve",

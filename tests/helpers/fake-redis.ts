@@ -34,6 +34,8 @@ export interface FakeRedis {
 
 export function createFakeRedis(): FakeRedis {
     const data = new Map<string, { value: string; expiresAt: number }>();
+    /** Sliding logs of the global limit, by key. */
+    const logs = new Map<string, number[]>();
     const ops = new Map<string, number>();
     const server: FakeRedis = {
         fault: undefined,
@@ -138,10 +140,14 @@ export function createFakeRedis(): FakeRedis {
                 if (g > t) return [0, Math.ceil(g - t), "global"];
             }
             const limit = keys[2] === undefined ? 0 : Number(argv[3] ?? 0);
-            if (limit > 0 && Number(get(keys[2]!) ?? 0) >= limit)
+            const log = (logs.get(keys[2] ?? "") ?? []).filter(
+                (at) => at > t - Number(argv[4]),
+            );
+            if (keys[2] !== undefined) logs.set(keys[2], log);
+            if (limit > 0 && log.length >= limit)
                 return [
                     0,
-                    Math.max(1, data.get(keys[2]!)!.expiresAt - t),
+                    Math.max(1, log[0]! + Number(argv[4]) - t + 1),
                     "global",
                 ];
             const { reservation, next } = reserveState(
@@ -150,14 +156,7 @@ export function createFakeRedis(): FakeRedis {
                 Number(argv[0]),
             );
             if (next) save(keys[0]!, next, t, next.probe ? 0 : Number(argv[2]));
-            if (limit > 0 && reservation.granted) {
-                const count = Number(get(keys[2]!) ?? 0) + 1;
-                const expiresAt =
-                    count === 1
-                        ? t + Number(argv[4])
-                        : data.get(keys[2]!)!.expiresAt;
-                data.set(keys[2]!, { value: String(count), expiresAt });
-            }
+            if (limit > 0 && reservation.granted) log.push(t);
             return reservation.granted
                 ? [1, reservation.resetAt, reservation.known ? 1 : 0]
                 : [0, Math.ceil(reservation.retryAfterMs), reservation.reason];

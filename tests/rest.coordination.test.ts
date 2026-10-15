@@ -16,7 +16,11 @@ import {
     type RateLimitStore,
     type Reservation,
 } from "../packages/rest/src/index.ts";
-import { reconcileState, reserveState } from "../packages/rest/src/store.ts";
+import {
+    reconcileState,
+    reserveState,
+    takeGlobalSlot,
+} from "../packages/rest/src/store.ts";
 import {
     createFakeDiscord,
     startFakeDiscord,
@@ -1618,5 +1622,29 @@ describe("maxQueueWait", () => {
                     .catch((e: unknown) => e)) as RESTError
             ).kind,
         ).toBe("aborted");
+    });
+});
+
+describe("sliding global window", () => {
+    test("never more than the limit in any window-long span", () => {
+        const log: number[] = [];
+        const sent: number[] = [];
+        for (let t = 0; t < 5000; t += 7)
+            if (takeGlobalSlot(log, t, 10, 1000) === 0) sent.push(t);
+        for (let i = 0; i + 10 < sent.length; i++)
+            expect(sent[i + 10]! - sent[i]!).toBeGreaterThanOrEqual(1000);
+        // The wait is until the oldest send leaves the window.
+        expect(takeGlobalSlot([0, 1, 2], 500, 3, 1000)).toBe(501);
+    });
+
+    test("the memory store grants exactly the limit on its first window (the prune cannot drop the log)", () => {
+        const store = new MemoryRateLimitStore();
+        let granted = 0;
+        for (let i = 0; i < 55; i++)
+            if (
+                store.reserve(`k${i}`, { global: "g", globalLimit: 50 }).granted
+            )
+                granted++;
+        expect(granted).toBe(50);
     });
 });

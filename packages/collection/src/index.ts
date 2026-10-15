@@ -1095,3 +1095,9 @@ export class Collection<K, V> extends Map<K, V> {
 
 export { Cache } from "./cache.js";
 export type { CacheOptions } from "./cache.js";
+export {
+    RedisCollection,
+    type RedisCollectionOptions,
+    type RedisCommandClient,
+    type RedisSerializer,
+} from "./redis.js";

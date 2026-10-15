@@ -101,6 +101,8 @@ const client = new Client({
 
 ## Shared Cache in Redis
 
+For your own data shared between processes (sessions, cooldowns, counters), use [`RedisCollection`](/reference/collection/#sharing-a-collection-between-processes-rediscollection). For Discord's data, read on.
+
 The in-memory cache of each process holds only the guilds its own shards receive. `RedisCache` mirrors the same Gateway events into Redis, so another cluster, a dashboard or a worker without a Gateway can read any guild. It sits beside the in-memory cache and changes nothing about it: `client.guilds.get(id)` stays synchronous.
 
 ```ts

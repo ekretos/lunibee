@@ -435,3 +435,38 @@ const cache = new Collection<string, number>(null, {
 A later `set()` turns a `setWithoutTTL()` entry back into a TTL entry.
 Expired entries are removed by a single unref'd timer and are never visible to
 reads or iteration.
+
+## Sharing a collection between processes: `RedisCollection`
+
+A `Collection` lives in one process. `RedisCollection` keeps its entries in Redis, so every process that opens it with the same `name` (and `prefix`) shares them, with the same retention policy: a sliding TTL, `maxSize` evicting the least recently used across every process, and `onEvict`.
+
+```ts
+import { RedisCollection } from "lunibee";
+
+const sessions = new RedisCollection<{ step: number }>({
+  client: new Bun.RedisClient(process.env.REDIS_URL!), // ioredis: { send: (c, a) => redis.call(c, ...a) }
+  name: "sessions",       // letters, digits, _ . : - (up to 100)
+  prefix: "mybot:",       // default "lunibee:collection:"; keys live under <prefix>v1:{name}:
+  ttl: 15 * 60_000,       // default TTL for set(), sliding unless slide: false
+  maxSize: 10_000,        // LRU across every process
+  onEvict: (key, value, reason) => {}, // for removals this instance's operations make
+});
+
+await sessions.set(userId, { step: 1 });
+const session = await sessions.get(userId);          // from any process
+const fresh = await sessions.ensure(userId, () => ({ step: 0 }));
+```
+
+| Method | Description |
+|---|---|
+| `get(key)` | The value, or `undefined`. Marks it recently used; with `slide`, restarts its TTL. |
+| `peek(key)`, `has(key)` | Read without marking or restarting. |
+| `set(key, value, ttl?)` | Stores with the default TTL, or `ttl` ms (`0`: never expires). |
+| `setWithoutTTL(key, value)` | Stores with no expiry. Unlike `Collection`, it still counts towards `maxSize`. |
+| `ensure(key, factory, ttl?)` | Returns the stored value, or stores what `factory` gives. When processes race, one value wins and every caller gets it. |
+| `delete(key)`, `clear()` | Remove one entry (`true` if it was there) / all (returns how many). |
+| `size()`, `keys()`, `values()`, `entries()` | Live entries, least recently used first. |
+| `ttlRemaining(key)` | Milliseconds left, or `undefined` when it never expires or is absent. |
+| `stats` | `{ hits, misses, expired, evicted }` seen by this instance. |
+
+Every method is `async`. Each operation is one atomic Lua script that reads the time from Redis, so processes never see a half-applied write and skewed clocks do not change expiry. Keys are strings (numbers are converted). Values are JSON by default; pass `serializer: { serialize, deserialize }` for values JSON cannot carry, such as `bigint` or `Map`. All keys of one collection share a Redis Cluster hash slot (`{name}`). `onEvict` reports the removals this instance's own calls perform; another process's calls are reported to that process.

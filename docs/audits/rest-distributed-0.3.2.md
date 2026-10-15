@@ -173,6 +173,18 @@ Lua; tokens appear only as a 16-hex SHA-256 fingerprint; telemetry routes are re
 passwords in the client URL do not reach `diagnostics()` (checked with `Bun.RedisClient`); every
 new map is bounded; new regexes are linear.
 
+### R-17 — Proactive global window misaligned with Discord's; off-by-one in the memory store
+- **Severity:** P2
+- **Problem:** see the R-15 note below. Separately, the memory store's automatic prune could run
+  during the first reservation and drop the (then empty) log in use, letting one extra request
+  through.
+- **Fix:** `takeGlobalSlot()` — a sliding log, at most the limit in any 1,050 ms span — in the
+  memory store, the reserve script and the in-process fallback; the send is recorded before the
+  write that can prune.
+- **Regression test:** "sliding global window" (unit); integration "the proactive global limit
+  holds across processes", 5 consecutive runs with 0 global 429s.
+- **Status:** Verified
+
 ## Accepted risks / open
 
 - A request that times out or loses its connection keeps its unit spent (it may have reached
@@ -182,8 +194,10 @@ new map is bounded; new regexes are linear.
 - Discord's invalid-request limit (10,000 401/403/429 per 10 min): counted
   (`diagnostics().invalidRequests`); 401s stop the token (`stopOnInvalidToken`). 403/429 do not
   stop requests. Fixed (R-14).
-- The proactive global limit (R-15) is a fixed 1 s window: up to 2× the limit can pass around a
-  window boundary. Accepted.
+- The proactive global limit (R-15) was first a fixed 1 s window from our first send; Discord's
+  window starts at its first arrival, so latency offset the two and a burst at the start of our
+  next window could land in Discord's previous one (the cross-process integration test saw 1-12
+  global 429s in 3 of 4 runs). Fixed (R-17): a sliding log over 1,050 ms; 5 of 5 runs clean.
 - `EVAL` sends the script text with every command. `EVALSHA` was tried and removed by the
   maintainer's decision: plain `EVAL` is always correct (no `NOSCRIPT` state after a restart or
   `SCRIPT FLUSH`). Accepted.

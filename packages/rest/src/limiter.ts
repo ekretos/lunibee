@@ -3,8 +3,8 @@ import { parseRateLimitHeaders } from "./headers.js";
 import { scopeBucket } from "./route.js";
 import {
     DEFAULT_PROBE_MS,
-    GLOBAL_WINDOW_MS,
     reconcileState,
+    takeGlobalSlot,
     type BucketUpdate,
     type RateLimitStore,
 } from "./store.js";
@@ -57,7 +57,7 @@ export class RateLimiter {
     readonly #routes = new Map<string, string>();
     readonly #globalLimit: number;
     /** Per-scope request windows, for stores that cannot count globally themselves. */
-    readonly #localGlobal = new Map<string, { start: number; count: number }>();
+    readonly #localGlobal = new Map<string, number[]>();
 
     /**
      * @param store Rate-limit state store.
@@ -309,27 +309,18 @@ export class RateLimiter {
         path: string,
     ): Promise<void> {
         if (!this.#globalLimit) return;
+        let log = this.#localGlobal.get(scope);
+        if (!log) {
+            this.#localGlobal.set(scope, (log = []));
+            if (this.#localGlobal.size > MAX_CACHED_ROUTES)
+                this.#localGlobal.delete(
+                    this.#localGlobal.keys().next().value as string,
+                );
+        }
         for (;;) {
-            const now = Date.now();
-            let window = this.#localGlobal.get(scope);
-            if (!window || now - window.start >= GLOBAL_WINDOW_MS) {
-                window = { start: now, count: 0 };
-                this.#localGlobal.set(scope, window);
-                if (this.#localGlobal.size > MAX_CACHED_ROUTES)
-                    this.#localGlobal.delete(
-                        this.#localGlobal.keys().next().value as string,
-                    );
-            }
-            if (window.count < this.#globalLimit) {
-                window.count++;
-                return;
-            }
-            await this.#wait(
-                "global",
-                window.start + GLOBAL_WINDOW_MS - now,
-                signal,
-                path,
-            );
+            const wait = takeGlobalSlot(log, Date.now(), this.#globalLimit);
+            if (wait === 0) return;
+            await this.#wait("global", wait, signal, path);
         }
     }
 
