@@ -95,3 +95,32 @@ describe("transports and backpressure (F-H2, F-H4)", () => {
         expect(count).toBeGreaterThan(0);
     });
 });
+
+describe("joinVoiceChannel and setSpeaking (D-04, D-05)", () => {
+    test("an empty channel ID throws without registering a connection", async () => {
+        const { joinVoiceChannel, getVoiceConnection } =
+            await import("../packages/voice/src/index.ts");
+        expect(() =>
+            joinVoiceChannel({ guildId: "d04", channelId: "" }),
+        ).toThrow(TypeError);
+        expect(getVoiceConnection("d04")).toBeUndefined();
+    });
+
+    test("setSpeaking sends the SSRC it is given", () => {
+        const connection = new VoiceConnection("1");
+        const sent: unknown[] = [];
+        connection.attachTransports(
+            { send: (p: unknown) => void sent.push(p), close() {} } as never,
+            { send() {}, close() {} } as never,
+        );
+        const spoken: unknown[] = [];
+        connection.on("speaking", (flags, ssrc) => spoken.push([flags, ssrc]));
+        connection.setSpeaking(1, 4242);
+        expect(sent.at(-1)).toEqual({
+            op: 5,
+            d: { speaking: 1, delay: 0, ssrc: 4242 },
+        });
+        expect(spoken).toEqual([[1, 4242]]);
+        connection.destroy();
+    });
+});

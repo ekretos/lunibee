@@ -3,7 +3,7 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
-## v0.3.2 (unreleased)
+## v0.3.2
 
 Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1.md), "Fifth pass"), two Components V2 payload bugs, the last REST compatibility gaps, and complete reference pages for REST, Gateway, sharding and voice.
 
@@ -38,6 +38,10 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **`users.fetch()`, `members.fetch()` and `roles.fetch()` keep cached references current.** They stored the fetched object in place of the cached one, so references held elsewhere went stale; they now merge into the cached instance, like Gateway updates.
 - **`@lunibee/structures` no longer imports `@lunibee/core` at runtime.** The permission classes (`PermissionSet`, `PermissionsBitField`, `computePermissions`…) moved into `@lunibee/structures`; `@lunibee/core` and `lunibee` re-export them unchanged. Installing `@lunibee/structures` on its own works, and `check:deps` now also checks source imports.
 - **`onRetry` fires for retries after a network failure** (with `status: 0`); **`lunibee doctor`** requires Bun 1.4; **`GatewayOptions.compress`** is typed.
+- **Sharding backlog:** `ShardBus.off(type, handler)` removes a `respond()` handler; the cluster relay drops a message whose `source` is not one of the sending cluster's shards; a host answers a spawn it refuses with an error instead of leaving the cluster `starting`; `ShardManager` counts started shards against the remembered IDENTIFY budget, starts no auto-scale timer for a fixed shard count, and re-initialises inside a worker with the cluster's shard count; the supervisor's restart delay never exceeds `maxDelay`, jitter included.
+- **Voice:** `joinVoiceChannel()` checks the channel ID before registering anything; `setSpeaking(flags, ssrc)` sends the SSRC it is given.
+- **Builders and structures:** a string option with choices refuses `setAutocomplete(true)` in either order; `PermissionSet` has getters for `setVoiceChannelStatus`, `pinMessages` and `bypassSlowmode`; `Collector` `collect` / `end` listeners are typed.
+- **`isSnowflake()` and prefix-argument parsing** accept at most 20 digits (a snowflake is an unsigned 64-bit number); 21- and 22-digit strings are no longer IDs.
 - **`ShardBus` over IPC reaches shards in the same worker.** The parent relays only between clusters, so a `send()` to a shard of the same cluster (and that part of a `broadcast()`) was never delivered; `IpcTransport`s on one process now deliver to each other locally.
 - **`ClusterManager` listens for each worker's `error` event**, so an `EPIPE` from `send()` to a dying worker is emitted as `error` instead of crashing the manager.
 - **`IdentifyBudget` refills after a long idle gap** (new `period` option, default 24 h) instead of staying empty.
@@ -57,6 +61,8 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **`rest.request({ method, path | fullRoute, body, ... })`** — the single-object form from `@discordjs/rest`, beside the positional one. `MockREST` supports both.
 - **`WebhookClient`:** `avatarURL`, `threadId` and `allowedMentions` aliases; `editMessage()` takes the full message options (components, files, `threadId`); new `fetchMessage()`; `deleteMessage()` accepts `threadId`.
 - **`maxBackoff`** (REST) and **`connectTimeout`** (Gateway) options.
+- **`ShardManager` `shardCreate` event** `(shardId, gateway)`: fires for each new `Gateway` before it connects, so dispatch listeners never miss early events (also after `destroy()` + `connect()` and `reshard()`).
+- **`benchmarks/rest-buckets.ts`**: sequential against concurrent bucket scheduling with a fake Discord that enforces rate-limit windows.
 - **Command managers accept builders.** `commands.create()`, `set()`, `edit()` and their guild versions take a `CreateSlashCommand` / context-menu builder as it is (its `toJSON()` is sent), next to plain data. New type `ApplicationCommandInput`.
 - **`MessageFileSource`** (anything with `name` and `toBuffer()`) is accepted in `files`; `RESTFileAttachment.data` may be a promise.
 

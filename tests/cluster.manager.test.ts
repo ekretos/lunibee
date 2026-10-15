@@ -1025,6 +1025,30 @@ describe("recovery by reassignment", () => {
     });
 });
 
+describe("relay source check (D-02)", () => {
+    test("a cluster cannot send as a shard it does not own", async () => {
+        const { manager, children } = setup();
+        await manager.spawn();
+        // Cluster 0 owns shards 0 and 2; shard 1 belongs to cluster 1.
+        children[0]!.bus({
+            source: 1,
+            target: 3,
+            type: "t",
+            data: 1,
+            id: "forged",
+        });
+        children[0]!.bus({
+            source: 0,
+            target: 3,
+            type: "t",
+            data: 1,
+            id: "real",
+        });
+        await tick();
+        expect(children[1]!.busFrames().map((m) => m.id)).toEqual(["real"]);
+    });
+});
+
 describe("readiness with a failed cluster (D-01)", () => {
     test("a failed cluster whose shards moved no longer blocks ready()", async () => {
         const { manager, children } = setup({

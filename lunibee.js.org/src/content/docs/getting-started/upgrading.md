@@ -3,7 +3,7 @@ title: Upgrading
 description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.3.2.
 ---
 
-## 0.3.1 → 0.3.2 (unreleased)
+## 0.3.1 → 0.3.2
 
 - **Thumbnails and media galleries.** `CreateThumbnail.toJSON()` returns `{ type: 11, media: { url } }` and gallery items are `{ media: { url }, description?, spoiler? }`. Read `media.url` instead of `url`, and delete any helper you wrote to work around the old shape.
 - **Stricter input.** Embed, link-button and `link()` URLs must be `http`/`https` (embeds also `attachment:`, buttons also `discord:`); an `allowed_mentions` Discord would reject, a non-finite choice value, or `setMinValue()` above the maximum now throws before sending. Fix the input the error names.
@@ -11,6 +11,8 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 - **`Client.destroy()`** now empties the caches and stops collectors; read what you need before destroying.
 - **Cluster workers exit when the parent goes away.** Pass `new ClusterWorker(context, process, { exitOnParentLoss: false })` to keep the old behaviour.
 - **`ClusterManager.ready()` can reject.** When a cluster fails and its shards are left with no owner, pending `ready()` calls (and `spawn()` with `waitForReady`) reject instead of hanging. Catch it if you call `ready()` without a timeout.
+- **`isSnowflake()` and prefix parsing** reject 21- and 22-digit strings (a snowflake has at most 20 digits).
+- **Voice:** `setSpeaking(flags, ssrc)` now takes the SSRC; pass the one from your voice gateway's READY.
 - **REST waits are bounded** by `maxBackoff` (10 minutes): a longer `Retry-After` fails with a `RESTError` instead of sleeping. Raise `maxBackoff` if you really want longer waits.
 
 ## 0.2.x → 0.3.1

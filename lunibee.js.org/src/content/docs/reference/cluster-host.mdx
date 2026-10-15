@@ -239,7 +239,7 @@ After an accepted connection is lost, the host kills its workers, emits `disconn
 - Only its own `script`. The coordinator sends a cluster ID and an environment, never a path or code.
 - The environment is the host's own `process.env` plus at most the seven worker-contract variables (`SHARD_LIST`, `SHARD_COUNT`, `CLUSTER_ID`, `CLUSTER_COUNT`, `LUNIBEE_SHARD_BUS`, `LUNIBEE_CLUSTER_WORKER`, `LUNIBEE_IDENTIFY`). A spawn request with any other variable (`NODE_OPTIONS`, `LD_PRELOAD`, a token) is rejected whole as a malformed frame.
 - The coordinator can send only `SIGTERM`, `SIGKILL` or `SIGINT` to a worker.
-- One worker per cluster: a second spawn for a cluster that is still running is refused, and the coordinator reports it as an `error` and handles it as a crash. So is a worker that fails to fork.
+- One worker per cluster: a second spawn for a cluster that is still running is refused, and the coordinator reports it as an `error` and handles it as a crash. So is a worker that fails to fork, and a spawn request the host will not run (for example one with an environment variable outside the allowlist).
 
 The worker's IPC parent is the `ClusterHost` process. `ClusterWorker` exits a worker whose parent goes away (`exitOnParentLoss`), so killing the agent also stops its workers.
 

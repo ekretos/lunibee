@@ -1026,6 +1026,9 @@ export class ClusterManager {
             (message.target !== null && !Number.isInteger(message.target))
         )
             return;
+        // A cluster speaks only for its own shards: a `source` it does not
+        // own would let it answer requests meant for another cluster's shard.
+        if (!from.shards.includes(message.source as number)) return;
         // Relay only the documented envelope, so undeclared fields cannot
         // ride along to every other cluster.
         const { type, id, source, target, data, expectsReply } =

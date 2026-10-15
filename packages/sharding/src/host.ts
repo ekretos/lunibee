@@ -220,6 +220,34 @@ export class ClusterHost {
         }
     }
 
+    /**
+     * A spawn this host will not run (an environment variable outside the
+     * allowlist, say) is answered with an error, so the coordinator fails the
+     * cluster at once instead of waiting for it to start.
+     */
+    #refuseSpawn(socket: WebSocket, data: unknown): void {
+        if (typeof data !== "string" || data.length > 65_536) return;
+        let frame: { t?: unknown; cluster?: unknown; epoch?: unknown };
+        try {
+            frame = JSON.parse(data) as typeof frame;
+        } catch {
+            return;
+        }
+        if (
+            frame?.t !== "spawn" ||
+            !Number.isInteger(frame.cluster) ||
+            !Number.isInteger(frame.epoch)
+        )
+            return;
+        this.#send(socket, {
+            t: "error",
+            cluster: frame.cluster as number,
+            epoch: frame.epoch as number,
+            message:
+                "This host refused the spawn request (malformed or not allowed).",
+        });
+    }
+
     #message(socket: WebSocket, data: unknown): void {
         if (this.#socket !== socket) return;
         const message = parseToHost(data);
@@ -228,6 +256,7 @@ export class ClusterHost {
                 "error",
                 new Error("The coordinator sent a malformed frame."),
             );
+            this.#refuseSpawn(socket, data);
             return;
         }
         this.#lastRx = Date.now();

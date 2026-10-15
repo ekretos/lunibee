@@ -195,18 +195,18 @@ any state ──destroy()──▶ destroyed (terminal)
 | `attachTransports(gateway, udp)` | `this` | Attaches a voice gateway and a UDP transport. See [Transports](#transports). |
 | `setChannel(channelId)` | `void` | Sets `channelId`. Throws `TypeError` for an empty ID and `VoiceError` once destroyed. Sends nothing. |
 | `setSuppression({ selfMute?, selfDeaf? })` | `void` | Updates the flags that are given; omitted ones keep their value. Throws `VoiceError` once destroyed. Sends nothing. |
-| `setSpeaking(flags?)` | `void` | Sends `{ op: 5, d: { speaking: flags, delay: 0, ssrc: 0 } }` through the gateway transport and emits `speaking`. `flags` defaults to `SpeakingFlags.Microphone`; pass `0` to stop speaking. Throws `VoiceError` when destroyed or when no gateway transport is attached. |
+| `setSpeaking(flags?, ssrc?)` | `void` | Sends `{ op: 5, d: { speaking: flags, delay: 0, ssrc } }` through the gateway transport and emits `speaking`. `flags` defaults to `SpeakingFlags.Microphone`; pass `0` to stop speaking. Pass the `ssrc` your voice gateway assigned in its READY (default `0`). Throws `VoiceError` when destroyed or when no gateway transport is attached. |
 | `on(event, listener)` | `this` | Adds a listener. Throws `TypeError` if `listener` is not a function. |
 | `off(event, listener)` | `this` | Removes a listener. |
 
-`setSpeaking()` always sends `ssrc: 0`. If your voice server needs the real SSRC in op 5, send that payload through your own transport instead.
+Pass the SSRC from your voice gateway's READY as the second argument; Discord uses it to match the audio to this user.
 
 ### Events
 
 ```ts
 interface VoiceEvents {
   stateChange: [VoiceConnectionState, VoiceConnectionState]; // (next, previous)
-  speaking: [number, number];                                 // (flags, 0)
+  speaking: [number, number];                                 // (flags, ssrc)
   error: [VoiceError];
 }
 ```
@@ -214,7 +214,7 @@ interface VoiceEvents {
 | Event | Arguments | Emitted when |
 |---|---|---|
 | `stateChange` | `(next, previous)` | The state changes. **The new state comes first**, which is the opposite of `AudioPlayer`. Not emitted when the state does not change. |
-| `speaking` | `(flags, 0)` | `setSpeaking()` sent a payload. The second argument is always `0`. |
+| `speaking` | `(flags, ssrc)` | `setSpeaking()` sent a payload, with the SSRC it was given. |
 | `error` | `(error: VoiceError)` | A transport's `close()` threw during cleanup (`"Voice gateway cleanup failed."` / `"Voice UDP cleanup failed."`, original error in `cause`), or a `stateChange` listener threw (`"Voice event listener failed."`). A thrown `VoiceError` is passed as is. |
 
 ```ts
@@ -429,8 +429,8 @@ These mirror `@discordjs/voice` names. Behaviour is Lunibee's.
 joinVoiceChannel(options: VoiceConnectionOptions & { channelId: string }): VoiceConnection
 ```
 
-1. Reuses the guild's tracked connection, or creates one and tracks it.
-2. Calls `setChannel(channelId)` (throws `TypeError` for an empty ID).
+1. Throws `TypeError` for an empty `channelId`, before anything is created or tracked.
+2. Reuses the guild's tracked connection, or creates one and tracks it, and calls `setChannel(channelId)`.
 3. Calls `setSuppression(options)`, so omitted `selfMute` / `selfDeaf` keep the connection's current values.
 4. Calls `connect()`, so the connection is `connected` when the function returns.
 

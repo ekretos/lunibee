@@ -218,15 +218,22 @@ export class VoiceConnection {
     }
 
     /** Publishes a speaking state through the attached voice gateway. @param flags Speaking flags. @returns Nothing. @throws {VoiceError} If the connection is destroyed or has no gateway transport. */
-    public setSpeaking(flags: number = SpeakingFlags.Microphone): void {
+    /**
+     * Sends a speaking update (voice op 5). Pass the `ssrc` your voice gateway
+     * assigned in READY; Discord uses it to match the audio to this user.
+     */
+    public setSpeaking(
+        flags: number = SpeakingFlags.Microphone,
+        ssrc = 0,
+    ): void {
         this.assertUsable();
         if (!this.gateway) {
             throw new VoiceError(
                 "A voice gateway transport is required to change speaking state.",
             );
         }
-        this.gateway.send({ op: 5, d: { speaking: flags, delay: 0, ssrc: 0 } });
-        this.#emit("speaking", flags, 0);
+        this.gateway.send({ op: 5, d: { speaking: flags, delay: 0, ssrc } });
+        this.#emit("speaking", flags, ssrc);
     }
 
     /** Ensures the connection is still usable. @returns Nothing. @throws {VoiceError} If destroyed. */
@@ -670,6 +677,9 @@ const voiceConnections = new Map<string, VoiceConnection>();
 export function joinVoiceChannel(
     options: VoiceConnectionOptions & { channelId: string },
 ): VoiceConnection {
+    // Checked before anything is registered, so a bad call leaves no entry behind.
+    if (typeof options.channelId !== "string" || !options.channelId.trim())
+        throw new TypeError("A voice channel ID is required.");
     let connection = voiceConnections.get(options.guildId);
     if (!connection) {
         connection = new VoiceConnection(options);

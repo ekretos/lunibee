@@ -24,10 +24,10 @@ future sessions should pick up.
 Fixes from the fifth security audit of 0.3.1 (status of every finding in
 `docs/audits/security-0.3.1.md`, "Fifth pass"), the `CreateThumbnail` / `CreateMediaGallery`
 payload bugs, the REST compatibility gaps (`request(options)`, `WebhookClient` aliases),
-100% REST coverage, and complete reference pages for REST, Gateway, sharding and voice. All in the
-changelog's "v0.3.2 (unreleased)". Versions are already 0.3.2 and the 0.3.1 docs are archived in
-the version picker. Left for the maintainer: the `0.3.2` tag, `publish:all`, and removing
-"(unreleased)" from the changelog heading.
+100% REST coverage, and complete reference pages for REST, Gateway, sharding and voice. Every
+finding of the 0.3.2 docs review (D-01 to D-26 in that report) is fixed. All in the changelog's
+"v0.3.2". Versions are 0.3.2 and the 0.3.1 docs are archived in the version picker. Left for the
+maintainer: the `0.3.2` tag and `publish:all`.
 
 ## 0.3.1 (shipped)
 

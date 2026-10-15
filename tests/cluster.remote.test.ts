@@ -950,6 +950,70 @@ describe("host loss and fencing", () => {
     });
 });
 
+describe("a refused spawn (D-03)", () => {
+    test("the host answers a spawn it will not run with an error", async () => {
+        const forked = fakeFork();
+        const received: { t: string; cluster?: number; epoch?: number }[] = [];
+        const server = Bun.serve({
+            port: 0,
+            fetch: (req, s) =>
+                s.upgrade(req) ? undefined : new Response("x", { status: 426 }),
+            websocket: {
+                open: (ws) => {
+                    ws.send(
+                        JSON.stringify({
+                            t: "challenge",
+                            nonce: "n",
+                            version: REMOTE_PROTOCOL_VERSION,
+                        }),
+                    );
+                },
+                message: (ws, raw) => {
+                    const frame = JSON.parse(raw as string) as {
+                        t: string;
+                    };
+                    received.push(frame);
+                    if (frame.t === "hello") {
+                        ws.send(
+                            JSON.stringify({
+                                t: "welcome",
+                                leaseMs: 5000,
+                                pingMs: 1000,
+                            }),
+                        );
+                        ws.send(
+                            JSON.stringify({
+                                t: "spawn",
+                                cluster: 3,
+                                epoch: 7,
+                                env: { NODE_OPTIONS: "--require evil" },
+                            }),
+                        );
+                    }
+                },
+            },
+        });
+        cleanup.push(() => server.stop(true));
+        const host = new ClusterHost({
+            url: `ws://127.0.0.1:${server.port}`,
+            secret: SECRET,
+            id: "h",
+            script: "w.js",
+            fork: forked.fork,
+            reconnectDelay: 60_000,
+        });
+        host.on("error", () => {});
+        cleanup.push(() => host.close());
+        await host.connect();
+        await until(() => received.some((f) => f.t === "error"));
+        expect(received.find((f) => f.t === "error")).toMatchObject({
+            cluster: 3,
+            epoch: 7,
+        });
+        expect(forked.children).toHaveLength(0);
+    });
+});
+
 describe("shutdown", () => {
     test("shutdownAll stops remote workers and the listener, repeatedly", async () => {
         const { manager, agents, spawning } = await deployment(["a", "b"]);
