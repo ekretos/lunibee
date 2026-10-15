@@ -99,6 +99,45 @@ const client = new Client({
 });
 ```
 
+## Shared Cache in Redis
+
+The in-memory cache of each process holds only the guilds its own shards receive. `RedisCache` mirrors the same Gateway events into Redis, so another cluster, a dashboard or a worker without a Gateway can read any guild. It sits beside the in-memory cache and changes nothing about it: `client.guilds.get(id)` stays synchronous.
+
+```ts
+import { Client, RedisCache } from "lunibee";
+
+const shared = new RedisCache({
+  client: new Bun.RedisClient(process.env.REDIS_URL!), // ioredis: { send: (c, a) => redis.call(c, ...a) }
+  prefix: "mybot:cache:",   // default "lunibee:cache:"; keys live under <prefix>v1:
+  members: true,            // default; false skips members and their users
+  ttlSeconds: 86_400,       // optional: expire keys a day after their last write
+  onError: (event, error) => console.warn("cache write failed", event, error),
+});
+shared.attach(client);      // or shared.attach(gateway) for each shard
+
+// In any process with the same Redis:
+const guild = await shared.guild(guildId);
+const channels = await shared.channels(guildId);
+const member = await shared.member(guildId, userId); // with .user
+```
+
+| Read | Returns |
+|---|---|
+| `guild(id)` | The guild payload, without its channels, roles, members and presences. |
+| `guildIds()` | Every cached guild id. |
+| `channel(id)` / `channels(guildId)` | A channel or thread (with `guild_id`) / all of a guild's. |
+| `role(guildId, id)` / `roles(guildId)` | One role / all of a guild's. |
+| `member(guildId, userId)` / `members(guildId)` | A member with its `user` / every cached member (mind the size of large guilds). |
+| `user(id)` | A user. |
+
+Values are raw Discord payloads; pass a type to read them typed: `shared.guild<APIGuild>(id)`.
+
+- **Events mirrored:** `GUILD_CREATE` (a full snapshot that replaces what was stored), `GUILD_UPDATE`, `GUILD_DELETE` (an outage keeps the data marked `unavailable`; leaving drops it), channel and thread create/update/delete, role create/update/delete, member add/update (merged, since updates are partial)/remove, `GUILD_MEMBERS_CHUNK`, emoji and sticker updates, `USER_UPDATE`. Messages and presences are not stored.
+- **Ordering:** one guild's writes are applied in Gateway order; users, shared by every guild, are written on one chain in Gateway order.
+- **Failures:** a failed write is counted (`diagnostics()`), passed to `onError` and never thrown into the Gateway; reads throw on a Redis error. `flush()` resolves when every queued write is done.
+- **Freshness:** each process writes the guilds of its own shards. A guild the bot left while no process was connected stays until a `ttlSeconds` expiry; set one if that matters.
+- `handle(event, data)` applies one dispatch directly, for events relayed from elsewhere.
+
 ## Structure Resource Methods
 
 Structures like `Message`, `Guild`, and `Channel` expose intuitive helper methods that automatically route through the manager's REST client:

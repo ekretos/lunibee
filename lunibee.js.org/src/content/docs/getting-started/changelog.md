@@ -92,6 +92,7 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
     - `RESTMetrics`: counters, gauges and latency histograms from the telemetry events, with bounded route labels and a Prometheus text export.
     - `parseRateLimitHeaders()`, `headerNumber()`, `requestIdentity()`, `tokenFingerprint()`, `DEFAULT_MAX_BACKOFF_MS`, and the types `Grant`, `BucketUpdate`, `ReserveOptions`, `RateLimitHeaders`, `RateLimitScope`, `RequestIdentity`, `SchedulerOptions`, `ApplyResponseOptions`, `RESTDiagnostics`, `RESTTelemetry`, `RESTTelemetryEvent`, `RESTMetricsSnapshot`, `CoordinationMode`, `RedisFailurePolicy`, `RedisStoreDiagnostics`.
     - Reaction routes are keyed without the emoji (`/reactions/:emoji`), so they no longer create a key per emoji.
+- **`RedisCache`** (`@lunibee/core`, `lunibee`): a shared cache in Redis beside the in-memory one. `attach(client)` mirrors guilds, channels, threads, roles, members and users from the Gateway as raw payloads, and any process reads them with `guild()`, `channels()`, `member()`… Works with `Bun.RedisClient` directly. See [Caching](/core-concepts/caching/#shared-cache-in-redis).
 - **`benchmarks/rest-distributed.ts`**: REST instances in separate processes sharing Redis, against a fake Discord HTTP server that counts every request over the limit.
 
 ### 📚 Documentation

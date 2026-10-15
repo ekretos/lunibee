@@ -28,7 +28,8 @@ payload bugs, the REST compatibility gaps (`request(options)`, `WebhookClient` a
 finding of the 0.3.2 docs review (D-01 to D-26 in that report) is fixed. All in the changelog's
 "v0.3.2". Distributed REST coordination (atomic Lua reservations and merges on Redis `TIME`, bot
 identity in keys, probes, `failurePolicy`, telemetry, queue limits, `close()`) is in too: findings
-and status in `docs/audits/rest-distributed-0.3.2.md`, docs on `/core-concepts/distributed-rest`.
+and status in `docs/audits/rest-distributed-0.3.2.md`, docs on `/core-concepts/distributed-rest`. `RedisCache` (`packages/core/src/redis-cache.ts`), a
+shared Redis mirror of the Gateway cache, is in too.
 Versions are 0.3.2 and the 0.3.1 docs are archived in the version picker. Left for the
 maintainer: the `0.3.2` tag and `publish:all`.
 

@@ -21,6 +21,13 @@ export {
 } from "./events.js";
 export { Collector, type CollectorOptions } from "./collector.js";
 export {
+    RedisCache,
+    type RedisCacheOptions,
+    type RedisCacheDiagnostics,
+    type RedisCommandClient,
+    type RawDispatchSource,
+} from "./redis-cache.js";
+export {
     createApi,
     type Api,
     type ApplicationNode,
