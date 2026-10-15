@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { RESTError, sanitizeCause } from "./errors.js";
 import {
     BUCKET_LINGER_MS,
@@ -175,6 +176,9 @@ end
 return 0
 `;
 
+/** SHA-1 of each script, computed once. */
+const SHAS = new Map<string, string>();
+
 /** Checks that scripting and `TIME` are available. */
 const VERIFY_SCRIPT = "return redis.call('TIME')[1]";
 
@@ -199,6 +203,17 @@ export interface MinimalRedisClient {
      */
     eval?(
         script: string,
+        numKeys: number,
+        ...args: Array<string | number>
+    ): Promise<unknown>;
+    /**
+     * Optional `EVALSHA` (ioredis/node-redis compatible). When present, the
+     * store sends each script's SHA-1 instead of its text, and falls back to
+     * `eval` once when Redis answers `NOSCRIPT` (after a restart or
+     * `SCRIPT FLUSH`).
+     */
+    evalsha?(
+        sha: string,
         numKeys: number,
         ...args: Array<string | number>
     ): Promise<unknown>;
@@ -231,6 +246,8 @@ export function fromBunRedis(client: {
         del: (...keys) => client.send("DEL", keys) as Promise<number>,
         eval: (script, numKeys, ...args) =>
             client.send("EVAL", [script, String(numKeys), ...args.map(String)]),
+        evalsha: (sha, numKeys, ...args) =>
+            client.send("EVALSHA", [sha, String(numKeys), ...args.map(String)]),
     };
 }
 
@@ -489,6 +506,31 @@ export class RedisRateLimitStore implements RateLimitStore {
         }
     }
 
+    /**
+     * Runs a script by its SHA-1 when the client has `evalsha` (one round
+     * trip without the script text), loading it with `eval` on `NOSCRIPT`.
+     */
+    async #script(
+        script: string,
+        numKeys: number,
+        ...args: Array<string | number>
+    ): Promise<unknown> {
+        if (!this.#client.evalsha)
+            return this.#client.eval!(script, numKeys, ...args);
+        let sha = SHAS.get(script);
+        if (!sha) {
+            sha = createHash("sha1").update(script).digest("hex");
+            SHAS.set(script, sha);
+        }
+        try {
+            return await this.#client.evalsha(sha, numKeys, ...args);
+        } catch (error) {
+            if (!/NOSCRIPT/i.test(String((error as Error)?.message ?? error)))
+                throw error;
+            return this.#client.eval!(script, numKeys, ...args);
+        }
+    }
+
     #bucketKey(key: string): string {
         return `${this.#prefix}bucket:${key}`;
     }
@@ -594,7 +636,7 @@ export class RedisRateLimitStore implements RateLimitStore {
         return this.#run(
             "reserve",
             async () => {
-                const result = await this.#client.eval!(
+                const result = await this.#script(
                     RESERVE_SCRIPT,
                     keys.length,
                     ...keys,
@@ -618,7 +660,7 @@ export class RedisRateLimitStore implements RateLimitStore {
         await this.#run(
             "reconcile",
             async () => {
-                await this.#client.eval!(
+                await this.#script(
                     RECONCILE_SCRIPT,
                     1,
                     this.#bucketKey(key),
@@ -640,7 +682,7 @@ export class RedisRateLimitStore implements RateLimitStore {
         await this.#run(
             "extendGlobalReset",
             async () => {
-                await this.#client.eval!(
+                await this.#script(
                     EXTEND_GLOBAL_SCRIPT,
                     1,
                     this.#globalKey(scope),
@@ -662,7 +704,7 @@ export class RedisRateLimitStore implements RateLimitStore {
         await this.#run(
             "release",
             async () => {
-                await this.#client.eval!(
+                await this.#script(
                     RELEASE_SCRIPT,
                     1,
                     this.#bucketKey(key),

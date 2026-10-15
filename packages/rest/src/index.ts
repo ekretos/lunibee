@@ -93,6 +93,12 @@ export interface RESTRequestOptions {
     reason?: string;
     /** Set `false` to omit the `Authorization` header for this request. Defaults to `true`. */
     auth?: boolean;
+    /**
+     * Longest, in ms, this request may wait before it is sent: queued behind
+     * its bucket, for a rate limit, or between retries. Past it the request
+     * fails with kind `"overloaded"`. Overrides the client's `maxQueueWait`.
+     */
+    maxQueueWait?: number;
 }
 
 /**
@@ -129,6 +135,7 @@ const REQUEST_DATA_KEYS = new Set([
     "reason",
     "auth",
     "signal",
+    "maxQueueWait",
 ]);
 
 /**
@@ -264,6 +271,20 @@ export interface RESTDiagnostics {
     tokenRejected: boolean;
 }
 
+/** Abort reason for a request that waited past `maxQueueWait`. */
+class QueueWaitExceeded extends Error {
+    public constructor(public readonly ms: number) {
+        super("maxQueueWait exceeded");
+    }
+}
+
+function checkWait(ms: number | undefined): number | undefined {
+    if (ms === undefined) return undefined;
+    if (!(ms >= 0) || !Number.isFinite(ms))
+        throw new RangeError("maxQueueWait must be a non-negative number.");
+    return ms;
+}
+
 /** Bun-native REST transport with Discord bucket-aware rate limiting, retries, and cancellation. */
 export class REST {
     readonly #retryPolicy: RetryPolicy;
@@ -278,6 +299,7 @@ export class REST {
     /** Fingerprint of a token Discord answered 401 for. */
     #rejected?: string;
     readonly #stopOnInvalidToken: boolean;
+    readonly #maxQueueWait?: number;
     /** Invalid responses per minute, for the last ten minutes. */
     readonly #invalid = new Array<number>(10).fill(0);
     #invalidMinute = 0;
@@ -346,6 +368,13 @@ export class REST {
              * count towards Discord's invalid-request ban. Default `true`.
              */
             stopOnInvalidToken?: boolean;
+            /**
+             * Longest, in ms, a request may wait before it is sent (queue,
+             * rate limits, pauses between retries); past it the request fails
+             * with kind `"overloaded"`. Default unlimited. Per request:
+             * `maxQueueWait` in the request options.
+             */
+            maxQueueWait?: number;
         } = {},
     ) {
         this.#token = options.token;
@@ -386,6 +415,7 @@ export class REST {
                     : (options.globalLimit ?? 50),
         });
         this.#stopOnInvalidToken = options.stopOnInvalidToken ?? true;
+        this.#maxQueueWait = checkWait(options.maxQueueWait);
         if (options.hooks) this.#hooks = options.hooks;
     }
     /** The rate-limit store backing this transport. */
@@ -534,9 +564,20 @@ export class REST {
             );
         // Waits end on the caller's signal or on close(); a sent attempt only
         // on the caller's signal.
-        const waitSignal = options.signal
-            ? AbortSignal.any([options.signal, this.#closing.signal])
-            : this.#closing.signal;
+        const queueWait = checkWait(options.maxQueueWait) ?? this.#maxQueueWait;
+        let deadline: ReturnType<typeof setTimeout> | undefined;
+        const sources = [this.#closing.signal];
+        if (options.signal) sources.push(options.signal);
+        if (queueWait !== undefined) {
+            const expired = new AbortController();
+            deadline = setTimeout(
+                () => expired.abort(new QueueWaitExceeded(queueWait)),
+                queueWait,
+            );
+            sources.push(expired.signal);
+        }
+        const waitSignal =
+            sources.length === 1 ? sources[0]! : AbortSignal.any(sources);
         const state = { attempts: 0, status: 0 };
         const started = performance.now();
         this.#inFlight++;
@@ -571,7 +612,20 @@ export class REST {
                     );
                 },
             );
-        } catch (error) {
+        } catch (caught) {
+            let error = caught;
+            if (
+                error instanceof RESTError &&
+                error.kind === "aborted" &&
+                error.cause instanceof QueueWaitExceeded
+            )
+                error = new RESTError(
+                    `The request waited longer than maxQueueWait (${error.cause.ms}ms) before it could be sent.`,
+                    0,
+                    undefined,
+                    undefined,
+                    { method: route.method, path, kind: "overloaded" },
+                );
             if (error instanceof RESTError) {
                 if (error.kind === "aborted" && state.attempts === 0)
                     emitTelemetry(this.#telemetry, {
@@ -584,6 +638,7 @@ export class REST {
             }
             throw error;
         } finally {
+            clearTimeout(deadline);
             emitTelemetry(this.#telemetry, {
                 type: "request",
                 method: route.method,

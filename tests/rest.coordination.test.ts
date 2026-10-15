@@ -1175,6 +1175,7 @@ describe("Redis adapters and release", () => {
         await c.set("a", "v", "PX", 5);
         await c.del("a", "b");
         await c.eval!("return 1", 1, "k", 2);
+        await c.evalsha!("abc", 0);
         expect(sent).toEqual([
             ["GET", ["a"]],
             ["MGET", ["a"]],
@@ -1182,6 +1183,7 @@ describe("Redis adapters and release", () => {
             ["SET", ["a", "v", "PX", "5"]],
             ["DEL", ["a", "b"]],
             ["EVAL", ["return 1", "1", "k", "2"]],
+            ["EVALSHA", ["abc", "0"]],
         ]);
     });
 
@@ -1548,5 +1550,119 @@ describe("hostile rate-limit headers", () => {
         expect(store.getBucket("k")!.window).toBeUndefined();
         await limiter.applyResponse(res(1, now + 5), "k", "r", "@none");
         expect(store.getBucket("k")!.remaining).toBe(1);
+    });
+});
+
+describe("EVALSHA", () => {
+    test("scripts run by SHA-1 after the first load, and reload after a flush", async () => {
+        const redis = createFakeRedis();
+        const store = new RedisRateLimitStore({ client: redis.client() });
+        await store.reserve!("a");
+        expect(redis.ops.get("EVAL")).toBe(1); // NOSCRIPT once, then loaded
+        await store.reserve!("b");
+        await store.reconcile!("b", { remaining: 1, resetAfterMs: 1000 });
+        await store.reconcile!("b", { remaining: 0, resetAfterMs: 1000 });
+        expect(redis.ops.get("EVAL")).toBe(2); // the reconcile script, once
+        expect(redis.ops.get("EVALSHA")).toBe(4); // two hit NOSCRIPT
+        redis.flushScripts();
+        await store.reserve!("c");
+        expect(redis.ops.get("EVAL")).toBe(3);
+        expect((await store.getBucket("c"))?.probe).toBe(true);
+    });
+
+    test("a client without evalsha uses eval; other errors are not retried as eval", async () => {
+        const redis = createFakeRedis();
+        const plain = new RedisRateLimitStore({
+            client: redis.client({ evalsha: false }),
+        });
+        await plain.reserve!("a");
+        await plain.reserve!("b");
+        expect(redis.ops.get("EVALSHA")).toBeUndefined();
+        expect(redis.ops.get("EVAL")).toBe(2);
+        const failing = new RedisRateLimitStore({
+            client: {
+                ...redis.client(),
+                evalsha: async () => {
+                    throw new Error("ERR something else");
+                },
+            },
+            failurePolicy: "fail-closed",
+        });
+        const before = redis.ops.get("EVAL");
+        expect(failing.reserve!("x")).rejects.toMatchObject({
+            kind: "coordination",
+        });
+        await Bun.sleep(5);
+        expect(redis.ops.get("EVAL")).toBe(before);
+    });
+});
+
+describe("maxQueueWait", () => {
+    test("a request that waits too long for its bucket fails as overloaded, unsent", async () => {
+        const store = new MemoryRateLimitStore();
+        let sent = 0;
+        const rest = new REST({
+            token: TOKEN,
+            store,
+            maxQueueWait: 50,
+            transport: new HttpTransport({
+                fetch: async () => {
+                    sent++;
+                    return new Response("{}");
+                },
+            }),
+        });
+        store.updateBucket(`${tokenFingerprint(TOKEN)}/GET:/channels/:id|1`, {
+            remaining: 0,
+            resetAt: Date.now() + 5_000,
+        });
+        const started = Date.now();
+        const error = (await rest
+            .get("/channels/1")
+            .catch((e: unknown) => e)) as RESTError;
+        expect(error.kind).toBe("overloaded");
+        expect(error.message).toContain("maxQueueWait (50ms)");
+        expect(Date.now() - started).toBeLessThan(1000);
+        expect(sent).toBe(0);
+        // Per request, it can be raised or lowered; unset, nothing changes.
+        expect(
+            await rest.get<string>("/channels/2", { maxQueueWait: 1000 }),
+        ).toBe("{}");
+        expect(() => new REST({ maxQueueWait: -1 })).toThrow(RangeError);
+        expect(rest.get("/x", { maxQueueWait: Number.NaN })).rejects.toThrow(
+            RangeError,
+        );
+        const free = new REST({
+            token: TOKEN,
+            transport: new HttpTransport({
+                fetch: async () => new Response("{}"),
+            }),
+        });
+        expect(await free.get<string>("/a")).toBe("{}");
+    });
+
+    test("it also bounds the pause between retries, and a caller abort stays an abort", async () => {
+        const rest = new REST({
+            token: TOKEN,
+            maxQueueWait: 60,
+            retryPolicy: {
+                maxRetries: 3,
+                shouldRetry: () => true,
+                getDelay: () => 1_000,
+            },
+            transport: new HttpTransport({
+                fetch: async () => new Response("{}", { status: 500 }),
+            }),
+        });
+        expect(
+            ((await rest.get("/a").catch((e: unknown) => e)) as RESTError).kind,
+        ).toBe("overloaded");
+        expect(
+            (
+                (await rest
+                    .get("/b", { signal: AbortSignal.timeout(10) })
+                    .catch((e: unknown) => e)) as RESTError
+            ).kind,
+        ).toBe("aborted");
     });
 });

@@ -5,6 +5,7 @@
  * Lua ports — so unit tests exercise the store's TypeScript paths, and the
  * Lua itself is checked against real Redis in tests/integration.
  */
+import { createHash } from "node:crypto";
 import {
     EXTEND_GLOBAL_SCRIPT,
     RECONCILE_SCRIPT,
@@ -20,7 +21,9 @@ import {
 
 export interface FakeRedis {
     /** A new client connection to this server. */
-    client(options?: { eval?: boolean }): MinimalRedisClient;
+    client(options?: { eval?: boolean; evalsha?: boolean }): MinimalRedisClient;
+    /** Forgets loaded scripts (`SCRIPT FLUSH`). */
+    flushScripts(): void;
     /** Makes every command fail (`"error"`), hang (`"hang"`), or work again (`undefined`). */
     fault: "error" | "hang" | undefined;
     /** Shifts the server clock. */
@@ -35,12 +38,14 @@ export interface FakeRedis {
 export function createFakeRedis(): FakeRedis {
     const data = new Map<string, { value: string; expiresAt: number }>();
     const ops = new Map<string, number>();
+    const scripts = new Map<string, string>();
     const server: FakeRedis = {
         fault: undefined,
         skewMs: 0,
         ops,
         data,
         flush: () => data.clear(),
+        flushScripts: () => scripts.clear(),
         client: (options = {}) => {
             const c: MinimalRedisClient = {
                 get: (key) => run("GET", () => get(key)),
@@ -53,15 +58,34 @@ export function createFakeRedis(): FakeRedis {
                 del: (...keys) =>
                     run("DEL", () => keys.filter((k) => data.delete(k)).length),
             };
-            if (options.eval !== false)
+            if (options.eval !== false) {
                 c.eval = (script, numKeys, ...args) =>
-                    run("EVAL", () =>
-                        evaluate(
+                    run("EVAL", () => {
+                        scripts.set(
+                            createHash("sha1").update(script).digest("hex"),
+                            script,
+                        );
+                        return evaluate(
                             script,
                             args.slice(0, numKeys).map(String),
                             args.slice(numKeys).map(String),
-                        ),
-                    );
+                        );
+                    });
+                if (options.evalsha !== false)
+                    c.evalsha = (sha, numKeys, ...args) =>
+                        run("EVALSHA", () => {
+                            const script = scripts.get(sha);
+                            if (!script)
+                                throw new Error(
+                                    "NOSCRIPT No matching script. Please use EVAL.",
+                                );
+                            return evaluate(
+                                script,
+                                args.slice(0, numKeys).map(String),
+                                args.slice(numKeys).map(String),
+                            );
+                        });
+            }
             return c;
         },
     };

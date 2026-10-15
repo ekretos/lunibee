@@ -73,6 +73,7 @@ new REST(options?: RESTOptions)
 | `maxQueued` | `number` | unlimited | Most requests waiting for a bucket slot, over all buckets. One more fails at once with a `RESTError` of kind `"overloaded"`. |
 | `maxQueuedPerBucket` | `number` | unlimited | The same limit for the requests waiting on one bucket. |
 | `globalLimit` | `number \| false` | `50` | Requests per second this bot may send across all buckets, enforced before Discord answers with a global 429 and shared through the store by every process. Set the limit Discord granted a large bot, or `false` to rely on 429s alone. Interaction callbacks do not count. |
+| `maxQueueWait` | `number` | unlimited | Longest, in ms, a request may wait before it is sent: queued behind its bucket, for a rate limit, or between retries. Past it the request fails with kind `"overloaded"`. A request can set its own `maxQueueWait` in its options. |
 | `stopOnInvalidToken` | `boolean` | `true` | After a `401` on a bot route, refuse later requests with that token (kind `"authentication"`, not sent) until `setToken()`. Repeated 401s count towards Discord's invalid-request ban. |
 
 There is no `apiVersion` option: the version is part of `baseURL`.
@@ -305,7 +306,7 @@ ioredis and node-redis clients are passed as they are (`client: new Redis(url)`)
 
 | `RedisRateLimitStoreOptions` | Default | Description |
 |---|---|---|
-| `client` | — | Any client with `get`, `mget`, `set` and `del` (ioredis and node-redis both fit; `fromBunRedis()` adapts `Bun.RedisClient`). With `eval`, every reservation, response merge and global extension is one atomic Lua script that reads Redis's own clock (`TIME`). Without it the store is *observational*: workers can race on the last unit. |
+| `client` | — | Any client with `get`, `mget`, `set` and `del` (ioredis and node-redis both fit; `fromBunRedis()` adapts `Bun.RedisClient`). With `eval`, every reservation, response merge and global extension is one atomic Lua script that reads Redis's own clock (`TIME`). Without it the store is *observational*: workers can race on the last unit. With `evalsha` too (ioredis, node-redis and `fromBunRedis()` have it), each script is sent by its SHA-1 and loaded with `eval` only on `NOSCRIPT`. |
 | `prefix` | `"lunibee:rest:"` | Key prefix. Keys are versioned under it (`…v1:bucket:…`, `…v1:global:…`, `…v1:route:…`) and every key has a TTL. On Redis Cluster put a hash tag in it (`"{mybot}:rest:"`). |
 | `failurePolicy` | `"degraded-local"` | While Redis is unreachable: `"degraded-local"` limits from this process's last known state; `"fail-closed"` fails each request with kind `"coordination"` without sending it. Either way the change is logged once, emitted as a `mode` event and shown by `mode` / `diagnostics()`, and the store returns to Redis when it answers. |
 | `commandTimeout` | `2000` | Longest one Redis command may take, in ms, before it counts as failed. |
@@ -503,7 +504,7 @@ try {
 | `server` | `5xx`. |
 | `client` | Any other `4xx`. |
 | `coordination` | The rate-limit store failed (`failurePolicy: "fail-closed"`, a script error, an invalid reply, or refusals with no wait). The request was not sent. |
-| `overloaded` | `maxQueued` or `maxQueuedPerBucket` was reached. The request was not sent. |
+| `overloaded` | `maxQueued` or `maxQueuedPerBucket` was reached (the request was not sent), or the request waited past `maxQueueWait`. |
 
 `DiscordAPIError` is exported as an alias of `RESTError`, so Discord.js-style `instanceof DiscordAPIError` checks work.
 
