@@ -103,14 +103,14 @@ describe("MemoryRateLimitStore", () => {
         expect(store.getBucketHash("r")).toBeUndefined();
         store.setBucketHash("r", "h");
         expect(store.getBucketHash("r")).toBe("h");
-        expect(store.reserve("b")).toEqual({ granted: true });
+        expect(store.reserve("b")).toMatchObject({ granted: true });
         const later = Date.now() + 60_000;
         store.updateBucket("b", {
             remaining: 1,
             limit: 2,
             resetAt: later,
         } as never);
-        expect(store.reserve("b")).toEqual({ granted: true });
+        expect(store.reserve("b")).toMatchObject({ granted: true });
         const denied = store.reserve("b");
         expect(denied.granted).toBe(false);
         store.updateBucket("old", {

@@ -21,12 +21,15 @@ It reports the median of nine runs for `set`, `get`, `filter`, `find`, `random` 
 Other harnesses:
 
 ```sh
-bun run bench:rest                 # REST scheduling: sequential vs concurrent buckets, fake Discord
+bun run bench:rest                 # REST scheduling (fake Discord): sequential vs concurrent buckets,
+                                   # then several processes sharing limits (Redis rows need REDIS_URL)
 bun benchmarks/gateway-events.ts   # per-event cost of Gateway dispatches, cache included
 bun benchmarks/cache-memory.ts     # heap kept per guild for small, medium and large guilds
 bun run bench:compare              # runtime benchmark vs the committed baseline (build first)
 ```
 
 The [Benchmarks](https://lunibee.js.org/benchmarks/) pages of the docs are generated from all of these with `bun run build && bun scripts/bench-docs.ts`.
+
+`benchmarks/rest-distributed.ts` takes `LIMIT`, `WINDOW_MS`, `BUCKETS`, `PER_BUCKET` and `LATENCY_MS` from the environment (defaults 5, 200, 4, 25, 5). Each row spawns its processes (`tests/helpers/rest-worker.ts`), and reports wall time, the fake server's 429 count, request latency percentiles, Redis commands per request and peak RSS. The method and the 0.3.1-vs-0.3.2 numbers are on the [Distributed REST](https://lunibee.js.org/core-concepts/distributed-rest/#benchmarks) page.
 
 Network and Gateway load tests should use controlled fakes or dedicated integration environments rather than making CI depend on Discord availability.

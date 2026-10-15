@@ -14,6 +14,11 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 - **`isSnowflake()` and prefix parsing** reject 21- and 22-digit strings (a snowflake has at most 20 digits).
 - **Voice:** `setSpeaking(flags, ssrc)` now takes the SSRC; pass the one from your voice gateway's READY.
 - **REST waits are bounded** by `maxBackoff` (10 minutes): a longer `Retry-After` fails with a `RESTError` instead of sleeping. Raise `maxBackoff` if you really want longer waits.
+- **Redis rate-limit keys moved** to `<prefix>v1:…`, and bucket keys now carry a fingerprint of the bot's token. 0.3.1 and 0.3.2 processes do not share state: upgrade every process of a fleet together. Old keys expire on their own.
+- **Two new `RESTError` kinds:** `"coordination"` (the rate-limit store failed; the request was not sent) and `"overloaded"` (a `maxQueued` limit was reached). Both are `retryable`. Add them to any exhaustive `switch` over `kind`.
+- **Custom rate-limit stores** keep working. `reserve()` is now called as `reserve(key, options)` and may also return `known` and `resetAt`; the new methods (`reconcile`, `extendGlobalReset`, `release`, `reservesGlobal`) are optional and each makes one step atomic. `getGlobalReset` / `setGlobalReset` receive a scope as an extra argument, which a store may ignore.
+- **Rate-limit state is merged more conservatively.** A response with no rate-limit headers no longer sets `remaining` to 0, and responses within a window can no longer raise `remaining`, also with `concurrentBuckets: false`. A 429's wait is held in the store, so every request on the bucket waits it out.
+- **Redis failures are logged once per state change**, not once per failed command. Read `store.mode` or `store.diagnostics()`, or pass `telemetry`, to watch them. See [Distributed REST](/core-concepts/distributed-rest/).
 
 ## 0.2.x → 0.3.1
 

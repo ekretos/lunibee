@@ -7,7 +7,7 @@ description: Every type the lunibee package exports, grouped by package, with a 
 
 Every interface and type alias that `lunibee` exports, with what it is for. Each name links to its full definition in the generated API reference. The classes and functions that use these types are described on the other reference pages.
 
-313 types in 12 packages.
+328 types in 12 packages.
 
 ## `@lunibee/builders`
 
@@ -133,29 +133,44 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 
 | Type | Kind | Description |
 |---|---|---|
-| [`BucketState`](/api/interfaces/bucketstate/) | interface | A rate-limit bucket as stored: units `remaining` in the window and when it resets (`resetAt`, ms since the epoch). |
+| [`ApplyResponseOptions`](/api/interfaces/applyresponseoptions/) | interface | Context for RateLimiter.applyResponse beyond the response itself. |
+| [`BucketState`](/api/interfaces/bucketstate/) | interface | A rate-limit bucket as stored: units `remaining` in the window and when it resets (`resetAt`, ms since the epoch, in the store's clock). |
+| [`BucketUpdate`](/api/interfaces/bucketupdate/) | interface | What a response said about a bucket, for RateLimitStore.reconcile. |
 | [`DecodedError`](/api/interfaces/decodederror/) | interface | Normalised shape of a Discord error payload. |
+| [`Grant`](/api/interfaces/grant/) | interface | What RateLimiter.acquire obtained. |
 | [`MinimalRedisClient`](/api/interfaces/minimalredisclient/) | interface | A Redis client interface that matches the subset of ioredis methods needed for the RedisRateLimitStore. |
+| [`RESTDiagnostics`](/api/interfaces/restdiagnostics/) | interface | A REST client's state, for health checks and diagnostics endpoints. |
 | [`RESTFileAttachment`](/api/interfaces/restfileattachment/) | interface | A file attachment sent as part of a multipart REST request. |
 | [`RESTHooks`](/api/interfaces/resthooks/) | interface | Lightweight callback hooks for REST request lifecycle events. |
+| [`RESTMetricsSnapshot`](/api/interfaces/restmetricssnapshot/) | interface | A snapshot of RESTMetrics. |
 | [`RESTRateLimitContext`](/api/interfaces/restratelimitcontext/) | interface | Context passed to `RESTHooks.onRateLimit`. |
 | [`RESTRequestContext`](/api/interfaces/restrequestcontext/) | interface | Context passed to `RESTHooks.onRequest`. |
 | [`RESTRequestOptions`](/api/interfaces/restrequestoptions/) | interface | Options controlling an individual REST request. |
 | [`RESTResponseContext`](/api/interfaces/restresponsecontext/) | interface | Context passed to `RESTHooks.onResponse`. |
 | [`RESTRetryContext`](/api/interfaces/restretrycontext/) | interface | Context passed to `RESTHooks.onRetry`. |
+| [`RESTTelemetry`](/api/interfaces/resttelemetry/) | interface | Receives telemetry events. |
+| [`RateLimitHeaders`](/api/interfaces/ratelimitheaders/) | interface | A response's rate-limit headers, each one validated on its own. |
 | [`RateLimitStore`](/api/interfaces/ratelimitstore/) | interface | Interface for distributed or local rate limit synchronization. |
-| [`RedisRateLimitStoreOptions`](/api/interfaces/redisratelimitstoreoptions/) | interface | Options for `RedisRateLimitStore`: the Redis client, a key prefix, and an error callback. |
+| [`RedisRateLimitStoreOptions`](/api/interfaces/redisratelimitstoreoptions/) | interface | Options for `RedisRateLimitStore`. |
+| [`RedisStoreDiagnostics`](/api/interfaces/redisstorediagnostics/) | interface | The store's health, for diagnostics endpoints. |
 | [`RequestData`](/api/interfaces/requestdata/) | interface | Discord.js-familiar request payload. |
+| [`RequestIdentity`](/api/interfaces/requestidentity/) | interface | Who a request's rate limits belong to. |
 | [`RequestOptionsObject`](/api/interfaces/requestoptionsobject/) | interface | The single-object form of REST.request, matching `@discordjs/rest`: the route is `path` (or its Discord.js name, `fullRoute`). |
+| [`ReserveOptions`](/api/interfaces/reserveoptions/) | interface | Options for RateLimitStore.reserve. |
 | [`RetryPolicy`](/api/interfaces/retrypolicy/) | interface | Configures which REST failures may be retried. |
 | [`RouteKey`](/api/interfaces/routekey/) | interface | Identity of a request as Discord's rate limiter sees it. |
+| [`SchedulerOptions`](/api/interfaces/scheduleroptions/) | interface | Limits for RequestScheduler. |
 | [`TransportRequest`](/api/interfaces/transportrequest/) | interface | One HTTP attempt, fully resolved: no routing, retry or rate-limit concerns. |
 | [`WebhookClientOptions`](/api/interfaces/webhookclientoptions/) | interface | Where a `WebhookClient` sends: a Discord webhook `url`, or its `id` and `token`. |
 | [`WebhookMessageOptions`](/api/interfaces/webhookmessageoptions/) | interface | A webhook message for `send()` and `editMessage()`; camelCase aliases (`avatarURL`, `threadId`, `allowedMentions`) are accepted beside the wire names. |
+| [`CoordinationMode`](/api/type-aliases/coordinationmode/) | type | How a store enforces limits right now. |
 | [`FetchLike`](/api/type-aliases/fetchlike/) | type | Minimal fetch shape the transport depends on, so a stub needs no extras. |
 | [`RESTErrorCode`](/api/type-aliases/resterrorcode/) | type | One RESTErrorCode value, usable as a type. |
 | [`RESTErrorKind`](/api/type-aliases/resterrorkind/) | type | Why a REST request failed, for handling without matching on status codes. |
 | [`RESTQuery`](/api/type-aliases/restquery/) | type | Query-string value accepted by a request. |
+| [`RESTTelemetryEvent`](/api/type-aliases/resttelemetryevent/) | type | What the REST pipeline reports while it works. |
+| [`RateLimitScope`](/api/type-aliases/ratelimitscope/) | type | Which limit a 429 counts against, from `X-RateLimit-Scope`. |
+| [`RedisFailurePolicy`](/api/type-aliases/redisfailurepolicy/) | type | What the store does when Redis cannot be reached. |
 | [`Reservation`](/api/type-aliases/reservation/) | type | Outcome of an atomic reservation. |
 
 ## `@lunibee/sharding`

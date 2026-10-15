@@ -7,7 +7,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@lunibee/rest` is Lunibee's HTTP client for the Discord REST API. It has no runtime dependencies and handles:
 
-- per-bucket and global rate limits (shared across processes with Redis if you want);
+- per-bucket and global rate limits, shared across processes and bots through Redis with atomic reservations if you want (see [Distributed REST](/core-concepts/distributed-rest/));
 - safe retries and a bounded server-controlled backoff;
 - per-request timeouts and `AbortSignal` cancellation;
 - token-safe errors, hooks and logs;
@@ -69,6 +69,9 @@ new REST(options?: RESTOptions)
 | `store` | `RateLimitStore` | `MemoryRateLimitStore` | Where rate-limit state lives. `RedisRateLimitStore` shares it between processes. |
 | `hooks` | `RESTHooks` | `{}` | Lifecycle callbacks. See [Hooks](#hooks). |
 | `transport` | `HttpTransport` | an `HttpTransport` from `baseURL`, `allowInsecureBaseURL` and `timeout` | Replaces the HTTP stage, for example with a fake `fetch` in tests. When given, `baseURL`, `allowInsecureBaseURL` and `timeout` are ignored. |
+| `telemetry` | `RESTTelemetry` | — | Receives [telemetry events](#telemetry). `RESTMetrics` is a ready-made aggregator. |
+| `maxQueued` | `number` | unlimited | Most requests waiting for a bucket slot, over all buckets. One more fails at once with a `RESTError` of kind `"overloaded"`. |
+| `maxQueuedPerBucket` | `number` | unlimited | The same limit for the requests waiting on one bucket. |
 
 There is no `apiVersion` option: the version is part of `baseURL`.
 
@@ -88,6 +91,8 @@ const rest = new REST({
 | `setToken(token)` | Sets the token for later requests. Throws a `TypeError` for an empty token. |
 | `setHooks(hooks)` | Replaces every hook. `setHooks({})` removes them. Returns `this`. |
 | `store` | The `RateLimitStore` in use (read-only). |
+| `diagnostics()` | `{ mode, queued, inFlight, buckets, closed }`: how limits are enforced right now (`"local"`, `"distributed"`, `"observational"`, `"degraded-local"` or `"unavailable"`), requests waiting for a slot, requests started and not settled, bucket keys holding a slot, and whether `close()` was called. |
+| `close()` | Stops the client. New requests and requests still queued or waiting for a limit fail with kind `"aborted"`; attempts already sent finish. Resolves when nothing is in flight. |
 
 ## Making requests
 
@@ -254,15 +259,20 @@ For a route without a builder, write the path yourself; the [path safety](#path-
 
 Discord limits requests per **bucket**. A bucket is identified by the hash Discord returns in `X-RateLimit-Bucket`, scoped by the route's major parameter (channel, guild, or webhook id and token). Two channels on the same endpoint get separate limits, and two routes Discord maps to one hash share one.
 
+Limits belong to a bot: bucket keys and the global limit are scoped by a fingerprint of the token (a truncated SHA-256, never the token), so bots sharing one store never share a counter. Interaction callbacks (`/interactions/:id/:token/…`) and token webhooks (`/webhooks/:id/:token…`) are limited per webhook, whoever sends them, so their buckets are shared by every bot; interaction callbacks count against no global limit. Requests without a token are scoped as `"anon"`.
+
 For each request the client:
 
-1. builds a route key: the method plus the path with ids replaced by `:id` and the query removed, plus the major parameter;
+1. builds a route key: the method plus the path with ids replaced by `:id`, a reaction's emoji by `:emoji` and the query removed, plus the major parameter;
 2. looks up the bucket hash learned for that route, falling back to the route key until Discord sends one;
-3. queues behind earlier requests on that bucket, or, with `concurrentBuckets`, reserves one unit of the bucket's `remaining` allowance;
-4. waits while the bucket is exhausted or a global limit is active;
-5. records `X-RateLimit-Remaining`, `X-RateLimit-Reset-After` and `X-RateLimit-Bucket` from the response.
+3. queues behind earlier requests on that bucket;
+4. **reserves** one unit of the bucket's allowance, in the same atomic step that checks the global limit, and waits while either is spent. On a bucket nobody knows yet, one request (the *probe*) goes first and the others wait for its response; after a window resets, the next one opens at the known limit, so a fleet waking together cannot send more than the limit at once;
+5. with `concurrentBuckets`, frees the bucket's slot as soon as the reservation is granted on a bucket whose limit is known, so the next request can go;
+6. merges `X-RateLimit-Limit`, `-Remaining`, `-Reset-After`, `-Reset` and `-Bucket` from the response. Within a window `remaining` only goes down, and a response from an older window (an earlier `X-RateLimit-Reset`) is ignored, so a late response cannot hand back allowance already reserved.
 
-A `429` is retried after `retry_after` (from the body) or the `Retry-After` header, or one second when neither is usable. A `429` with `global: true` (or `X-RateLimit-Global`) pauses every request until the global limit resets. The `onRateLimit` hook fires for every `429` response; a wait the client imposes on itself from earlier headers (an exhausted bucket, an active global limit) does not fire it.
+Headers are parsed one by one: a missing, empty, negative or non-numeric value is ignored, never read as `0`.
+
+A `429` records its wait (`retry_after` from the body, else `Retry-After`, else `X-RateLimit-Reset-After`, else one second) in the store, on the bucket, or on the bot's global limit when the body says `global: true`, `X-RateLimit-Global` is `true` or `X-RateLimit-Scope` is `global`. The retry then waits for that state like any other request, so every request on the bucket, in every process, honours it. The `onRateLimit` hook fires for every `429` response; a wait the client imposes on itself from earlier headers (an exhausted bucket, an active global limit) does not fire it.
 
 ### Bounded backoff
 
@@ -270,47 +280,73 @@ The server decides how long the client waits, so a misbehaving proxy, or anyone 
 
 - A `Retry-After` longer than `maxBackoff` fails the request immediately with a `RESTError` (status `429`) instead of sleeping.
 - Bucket resets and global resets are stored no further than `maxBackoff` ahead.
+- A request that keeps losing the race for its bucket to other processes gives up after waiting twice `maxBackoff`, with a `RESTError` of kind `"rateLimited"`, rather than wait forever.
 
 ### Sharing limits between processes
 
-By default each process keeps its own limits in a `MemoryRateLimitStore`. Bots that send from several processes (clusters, workers, a dashboard) should share them with Redis:
+By default each process keeps its own limits in a `MemoryRateLimitStore`. Bots that send from several processes (clusters, workers, a dashboard) should share them with Redis. With Bun's built-in client:
 
 ```ts
-import Redis from "ioredis";
-import { REST, RedisRateLimitStore } from "@lunibee/rest";
+import { REST, RedisRateLimitStore, fromBunRedis } from "@lunibee/rest";
 
-const rest = new REST({
-  token: process.env.DISCORD_TOKEN!,
-  store: new RedisRateLimitStore({
-    client: new Redis(process.env.REDIS_URL!),
-    prefix: "mybot:rest:",              // default "lunibee:rest:"
-    onError: (operation, error) => console.warn("redis", operation, error),
-  }),
+const store = new RedisRateLimitStore({
+  client: fromBunRedis(new Bun.RedisClient(process.env.REDIS_URL!)),
+  prefix: "mybot:rest:",              // default "lunibee:rest:"
+  failurePolicy: "degraded-local",    // or "fail-closed"
 });
+await store.verify();                 // fails fast if EVAL is disabled
+
+const rest = new REST({ token: process.env.DISCORD_TOKEN!, store });
 ```
 
-| `RedisRateLimitStoreOptions` | Description |
+ioredis and node-redis clients are passed as they are (`client: new Redis(url)`).
+
+| `RedisRateLimitStoreOptions` | Default | Description |
+|---|---|---|
+| `client` | — | Any client with `get`, `mget`, `set` and `del` (ioredis and node-redis both fit; `fromBunRedis()` adapts `Bun.RedisClient`). With `eval`, every reservation, response merge and global extension is one atomic Lua script that reads Redis's own clock (`TIME`). Without it the store is *observational*: workers can race on the last unit. |
+| `prefix` | `"lunibee:rest:"` | Key prefix. Keys are versioned under it (`…v1:bucket:…`, `…v1:global:…`, `…v1:route:…`) and every key has a TTL. On Redis Cluster put a hash tag in it (`"{mybot}:rest:"`). |
+| `failurePolicy` | `"degraded-local"` | While Redis is unreachable: `"degraded-local"` limits from this process's last known state; `"fail-closed"` fails each request with kind `"coordination"` without sending it. Either way the change is logged once, emitted as a `mode` event and shown by `mode` / `diagnostics()`, and the store returns to Redis when it answers. |
+| `commandTimeout` | `2000` | Longest one Redis command may take, in ms, before it counts as failed. |
+| `requireAtomic` | `false` | Throw at construction when the client has no `eval`. |
+| `telemetry` | — | Receives `store` (per-command latency and outcome) and `mode` events. |
+| `onError` | — | Called with `(operation, error)` for every failed command. |
+
+| Member | Description |
 |---|---|
-| `client` | Any client with `get`, `mget`, `set` and `del` (ioredis and node-redis both fit). With `eval`, allowance is **reserved atomically** by a Lua script, so two workers can never spend the same unit. |
-| `prefix` | Key prefix. Default `lunibee:rest:`. |
-| `onError` | Called when a Redis operation fails. The store then falls back to local limiting for that call, so Redis being down slows nothing; `store.lastError` holds the latest error. |
+| `mode` | `"distributed"`, `"observational"`, `"degraded-local"` or `"unavailable"`. |
+| `diagnostics()` | `{ mode, failurePolicy, atomic, failures, lastFailureAt, lastError }`, with tokens removed from `lastError`. |
+| `verify()` | Runs a script once; throws a `TypeError` without `eval`, or a `RESTError` of kind `"coordination"` when Redis refuses scripts. |
+| `isHealthy()`, `lastError` | Whether the last command succeeded, and the latest error. |
+| `supportsReservation` | Whether the client has `eval`. |
 
-The memory store keeps at most 10,000 bucket entries and 10,000 route-to-bucket mappings, dropping the oldest first, and prunes expired buckets once a minute.
+The memory store keeps at most 10,000 bucket entries, 10,000 route-to-bucket mappings and 10,000 global scopes, dropping the oldest first, and prunes buckets a minute after their reset (the limit is remembered that long, so the next window opens at it).
 
-To write your own store, implement `RateLimitStore`:
+Failure modes, guarantees and scaling are on [Distributed REST](/core-concepts/distributed-rest/).
+
+To write your own store, implement `RateLimitStore`. Only the first six methods are required; each optional one adds a guarantee:
 
 ```ts
 interface RateLimitStore {
   getBucketHash(route: string): Promise<string | undefined> | string | undefined;
   setBucketHash(route: string, hash: string): Promise<void> | void;
   getBucket(key: string): Promise<BucketState | undefined> | BucketState | undefined;
-  updateBucket(key: string, state: BucketState): Promise<void> | void;   // { remaining, resetAt }
-  getGlobalReset(): Promise<number> | number;
-  setGlobalReset(resetAt: number): Promise<void> | void;
-  reserve?(key: string): Promise<Reservation> | Reservation;             // enables concurrentBuckets
+  updateBucket(key: string, state: BucketState): Promise<void> | void;
+  getGlobalReset(scope?: string): Promise<number> | number;
+  setGlobalReset(resetAt: number, scope?: string): Promise<void> | void;
+  // Atomic reservation (enables concurrentBuckets). Must grant one probe on an unknown bucket.
+  reserve?(key: string, options?: ReserveOptions): Promise<Reservation> | Reservation;
+  readonly reservesGlobal?: boolean;   // reserve() also checks options.global
+  // Atomic response merge; without it the limiter reads, merges and writes.
+  reconcile?(key: string, update: BucketUpdate): Promise<void> | void;
+  // Atomic "at least this long" global limit; without it a concurrent writer can shorten it.
+  extendGlobalReset?(scope: string, waitMs: number): Promise<void> | void;
+  // Clears a probe placeholder, or refunds a unit whose request never left.
+  release?(key: string, grant: { resetAt?: number }, refund: boolean): Promise<void> | void;
   prune?(maxAge?: number): Promise<void> | void;
 }
 ```
+
+`reserveState()` and `reconcileState()` in `packages/rest/src/store.ts` are the decisions the built-in stores make; a custom store can call them on its own state.
 
 ## Retries
 
@@ -322,7 +358,9 @@ The default policy is `createRetryPolicy(retries)`, with `retries` defaulting to
 | `5xx` | `GET`, `HEAD`, `PUT`, `DELETE` | `min(10 s, 500 ms × 2^attempt)` plus up to 250 ms of jitter |
 | network failure (DNS, reset, TLS) | `GET`, `HEAD`, `PUT`, `DELETE` | same as `5xx` |
 
-`POST` and `PATCH` are never replayed after a `5xx` or a network failure: Discord may already have acted on them, and a second message or a second ban is worse than an error. A timeout is never retried. The `onRetry` hook fires before each retry of an error response (`429`, `5xx`); a retry after a network failure does not fire it.
+`POST` and `PATCH` are never replayed after a `5xx` or a network failure: Discord may already have acted on them, and a second message or a second ban is worse than an error. A timeout is never retried, and neither is a `401`, `403` or any other `4xx` but `429`.
+
+For a `429` the wait is the limiter's (see [Rate limits](#rate-limits)): the retry sleeps only what `getDelay()` asks beyond the server's delay, then waits for the bucket or global limit with every other request. The `onRetry` hook fires before each retry of an error response (`429`, `5xx`); a retry after a network failure does not fire it.
 
 A custom policy:
 
@@ -369,6 +407,53 @@ try {
 
 `abortError(path, reason)` builds the same `RESTError` (kind `"aborted"`), for custom transports or stores that need to report a cancellation the same way.
 
+## Queue limits and shutdown
+
+Requests wait in memory for their bucket. To bound that, set `maxQueued` (all buckets) or `maxQueuedPerBucket`; a request beyond either fails at once with kind `"overloaded"` (retryable), so a flood sheds load instead of growing the heap. A request on an idle bucket never counts as waiting.
+
+`close()` is the graceful shutdown: it refuses new requests and fails those still queued or waiting for a limit (kind `"aborted"`), lets attempts already on the wire finish, and resolves when nothing is in flight.
+
+```ts
+process.on("SIGTERM", async () => {
+  await rest.close();
+  process.exit(0);
+});
+```
+
+## Telemetry
+
+Pass `telemetry: { emit(event) { … } }` to receive events. They never contain a token, a token fingerprint or a body, and routes are normalised (`GET:/channels/:id/messages/:id/reactions/:emoji`), so labels stay bounded. A sink that throws is ignored.
+
+| Event `type` | Fields |
+|---|---|
+| `request` | `method`, `route`, `status`, `attempts`, `durationMs`, `ok` — once per request, end to end. |
+| `response` | `method`, `route`, `status`, `durationMs` — once per HTTP attempt. |
+| `rateLimited` | `route`, `scope` (`user`, `global`, `shared`, `unknown`), `retryAfterMs`. |
+| `wait` | `reason` (`bucket`, `global`, `probe`), `durationMs`. |
+| `reservation` | `granted`, `known`, `latencyMs`. |
+| `retry` | `route`, `reason` (`rateLimited`, `server`, `network`), `attempt`. |
+| `cancelled` | `stage` (`queued`, `waiting`, `transport`, `retry`). |
+| `overloaded`, `networkError` (`timedOut`) | A refused or failed attempt. |
+| `bucket` | `change` (`discovered`, `remapped`), `route`. |
+| `queue` | `queued`, `inFlight`. |
+| `store`, `mode` | From `RedisRateLimitStore`'s own `telemetry`: per-command latency and outcome, and mode changes. |
+
+`RESTMetrics` turns them into counters, gauges and latency histograms, capping distinct route labels (500 by default, then `other`):
+
+```ts
+import { REST, RedisRateLimitStore, RESTMetrics } from "@lunibee/rest";
+
+const metrics = new RESTMetrics();
+const rest = new REST({
+  token: process.env.DISCORD_TOKEN!,
+  telemetry: metrics,
+  store: new RedisRateLimitStore({ client: redisClient, telemetry: metrics }),
+});
+
+Bun.serve({ port: 9100, fetch: () => new Response(metrics.toPrometheus()) });
+metrics.snapshot(); // { counters, gauges, histograms }
+```
+
 ## Errors
 
 ### `RESTError`
@@ -399,7 +484,7 @@ try {
 | `method` | `string \| undefined` | Request method. |
 | `path` | `string \| undefined` | Request path, with webhook and interaction tokens replaced by `:token`. |
 | `hint` | `string \| undefined` | What to check, for codes `50001` (Missing Access) and `50013` (Missing Permissions); `undefined` for any other code. |
-| `retryable` | `boolean` | Whether the same request could succeed later: `true` for `rateLimited`, `server`, `network` and `timeout`. |
+| `retryable` | `boolean` | Whether the same request could succeed later: `true` for `rateLimited`, `server`, `network`, `timeout`, `coordination` and `overloaded`. |
 | `cause` | `unknown` | For network failures, a copy of the underlying error with tokens removed. |
 
 | `kind` | When |
@@ -414,6 +499,8 @@ try {
 | `validation` | `400` or `422`: Discord refused the body. |
 | `server` | `5xx`. |
 | `client` | Any other `4xx`. |
+| `coordination` | The rate-limit store failed (`failurePolicy: "fail-closed"`, a script error, an invalid reply, or refusals with no wait). The request was not sent. |
+| `overloaded` | `maxQueued` or `maxQueuedPerBucket` was reached. The request was not sent. |
 
 `DiscordAPIError` is exported as an alias of `RESTError`, so Discord.js-style `instanceof DiscordAPIError` checks work.
 
@@ -525,12 +612,15 @@ request → createRouteKey → RequestScheduler → RateLimiter → HttpTranspor
 |---|---|
 | `createRouteKey(method, path)` | Returns `{ method, path, route, major }`: the normalised route (`GET:/channels/:id/messages`) and its major parameter. |
 | `normalizeRoutePath(path)`, `majorParameter(path)`, `scopeBucket(hash, major)`, `serializeQuery(query)` | The pieces `createRouteKey` and `request` use. |
-| `RequestScheduler` | Runs one request per bucket key at a time and frees the slot on every exit path, including an abort while queued. |
-| `RateLimiter` | Waits for or reserves bucket and global allowance, applies response headers, caps waits to `maxBackoff`. |
+| `RequestScheduler` | Runs one request per bucket key at a time and frees the slot on every exit path, including an abort while queued. Options: `maxQueued`, `maxQueuedPerBucket`; `queued` counts waiting requests. |
+| `RateLimiter` | Reserves bucket and global allowance (`acquire()` returns a `Grant`), merges response headers (`applyResponse()`), records 429s, gives back a probe or an unsent request's unit (`releaseGrant()`), caps waits to `maxBackoff` (`DEFAULT_MAX_BACKOFF_MS`). |
+| `parseRateLimitHeaders(headers)`, `headerNumber(headers, name)` | Defensive header parsing: absent or invalid values are `undefined`, never `0`. |
+| `requestIdentity(path, fingerprint)`, `tokenFingerprint(token)` | Whose limits a request counts against (see [Rate limits](#rate-limits)). |
 | `HttpTransport` | One HTTP attempt with timeout, cancellation and `redirect: "error"`. Options: `baseURL`, `allowInsecureBaseURL`, `timeout`, `fetch`. |
 | `TransportError` | What `HttpTransport` throws for a failed attempt (`timedOut` tells a timeout apart). `REST` turns it into a `RESTError`. |
 | `ResponseDecoder` | Reads JSON, text or nothing (`204`), and Discord's error fields and `Retry-After`. |
-| `MemoryRateLimitStore`, `RedisRateLimitStore` | The built-in stores. |
+| `MemoryRateLimitStore`, `RedisRateLimitStore`, `fromBunRedis(client)` | The built-in stores, and the `Bun.RedisClient` adapter. |
+| `RESTMetrics` | An in-memory telemetry aggregator; see [Telemetry](#telemetry). |
 | `createRetryPolicy(maxRetries)` | The default retry policy. |
 
 ### Testing without the network

@@ -11,6 +11,7 @@ import {
     type MinimalRedisClient,
     type Reservation,
 } from "../packages/rest/src/index.ts";
+import { createFakeRedis } from "./helpers/fake-redis.ts";
 
 /**
  * Stage 1A coverage: REST-005 (atomic reservation across workers) and
@@ -18,53 +19,19 @@ import {
  */
 
 /**
- * In-memory stand-in for Redis with real `eval` semantics for the reservation
- * script: reads and writes of one key cannot interleave, and every client
- * instance shares the same backing map, the way separate workers share a server.
+ * In-memory stand-in for Redis that runs the store's scripts atomically:
+ * every client instance shares the same backing map, the way separate
+ * workers share a server.
  */
 function createSharedRedis(): {
     client: () => MinimalRedisClient;
     evalCalls: () => number;
 } {
-    const data = new Map<string, string>();
-    let evals = 0;
-    const client = (): MinimalRedisClient => ({
-        async get(key) {
-            return data.get(key) ?? null;
-        },
-        async mget(keys) {
-            return keys.map((key) => data.get(key) ?? null);
-        },
-        async set(key, value) {
-            data.set(key, String(value));
-            return "OK";
-        },
-        async del(...keys) {
-            let removed = 0;
-            for (const key of keys) if (data.delete(key)) removed++;
-            return removed;
-        },
-        async eval(_script, _numKeys, ...args) {
-            evals++;
-            const key = String(args[0]);
-            const now = Number(args[1]);
-            const raw = data.get(key);
-            if (!raw) return [1, 0];
-            const state = JSON.parse(raw) as {
-                remaining: number;
-                resetAt: number;
-            };
-            const wait = state.resetAt - now;
-            if (wait <= 0) return [1, 0];
-            if (state.remaining > 0) {
-                state.remaining -= 1;
-                data.set(key, JSON.stringify(state));
-                return [1, 0];
-            }
-            return [0, Math.ceil(wait)];
-        },
-    });
-    return { client, evalCalls: () => evals };
+    const redis = createFakeRedis();
+    return {
+        client: () => redis.client(),
+        evalCalls: () => redis.ops.get("EVAL") ?? 0,
+    };
 }
 
 describe("REST-005: atomic reservation", () => {
@@ -112,9 +79,9 @@ describe("REST-005: atomic reservation", () => {
 
     test("an unknown or elapsed bucket is granted, never deadlocked", async () => {
         const store = new MemoryRateLimitStore();
-        expect(store.reserve("never-seen")).toEqual({ granted: true });
+        expect(store.reserve("never-seen")).toMatchObject({ granted: true });
         store.updateBucket("stale", { remaining: 0, resetAt: Date.now() - 10 });
-        expect(store.reserve("stale")).toEqual({ granted: true });
+        expect(store.reserve("stale")).toMatchObject({ granted: true });
     });
 
     test("the memory store decrements, refuses, then grants after the reset", async () => {
@@ -205,6 +172,9 @@ describe("REST-004: routes sharing one bucket hash", () => {
         // once the hash is known.
         const store = new MemoryRateLimitStore();
         const live = new Set<string>();
+        // Requests are labelled by their start order per path, so the label
+        // names the same request however the event loop interleaves them.
+        const started = new Map<string, number>();
         const overlaps = new Set<string>();
         const durations: Record<string, number> = {
             "/channels/1/pins": 60,
@@ -219,7 +189,9 @@ describe("REST-004: routes sharing one bucket hash", () => {
             transport: new HttpTransport({
                 fetch: async (url) => {
                     const path = new URL(url).pathname;
-                    const label = `${path}#${live.size}`;
+                    const n = started.get(path) ?? 0;
+                    started.set(path, n + 1);
+                    const label = `${path}#${n}`;
                     for (const other of live) overlaps.add(`${other}|${label}`);
                     live.add(label);
                     await new Promise((resolve) =>
@@ -249,6 +221,7 @@ describe("REST-004: routes sharing one bucket hash", () => {
         ).toBeUndefined();
 
         overlaps.clear();
+        started.clear();
         await Promise.all([
             rest.get("/channels/1/messages"), // discovers the hash
             rest.get("/channels/1/messages"), // queued behind it, must remap

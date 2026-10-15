@@ -31,7 +31,11 @@ export function normalizeRoutePath(path: string): string {
     const queryIndex = path.indexOf("?");
     const routePath = queryIndex === -1 ? path : path.slice(0, queryIndex);
     // Tokens never enter a route key: keys are stored (Redis keeps them for days).
-    return redactPath(routePath).replace(/\/\d+(?=\/|$)/g, "/:id");
+    // A reaction's emoji is free text: one key per emoji would grow without
+    // bound, and Discord limits reactions per channel, not per emoji.
+    return redactPath(routePath)
+        .replace(/\/\d+(?=\/|$)/g, "/:id")
+        .replace(/\/reactions\/[^/]+/i, "/reactions/:emoji");
 }
 
 /**

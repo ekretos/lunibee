@@ -19,7 +19,17 @@ import {
     type RouteKey,
 } from "./route.js";
 import { RequestScheduler } from "./scheduler.js";
-import { RateLimiter } from "./limiter.js";
+import { RateLimiter, type Grant } from "./limiter.js";
+import {
+    requestIdentity,
+    tokenFingerprint,
+    type RequestIdentity,
+} from "./identity.js";
+import {
+    emitTelemetry,
+    type CoordinationMode,
+    type RESTTelemetry,
+} from "./telemetry.js";
 import { HttpTransport, TransportError } from "./transport.js";
 import { ResponseDecoder } from "./decoder.js";
 
@@ -233,14 +243,36 @@ export function createRetryPolicy(maxRetries = 2): RetryPolicy {
     };
 }
 
+/** A REST client's state, for health checks and diagnostics endpoints. */
+export interface RESTDiagnostics {
+    /** How the store enforces limits right now. */
+    mode: CoordinationMode;
+    /** Requests waiting for a bucket slot. */
+    queued: number;
+    /** Requests started and not yet settled, queued ones included. */
+    inFlight: number;
+    /** Bucket keys holding a queue slot. */
+    buckets: number;
+    /** Whether `close()` was called. */
+    closed: boolean;
+}
+
 /** Bun-native REST transport with Discord bucket-aware rate limiting, retries, and cancellation. */
 export class REST {
     readonly #retryPolicy: RetryPolicy;
     #token?: string;
+    /** Fingerprint of the token: identifies this bot's limits without holding the token. */
+    #fingerprint?: string;
+    readonly #telemetry?: RESTTelemetry;
+    /** Aborted by `close()`: cancels every wait, never an attempt already sent. */
+    readonly #closing = new AbortController();
+    #inFlight = 0;
+    #idle?: () => void;
+    #drained?: Promise<void>;
     /** Rate-limit state: when a request may go out, what a response says. */
     readonly #limiter: RateLimiter;
     /** Per-bucket ordering. */
-    readonly #scheduler = new RequestScheduler();
+    readonly #scheduler: RequestScheduler;
     /** One HTTP attempt, with timeout and cancellation. */
     readonly #transport: HttpTransport;
     /** Response payload and error metadata. */
@@ -277,9 +309,27 @@ export class REST {
              * Default 600,000 (ten minutes).
              */
             maxBackoff?: number;
+            /**
+             * Receives telemetry events (latency, 429s by scope, waits,
+             * reservations, retries, cancellations, queue depth). See
+             * `RESTMetrics` for a ready-made aggregator.
+             */
+            telemetry?: RESTTelemetry;
+            /** Most requests waiting for a bucket slot; more fail with kind `"overloaded"`. Default unlimited. */
+            maxQueued?: number;
+            /** Most requests waiting on one bucket; more fail with kind `"overloaded"`. Default unlimited. */
+            maxQueuedPerBucket?: number;
         } = {},
     ) {
         this.#token = options.token;
+        this.#fingerprint = options.token
+            ? tokenFingerprint(options.token)
+            : undefined;
+        this.#telemetry = options.telemetry;
+        this.#scheduler = new RequestScheduler({
+            maxQueued: options.maxQueued,
+            maxQueuedPerBucket: options.maxQueuedPerBucket,
+        });
         this.#retryPolicy =
             options.retryPolicy ?? createRetryPolicy(options.retries ?? 2);
         this.#transport =
@@ -296,6 +346,13 @@ export class REST {
         this.#limiter = new RateLimiter(store, {
             concurrent: this.#concurrentBuckets,
             maxBackoff: options.maxBackoff,
+            // A probe holds an unknown bucket for as long as its attempt can
+            // take, so a second one cannot start while it is still out.
+            probeMs:
+                this.#transport.timeout > 0
+                    ? this.#transport.timeout + 1000
+                    : undefined,
+            telemetry: options.telemetry,
         });
         if (options.hooks) this.#hooks = options.hooks;
     }
@@ -313,6 +370,43 @@ export class REST {
         if (!token.trim())
             throw new TypeError("A Discord bot token is required.");
         this.#token = token;
+        this.#fingerprint = tokenFingerprint(token);
+    }
+    /** The client's current state. */
+    public diagnostics(): RESTDiagnostics {
+        const store = this.#limiter.store as { mode?: CoordinationMode };
+        return {
+            mode:
+                store.mode ??
+                (store instanceof MemoryRateLimitStore
+                    ? "local"
+                    : "distributed"),
+            queued: this.#scheduler.queued,
+            inFlight: this.#inFlight,
+            buckets: this.#scheduler.size,
+            closed: this.#closing.signal.aborted,
+        };
+    }
+    /**
+     * Stops the client: new requests are refused, requests still queued or
+     * waiting for a limit fail with kind `"aborted"`, and attempts already
+     * sent are allowed to finish. Resolves when nothing is in flight.
+     */
+    public async close(): Promise<void> {
+        if (!this.#closing.signal.aborted)
+            this.#closing.abort(new Error("The REST client was closed."));
+        if (this.#inFlight === 0) return;
+        this.#drained ??= new Promise<void>((resolve) => {
+            this.#idle = resolve;
+        });
+        await this.#drained;
+    }
+    #queueChanged(): void {
+        emitTelemetry(this.#telemetry, {
+            type: "queue",
+            queued: this.#scheduler.queued,
+            inFlight: this.#inFlight,
+        });
     }
     /** Executes an HTTP request with Discord bucket/global rate limits, retry handling, and AbortSignal support.
      * Accepts a JSON body, a FormData body (for file uploads), or undefined.
@@ -372,6 +466,23 @@ export class REST {
             );
         const query = serializeQuery(options.query);
         const requestPath = query ? `${path}${query}` : path;
+        if (this.#closing.signal.aborted)
+            throw abortError(path, this.#closing.signal.reason);
+        const identity = requestIdentity(
+            path,
+            options.auth !== false && this.#token
+                ? this.#fingerprint
+                : undefined,
+        );
+        // Waits end on the caller's signal or on close(); a sent attempt only
+        // on the caller's signal.
+        const waitSignal = options.signal
+            ? AbortSignal.any([options.signal, this.#closing.signal])
+            : this.#closing.signal;
+        const state = { attempts: 0, status: 0 };
+        const started = performance.now();
+        this.#inFlight++;
+        this.#queueChanged();
 
         // Discord scopes a rate limit by (bucket hash, major parameter): two
         // channels sharing an endpoint have independent limits, while two
@@ -379,20 +490,58 @@ export class REST {
         // again once the slot is acquired, so a request that queued under its
         // route-derived key joins the shared bucket's queue if one was
         // discovered while it waited.
-        return this.#scheduler.runResolved(
-            () => this.#limiter.resolveBucketKey(route.route, route.major),
-            options.signal,
-            path,
-            (bucketKey, release) =>
-                this.#attempts<T>(
-                    route,
-                    requestPath,
-                    body,
-                    options,
-                    bucketKey,
-                    release,
-                ),
-        );
+        try {
+            return await this.#scheduler.runResolved(
+                () =>
+                    this.#limiter.resolveBucketKey(
+                        route.route,
+                        route.major,
+                        identity.bucket,
+                    ),
+                waitSignal,
+                path,
+                (bucketKey, release) => {
+                    this.#queueChanged();
+                    return this.#attempts<T>(
+                        route,
+                        requestPath,
+                        body,
+                        options,
+                        { identity, waitSignal, state },
+                        bucketKey,
+                        release,
+                    );
+                },
+            );
+        } catch (error) {
+            if (error instanceof RESTError) {
+                if (error.kind === "aborted" && state.attempts === 0)
+                    emitTelemetry(this.#telemetry, {
+                        type: "cancelled",
+                        stage: "queued",
+                    });
+                else if (error.kind === "overloaded")
+                    emitTelemetry(this.#telemetry, { type: "overloaded" });
+                if (state.status === 0) state.status = error.status;
+            }
+            throw error;
+        } finally {
+            emitTelemetry(this.#telemetry, {
+                type: "request",
+                method: route.method,
+                route: route.route,
+                status: state.status,
+                attempts: state.attempts,
+                durationMs: performance.now() - started,
+                ok: state.status >= 200 && state.status < 300,
+            });
+            if (--this.#inFlight === 0 && this.#idle) {
+                this.#idle();
+                this.#idle = undefined;
+                this.#drained = undefined;
+            }
+            this.#queueChanged();
+        }
     }
     /**
      * Runs the retry loop for one scheduled request: acquire limits, send,
@@ -403,26 +552,55 @@ export class REST {
         requestPath: string,
         body: unknown,
         options: RequestData,
+        context: {
+            identity: RequestIdentity;
+            waitSignal: AbortSignal;
+            state: { attempts: number; status: number };
+        },
         initialBucketKey: string,
         release: () => void,
     ): Promise<T> {
         const { method, path } = route;
+        const { identity, waitSignal, state } = context;
+        const label = route.route;
         let bucketKey = initialBucketKey;
         for (
             let attempt = 0;
             attempt <= this.#retryPolicy.maxRetries;
             attempt++
         ) {
-            await this.#limiter.acquire(bucketKey, options.signal, path);
+            let grant: Grant;
+            try {
+                grant = await this.#limiter.acquire(
+                    bucketKey,
+                    waitSignal,
+                    path,
+                    { global: identity.global },
+                );
+            } catch (error) {
+                if (error instanceof RESTError && error.kind === "aborted")
+                    emitTelemetry(this.#telemetry, {
+                        type: "cancelled",
+                        stage: "waiting",
+                    });
+                throw error;
+            }
             // The reservation already claimed this request's unit, so once the
-            // bucket's window is known the next request need not wait for our
+            // bucket's limit is known the next request need not wait for our
             // response. An unknown bucket stays serial until a response
             // reveals its limit.
-            if (this.#concurrentBuckets) {
-                const bucket = await this.#limiter.store.getBucket(bucketKey);
-                if (bucket && bucket.resetAt > Date.now()) release();
+            if (this.#concurrentBuckets && grant.known) release();
+            if (waitSignal.aborted) {
+                // Never sent: the unit goes back to its window.
+                await this.#limiter.releaseGrant(bucketKey, grant, true);
+                emitTelemetry(this.#telemetry, {
+                    type: "cancelled",
+                    stage: "waiting",
+                });
+                throw abortError(path, waitSignal.reason);
             }
             this.#emit(this.#hooks.onRequest, { method, path, attempt });
+            state.attempts = attempt + 1;
             const requestStart = Date.now();
             let response: Response;
             try {
@@ -434,9 +612,27 @@ export class REST {
                     signal: options.signal,
                 });
             } catch (error) {
-                if (error instanceof RESTError) throw error;
-                if (options.signal?.aborted)
+                // No response: the request may or may not have reached
+                // Discord, so its unit stays spent; only a probe placeholder
+                // (or a request refused before it left) gives anything back.
+                const notSent =
+                    error instanceof RESTError && error.kind === "aborted";
+                await this.#limiter.releaseGrant(bucketKey, grant, notSent);
+                if (error instanceof RESTError) {
+                    if (error.kind === "aborted")
+                        emitTelemetry(this.#telemetry, {
+                            type: "cancelled",
+                            stage: "transport",
+                        });
+                    throw error;
+                }
+                if (options.signal?.aborted) {
+                    emitTelemetry(this.#telemetry, {
+                        type: "cancelled",
+                        stage: "transport",
+                    });
                     throw abortError(path, options.signal.reason);
+                }
                 const failure =
                     error instanceof TransportError
                         ? error
@@ -445,6 +641,10 @@ export class REST {
                               false,
                               sanitizeCause(error),
                           );
+                emitTelemetry(this.#telemetry, {
+                    type: "networkError",
+                    timedOut: failure.timedOut,
+                });
                 if (
                     !failure.timedOut &&
                     attempt < this.#retryPolicy.maxRetries &&
@@ -459,7 +659,13 @@ export class REST {
                         status: 0,
                         delayMs: delay,
                     });
-                    await sleep(delay, options.signal, path);
+                    emitTelemetry(this.#telemetry, {
+                        type: "retry",
+                        route: label,
+                        reason: "network",
+                        attempt,
+                    });
+                    await this.#retrySleep(delay, waitSignal, path);
                     continue;
                 }
                 throw new RESTError(failure.message, 0, undefined, undefined, {
@@ -469,48 +675,79 @@ export class REST {
                     kind: failure.timedOut ? "timeout" : "network",
                 });
             }
+            state.status = response.status;
+            const durationMs = Date.now() - requestStart;
             this.#emit(this.#hooks.onResponse, {
                 method,
                 path,
                 status: response.status,
-                durationMs: Date.now() - requestStart,
+                durationMs,
             });
+            emitTelemetry(this.#telemetry, {
+                type: "response",
+                method,
+                route: label,
+                status: response.status,
+                durationMs,
+            });
+            const payload = await this.#decoder.read(response);
+            const data = response.ok ? {} : this.#decoder.errorData(payload);
             bucketKey = await this.#limiter.applyResponse(
                 response,
                 bucketKey,
                 route.route,
                 route.major,
+                {
+                    identity: identity.bucket,
+                    global: identity.global,
+                    body: data,
+                    grant,
+                },
             );
-            const payload = await this.#decoder.read(response);
             if (response.ok)
                 return (response.status === 204 ? undefined : payload) as T;
 
-            const data = this.#decoder.errorData(payload);
-            const retryAfter =
-                response.status === 429
-                    ? this.#decoder.retryAfter(response, data)
-                    : undefined;
-            if (data.global && retryAfter !== undefined)
-                await this.#limiter.noteGlobalReset(
-                    Date.now() + retryAfter * 1000,
-                );
+            const limited = response.status === 429;
+            const retryAfterMs = limited
+                ? this.#limiter.retryAfterMs(response, data)
+                : undefined;
             // Fire for ANY 429, including a global limit that arrives without a
-            // Retry-After header; fall back to 1s in that case.
-            if (response.status === 429)
+            // Retry-After header (one second is assumed then).
+            if (limited) {
+                const global =
+                    data.global === true ||
+                    response.headers.get("X-RateLimit-Global") === "true";
+                const scope = response.headers
+                    .get("X-RateLimit-Scope")
+                    ?.toLowerCase();
+                emitTelemetry(this.#telemetry, {
+                    type: "rateLimited",
+                    route: label,
+                    scope: global
+                        ? "global"
+                        : scope === "user" || scope === "shared"
+                          ? scope
+                          : "unknown",
+                    retryAfterMs: retryAfterMs!,
+                });
                 this.#emit(this.#hooks.onRateLimit, {
                     method,
                     path,
-                    retryAfterMs: (retryAfter ?? 1) * 1000,
-                    global: data.global ?? false,
-                    bucket: await this.#limiter.store.getBucketHash(
-                        route.route,
-                    ),
+                    retryAfterMs: retryAfterMs!,
+                    global,
+                    bucket:
+                        response.headers.get("X-RateLimit-Bucket") ??
+                        (await this.#limiter.store.getBucketHash(route.route)),
                 });
+            }
             if (
                 attempt < this.#retryPolicy.maxRetries &&
                 this.#retryPolicy.shouldRetry(method, response.status)
             ) {
-                const delay = this.#retryPolicy.getDelay(attempt, retryAfter);
+                const delay = this.#retryPolicy.getDelay(
+                    attempt,
+                    limited ? retryAfterMs! / 1000 : undefined,
+                );
                 if (delay > this.#limiter.maxBackoff)
                     throw new RESTError(
                         `Discord asked to wait ${Math.ceil(delay / 1000)}s before retrying, longer than maxBackoff (${Math.ceil(this.#limiter.maxBackoff / 1000)}s).`,
@@ -526,7 +763,21 @@ export class REST {
                     status: response.status,
                     delayMs: delay,
                 });
-                await sleep(delay, options.signal, path);
+                emitTelemetry(this.#telemetry, {
+                    type: "retry",
+                    route: label,
+                    reason: limited ? "rateLimited" : "server",
+                    attempt,
+                });
+                // A 429's wait is now in the limiter's state, where every
+                // request on the bucket (in every process) honours it; the
+                // next acquire waits it out. Sleep only what the retry policy
+                // adds on top.
+                await this.#retrySleep(
+                    limited ? delay - retryAfterMs! : delay,
+                    waitSignal,
+                    path,
+                );
                 continue;
             }
             throw new RESTError(
@@ -546,6 +797,22 @@ export class REST {
             undefined,
             { method, path },
         );
+    }
+    /** The pause between attempts, reported as a cancellation when cut short. */
+    async #retrySleep(
+        delay: number,
+        signal: AbortSignal,
+        path: string,
+    ): Promise<void> {
+        try {
+            await sleep(delay, signal, path);
+        } catch (error) {
+            emitTelemetry(this.#telemetry, {
+                type: "cancelled",
+                stage: "retry",
+            });
+            throw error;
+        }
     }
     /** Builds the header set for one attempt; library headers win over caller headers. */
     #headers(body: unknown, options: RequestData): Record<string, string> {
@@ -739,8 +1006,31 @@ export {
     type RouteKey,
     type RESTQuery,
 } from "./route.js";
-export { RequestScheduler } from "./scheduler.js";
-export { RateLimiter } from "./limiter.js";
+export { RequestScheduler, type SchedulerOptions } from "./scheduler.js";
+export {
+    RateLimiter,
+    DEFAULT_MAX_BACKOFF_MS,
+    type Grant,
+    type ApplyResponseOptions,
+} from "./limiter.js";
+export {
+    parseRateLimitHeaders,
+    headerNumber,
+    type RateLimitHeaders,
+    type RateLimitScope,
+} from "./headers.js";
+export {
+    requestIdentity,
+    tokenFingerprint,
+    type RequestIdentity,
+} from "./identity.js";
+export {
+    RESTMetrics,
+    type RESTMetricsSnapshot,
+    type RESTTelemetry,
+    type RESTTelemetryEvent,
+    type CoordinationMode,
+} from "./telemetry.js";
 export {
     HttpTransport,
     TransportError,
@@ -751,12 +1041,17 @@ export { ResponseDecoder, type DecodedError } from "./decoder.js";
 export {
     type RateLimitStore,
     type BucketState,
+    type BucketUpdate,
     type Reservation,
+    type ReserveOptions,
     MemoryRateLimitStore,
 } from "./store.js";
 export {
     RedisRateLimitStore,
+    fromBunRedis,
     type RedisRateLimitStoreOptions,
+    type RedisFailurePolicy,
+    type RedisStoreDiagnostics,
     type MinimalRedisClient,
 } from "./redis.js";
 

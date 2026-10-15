@@ -1,0 +1,149 @@
+# REST distributed coordination audit (0.3.2)
+
+Scope: `packages/rest` as a multi-process, multi-bot Discord REST client sharing state through
+Redis. Base: `v0.3` at `ae6bd65`. Confirmed findings were reproduced (a scratch script against
+Redis 7.0.15, or `benchmarks/rest-distributed.ts`) before they were fixed; each has a regression
+test. Status: **Verified** = fixed, with a test that fails without the fix or a measured
+before/after.
+
+## Baseline (before)
+
+`benchmarks/rest-distributed.ts` (4 buckets × 25 requests per process, limit 5 per 200 ms, 5 ms
+latency, Bun 1.4.2, Redis 7.0.15 on localhost, 4 vCPU):
+
+| Scenario | Time | 429s | Redis ops/request |
+|---|---|---|---|
+| 1 process, Redis | 878 ms | 0 | 9.28 |
+| 4 processes, Redis, one bot | 18,514 ms | 180 | 15.21 |
+| 4 processes, Redis, two bots | 4,179 ms | 7 | 10.20 |
+
+After: 0 / 0 / 0 429s, 4.28 / 5.4 / 4.6 ops per request, 3.99 s and 1.93 s for the fleets (floors
+4 s and 2 s). Full table on the docs page `/core-concepts/distributed-rest#benchmarks`.
+
+## Findings
+
+### R-01 — A refused reservation fell through to an unreserved send
+- **Severity:** P0
+- **Location:** `limiter.ts` `RateLimiter.acquire`
+- **Problem:** after eight refusals the loop ended and `acquire()` returned; the request was sent.
+- **Impact:** under contention (a fleet on a hot bucket) requests went out with no reservation.
+- **Evidence:** scratch repro: a store refusing eight times → `acquire` resolved.
+- **Fix:** loop until granted; refusals without a wait end in a `"coordination"` error after 16;
+  total wait bounded by `2 × maxBackoff` (`"rateLimited"`); malformed replies are errors.
+- **Regression test:** `rest.coordination.test.ts` "a store that keeps refusing".
+- **Status:** Verified
+
+### R-02 — Redis failures silently downgraded to local enforcement
+- **Severity:** P1
+- **Location:** `redis.ts` every operation (`#onError` → mirror)
+- **Problem:** any failure, including of `reserve`, fell back to the local mirror with a
+  `console.warn` per call and no state to inspect.
+- **Fix:** `failurePolicy` (`degraded-local` default, `fail-closed`), `commandTimeout`, `mode` /
+  `diagnostics()`, one log line and one `mode` event per transition, `verify()`, `requireAtomic`.
+  Post-response writes never fail a request.
+- **Regression test:** `rest.coordination.test.ts` "Redis failures"; `tests/integration` outage
+  through a TCP proxy, with reconnect.
+- **Status:** Verified
+
+### R-03 — No bot identity in keys
+- **Severity:** P0 (cross-tenant limit corruption)
+- **Location:** `redis.ts` keys, `limiter.ts` bucket keys, global key
+- **Problem:** two bots on one Redis shared every bucket counter and one global limit.
+- **Fix:** bucket keys and global scope prefixed by a 16-hex SHA-256 fingerprint
+  (`identity.ts`); webhook-token and interaction routes classified as shared; keys versioned
+  (`<prefix>v1:`). Raw tokens never stored.
+- **Regression test:** "two bots sharing one Redis never share a bucket counter"; integration
+  "4 processes, two bots".
+- **Status:** Verified
+
+### R-04 — Missing `X-RateLimit-Remaining` read as 0
+- **Severity:** P1
+- **Location:** `limiter.ts` `applyResponse` (`Number(null)`)
+- **Fix:** `headers.ts` parses every header on its own (absent, empty, negative, non-numeric →
+  `undefined`); bucket hashes validated.
+- **Regression test:** "headers are parsed defensively".
+- **Status:** Verified
+
+### R-05 — Global reset could be shortened by a concurrent worker
+- **Severity:** P1
+- **Location:** `limiter.ts` `noteGlobalReset` (get, max, set)
+- **Evidence:** scratch repro: concurrent 60 s and 2 s extends left 2 s.
+- **Fix:** `extendGlobalReset` (Lua max on Redis `TIME`); global checked inside the reserve
+  script.
+- **Regression test:** "concurrent extends … keep the longest" (unit and integration).
+- **Status:** Verified
+
+### R-06 — Response merge was a non-atomic read-modify-write, and conditional
+- **Severity:** P1
+- **Location:** `limiter.ts` `applyResponse` / `store.updateBucket`
+- **Problem:** workers raced on the merge; the min/max protection applied only with
+  `concurrentBuckets`, and nothing told windows apart.
+- **Fix:** `reconcile` (Lua): min within a window, older window (by `X-RateLimit-Reset`) ignored,
+  estimates replaced by server resets, 429 recorded on the bucket.
+- **Regression test:** "out-of-order responses"; integration "Lua scripts behave like the JS core".
+- **Status:** Verified
+
+### R-07 — Unknown and reset buckets let every worker send at once
+- **Severity:** P1
+- **Location:** `store.ts` / `redis.ts` reserve (granted unknown or elapsed buckets outright)
+- **Fix:** a probe placeholder (one request per fleet; others poll every 50 ms; expires after the
+  attempt timeout + 1 s; cleared on failure or remap); an elapsed window with a known limit
+  reopens at that limit.
+- **Regression test:** "an unknown bucket is probed by one request across instances", "burst after
+  reset"; integration "exactly one probe across connections".
+- **Status:** Verified
+
+### R-08 — Reservation windows used each worker's clock
+- **Severity:** P2
+- **Location:** `redis.ts` RESERVE_SCRIPT (`ARGV[1] = Date.now()`)
+- **Fix:** every script reads `TIME`.
+- **Regression test:** unit "a server clock ahead of the client's"; integration "a skewed client
+  clock does not move the windows".
+- **Status:** Verified
+
+### R-09 — A 429 held its bucket for the whole-second header, and retried on a separate timer
+- **Severity:** P2
+- **Location:** `limiter.ts` `applyResponse` (header `Retry-After`), `index.ts` retry sleep
+- **Fix:** the wait (body `retry_after` → `Retry-After` → `Reset-After` → 1 s) is recorded in the
+  store; the retry sleeps only what the policy adds and then waits on the limiter.
+- **Regression test:** "429 delays".
+- **Status:** Verified
+
+### R-10 — Hash that differs per major parameter (or changes) split a bucket
+- **Severity:** P2
+- **Location:** `limiter.ts` route-to-hash resolution
+- **Evidence:** `benchmarks/rest-buckets.ts` (per-channel hashes) produced 7 429s during this
+  work; the test fails with the old resolution (3 overshoots).
+- **Fix:** a major parameter's own responses win over the route-level hash.
+- **Regression test:** "a route whose hash differs per channel is not split across keys".
+- **Status:** Verified
+
+### R-11 — Unbounded queues, no shutdown
+- **Severity:** P2
+- **Fix:** `maxQueued`, `maxQueuedPerBucket` (`"overloaded"`); `close()` cancels waits, lets sent
+  attempts finish.
+- **Regression test:** "queues and shutdown".
+- **Status:** Verified
+
+### R-12 — Redis op count per request
+- **Severity:** P3
+- **Problem:** every request read the route hash and every response wrote it (9–15 ops/request).
+- **Fix:** in-process route cache; reserve + global in one script. 4.3–5.4 ops/request measured.
+- **Status:** Verified
+
+### R-13 — Reaction emoji in route keys
+- **Severity:** P3
+- **Problem:** one Redis key (7-day TTL) per emoji per route.
+- **Fix:** `/reactions/:emoji` in `normalizeRoutePath`.
+- **Status:** Verified
+
+## Accepted risks / open
+
+- A request that times out or loses its connection keeps its unit spent (it may have reached
+  Discord); only certainly-unsent requests are refunded. Conservative by design.
+- A probe whose response is lost lets a second probe go: at most two in flight on a new bucket.
+- A Discord bucket-hash change can overshoot by the requests reserved under the old key.
+- Discord's invalid-request limit (10,000 401/403/429 per 10 min) is not enforced; telemetry
+  counts the responses. Open (P2): a guard that pauses the token after repeated 401s.
+- `EVAL` sends the script text each time; `EVALSHA` with a fallback would save bandwidth. Open (P3).
+- Redis Cluster needs a hash-tagged `prefix`; not tested against a cluster. Open (P3).

@@ -97,6 +97,38 @@ jobs:
       - name: Run test suite
         run: bun run ci:test
 
+  redis:
+    name: REST against real Redis
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun run ci:install
+
+      - name: Redis integration tests
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+        run: bun run test:redis
+
   bench:
     name: Benchmarks
     runs-on: ubuntu-latest

@@ -84,6 +84,7 @@ export default defineConfig({
             { label: "Client & Lifecycle", link: "/core-concepts/client" },
             { label: "Gateway & WebSocket", link: "/core-concepts/gateway" },
             { label: "REST & Rate Limits", link: "/core-concepts/rest" },
+            { label: "Distributed REST", link: "/core-concepts/distributed-rest" },
             { label: "Caching & Structures", link: "/core-concepts/caching" },
             { label: "Permissions", link: "/core-concepts/permissions" },
             { label: "Interactions & Commands", link: "/core-concepts/interactions" },

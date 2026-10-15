@@ -19,7 +19,11 @@ export type RESTErrorKind =
     /** 5xx: Discord failed to handle the request. */
     | "server"
     /** Any other 4xx. */
-    | "client";
+    | "client"
+    /** The rate-limit store failed or refused to coordinate; the request was not sent. */
+    | "coordination"
+    /** A local queue limit was reached; the request was not sent. */
+    | "overloaded";
 
 function kindFromStatus(status: number): RESTErrorKind {
     if (status === 429) return "rateLimited";
@@ -131,7 +135,9 @@ export class RESTError extends Error {
             this.kind === "rateLimited" ||
             this.kind === "server" ||
             this.kind === "network" ||
-            this.kind === "timeout"
+            this.kind === "timeout" ||
+            this.kind === "coordination" ||
+            this.kind === "overloaded"
         );
     }
 }

@@ -1,0 +1,117 @@
+---
+title: Distributed REST
+description: How Lunibee shares Discord rate limits between processes and bots through Redis — architecture, guarantees, failure modes, scaling and benchmarks.
+---
+
+Several processes sending for one bot (clusters, workers, a dashboard) share one set of Discord rate limits. Lunibee coordinates them through a shared `RateLimitStore`, usually `RedisRateLimitStore`, inside each process: there is no proxy to deploy, no leader and no membership. This page is the operator's view; the API is on the [REST reference](/reference/rest/#sharing-limits-between-processes).
+
+## Architecture
+
+```text
+REST.request ─► RequestScheduler ─► RateLimiter ─► HttpTransport ─► Discord
+                 per-bucket FIFO     reserve / merge    one attempt
+                                         │
+                                  RateLimitStore
+                         memory (one process) │ Redis (a fleet)
+```
+
+| Layer | Owns | Replaceable |
+|---|---|---|
+| `RequestScheduler` | Per-bucket ordering, queue limits, the early slot release of `concurrentBuckets`. Buckets queue independently: a slow bucket never holds another up. | Exported and testable on its own. |
+| `RateLimiter` | When a request may go out (a *reservation*) and what a response says (a *merge*). It never sends a request without a reservation. | Takes any `RateLimitStore`. |
+| `RateLimitStore` | The shared state, with atomic `reserve`, `reconcile`, `extendGlobalReset` and `release`. | Memory, Redis, or your own — the interface is the seam for an external coordinator later. |
+| `HttpTransport` | One HTTP attempt: timeout, cancellation, no redirects. | `transport` option. |
+
+Every Redis operation the limiter needs is one Lua script: the read, the decision and the write cannot interleave across processes, and the clock is Redis's own (`TIME`), so workers with skewed clocks agree on when a window resets. An ordinary request costs two scripts (reserve, merge) and no lock.
+
+## What is guaranteed
+
+With `RedisRateLimitStore` on a client with `eval`, while Redis answers:
+
+- **No unit is spent twice.** A bucket's `remaining` is decremented atomically; it never goes below zero, and a request is sent only with a granted reservation. A store that fails, replies with something unreadable, or refuses without a wait fails the request with kind `"coordination"` — it is never sent unreserved.
+- **Responses cannot hand back allowance.** Within a window the merge keeps the lower of the stored count (which includes reservations still in flight) and the header; a response from an older window (an earlier `X-RateLimit-Reset`) is ignored; an estimated reset is replaced by the server's.
+- **Unknown buckets are probed once.** The first request on a bucket nobody knows holds a placeholder; everyone else, in every process, polls every 50 ms until its response lands. A probe that fails without a response clears the placeholder; one whose process dies expires with the attempt timeout plus one second.
+- **Resets do not cause bursts.** When a window with a known limit elapses, the next reservation opens the new window at that limit, so a fleet waking together sends at most `limit` requests before the first response confirms the window.
+- **Global limits only grow.** A global 429 extends the bot's global reset to *at least* its wait, atomically; a shorter one from another worker cannot shorten it. The global limit is checked in the same script as the bucket.
+- **Bots are isolated.** Bucket keys and the global limit are scoped by a token fingerprint (16 hex characters of SHA-256). Raw tokens never appear in keys, metrics, logs or errors. Token webhooks and interaction callbacks are limited per webhook, so all bots share those buckets; interaction callbacks count against no global limit.
+- **State is bounded.** Every key has a TTL (a bucket lives one minute past its reset, a route mapping seven days, a global limit until it resets), keys are versioned (`<prefix>v1:…`) and reaction emoji are normalised out of route keys.
+
+What is **not** guaranteed:
+
+- A request that times out or loses its connection may or may not have reached Discord, so its unit stays spent (conservative) and it is not retried unless it is idempotent (`GET`, `HEAD`, `PUT`, `DELETE`). Only a request that certainly never left (cancelled before sending) gets its unit back.
+- If a probe's response is lost, a second probe may go before the first is known to have arrived: on a brand-new bucket at most two requests can then be in flight.
+- If Discord changes a route's bucket hash, requests already reserved under the old key are not moved: the transition can overshoot by the requests in flight.
+- Discord's invalid-request limit (10,000 `401`/`403`/`429` per 10 minutes per IP) is not tracked; the telemetry counts the responses so you can alert on them.
+
+## Failure modes
+
+| Situation | `degraded-local` (default) | `fail-closed` |
+|---|---|---|
+| Redis unreachable, timing out (`commandTimeout`, 2 s) | Each process limits from the state it last saw, plus every response it gets. The fleet can exceed a limit by up to the number of processes. `mode` is `"degraded-local"`. | Requests fail with a retryable `RESTError` of kind `"coordination"` and are not sent. `mode` is `"unavailable"`. |
+| Redis answers again | The next command succeeds and `mode` returns to `"distributed"`. | The same. |
+| Redis restarted without persistence | Every bucket is unknown again: the next request on each is a probe. No overshoot. | The same. |
+| Redis without `EVAL` (some managed services) | `mode` is `"observational"`: limits are shared but read-then-written, so workers can race on the last unit. `verify()` or `requireAtomic: true` makes this a startup error. | The same. |
+| Script error or unreadable reply | The request fails with kind `"coordination"` under `fail-closed`; under `degraded-local` the call falls back to the local state. | Fails, not sent. |
+| A process crashes mid-request | Its reservation stays spent until the window resets; a probe placeholder expires with the attempt timeout + 1 s. | The same. |
+| Clock skew between workers | No effect: windows use Redis `TIME`. | The same. |
+
+Writes made after a response (the merge, a global extension, a route mapping) never fail a request under either policy: Discord already answered, so failing the caller would help nobody. They are mirrored locally and reported.
+
+Every transition is logged once (`console.warn`), emitted as a `mode` telemetry event, counted in `diagnostics().failures`, and visible in `rest.diagnostics().mode` — never silent. Choose `fail-closed` when overshooting a limit is worse than failing requests during an outage (large fleets close to their limits); keep `degraded-local` when availability matters more.
+
+## Configuration
+
+```ts
+import { REST, RedisRateLimitStore, RESTMetrics, fromBunRedis } from "@lunibee/rest";
+
+const metrics = new RESTMetrics();
+const store = new RedisRateLimitStore({
+  client: fromBunRedis(new Bun.RedisClient(process.env.REDIS_URL!)),
+  prefix: "{mybot}:rest:",          // hash tag: one slot on Redis Cluster
+  failurePolicy: "fail-closed",
+  commandTimeout: 1_000,
+  requireAtomic: true,
+  telemetry: metrics,
+});
+await store.verify();
+
+const rest = new REST({
+  token: process.env.DISCORD_TOKEN!,
+  store,
+  telemetry: metrics,
+  maxQueued: 10_000,                // shed load instead of growing the heap
+  maxQueuedPerBucket: 1_000,
+});
+```
+
+Health endpoint material: `rest.diagnostics()` (`mode`, `queued`, `inFlight`, `buckets`, `closed`) and `store.diagnostics()` (`mode`, `failures`, `lastFailureAt`, `lastError`).
+
+## Scaling
+
+- **Processes.** Throughput for one bot is bounded by Discord's limits, not by the processes: adding processes adds no capacity on a bucket, only on independent buckets. Coordination cost is about two Redis scripts per request, plus one per refused reservation while a bucket is spent.
+- **Bots.** Any number of bots can share one Redis; each has its own keys and global limit.
+- **Redis.** Each script touches one or two keys of one bot. On Redis Cluster, give each bot (or the fleet) a hash-tagged `prefix` so a script's keys share a slot.
+- **Memory.** The memory store and the in-process route cache are capped at 10,000 entries each; queues are bounded by `maxQueued` / `maxQueuedPerBucket` when set.
+
+## Benchmarks
+
+`bun run bench:rest` runs both REST benchmarks. `benchmarks/rest-distributed.ts` starts a fake Discord HTTP server that enforces real windows per bot, bucket and channel (limit 5 per 200 ms by default, 5 ms latency) and counts every request it had to reject; each REST instance runs in its own Bun process with its own Redis connection, and every process sends 25 requests to each of 4 buckets at once. A 429 there is a request sent over the limit.
+
+Measured on one machine (4 vCPU x86-64, Bun 1.4.2, Redis 7.0.15 on localhost), three runs, before and after this release's coordination changes:
+
+| Scenario | Before: time / 429s / Redis ops per request | After |
+|---|---|---|
+| 1 process, memory store | 876 ms / 0 / — | 868–878 ms / 0 / — |
+| 4 processes, memory (no coordination) | 19,237 ms / 628 / — | 3,955–4,005 ms / 886–935 / — |
+| 1 process, Redis | 878 ms / 0 / 9.28 | 872–882 ms / 0 / 4.28 |
+| 4 processes, Redis, one bot | 18,514 ms / **180** / 15.21 | 3,981–3,994 ms / **0** / 5.41–5.45 |
+| 4 processes, Redis, two bots | 4,179 ms / 7 / 10.20 | 1,924–1,946 ms / 0 / 4.62–4.64 |
+
+The floor for "4 processes, one bot" is 4 s (100 requests per bucket at 5 per 200 ms); for two bots, 2 s. The "no coordination" row shows what sharing prevents; it got faster because a 429 now records the body's precise `retry_after` on the bucket; before, the bucket was held for the whole-second `Retry-After` header. P50/P95/P99 request latency and peak RSS are printed per row. These are fake-server numbers on one host: they measure coordination correctness and overhead, not Discord's latency.
+
+## Migrating from 0.3.1
+
+- **Keys moved.** Redis keys are now `<prefix>v1:…` and bucket keys carry the bot's fingerprint. Processes on 0.3.1 and 0.3.2 do not see each other's state: upgrade every process of a fleet together. Old keys expire on their own (route mappings within seven days).
+- **Custom stores keep working.** The new store methods are optional; without them the limiter falls back to read-merge-write as before. `reserve()` now receives `(key, options)` and may return `known` and `resetAt`; returning `{ granted: true }` still works.
+- **Behaviour changes.** A response without rate-limit headers no longer resets `remaining` to 0. Responses always merge (`concurrentBuckets: false` included): a late response cannot raise `remaining` within a window. A 429 is waited out through the limiter instead of a separate sleep. Two new `RESTErrorKind`s, `"coordination"` and `"overloaded"`, can appear (both `retryable`); an exhaustive `switch` over `kind` needs the two cases.
+- **Redis failures are reported once per transition**, not on every failed command.

@@ -152,6 +152,8 @@ ${table("Gateway events")}
 `;
 
 const rest = await run([process.execPath, "benchmarks/rest-buckets.ts"]);
+// Redis rows only when REDIS_URL is set; the memory rows always run.
+const restDistributed = await run([process.execPath, "benchmarks/rest-distributed.ts"]);
 pages["rest.md"] =
     header("REST benchmarks", "Sequential against concurrent bucket scheduling, with a fake Discord that enforces real rate-limit windows.") +
     `${meta}
@@ -161,6 +163,14 @@ ${rest}
 \`\`\`
 
 \`bun run bench:rest\`. Since 0.3.1 requests on a bucket whose limit is known run concurrently, up to its remaining allowance (\`concurrentBuckets: true\`, the default). The gain appears when the round trip is longer than the bucket's window divided by its limit. Pass \`concurrentBuckets: false\` for strict per-bucket ordering. A separate 10,000-request soak test (\`tests/rest.soak.test.ts\`) checks that fewer than 1% of requests are rate limited.
+
+## Several processes
+
+\`\`\`text
+${restDistributed}
+\`\`\`
+
+\`REDIS_URL=redis://… bun benchmarks/rest-distributed.ts\`: each REST instance in its own Bun process (with its own Redis connection), against a fake Discord HTTP server that counts every request it had to reject (a 429 is a request sent over the limit). See [Distributed REST](/core-concepts/distributed-rest/#benchmarks) for the method and a before/after comparison.
 `;
 
 const memory = await run([process.execPath, "benchmarks/cache-memory.ts"]);

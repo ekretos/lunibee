@@ -26,7 +26,10 @@ Fixes from the fifth security audit of 0.3.1 (status of every finding in
 payload bugs, the REST compatibility gaps (`request(options)`, `WebhookClient` aliases),
 100% REST coverage, and complete reference pages for REST, Gateway, sharding and voice. Every
 finding of the 0.3.2 docs review (D-01 to D-26 in that report) is fixed. All in the changelog's
-"v0.3.2". Versions are 0.3.2 and the 0.3.1 docs are archived in the version picker. Left for the
+"v0.3.2". Distributed REST coordination (atomic Lua reservations and merges on Redis `TIME`, bot
+identity in keys, probes, `failurePolicy`, telemetry, queue limits, `close()`) is in too: findings
+and status in `docs/audits/rest-distributed-0.3.2.md`, docs on `/core-concepts/distributed-rest`.
+Versions are 0.3.2 and the 0.3.1 docs are archived in the version picker. Left for the
 maintainer: the `0.3.2` tag and `publish:all`.
 
 ## 0.3.1 (shipped)

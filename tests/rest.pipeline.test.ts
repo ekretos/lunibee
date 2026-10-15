@@ -388,9 +388,11 @@ describe("REST concurrent buckets (REST-003)", () => {
         const limiter = new RateLimiter(store, { concurrent: true });
         await limiter.applyResponse(limited(3), "k", "route", "@none");
         expect(store.getBucket("k")!.remaining).toBe(0);
+        // Since 0.3.2 a serial limiter merges the same way: within a window
+        // the stored count already includes reservations still in flight.
         const serial = new RateLimiter(store);
         await serial.applyResponse(limited(3), "k", "route", "@none");
-        expect(store.getBucket("k")!.remaining).toBe(3);
+        expect(store.getBucket("k")!.remaining).toBe(0);
     });
 
     test("never exceeds the bucket's remaining allowance", async () => {

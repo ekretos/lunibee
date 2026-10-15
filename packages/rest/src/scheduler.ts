@@ -1,4 +1,12 @@
-import { abortable } from "./errors.js";
+import { RESTError, abortable } from "./errors.js";
+
+/** Limits for {@link RequestScheduler}. */
+export interface SchedulerOptions {
+    /** Most requests waiting for a slot across all buckets. Default unlimited. */
+    maxQueued?: number;
+    /** Most requests waiting for a slot on one bucket. Default unlimited. */
+    maxQueuedPerBucket?: number;
+}
 
 /**
  * Serialises work per rate-limit bucket.
@@ -7,17 +15,34 @@ import { abortable } from "./errors.js";
  * limit state its predecessor's response wrote. The queue slot is released on
  * every exit path — including an abort raised while still waiting — because a
  * slot that is never released wedges its bucket for the process lifetime.
+ * Buckets queue independently: a slow bucket never holds up another.
  */
 export class RequestScheduler {
     /** Maximum times a request may be moved to a different bucket queue. */
     public static readonly MAX_REMAPS = 2;
     readonly #queues = new Map<string, Promise<void>>();
-    /** Creates an empty instance. */
-    public constructor() {}
+    readonly #waiting = new Map<string, number>();
+    #queued = 0;
+    readonly #maxQueued: number;
+    readonly #maxQueuedPerBucket: number;
+
+    /** Creates an empty scheduler. @param options Queue limits. */
+    public constructor(options: SchedulerOptions = {}) {
+        this.#maxQueued = options.maxQueued ?? Number.POSITIVE_INFINITY;
+        this.#maxQueuedPerBucket =
+            options.maxQueuedPerBucket ?? Number.POSITIVE_INFINITY;
+        if (!(this.#maxQueued >= 0) || !(this.#maxQueuedPerBucket >= 0))
+            throw new RangeError("Queue limits must be non-negative numbers.");
+    }
 
     /** Number of bucket keys currently holding a queue slot. */
     public get size(): number {
         return this.#queues.size;
+    }
+
+    /** Number of requests waiting for a slot. */
+    public get queued(): number {
+        return this.#queued;
     }
 
     /**
@@ -67,6 +92,7 @@ export class RequestScheduler {
      * @param path Request path, used for cancellation error context.
      * @param task Work to run while holding the slot, given an idempotent
      *   callback that frees the slot before the task settles.
+     * @throws {RESTError} Of kind `"overloaded"` when a queue limit is reached.
      */
     public async run<T>(
         key: string,
@@ -74,7 +100,20 @@ export class RequestScheduler {
         path: string,
         task: (release: () => void) => Promise<T>,
     ): Promise<T> {
-        const previous = this.#queues.get(key) ?? Promise.resolve();
+        const previous = this.#queues.get(key);
+        const waiting = this.#waiting.get(key) ?? 0;
+        if (
+            previous &&
+            (this.#queued >= this.#maxQueued ||
+                waiting >= this.#maxQueuedPerBucket)
+        )
+            throw new RESTError(
+                "The REST request queue is full; request not sent.",
+                0,
+                undefined,
+                undefined,
+                { path, kind: "overloaded" },
+            );
         let open!: () => void;
         const gate = new Promise<void>((resolve) => {
             open = resolve;
@@ -90,7 +129,18 @@ export class RequestScheduler {
             if (this.#queues.get(key) === gate) this.#queues.delete(key);
         };
         try {
-            await abortable(previous, signal, path);
+            if (previous) {
+                this.#queued++;
+                this.#waiting.set(key, waiting + 1);
+                try {
+                    await abortable(previous, signal, path);
+                } finally {
+                    this.#queued--;
+                    const left = (this.#waiting.get(key) ?? 1) - 1;
+                    if (left > 0) this.#waiting.set(key, left);
+                    else this.#waiting.delete(key);
+                }
+            } else await abortable(Promise.resolve(), signal, path);
             return await task(release);
         } finally {
             release();

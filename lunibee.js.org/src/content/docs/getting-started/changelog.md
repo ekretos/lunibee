@@ -5,7 +5,7 @@ description: Lunibee version history and release notes.
 
 ## v0.3.2
 
-Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1.md), "Fifth pass"), two Components V2 payload bugs, the last REST compatibility gaps, and complete reference pages for REST, Gateway, sharding and voice.
+Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1.md), "Fifth pass"), two Components V2 payload bugs, the last REST compatibility gaps, complete reference pages for REST, Gateway, sharding and voice, and distributed REST rate limiting that holds across processes and bots ([Distributed REST](/core-concepts/distributed-rest/)).
 
 ### ⚠️ Changed
 
@@ -22,8 +22,17 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **Types:** `options.getUser()` is typed `UserData & Record<string, unknown>` (it was `Record<string, unknown>`), so `new User(options.getUser("x")!)` type-checks; `ApplicationCommandData.description` is optional, since context-menu commands have none.
 - **Gateway:** `reconnectBaseDelay`, `reconnectMaxDelay` and `connectTimeout` must be greater than 0; dispatch names that are not UPPER_SNAKE_CASE are not re-emitted as events; `ownsGuild()` returns `false` for a non-numeric id.
 
+- **Distributed rate limiting** ([Distributed REST](/core-concepts/distributed-rest/)):
+    - Redis keys are versioned (`<prefix>v1:…`) and bucket keys and global limits are scoped by a token fingerprint, so bots sharing one Redis no longer share counters. 0.3.1 and 0.3.2 processes do not share state.
+    - Responses always merge: within a window `remaining` only goes down, also with `concurrentBuckets: false`, and a response from an older window is ignored.
+    - A 429's wait is recorded in the store (on the bucket, or the bot's global limit) and the retry waits for it like every other request, instead of sleeping on its own.
+    - `RedisRateLimitStore` warns once per state change instead of once per failed command.
+    - New `RESTErrorKind`s `"coordination"` and `"overloaded"` (both retryable).
+
 ### 🔒 Security
 
+- **A failed reservation can no longer send a request unreserved.** After eight refused reservations `acquire()` returned and the request went out anyway; and on any Redis error a reservation fell back to local state with nothing but a log line per call. A request is now sent only with a granted reservation: a store that errors, replies with something unreadable or refuses without a wait fails it with kind `"coordination"`, and Redis failures follow the explicit `failurePolicy`.
+- **Raw tokens never reach the rate-limit store.** Bot identity in keys is a 16-hex-character SHA-256 fingerprint; telemetry carries no token, fingerprint or body.
 - **Server-controlled backoff is bounded.** A `Retry-After` or rate-limit reset above `maxBackoff` (new REST option, default 10 minutes) fails the request with a `RESTError` instead of sleeping, and stored bucket and global limits are capped to it. `sleep()` clamps to the 32-bit timer limit.
 - **A custom `transport`'s thrown error is sanitised** before it becomes a `RESTError`'s `cause`.
 - **Multipart file names** have CR, LF, `"` and `\` replaced; **`baseURL`** is normalised and a bare `?` or `#` is refused; **encoded path segments** that decode to `..` are refused.
@@ -34,6 +43,14 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 
 ### 🐛 Fixed
 
+- **REST coordination across processes** (measured with `benchmarks/rest-distributed.ts`: four processes sharing Redis went from 180 requests over the limit to 0, and from 15.2 to 5.4 Redis operations per request):
+    - A response without `X-RateLimit-Remaining` set the bucket to 0 remaining (`Number(null)` is 0). Every rate-limit header is now parsed on its own; missing, empty, negative or non-numeric values are ignored.
+    - Two concurrent global 429s could shorten the global limit (read, compare and write were separate). It is now extended atomically and never shortened.
+    - Every worker that saw an unknown or reset bucket sent at once. One request now probes an unknown bucket for the whole fleet, and a reset window reopens at the known limit.
+    - Redis reservations used each worker's clock; they now use Redis `TIME`.
+    - A 429 held its bucket for the whole-second `Retry-After` header instead of the body's precise `retry_after`.
+    - A route whose bucket hash differed per channel, or changed, split one bucket's requests across two keys; the hash a major parameter's own responses gave now wins.
+    - Every response rewrote the route's bucket hash in Redis and every request read it; both are now cached in-process.
 - **A `failed` cluster no longer keeps `ClusterManager.ready()` pending forever.** Readiness now means every shard is served by a ready cluster, so a failed cluster whose shards were reassigned does not block it, and when a failure leaves shards with no owner, pending `ready()` calls reject with an error naming them.
 - **`users.fetch()`, `members.fetch()` and `roles.fetch()` keep cached references current.** They stored the fetched object in place of the cached one, so references held elsewhere went stale; they now merge into the cached instance, like Gateway updates.
 - **`@lunibee/structures` no longer imports `@lunibee/core` at runtime.** The permission classes (`PermissionSet`, `PermissionsBitField`, `computePermissions`…) moved into `@lunibee/structures`; `@lunibee/core` and `lunibee` re-export them unchanged. Installing `@lunibee/structures` on its own works, and `check:deps` now also checks source imports.
@@ -65,6 +82,14 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **`benchmarks/rest-buckets.ts`**: sequential against concurrent bucket scheduling with a fake Discord that enforces rate-limit windows.
 - **Command managers accept builders.** `commands.create()`, `set()`, `edit()` and their guild versions take a `CreateSlashCommand` / context-menu builder as it is (its `toJSON()` is sent), next to plain data. New type `ApplicationCommandInput`.
 - **`MessageFileSource`** (anything with `name` and `toBuffer()`) is accepted in `files`; `RESTFileAttachment.data` may be a promise.
+- **REST:**
+    - `RedisRateLimitStore` options `failurePolicy` (`"degraded-local"` default, or `"fail-closed"`), `commandTimeout` (2 s), `requireAtomic` and `telemetry`; members `mode`, `diagnostics()` and `verify()`; `fromBunRedis()` adapts `Bun.RedisClient`.
+    - Optional `RateLimitStore` methods `reconcile`, `extendGlobalReset`, `release` and `reservesGlobal`, each making one step atomic; both built-in stores implement them.
+    - `REST` options `telemetry`, `maxQueued` and `maxQueuedPerBucket`; `rest.close()` (graceful shutdown) and `rest.diagnostics()`.
+    - `RESTMetrics`: counters, gauges and latency histograms from the telemetry events, with bounded route labels and a Prometheus text export.
+    - `parseRateLimitHeaders()`, `headerNumber()`, `requestIdentity()`, `tokenFingerprint()`, `DEFAULT_MAX_BACKOFF_MS`, and the types `Grant`, `BucketUpdate`, `ReserveOptions`, `RateLimitHeaders`, `RateLimitScope`, `RequestIdentity`, `SchedulerOptions`, `ApplyResponseOptions`, `RESTDiagnostics`, `RESTTelemetry`, `RESTTelemetryEvent`, `RESTMetricsSnapshot`, `CoordinationMode`, `RedisFailurePolicy`, `RedisStoreDiagnostics`.
+    - Reaction routes are keyed without the emoji (`/reactions/:emoji`), so they no longer create a key per emoji.
+- **`benchmarks/rest-distributed.ts`**: REST instances in separate processes sharing Redis, against a fake Discord HTTP server that counts every request over the limit.
 
 ### 📚 Documentation
 
@@ -77,7 +102,9 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 
 ### 🧪 Testing
 
-- Every file in `packages/rest/src` is at 100% function and line coverage.
+- Every file in `packages/rest/src` is at 100% line coverage.
+- `tests/rest.coordination.test.ts`: concurrency on one bucket (150 requests), independent buckets, routes sharing a learned bucket, out-of-order responses, global extend vs shorten, several instances and several bots on one store, Redis errors, hangs, restarts and clock skew, persistent refusals and script errors, cancellation at every stage, probes, bursts after a reset, malformed headers and delays, queue limits, shutdown, telemetry without secrets, and bounded memory over 10,000 requests.
+- `tests/integration/rest-redis.test.ts` (`bun run test:redis`, a CI job with a Redis service): the Lua scripts against the JS logic they port, 400 concurrent reservations over 8 connections, one probe across connections, four REST processes for one and for two bots against a fake Discord server with no request over the limit, and an outage through a TCP proxy that degrades (or fails closed) and recovers on reconnect.
 - A regression test for each audit fix.
 
 ## v0.3.1

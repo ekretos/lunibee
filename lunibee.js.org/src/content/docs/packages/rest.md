@@ -86,9 +86,13 @@ const store = new RedisRateLimitStore({ client });
 store.supportsReservation; // true when the client can reserve atomically
 ```
 
-If Redis becomes unreachable, every write is mirrored in-process and reads fall back
-to that mirror, so a Redis outage does not silently drop the fleet to unlimited
-sending. `store.isHealthy()` reports whether the last operation succeeded.
+If Redis becomes unreachable, the store follows its `failurePolicy`: by default
+(`"degraded-local"`) each process limits from its last known state, mirrored
+in-process, so an outage does not drop the fleet to unlimited sending; with
+`"fail-closed"` requests fail with kind `"coordination"` instead of being sent.
+Either way the change is logged once and reported by `store.mode` and
+`store.diagnostics()`. Bun's own client works through `fromBunRedis()`. See
+[Distributed REST](/core-concepts/distributed-rest/) for the guarantees and failure modes.
 
 ### Observing limits
 
