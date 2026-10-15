@@ -257,7 +257,7 @@ for (const [name, run] of [
 
 // ── Gateway events (payload → cache sync → emit) ───────────────────────────
 
-const client = new Client({ token: "a.b", intents: 0 });
+const client = new Client({ token: "a.b", intents: [] });
 const gateway = client.gateway;
 const sf = (n) => String(200_000_000_000_000_000n + BigInt(n));
 const guildId = sf(1);

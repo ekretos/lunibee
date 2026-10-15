@@ -5,7 +5,7 @@
  */
 import { Client } from "../packages/core/src/index.ts";
 
-const client = new Client({ token: "a.b", intents: 0 });
+const client = new Client({ token: "a.b", intents: [] });
 const gateway = client.gateway as unknown as {
     emit(event: string, data: unknown): void;
 };
