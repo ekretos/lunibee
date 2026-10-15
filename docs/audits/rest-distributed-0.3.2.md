@@ -157,6 +157,22 @@ After: 0 / 0 / 0 429s, 4.28 / 5.4 / 4.6 ops per request, 3.99 s and 1.93 s for t
   run has 0).
 - **Status:** Verified
 
+### R-16 — Out-of-range rate-limit headers were trusted
+- **Severity:** P3 (needs a hostile or broken responder, e.g. a proxy)
+- **Problem:** an `X-RateLimit-Reset` far in the future became the window id, so every real
+  response looked stale and its lower `remaining` was ignored until the state expired; an absurd
+  `X-RateLimit-Limit` made the next window effectively unlimited.
+- **Fix:** window ids further than `maxBackoff` from now are dropped; limit and remaining above
+  100,000 are ignored.
+- **Regression test:** `rest.coordination.test.ts` "hostile rate-limit headers".
+- **Status:** Verified
+
+Security pass over the new code (0.3.2): `bun run audit:security` clean (secret scan, `bun audit`:
+no vulnerabilities); keys and script arguments are passed as `KEYS`/`ARGV`, never interpolated into
+Lua; tokens appear only as a 16-hex SHA-256 fingerprint; telemetry routes are redacted; Redis
+passwords in the client URL do not reach `diagnostics()` (checked with `Bun.RedisClient`); every
+new map is bounded; new regexes are linear.
+
 ## Accepted risks / open
 
 - A request that times out or loses its connection keeps its unit spent (it may have reached

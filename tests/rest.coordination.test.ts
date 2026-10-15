@@ -1519,3 +1519,34 @@ describe("invalid token guard", () => {
         expect(m.snapshot().counters.token_rejected_total).toBe(1);
     });
 });
+
+describe("hostile rate-limit headers", () => {
+    test("an absurd limit or remaining is ignored", () => {
+        const parsed = parseRateLimitHeaders(
+            new Headers({
+                "x-ratelimit-limit": "1e308",
+                "x-ratelimit-remaining": "100001",
+            }),
+        );
+        expect(parsed.limit).toBeUndefined();
+        expect(parsed.remaining).toBeUndefined();
+    });
+
+    test("a window id far from now cannot make real responses stale", async () => {
+        const store = new MemoryRateLimitStore();
+        const limiter = new RateLimiter(store, { maxBackoff: 60_000 });
+        const res = (remaining: number, reset: number) =>
+            new Response("{}", {
+                headers: {
+                    "x-ratelimit-remaining": String(remaining),
+                    "x-ratelimit-reset-after": "5",
+                    "x-ratelimit-reset": String(reset),
+                },
+            });
+        const now = Date.now() / 1000;
+        await limiter.applyResponse(res(4, now + 1e9), "k", "r", "@none");
+        expect(store.getBucket("k")!.window).toBeUndefined();
+        await limiter.applyResponse(res(1, now + 5), "k", "r", "@none");
+        expect(store.getBucket("k")!.remaining).toBe(1);
+    });
+});

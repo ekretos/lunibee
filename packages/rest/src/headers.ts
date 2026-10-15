@@ -41,6 +41,17 @@ export function headerNumber(
 /** Bucket hashes are short opaque strings; anything else is not one. */
 const BUCKET_HASH = /^[A-Za-z0-9:_\-.]{1,64}$/;
 
+/**
+ * Discord's per-bucket counts are small; one beyond this is a broken or
+ * hostile responder, and reading it would make the bucket unlimited.
+ */
+const MAX_COUNT = 100_000;
+function count(value: number | undefined): number | undefined {
+    return value === undefined || value > MAX_COUNT
+        ? undefined
+        : Math.floor(value);
+}
+
 /** Reads every rate-limit header of a response defensively. */
 export function parseRateLimitHeaders(headers: Headers): RateLimitHeaders {
     const remaining = headerNumber(headers, "X-RateLimit-Remaining");
@@ -51,8 +62,8 @@ export function parseRateLimitHeaders(headers: Headers): RateLimitHeaders {
     const bucket = headers.get("X-RateLimit-Bucket")?.trim();
     const scope = headers.get("X-RateLimit-Scope")?.trim().toLowerCase();
     return {
-        limit: limit === undefined ? undefined : Math.floor(limit),
-        remaining: remaining === undefined ? undefined : Math.floor(remaining),
+        limit: count(limit),
+        remaining: count(remaining),
         resetAfterMs: resetAfter === undefined ? undefined : resetAfter * 1000,
         resetAtMs: reset === undefined ? undefined : reset * 1000,
         bucket: bucket && BUCKET_HASH.test(bucket) ? bucket : undefined,

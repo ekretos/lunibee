@@ -437,7 +437,13 @@ export class RateLimiter {
                     ? undefined
                     : this.#capWait(resetAfterMs),
             limit: headers.limit,
-            window: headers.resetAtMs,
+            // The window id orders responses; one far from now (a hostile or
+            // broken responder) would make every real response look stale.
+            window:
+                headers.resetAtMs !== undefined &&
+                Math.abs(headers.resetAtMs - Date.now()) <= this.#maxBackoff
+                    ? headers.resetAtMs
+                    : undefined,
             retryAfterMs: limited && !onGlobal ? retryAfterMs : undefined,
         };
         if (this.#store.reconcile)

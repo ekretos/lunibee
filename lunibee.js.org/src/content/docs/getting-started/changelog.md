@@ -34,6 +34,7 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 ### 🔒 Security
 
 - **A failed reservation can no longer send a request unreserved.** After eight refused reservations `acquire()` returned and the request went out anyway; and on any Redis error a reservation fell back to local state with nothing but a log line per call. A request is now sent only with a granted reservation: a store that errors, replies with something unreadable or refuses without a wait fails it with kind `"coordination"`, and Redis failures follow the explicit `failurePolicy`.
+- **Out-of-range rate-limit headers are ignored:** a window id (`X-RateLimit-Reset`) further than `maxBackoff` from now, and a limit or remaining above 100,000, so a broken proxy cannot make a bucket unlimited or its real responses stale.
 - **Raw tokens never reach the rate-limit store.** Bot identity in keys is a 16-hex-character SHA-256 fingerprint; telemetry carries no token, fingerprint or body.
 - **Server-controlled backoff is bounded.** A `Retry-After` or rate-limit reset above `maxBackoff` (new REST option, default 10 minutes) fails the request with a `RESTError` instead of sleeping, and stored bucket and global limits are capped to it. `sleep()` clamps to the 32-bit timer limit.
 - **A custom `transport`'s thrown error is sanitised** before it becomes a `RESTError`'s `cause`.
