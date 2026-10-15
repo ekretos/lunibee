@@ -3,6 +3,7 @@ import { parseRateLimitHeaders } from "./headers.js";
 import { scopeBucket } from "./route.js";
 import {
     DEFAULT_PROBE_MS,
+    GLOBAL_WINDOW_MS,
     reconcileState,
     type BucketUpdate,
     type RateLimitStore,
@@ -54,13 +55,18 @@ export class RateLimiter {
     readonly #probeMs: number;
     /** Route → bucket hash, learned from this process's own responses or the store. */
     readonly #routes = new Map<string, string>();
+    readonly #globalLimit: number;
+    /** Per-scope request windows, for stores that cannot count globally themselves. */
+    readonly #localGlobal = new Map<string, { start: number; count: number }>();
 
     /**
      * @param store Rate-limit state store.
      * @param options `maxBackoff`: the most, in ms, that a rate-limit header can
      *   make later requests wait (default 10 minutes). `probeMs`: how long a
      *   request discovering an unknown bucket holds it (default 16 s; keep it
-     *   above the transport timeout). `telemetry`: event sink. `concurrent` is
+     *   above the transport timeout). `globalLimit`: most requests per second
+     *   per global scope, enforced before Discord answers 429 (default none;
+     *   `REST` passes 50). `telemetry`: event sink. `concurrent` is
      *   accepted for compatibility: responses are always merged so a late one
      *   cannot raise `remaining`.
      */
@@ -70,6 +76,7 @@ export class RateLimiter {
             concurrent?: boolean;
             maxBackoff?: number;
             probeMs?: number;
+            globalLimit?: number;
             telemetry?: RESTTelemetry;
         } = {},
     ) {
@@ -81,6 +88,9 @@ export class RateLimiter {
         if (!(this.#probeMs > 0))
             throw new RangeError("probeMs must be a positive number.");
         this.#telemetry = options.telemetry;
+        this.#globalLimit = options.globalLimit ?? 0;
+        if (!(this.#globalLimit >= 0) || !Number.isFinite(this.#globalLimit))
+            throw new RangeError("globalLimit must be a non-negative number.");
     }
 
     /** The ceiling on a wait a server header can cause, in ms. */
@@ -176,6 +186,8 @@ export class RateLimiter {
         const global = "global" in options ? options.global : "";
         if (!store.reserve) {
             await this.#waitGlobal(global ?? "", signal, path);
+            if (global !== undefined)
+                await this.#localGlobalSlot(global, signal, path);
             const bucket = await this.#call(path, "getBucket", () =>
                 store.getBucket(bucketKey),
             );
@@ -192,11 +204,17 @@ export class RateLimiter {
         const started = performance.now();
         let idle = 0;
         for (;;) {
-            if (global !== undefined && !store.reservesGlobal)
+            if (global !== undefined && !store.reservesGlobal) {
                 await this.#waitGlobal(global, signal, path);
+                await this.#localGlobalSlot(global, signal, path);
+            }
             const asked = performance.now();
             const reservation = await this.#call(path, "reserve", () =>
-                store.reserve!(bucketKey, { global, probeMs: this.#probeMs }),
+                store.reserve!(bucketKey, {
+                    global,
+                    probeMs: this.#probeMs,
+                    globalLimit: this.#globalLimit || undefined,
+                }),
             );
             if (
                 !reservation ||
@@ -279,6 +297,40 @@ export class RateLimiter {
             reason,
             durationMs: ms,
         });
+    }
+
+    /**
+     * Takes one request of `scope`'s per-second allowance in this process,
+     * for a store that cannot count it atomically across processes.
+     */
+    async #localGlobalSlot(
+        scope: string,
+        signal: AbortSignal | undefined,
+        path: string,
+    ): Promise<void> {
+        if (!this.#globalLimit) return;
+        for (;;) {
+            const now = Date.now();
+            let window = this.#localGlobal.get(scope);
+            if (!window || now - window.start >= GLOBAL_WINDOW_MS) {
+                window = { start: now, count: 0 };
+                this.#localGlobal.set(scope, window);
+                if (this.#localGlobal.size > MAX_CACHED_ROUTES)
+                    this.#localGlobal.delete(
+                        this.#localGlobal.keys().next().value as string,
+                    );
+            }
+            if (window.count < this.#globalLimit) {
+                window.count++;
+                return;
+            }
+            await this.#wait(
+                "global",
+                window.start + GLOBAL_WINDOW_MS - now,
+                signal,
+                path,
+            );
+        }
     }
 
     async #waitGlobal(

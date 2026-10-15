@@ -18,6 +18,8 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 - **Two new `RESTError` kinds:** `"coordination"` (the rate-limit store failed; the request was not sent) and `"overloaded"` (a `maxQueued` limit was reached). Both are `retryable`. Add them to any exhaustive `switch` over `kind`.
 - **Custom rate-limit stores** keep working. `reserve()` is now called as `reserve(key, options)` and may also return `known` and `resetAt`; the new methods (`reconcile`, `extendGlobalReset`, `release`, `reservesGlobal`) are optional and each makes one step atomic. `getGlobalReset` / `setGlobalReset` receive a scope as an extra argument, which a store may ignore.
 - **Rate-limit state is merged more conservatively.** A response with no rate-limit headers no longer sets `remaining` to 0, and responses within a window can no longer raise `remaining`, also with `concurrentBuckets: false`. A 429's wait is held in the store, so every request on the bucket waits it out.
+- **A bot is held to 50 requests per second** across all buckets (`globalLimit`). Large bots with a raised global limit should set it; `globalLimit: false` turns it off.
+- **After a 401 the token is not used again** until `setToken()`; later requests fail with kind `"authentication"` without being sent. `stopOnInvalidToken: false` turns this off.
 - **Redis failures are logged once per state change**, not once per failed command. Read `store.mode` or `store.diagnostics()`, or pass `telemetry`, to watch them. See [Distributed REST](/core-concepts/distributed-rest/).
 
 ## 0.2.x → 0.3.1

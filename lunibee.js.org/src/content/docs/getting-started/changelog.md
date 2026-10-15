@@ -28,6 +28,8 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
     - A 429's wait is recorded in the store (on the bucket, or the bot's global limit) and the retry waits for it like every other request, instead of sleeping on its own.
     - `RedisRateLimitStore` warns once per state change instead of once per failed command.
     - New `RESTErrorKind`s `"coordination"` and `"overloaded"` (both retryable).
+    - **A proactive global limit of 50 requests per second per bot** (`globalLimit`), shared through the store; set `globalLimit: false` for the old behaviour (429s only), or the limit Discord granted a large bot.
+    - **After a `401` on a bot route the token is not used again** until `setToken()` (`stopOnInvalidToken: false` restores sending).
 
 ### 🔒 Security
 
@@ -85,7 +87,7 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **REST:**
     - `RedisRateLimitStore` options `failurePolicy` (`"degraded-local"` default, or `"fail-closed"`), `commandTimeout` (2 s), `requireAtomic` and `telemetry`; members `mode`, `diagnostics()` and `verify()`; `fromBunRedis()` adapts `Bun.RedisClient`.
     - Optional `RateLimitStore` methods `reconcile`, `extendGlobalReset`, `release` and `reservesGlobal`, each making one step atomic; both built-in stores implement them.
-    - `REST` options `telemetry`, `maxQueued` and `maxQueuedPerBucket`; `rest.close()` (graceful shutdown) and `rest.diagnostics()`.
+    - `REST` options `telemetry`, `maxQueued`, `maxQueuedPerBucket`, `globalLimit` and `stopOnInvalidToken`; `rest.close()` (graceful shutdown) and `rest.diagnostics()` (including `invalidRequests` over the last ten minutes and `tokenRejected`).
     - `RESTMetrics`: counters, gauges and latency histograms from the telemetry events, with bounded route labels and a Prometheus text export.
     - `parseRateLimitHeaders()`, `headerNumber()`, `requestIdentity()`, `tokenFingerprint()`, `DEFAULT_MAX_BACKOFF_MS`, and the types `Grant`, `BucketUpdate`, `ReserveOptions`, `RateLimitHeaders`, `RateLimitScope`, `RequestIdentity`, `SchedulerOptions`, `ApplyResponseOptions`, `RESTDiagnostics`, `RESTTelemetry`, `RESTTelemetryEvent`, `RESTMetricsSnapshot`, `CoordinationMode`, `RedisFailurePolicy`, `RedisStoreDiagnostics`.
     - Reaction routes are keyed without the emoji (`/reactions/:emoji`), so they no longer create a key per emoji.

@@ -45,7 +45,16 @@ export interface ReserveOptions {
     global?: string;
     /** How long a probe may hold an unknown bucket before others may try (ms). */
     probeMs?: number;
+    /**
+     * Most requests per second the `global` scope may send, counted in the
+     * same atomic step (Discord's global limit, 50 for most bots). Omitted or
+     * 0: only a recorded global 429 is enforced.
+     */
+    globalLimit?: number;
 }
+
+/** Length of a proactive global-limit window (ms). */
+export const GLOBAL_WINDOW_MS = 1000;
 
 /** What a response said about a bucket, for {@link RateLimitStore.reconcile}. */
 export interface BucketUpdate {
@@ -276,6 +285,10 @@ export class MemoryRateLimitStore implements RateLimitStore {
     readonly #buckets = new Map<string, BucketState>();
     readonly #routeBuckets = new Map<string, string>();
     readonly #globals = new Map<string, number>();
+    readonly #globalCounts = new Map<
+        string,
+        { start: number; count: number }
+    >();
     /** Minimum interval between automatic prunes, in ms. */
     static readonly #PRUNE_INTERVAL = 60_000;
     #lastPruneAt = 0;
@@ -319,12 +332,32 @@ export class MemoryRateLimitStore implements RateLimitStore {
                     reason: "global",
                 };
         }
+        const limit =
+            options.global === undefined ? 0 : (options.globalLimit ?? 0);
+        let window =
+            limit > 0 ? this.#globalCounts.get(options.global!) : undefined;
+        if (window && now - window.start >= GLOBAL_WINDOW_MS)
+            window = undefined;
+        if (limit > 0 && window && window.count >= limit)
+            return {
+                granted: false,
+                retryAfterMs: window.start + GLOBAL_WINDOW_MS - now,
+                reason: "global",
+            };
         const { reservation, next } = reserveState(
             this.#buckets.get(key),
             now,
             options.probeMs ?? DEFAULT_PROBE_MS,
         );
         if (next) this.#write(key, next);
+        if (limit > 0 && reservation.granted) {
+            if (!window) {
+                window = { start: now, count: 0 };
+                this.#globalCounts.set(options.global!, window);
+                MemoryRateLimitStore.#evict(this.#globalCounts);
+            }
+            window.count++;
+        }
         return reservation;
     }
     public reconcile(key: string, update: BucketUpdate): void {
@@ -371,6 +404,9 @@ export class MemoryRateLimitStore implements RateLimitStore {
         }
         for (const [scope, resetAt] of this.#globals)
             if (resetAt <= Date.now()) this.#globals.delete(scope);
+        for (const [scope, window] of this.#globalCounts)
+            if (Date.now() - window.start >= GLOBAL_WINDOW_MS)
+                this.#globalCounts.delete(scope);
     }
     public getGlobalReset(scope = ""): number {
         return this.#globals.get(scope) ?? 0;

@@ -56,6 +56,8 @@ export type RESTTelemetryEvent =
       }
     /** A request was refused because a queue was full. */
     | { type: "overloaded" }
+    /** Discord answered 401 on a bot route: later requests with the token are refused. */
+    | { type: "tokenRejected" }
     /** A transport attempt failed without a response. */
     | { type: "networkError"; timedOut: boolean }
     /** A route learned its bucket hash, or the hash changed. */
@@ -237,6 +239,9 @@ export class RESTMetrics implements RESTTelemetry {
                 break;
             case "overloaded":
                 this.#inc("overloaded_total");
+                break;
+            case "tokenRejected":
+                this.#inc("token_rejected_total");
                 break;
             case "networkError":
                 this.#inc("network_errors_total", {

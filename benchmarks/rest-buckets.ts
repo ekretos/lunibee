@@ -69,6 +69,8 @@ async function run(concurrentBuckets: boolean) {
         token: "bench.token.value-0123456789",
         concurrentBuckets,
         retries: 10,
+        // Bucket scheduling only; the global limit is not what is measured.
+        globalLimit: false,
         transport: new HttpTransport({ fetch: discord.fetch as never }),
     });
     const started = performance.now();

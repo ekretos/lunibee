@@ -13,7 +13,13 @@ async function flood(
         windowMs: 100,
         latencyMs: 2,
     });
-    const rest = new REST({ token: "t", transport, ...options });
+    // These tests are about buckets; the global limit has its own tests.
+    const rest = new REST({
+        token: "t",
+        transport,
+        globalLimit: false,
+        ...options,
+    });
     const jobs: Promise<unknown>[] = [];
     for (let channel = 0; channel < channels; channel++)
         for (let i = 0; i < perChannel; i++)

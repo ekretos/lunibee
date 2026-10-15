@@ -72,6 +72,8 @@ new REST(options?: RESTOptions)
 | `telemetry` | `RESTTelemetry` | — | Receives [telemetry events](#telemetry). `RESTMetrics` is a ready-made aggregator. |
 | `maxQueued` | `number` | unlimited | Most requests waiting for a bucket slot, over all buckets. One more fails at once with a `RESTError` of kind `"overloaded"`. |
 | `maxQueuedPerBucket` | `number` | unlimited | The same limit for the requests waiting on one bucket. |
+| `globalLimit` | `number \| false` | `50` | Requests per second this bot may send across all buckets, enforced before Discord answers with a global 429 and shared through the store by every process. Set the limit Discord granted a large bot, or `false` to rely on 429s alone. Interaction callbacks do not count. |
+| `stopOnInvalidToken` | `boolean` | `true` | After a `401` on a bot route, refuse later requests with that token (kind `"authentication"`, not sent) until `setToken()`. Repeated 401s count towards Discord's invalid-request ban. |
 
 There is no `apiVersion` option: the version is part of `baseURL`.
 
@@ -91,7 +93,7 @@ const rest = new REST({
 | `setToken(token)` | Sets the token for later requests. Throws a `TypeError` for an empty token. |
 | `setHooks(hooks)` | Replaces every hook. `setHooks({})` removes them. Returns `this`. |
 | `store` | The `RateLimitStore` in use (read-only). |
-| `diagnostics()` | `{ mode, queued, inFlight, buckets, closed }`: how limits are enforced right now (`"local"`, `"distributed"`, `"observational"`, `"degraded-local"` or `"unavailable"`), requests waiting for a slot, requests started and not settled, bucket keys holding a slot, and whether `close()` was called. |
+| `diagnostics()` | `{ mode, queued, inFlight, buckets, closed, invalidRequests, tokenRejected }`: how limits are enforced right now (`"local"`, `"distributed"`, `"observational"`, `"degraded-local"` or `"unavailable"`), requests waiting for a slot, requests started and not settled, bucket keys holding a slot, whether `close()` was called, the `401`/`403`/`429` responses of the last ten minutes (shared-scope 429s excepted; Discord bans an IP for a while past 10,000), and whether the token was rejected. |
 | `close()` | Stops the client. New requests and requests still queued or waiting for a limit fail with kind `"aborted"`; attempts already sent finish. Resolves when nothing is in flight. |
 
 ## Making requests
@@ -434,6 +436,7 @@ Pass `telemetry: { emit(event) { … } }` to receive events. They never contain 
 | `retry` | `route`, `reason` (`rateLimited`, `server`, `network`), `attempt`. |
 | `cancelled` | `stage` (`queued`, `waiting`, `transport`, `retry`). |
 | `overloaded`, `networkError` (`timedOut`) | A refused or failed attempt. |
+| `tokenRejected` | Discord answered `401` on a bot route; later requests with the token are refused. |
 | `bucket` | `change` (`discovered`, `remapped`), `route`. |
 | `queue` | `queued`, `inFlight`. |
 | `store`, `mode` | From `RedisRateLimitStore`'s own `telemetry`: per-command latency and outcome, and mode changes. |

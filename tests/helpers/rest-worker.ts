@@ -17,6 +17,8 @@ const cfg = JSON.parse(process.argv[2]!) as {
     token: string;
     buckets: number;
     perBucket: number;
+    /** Requests per second for the bot; omitted: no proactive global limit. */
+    globalLimit?: number;
 };
 let redisOps = 0;
 let store: RedisRateLimitStore | undefined;
@@ -51,6 +53,7 @@ if (cfg.redis) {
 const rest = new REST({
     token: cfg.token,
     retries: 20,
+    globalLimit: cfg.globalLimit ?? false,
     store,
     transport: new HttpTransport({
         baseURL: cfg.url,

@@ -347,8 +347,14 @@ describe.skipIf(!REDIS_URL)("several REST processes sharing one Redis", () => {
     const discord = startFakeDiscord({ limit: 5, windowMs: 150, latencyMs: 3 });
     afterAll(() => discord.stop());
 
-    async function fleet(processes: number, tokens: number, perBucket: number) {
-        discord.reset();
+    async function fleet(
+        processes: number,
+        tokens: number,
+        perBucket: number,
+        server: ReturnType<typeof startFakeDiscord> = discord,
+        globalLimit?: number,
+    ) {
+        server.reset();
         const prefix = unique();
         const outputs = await Promise.all(
             Array.from({ length: processes }, async (_, i) => {
@@ -357,12 +363,13 @@ describe.skipIf(!REDIS_URL)("several REST processes sharing one Redis", () => {
                         "bun",
                         `${import.meta.dir}/../helpers/rest-worker.ts`,
                         JSON.stringify({
-                            url: discord.url,
+                            url: server.url,
                             redis: REDIS_URL,
                             prefix,
                             token: `it.token.${i % tokens}`,
                             buckets: 2,
                             perBucket,
+                            globalLimit,
                         }),
                     ],
                     { stdout: "pipe", stderr: "inherit" },
@@ -376,7 +383,7 @@ describe.skipIf(!REDIS_URL)("several REST processes sharing one Redis", () => {
         );
         return {
             errors: outputs.reduce((n, o) => n + o.errors, 0),
-            ...discord.stats,
+            ...server.stats,
         };
     }
 
@@ -396,5 +403,29 @@ describe.skipIf(!REDIS_URL)("several REST processes sharing one Redis", () => {
         // Each bot has 30 requests per bucket = 6 windows of 150 ms; sharing
         // one counter would need 12.
         expect(ms).toBeLessThan(12 * 150);
+    }, 30_000);
+
+    test("the proactive global limit holds across processes", async () => {
+        // Buckets are roomy; only the per-bot global limit (20/s here) binds.
+        const global = startFakeDiscord({
+            limit: 1000,
+            windowMs: 1000,
+            globalPerSecond: 20,
+        });
+        try {
+            // Control: without the proactive limit the fleet trips it.
+            const without = await fleet(3, 1, 8, global);
+            expect(without.global429).toBeGreaterThan(0);
+            await Bun.sleep(1100);
+            const started = performance.now();
+            const limited = await fleet(3, 1, 8, global, 20);
+            expect(limited.errors).toBe(0);
+            expect(limited.ok).toBe(48);
+            expect(limited.global429).toBe(0);
+            // 48 requests at 20 per second take at least two windows.
+            expect(performance.now() - started).toBeGreaterThan(1900);
+        } finally {
+            global.stop();
+        }
     }, 30_000);
 });

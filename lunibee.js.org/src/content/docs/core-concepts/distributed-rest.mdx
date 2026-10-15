@@ -32,6 +32,8 @@ With `RedisRateLimitStore` on a client with `eval`, while Redis answers:
 - **Responses cannot hand back allowance.** Within a window the merge keeps the lower of the stored count (which includes reservations still in flight) and the header; a response from an older window (an earlier `X-RateLimit-Reset`) is ignored; an estimated reset is replaced by the server's.
 - **Unknown buckets are probed once.** The first request on a bucket nobody knows holds a placeholder; everyone else, in every process, polls every 50 ms until its response lands. A probe that fails without a response clears the placeholder; one whose process dies expires with the attempt timeout plus one second.
 - **Resets do not cause bursts.** When a window with a known limit elapses, the next reservation opens the new window at that limit, so a fleet waking together sends at most `limit` requests before the first response confirms the window.
+- **The global limit is enforced before Discord does.** Each bot may send `globalLimit` requests per second (default 50, Discord's global limit) across all its buckets, counted in the same script as the reservation, so the whole fleet stays under it instead of learning it from a global 429. It is a fixed one-second window starting at the first request, so up to twice the limit can pass in the instant around a window boundary. Interaction callbacks do not count.
+- **A rejected token stops being used.** After a `401` on a bot route the client refuses that token's requests without sending them, until `setToken()`, so a revoked token cannot run up Discord's invalid-request limit. This is per process; each process stops after its own first 401.
 - **Global limits only grow.** A global 429 extends the bot's global reset to *at least* its wait, atomically; a shorter one from another worker cannot shorten it. The global limit is checked in the same script as the bucket.
 - **Bots are isolated.** Bucket keys and the global limit are scoped by a token fingerprint (16 hex characters of SHA-256). Raw tokens never appear in keys, metrics, logs or errors. Token webhooks and interaction callbacks are limited per webhook, so all bots share those buckets; interaction callbacks count against no global limit.
 - **State is bounded.** Every key has a TTL (a bucket lives one minute past its reset, a route mapping seven days, a global limit until it resets), keys are versioned (`<prefix>v1:…`) and reaction emoji are normalised out of route keys.
@@ -41,7 +43,7 @@ What is **not** guaranteed:
 - A request that times out or loses its connection may or may not have reached Discord, so its unit stays spent (conservative) and it is not retried unless it is idempotent (`GET`, `HEAD`, `PUT`, `DELETE`). Only a request that certainly never left (cancelled before sending) gets its unit back.
 - If a probe's response is lost, a second probe may go before the first is known to have arrived: on a brand-new bucket at most two requests can then be in flight.
 - If Discord changes a route's bucket hash, requests already reserved under the old key are not moved: the transition can overshoot by the requests in flight.
-- Discord's invalid-request limit (10,000 `401`/`403`/`429` per 10 minutes per IP) is not tracked; the telemetry counts the responses so you can alert on them.
+- Discord's invalid-request limit (10,000 `401`/`403`/`429` per 10 minutes per IP) is counted (`rest.diagnostics().invalidRequests`) but only 401s stop requests; alert on the count.
 
 ## Failure modes
 

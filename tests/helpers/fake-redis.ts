@@ -136,12 +136,27 @@ export function createFakeRedis(): FakeRedis {
                 const g = Number(get(keys[1]) ?? 0);
                 if (g > t) return [0, Math.ceil(g - t), "global"];
             }
+            const limit = keys[2] === undefined ? 0 : Number(argv[3] ?? 0);
+            if (limit > 0 && Number(get(keys[2]!) ?? 0) >= limit)
+                return [
+                    0,
+                    Math.max(1, data.get(keys[2]!)!.expiresAt - t),
+                    "global",
+                ];
             const { reservation, next } = reserveState(
                 load(keys[0]!),
                 t,
                 Number(argv[0]),
             );
             if (next) save(keys[0]!, next, t, next.probe ? 0 : Number(argv[2]));
+            if (limit > 0 && reservation.granted) {
+                const count = Number(get(keys[2]!) ?? 0) + 1;
+                const expiresAt =
+                    count === 1
+                        ? t + Number(argv[4])
+                        : data.get(keys[2]!)!.expiresAt;
+                data.set(keys[2]!, { value: String(count), expiresAt });
+            }
             return reservation.granted
                 ? [1, reservation.resetAt, reservation.known ? 1 : 0]
                 : [0, Math.ceil(reservation.retryAfterMs), reservation.reason];

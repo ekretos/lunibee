@@ -137,13 +137,36 @@ After: 0 / 0 / 0 429s, 4.28 / 5.4 / 4.6 ops per request, 3.99 s and 1.93 s for t
 - **Fix:** `/reactions/:emoji` in `normalizeRoutePath`.
 - **Status:** Verified
 
+### R-14 — A rejected token kept being used
+- **Severity:** P2
+- **Problem:** after a 401 every later request still went out, each counting towards Discord's
+  invalid-request ban.
+- **Fix:** `stopOnInvalidToken` (default on): bot-route requests with a 401'd token fail without
+  sending until `setToken()`; `diagnostics().invalidRequests` counts 401/403/429 over 10 minutes.
+- **Regression test:** `rest.coordination.test.ts` "invalid token guard".
+- **Status:** Verified
+
+### R-15 — The global limit was only learned from global 429s
+- **Severity:** P1
+- **Problem:** a bot spread across many buckets could exceed 50 requests/s; the fleet found out
+  from Discord's global 429s.
+- **Fix:** `globalLimit` (default 50) counted per bot in the reserve script (Redis) or the memory
+  store, with an in-process fallback for stores that cannot count it.
+- **Regression test:** "proactive global limit" (unit); integration "the proactive global limit
+  holds across processes" (3 processes, fake server at 20/s: control run trips global 429s, limited
+  run has 0).
+- **Status:** Verified
+
 ## Accepted risks / open
 
 - A request that times out or loses its connection keeps its unit spent (it may have reached
   Discord); only certainly-unsent requests are refunded. Conservative by design.
 - A probe whose response is lost lets a second probe go: at most two in flight on a new bucket.
 - A Discord bucket-hash change can overshoot by the requests reserved under the old key.
-- Discord's invalid-request limit (10,000 401/403/429 per 10 min) is not enforced; telemetry
-  counts the responses. Open (P2): a guard that pauses the token after repeated 401s.
+- Discord's invalid-request limit (10,000 401/403/429 per 10 min): counted
+  (`diagnostics().invalidRequests`); 401s stop the token (`stopOnInvalidToken`). 403/429 do not
+  stop requests. Fixed (R-14).
+- The proactive global limit (R-15) is a fixed 1 s window: up to 2× the limit can pass around a
+  window boundary. Accepted.
 - `EVAL` sends the script text each time; `EVALSHA` with a fallback would save bandwidth. Open (P3).
 - Redis Cluster needs a hash-tagged `prefix`; not tested against a cluster. Open (P3).

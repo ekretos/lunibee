@@ -2,6 +2,7 @@ import { RESTError, sanitizeCause } from "./errors.js";
 import {
     BUCKET_LINGER_MS,
     DEFAULT_PROBE_MS,
+    GLOBAL_WINDOW_MS,
     MemoryRateLimitStore,
     PROBE_POLL_MS,
     type BucketState,
@@ -43,14 +44,33 @@ end
  * Atomically checks the global limit and consumes one unit of a bucket.
  * A port of `reserveState` in store.ts.
  *
- * `KEYS[1]` bucket · `KEYS[2]` global (optional) · `ARGV` probe ms, poll ms, linger ms.
+ * `KEYS[1]` bucket · `KEYS[2]` global reset · `KEYS[3]` global request count
+ * (both optional) · `ARGV` probe ms, poll ms, linger ms, global limit, window ms.
  * Returns `{1, resetAt, known}` or `{0, waitMs, reason}`.
  */
 export const RESERVE_SCRIPT = `${LUA_PRELUDE}
 local now = now_ms()
+local glimit, gwindow = tonumber(ARGV[4]) or 0, tonumber(ARGV[5]) or 1000
 if #KEYS > 1 then
   local g = tonumber(redis.call('GET', KEYS[2]) or '0') or 0
   if g > now then return {0, math.ceil(g - now), 'global'} end
+end
+if #KEYS < 3 then glimit = 0 end
+if glimit > 0 then
+  local c = tonumber(redis.call('GET', KEYS[3]) or '0') or 0
+  if c >= glimit then
+    local ttl = redis.call('PTTL', KEYS[3])
+    if ttl < 0 then
+      redis.call('PEXPIRE', KEYS[3], gwindow)
+      ttl = gwindow
+    end
+    return {0, ttl, 'global'}
+  end
+end
+local function count()
+  if glimit > 0 then
+    if redis.call('INCR', KEYS[3]) == 1 then redis.call('PEXPIRE', KEYS[3], gwindow) end
+  end
 end
 local probe, poll, linger = tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3])
 local s = load(KEYS[1])
@@ -58,6 +78,7 @@ if s and s.resetAt > now then
   if s.remaining > 0 then
     s.remaining = s.remaining - 1
     save(KEYS[1], s, now, linger)
+    count()
     return {1, s.resetAt, 1}
   end
   local wait = s.resetAt - now
@@ -69,9 +90,11 @@ end
 local resetAt = now + probe
 if s and type(s.limit) == 'number' and s.limit > 0 then
   save(KEYS[1], {remaining = s.limit - 1, resetAt = resetAt, limit = s.limit, provisional = true}, now, linger)
+  count()
   return {1, resetAt, 1}
 end
 save(KEYS[1], {remaining = 0, resetAt = resetAt, provisional = true, probe = true}, now, 0)
+count()
 return {1, resetAt, 0}
 `;
 
@@ -563,8 +586,11 @@ export class RedisRateLimitStore implements RateLimitStore {
         options: ReserveOptions = {},
     ): Promise<Reservation> {
         const keys = [this.#bucketKey(key)];
-        if (options.global !== undefined)
+        if (options.global !== undefined) {
             keys.push(this.#globalKey(options.global));
+            if (options.globalLimit)
+                keys.push(`${this.#prefix}global-count:${options.global}`);
+        }
         return this.#run(
             "reserve",
             async () => {
@@ -575,6 +601,8 @@ export class RedisRateLimitStore implements RateLimitStore {
                     options.probeMs ?? DEFAULT_PROBE_MS,
                     PROBE_POLL_MS,
                     BUCKET_LINGER_MS,
+                    options.globalLimit ?? 0,
+                    GLOBAL_WINDOW_MS,
                 );
                 return parseReservation(result);
             },

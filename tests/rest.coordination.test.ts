@@ -1122,6 +1122,7 @@ describe("memory stays bounded", () => {
         const rest = new REST({
             token: TOKEN,
             store,
+            globalLimit: false,
             transport: new HttpTransport({
                 fetch: async () =>
                     new Response("{}", {
@@ -1302,5 +1303,219 @@ describe("against the fake Discord's own limits", () => {
         } finally {
             discord.stop();
         }
+    });
+});
+
+describe("proactive global limit", () => {
+    async function burst(rest: REST, n: number) {
+        const started = Date.now();
+        await Promise.all(
+            Array.from({ length: n }, (_, i) => rest.get(`/channels/${i}`)),
+        );
+        return Date.now() - started;
+    }
+    const ok = () =>
+        new HttpTransport({ fetch: async () => new Response("{}") });
+
+    test("holds a bot to globalLimit per second across buckets", async () => {
+        const rest = new REST({
+            token: TOKEN,
+            globalLimit: 5,
+            transport: ok(),
+        });
+        expect(await burst(rest, 5)).toBeLessThan(500);
+        // The sixth to tenth wait for the next second.
+        const store = rest.store as MemoryRateLimitStore;
+        const fast = new REST({
+            token: TOKEN,
+            store,
+            globalLimit: 5,
+            transport: ok(),
+        });
+        expect(await burst(fast, 3)).toBeGreaterThan(500);
+    });
+
+    test("defaults to 50 and can be turned off", async () => {
+        const capped = new REST({ token: TOKEN, transport: ok() });
+        expect(await burst(capped, 51)).toBeGreaterThan(500);
+        const free = new REST({
+            token: TOKEN,
+            globalLimit: false,
+            transport: ok(),
+        });
+        expect(await burst(free, 200)).toBeLessThan(500);
+        expect(() => new REST({ globalLimit: -1 })).toThrow(RangeError);
+    });
+
+    test("is per bot, and interaction callbacks do not count", async () => {
+        const store = new MemoryRateLimitStore();
+        const a = new REST({
+            token: "bot.a",
+            store,
+            globalLimit: 2,
+            transport: ok(),
+        });
+        const b = new REST({
+            token: "bot.b",
+            store,
+            globalLimit: 2,
+            transport: ok(),
+        });
+        await burst(a, 2);
+        expect(await burst(b, 2)).toBeLessThan(500);
+        const started = Date.now();
+        await Promise.all(
+            Array.from({ length: 5 }, (_, i) =>
+                a.post(`/interactions/${i}/tok/callback`, { type: 1 }),
+            ),
+        );
+        expect(Date.now() - started).toBeLessThan(500);
+    });
+
+    test("is shared through Redis by every process", async () => {
+        const redis = createFakeRedis();
+        const make = () =>
+            new REST({
+                token: TOKEN,
+                globalLimit: 4,
+                store: new RedisRateLimitStore({ client: redis.client() }),
+                transport: ok(),
+            });
+        await burst(make(), 4);
+        expect(await burst(make(), 1)).toBeGreaterThan(300);
+    });
+
+    test("a store that cannot count it is limited in-process", async () => {
+        const memory = new MemoryRateLimitStore();
+        const plain: RateLimitStore = {
+            getBucketHash: (r) => memory.getBucketHash(r),
+            setBucketHash: (r, h) => memory.setBucketHash(r, h),
+            getBucket: (k) => memory.getBucket(k),
+            updateBucket: (k, v) => memory.updateBucket(k, v),
+            getGlobalReset: () => 0,
+            setGlobalReset: () => {},
+        };
+        const observed = new REST({
+            token: TOKEN,
+            store: plain,
+            globalLimit: 3,
+            transport: ok(),
+        });
+        expect(await burst(observed, 6)).toBeGreaterThan(500);
+        const reserving = new REST({
+            token: TOKEN,
+            store: {
+                ...plain,
+                reserve: () => ({ granted: true, known: true }),
+            },
+            globalLimit: 3,
+            transport: ok(),
+        });
+        expect(await burst(reserving, 6)).toBeGreaterThan(500);
+    });
+});
+
+describe("invalid token guard", () => {
+    function counting(status: number, headers: Record<string, string> = {}) {
+        let sent = 0;
+        const transport = new HttpTransport({
+            fetch: async () => {
+                sent++;
+                return new Response(JSON.stringify({ message: "x", code: 0 }), {
+                    status,
+                    headers: { "content-type": "application/json", ...headers },
+                });
+            },
+        });
+        return { transport, sent: () => sent };
+    }
+
+    test("after a 401 the token is not used again until setToken()", async () => {
+        const events: RESTTelemetryEvent[] = [];
+        const c = counting(401);
+        const rest = new REST({
+            token: TOKEN,
+            transport: c.transport,
+            telemetry: { emit: (e) => void events.push(e) },
+        });
+        await rest.get("/users/@me").catch(() => undefined);
+        const error = (await rest
+            .get("/channels/1")
+            .catch((e: unknown) => e)) as RESTError;
+        expect(error.kind).toBe("authentication");
+        expect(error.status).toBe(401);
+        expect(c.sent()).toBe(1);
+        expect(rest.diagnostics()).toMatchObject({
+            tokenRejected: true,
+            invalidRequests: 1,
+        });
+        expect(events).toContainEqual({ type: "tokenRejected" });
+        // Token webhooks and unauthenticated requests are not that token's.
+        await rest.post("/webhooks/1/tok", {}).catch(() => undefined);
+        await rest.get("/gateway", { auth: false }).catch(() => undefined);
+        expect(c.sent()).toBe(3);
+        rest.setToken("a.new.token");
+        expect(rest.diagnostics().tokenRejected).toBe(false);
+        await rest.get("/channels/1").catch(() => undefined);
+        expect(c.sent()).toBe(4);
+    });
+
+    test("stopOnInvalidToken: false keeps sending", async () => {
+        const c = counting(401);
+        const rest = new REST({
+            token: TOKEN,
+            stopOnInvalidToken: false,
+            transport: c.transport,
+        });
+        await rest.get("/a").catch(() => undefined);
+        await rest.get("/b").catch(() => undefined);
+        expect(c.sent()).toBe(2);
+    });
+
+    test("403 and 429 count as invalid requests; shared-scope 429s do not", async () => {
+        const forbidden = counting(403);
+        const rest = new REST({
+            token: TOKEN,
+            retries: 0,
+            transport: forbidden.transport,
+        });
+        await rest.get("/a").catch(() => undefined);
+        await rest.get("/b").catch(() => undefined);
+        expect(rest.diagnostics().invalidRequests).toBe(2);
+        const shared = counting(429, {
+            "x-ratelimit-scope": "shared",
+            "retry-after": "0",
+        });
+        const s = new REST({
+            token: TOKEN,
+            retries: 0,
+            transport: shared.transport,
+        });
+        await s.get("/a").catch(() => undefined);
+        expect(s.diagnostics().invalidRequests).toBe(0);
+    });
+
+    test("the count forgets responses older than ten minutes", async () => {
+        const c = counting(403);
+        const rest = new REST({ token: TOKEN, transport: c.transport });
+        const now = Date.now;
+        try {
+            await rest.get("/a").catch(() => undefined);
+            Date.now = () => now() + 5 * 60_000;
+            await rest.get("/b").catch(() => undefined);
+            expect(rest.diagnostics().invalidRequests).toBe(2);
+            Date.now = () => now() + 11 * 60_000;
+            expect(rest.diagnostics().invalidRequests).toBe(1);
+            Date.now = () => now() + 60 * 60_000;
+            expect(rest.diagnostics().invalidRequests).toBe(0);
+        } finally {
+            Date.now = now;
+        }
+    });
+
+    test("RESTMetrics counts rejected tokens", () => {
+        const m = new RESTMetrics();
+        m.emit({ type: "tokenRejected" });
+        expect(m.snapshot().counters.token_rejected_total).toBe(1);
     });
 });

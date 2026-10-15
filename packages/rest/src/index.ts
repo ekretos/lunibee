@@ -255,6 +255,13 @@ export interface RESTDiagnostics {
     buckets: number;
     /** Whether `close()` was called. */
     closed: boolean;
+    /**
+     * `401`, `403` and `429` responses (shared-scope 429s excepted) in the
+     * last ten minutes. Discord bans an IP for a while past 10,000.
+     */
+    invalidRequests: number;
+    /** Whether requests are refused because Discord rejected the token (see `stopOnInvalidToken`). */
+    tokenRejected: boolean;
 }
 
 /** Bun-native REST transport with Discord bucket-aware rate limiting, retries, and cancellation. */
@@ -268,6 +275,12 @@ export class REST {
     readonly #closing = new AbortController();
     #inFlight = 0;
     #idle?: () => void;
+    /** Fingerprint of a token Discord answered 401 for. */
+    #rejected?: string;
+    readonly #stopOnInvalidToken: boolean;
+    /** Invalid responses per minute, for the last ten minutes. */
+    readonly #invalid = new Array<number>(10).fill(0);
+    #invalidMinute = 0;
     #drained?: Promise<void>;
     /** Rate-limit state: when a request may go out, what a response says. */
     readonly #limiter: RateLimiter;
@@ -319,6 +332,20 @@ export class REST {
             maxQueued?: number;
             /** Most requests waiting on one bucket; more fail with kind `"overloaded"`. Default unlimited. */
             maxQueuedPerBucket?: number;
+            /**
+             * Requests per second this bot may send across all buckets,
+             * enforced before Discord answers with a global 429 (shared through
+             * the store, so it holds for every process). Default 50, Discord's
+             * global limit; set what Discord granted a large bot, or `false`
+             * to rely on 429s alone.
+             */
+            globalLimit?: number | false;
+            /**
+             * After a `401` on a bot route, refuse every later request with
+             * this token without sending it, until `setToken()`: repeated 401s
+             * count towards Discord's invalid-request ban. Default `true`.
+             */
+            stopOnInvalidToken?: boolean;
         } = {},
     ) {
         this.#token = options.token;
@@ -353,7 +380,12 @@ export class REST {
                     ? this.#transport.timeout + 1000
                     : undefined,
             telemetry: options.telemetry,
+            globalLimit:
+                options.globalLimit === false
+                    ? undefined
+                    : (options.globalLimit ?? 50),
         });
+        this.#stopOnInvalidToken = options.stopOnInvalidToken ?? true;
         if (options.hooks) this.#hooks = options.hooks;
     }
     /** The rate-limit store backing this transport. */
@@ -371,6 +403,7 @@ export class REST {
             throw new TypeError("A Discord bot token is required.");
         this.#token = token;
         this.#fingerprint = tokenFingerprint(token);
+        this.#rejected = undefined;
     }
     /** The client's current state. */
     public diagnostics(): RESTDiagnostics {
@@ -385,6 +418,10 @@ export class REST {
             inFlight: this.#inFlight,
             buckets: this.#scheduler.size,
             closed: this.#closing.signal.aborted,
+            invalidRequests: this.#invalidCount(0),
+            tokenRejected:
+                this.#rejected !== undefined &&
+                this.#rejected === this.#fingerprint,
         };
     }
     /**
@@ -400,6 +437,16 @@ export class REST {
             this.#idle = resolve;
         });
         await this.#drained;
+    }
+    /** Adds to and returns the invalid responses of the last ten minutes. */
+    #invalidCount(add: number): number {
+        const minute = Math.floor(Date.now() / 60_000);
+        const elapsed = Math.min(10, minute - this.#invalidMinute);
+        for (let i = 1; i <= elapsed; i++)
+            this.#invalid[(this.#invalidMinute + i) % 10] = 0;
+        if (elapsed > 0) this.#invalidMinute = minute;
+        this.#invalid[minute % 10]! += add;
+        return this.#invalid.reduce((a, b) => a + b, 0);
     }
     #queueChanged(): void {
         emitTelemetry(this.#telemetry, {
@@ -474,6 +521,17 @@ export class REST {
                 ? this.#fingerprint
                 : undefined,
         );
+        if (
+            identity.bucket === this.#fingerprint &&
+            this.#rejected === this.#fingerprint
+        )
+            throw new RESTError(
+                "Discord rejected this bot token (401); request not sent. Call setToken() with a valid token.",
+                401,
+                undefined,
+                undefined,
+                { method: route.method, path, kind: "authentication" },
+            );
         // Waits end on the caller's signal or on close(); a sent attempt only
         // on the caller's signal.
         const waitSignal = options.signal
@@ -676,6 +734,21 @@ export class REST {
                 });
             }
             state.status = response.status;
+            if (
+                response.status === 401 ||
+                response.status === 403 ||
+                (response.status === 429 &&
+                    response.headers.get("X-RateLimit-Scope") !== "shared")
+            )
+                this.#invalidCount(1);
+            if (
+                response.status === 401 &&
+                this.#stopOnInvalidToken &&
+                identity.bucket === this.#fingerprint
+            ) {
+                this.#rejected = this.#fingerprint;
+                emitTelemetry(this.#telemetry, { type: "tokenRejected" });
+            }
             const durationMs = Date.now() - requestStart;
             this.#emit(this.#hooks.onResponse, {
                 method,
