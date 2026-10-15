@@ -79,8 +79,9 @@ export function inlineCode(text: string): string {
  * @param language Optional language identifier for syntax highlighting.
  */
 export function codeBlock(text: string, language = ""): string {
-    // A zero-width space between backticks keeps the text from closing the block.
-    const safe = text.replace(/```/g, "`\u200b``");
+    // A zero-width space between every two adjacent backticks: no run of any
+    // length (```` included) can then form a closing fence.
+    const safe = text.replace(/`(?=`)/g, "`\u200b");
     const lang = language.replace(/[^\w+#.-]/g, "");
     return `\`\`\`${lang}\n${safe}\n\`\`\``;
 }

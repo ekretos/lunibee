@@ -71,6 +71,7 @@ switch (channel.kind) {
 | `createdTimestamp` | `number` | The same, in milliseconds. |
 | `permissionOverwrites` | `APIOverwrite[]` | Role and member overwrites (empty for DMs and when not sent). |
 | `kind` | `ChannelKind \| "unknown"` | See [Kinds](#kinds-031). |
+| `partial` *(0.3.2)* | `boolean` | `true` for the placeholder `message.channel` gets when the channel is not cached: only `id`, `guildId` and a guessed `type` are known, and `permissionOverwrites` is empty because it was never sent. `permissionsFor()` returns `null` for it. |
 
 ## Methods
 
@@ -304,6 +305,6 @@ Changes some permissions of one role's or member's overwrite and keeps the rest 
 await channel.editPermissionOverwrite(userId, { ViewChannel: true, SendMessages: false }, { type: 1, reason: "Ticket locked" });
 ```
 
-The manager form is `client.channels.permissionOverwrites(channelId).update(id, { allow?, deny?, inherit? }, { type?, reason? })` with bitfields. It reads the cached overwrites and fetches the channel when they are unknown.
+The manager form is `client.channels.permissionOverwrites(channelId).update(id, { allow?, deny?, inherit? }, { type?, reason? })` with bitfields. It reads the cached overwrites and fetches the channel when they are unknown or the channel is `partial`, so an edit never replaces the real overwrites with the placeholder's empty list.
 
 `send` also accepts `files` (see [Message](/reference/message/)).

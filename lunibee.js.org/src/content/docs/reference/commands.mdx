@@ -61,6 +61,8 @@ bot.once("ready", () => bot.commands.deploy());
 
 An option is always present when it has `required: true` or a `default`; otherwise the handler gets `undefined` when it was left out. `choices` are plain values or `{ name, value }` pairs. The description defaults to the option's name.
 
+For prefix commands, Lunibee checks what Discord checks for slash commands: a channel option must be a channel of the message's server (in a DM, the DM itself) and of one of its `kinds`; a role option, or a role mentionable, must be a role of that server. A string matching a choice in another case (`RED` for `red`) is passed as the choice itself.
+
 ## The context
 
 | | |

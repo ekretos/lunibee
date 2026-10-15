@@ -516,6 +516,10 @@ export class Client
                 this.channels.unpinMessage(channelId, messageId, reason),
             collectInteractions: (options) =>
                 this.createCollector(ClientEvent.InteractionCreate, options),
+            cachedChannel: (channelId) => {
+                const channel = this.channels.get(channelId);
+                return channel && !channel.partial ? channel : undefined;
+            },
             memberPermissions: (
                 guildId,
                 memberId,
@@ -1386,7 +1390,8 @@ export class Client
                 channel = channel.parentId
                     ? this.channels.get(channel.parentId)
                     : undefined;
-            if (!channel || channel.guildId !== guildId) return null;
+            if (!channel || channel.partial || channel.guildId !== guildId)
+                return null;
         }
         return computePermissions({
             guildId,
@@ -1409,6 +1414,8 @@ export class Client
         guildOrChannelId: string,
     ): PermissionSet | null {
         let channel = this.channels.get(guildOrChannelId);
+        // A placeholder's overwrites are unknown: so is the answer.
+        if (channel?.partial) return null;
         // Threads have no overwrites of their own: they use the parent's.
         // Without a cached parent the answer would be guild-level only, which
         // could wrongly grant access, so report it as unknown instead.
@@ -1416,7 +1423,7 @@ export class Client
             channel = channel.parentId
                 ? this.channels.get(channel.parentId)
                 : undefined;
-            if (!channel) return null;
+            if (!channel || channel.partial) return null;
         }
         const guildId = channel?.guildId ?? guildOrChannelId;
         const guild = this.guilds.get(guildId);

@@ -88,6 +88,8 @@ export interface ResourceContext {
      * (with overwrites) when a channel ID is given. Null when the guild (or
      * channel) is not cached.
      */
+    /** The cached channel, when the client has a complete one (not a partial placeholder). */
+    cachedChannel?(channelId: string): Channel | undefined;
     memberPermissions?(
         guildId: string,
         memberId: string,
@@ -239,12 +241,19 @@ export class Channel extends BaseStructure {
     public position?: number;
     /** Role and member permission overwrites (empty for DMs and when not provided). */
     public permissionOverwrites: import("@lunibee/types").APIOverwrite[];
+    /**
+     * A placeholder built from a message's `channel_id`, not from channel
+     * data: its `type`, `name`, `parentId` and `permissionOverwrites` are not
+     * the real channel's, so nothing may decide access from them.
+     */
+    public partial: boolean;
     readonly #context?: ResourceContext;
 
-    /** Creates a channel structure from Discord channel data. */
+    /** Creates a channel structure from Discord channel data. `options.partial` marks a placeholder. */
     public constructor(
         data: import("@lunibee/types").APIChannel,
         context?: ResourceContext,
+        options: { partial?: boolean } = {},
     ) {
         super(data.id);
         if (!Number.isInteger(data.type) || data.type < 0)
@@ -262,6 +271,7 @@ export class Channel extends BaseStructure {
         this.permissionOverwrites = (data.permission_overwrites ?? []).map(
             (overwrite) => ({ ...overwrite }),
         );
+        this.partial = options.partial ?? false;
         this.#context = context;
     }
 

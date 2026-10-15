@@ -139,11 +139,22 @@ export class ChannelManager extends Manager<string, Channel> {
         return new PermissionOverwriteManager(
             this.#rest,
             channelId,
-            () => this.get(channelId)?.permissionOverwrites,
+            // A partial channel's overwrites are unknown, not empty: fetch.
+            () => {
+                const channel = this.get(channelId);
+                return channel && !channel.partial
+                    ? channel.permissionOverwrites
+                    : undefined;
+            },
         );
     }
     public threads(channelId: string): ThreadManager {
-        return new ThreadManager(this.#rest, this.#context, channelId);
+        return new ThreadManager(
+            this.#rest,
+            this.#context,
+            channelId,
+            this.#allowedMentions,
+        );
     }
     /** Fetches a channel; concurrent fetches share a request and a stale result never overwrites newer state. */
     public fetch(channelId: string): Promise<Channel> {

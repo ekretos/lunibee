@@ -40,7 +40,15 @@ import { ResponseDecoder } from "./decoder.js";
  * never asked for. The path is left out of the message: it may hold a token.
  */
 function assertSafePath(path: string): void {
-    const end = path.search(/[?#]/);
+    // The URL parser deletes tab, LF and CR before it resolves dot segments,
+    // so `.\t.` would pass the segment check below and become `..`; a `#`
+    // cuts off whatever the route adds after it. Neither belongs in a REST
+    // path, and neither do other control characters or spaces.
+    if (/[\u0000-\u0020\u007f#]/.test(path))
+        throw new TypeError(
+            "REST paths must not contain control characters, spaces or '#'.",
+        );
+    const end = path.indexOf("?");
     const pathname = end === -1 ? path : path.slice(0, end);
     if (pathname.includes("\\"))
         throw new TypeError("REST paths must not contain backslashes.");
@@ -51,11 +59,17 @@ function assertSafePath(path: string): void {
         } catch {
             throw new TypeError("REST path has malformed percent-encoding.");
         }
+        // Percent-encoded whitespace (`%09..`) is judged the way a server
+        // that strips it would read the segment.
+        const bare = decoded.replace(/[\u0000-\u0020\u007f]/g, "");
         if (
-            decoded === "." ||
-            decoded === ".." ||
+            bare === "." ||
+            bare === ".." ||
             (/[\\/]/.test(decoded) &&
-                decoded.split(/[\\/]/).some((s) => s === "." || s === ".."))
+                decoded.split(/[\\/]/).some((s) => {
+                    const part = s.replace(/[\u0000-\u0020\u007f]/g, "");
+                    return part === "." || part === "..";
+                }))
         )
             throw new TypeError(
                 "REST paths must not contain '.' or '..' segments.",

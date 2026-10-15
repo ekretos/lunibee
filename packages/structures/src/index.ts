@@ -115,10 +115,15 @@ export class Message extends BaseStructure {
                       context,
                   )
                 : null;
-        this.channel = new Channel(
-            { id: data.channel_id, type: 0, guild_id: data.guild_id },
-            context,
-        );
+        // The cached channel when the client has it; otherwise a placeholder
+        // marked partial, since a message carries only the channel's id.
+        this.channel =
+            context?.cachedChannel?.(data.channel_id) ??
+            new Channel(
+                { id: data.channel_id, type: 0, guild_id: data.guild_id },
+                context,
+                { partial: true },
+            );
     }
 
     /** Whether embeds are suppressed on this message. */

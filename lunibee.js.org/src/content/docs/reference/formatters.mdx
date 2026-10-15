@@ -146,7 +146,7 @@ inlineCode("process.env.TOKEN")  // → "`process.env.TOKEN`"
 
 ### `codeBlock(text, language?)`
 
-Wraps text in a fenced code block.
+Wraps text in a fenced code block. A zero-width space is put after every backtick that is followed by another, so no run of backticks in `text` can close the fence (any length).
 
 <Tabs>
 <TabItem label="TypeScript">

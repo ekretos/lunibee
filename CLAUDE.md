@@ -31,6 +31,8 @@ identity in keys, probes, `failurePolicy`, telemetry, queue limits, `close()`) i
 and status in `docs/audits/rest-distributed-0.3.2.md`, docs on `/core-concepts/distributed-rest`. `RedisCache` (`packages/core/src/redis-cache.ts`), a
 shared Redis mirror of the Gateway cache, and `RedisCollection` (`packages/collection/src/redis.ts`),
 a Collection shared between processes through Redis, are in too.
+The external assessment of 2026-10-15 (LUNIBEE-001 to 007) is fixed; status in
+`docs/audits/security-0.3.1-external.md`.
 Versions are 0.3.2 and the 0.3.1 docs are archived in the version picker. Left for the
 maintainer: the `0.3.2` tag and `publish:all`.
 

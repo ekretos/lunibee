@@ -178,7 +178,7 @@ describe("prefix arguments", () => {
             parsePrefixArgs("RED", [
                 { name: "s", type: "string", choices: ["red"] },
             ]),
-        ).toEqual({ ok: true, values: { s: "RED" } });
+        ).toEqual({ ok: true, values: { s: "red" } }); // the choice itself (LUNIBEE-005)
         expect(
             parsePrefixArgs("blue", [
                 { name: "s", type: "string", choices: ["red"] },

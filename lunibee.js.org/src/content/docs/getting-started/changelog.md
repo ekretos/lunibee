@@ -33,6 +33,18 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 
 ### 🔒 Security
 
+The external assessment of 2026-10-15 (LUNIBEE-001 to 007; status in [`docs/audits/security-0.3.1-external.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1-external.md)):
+
+- **REST paths with control characters, spaces or `#` are refused** (LUNIBEE-001). A URL parser strips tab, CR and LF before resolving `.`/`..`, so `/channels/1/.\t./x` reached a different endpoint with the bot token.
+- **Prefix channel and role options are checked like slash ones** (LUNIBEE-002): a channel must belong to the message's server (in a DM, be the DM) and match `kinds`; a role must belong to the server.
+- **A placeholder `message.channel` no longer wipes overwrites** (LUNIBEE-003). An uncached channel is now `partial`: `editPermissionOverwrite()` fetches the real overwrites first and `permissionsFor()` returns `null`. A cached channel is used as `message.channel` when there is one.
+- **Unauthenticated connections cannot lock hosts out of the coordinator** (LUNIBEE-004): a full listener closes the longest-waiting connection instead of refusing the new one; new `maxUnauthenticatedPerAddress` (4) and `connectionsPerSecond` (10, HTTP 429 above it) limits, a `clientAddress` hook for proxies, and `helloTimeout` is 3 s (was 10 s). `ClusterHost.connect()` retries a first connection closed with `4429`/`4408` (`connectAttempts`, 10).
+- **Prefix choices are passed as the declared value** (LUNIBEE-005): `RED` for a choice `red` arrives as `red`.
+- **`codeBlock()` cannot be closed by four or more backticks** (LUNIBEE-006).
+- **Forum posts get the default `allowedMentions`** (LUNIBEE-007). Raw `bot.rest` / `bot.api` calls still send exactly what they are given.
+
+Earlier findings of this release:
+
 - **A failed reservation can no longer send a request unreserved.** After eight refused reservations `acquire()` returned and the request went out anyway; and on any Redis error a reservation fell back to local state with nothing but a log line per call. A request is now sent only with a granted reservation: a store that errors, replies with something unreadable or refuses without a wait fails it with kind `"coordination"`, and Redis failures follow the explicit `failurePolicy`.
 - **Out-of-range rate-limit headers are ignored:** a window id (`X-RateLimit-Reset`) further than `maxBackoff` from now, and a limit or remaining above 100,000, so a broken proxy cannot make a bucket unlimited or its real responses stale.
 - **Raw tokens never reach the rate-limit store.** Bot identity in keys is a 16-hex-character SHA-256 fingerprint; telemetry carries no token, fingerprint or body.

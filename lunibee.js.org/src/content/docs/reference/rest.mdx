@@ -213,6 +213,7 @@ await rest.request({
 Before anything is sent, a path is refused with a `TypeError` if it:
 
 - does not start with `/`;
+- contains a control character (tab, CR, LF and the rest of U+0000–U+001F, U+007F), a space or `#`, which a URL parser would strip or treat as the end of the path;
 - has a `.` or `..` segment, including percent-encoded forms such as `%2e%2e` and segments like `%2f..%2f` that decode to one;
 - contains a backslash;
 - has malformed percent-encoding.

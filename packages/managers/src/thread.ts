@@ -1,16 +1,17 @@
-import { REST, Routes } from "@lunibee/rest";
+import { REST, Routes, type RESTFileAttachment } from "@lunibee/rest";
 import {
     Channel,
     createChannel,
     type ResourceContext,
 } from "@lunibee/structures";
 import type {
+    AllowedMentions,
     APIChannel,
     APIGuildMember,
     APIThreadMember,
     MessageCreateOptions,
 } from "@lunibee/types";
-import { toAttachments } from "./message.js";
+import { toRequest } from "./message.js";
 
 type ChannelData = ConstructorParameters<typeof Channel>[0];
 
@@ -45,16 +46,19 @@ export class ThreadManager {
     readonly #rest: REST;
     readonly #context: ResourceContext;
     readonly #channelId: string;
-    /** Creates a thread manager. @param rest REST transport. @param context Structure resource context. @param channelId Parent channel identifier. @throws {TypeError} If channelId is empty. */
+    readonly #allowedMentions?: AllowedMentions;
+    /** Creates a thread manager. @param rest REST transport. @param context Structure resource context. @param channelId Parent channel identifier. @param allowedMentions Default `allowed_mentions` for a forum post's first message without its own. @throws {TypeError} If channelId is empty. */
     public constructor(
         rest: REST,
         context: ResourceContext,
         channelId: string,
+        allowedMentions?: AllowedMentions,
     ) {
         if (!channelId) throw new TypeError("Channel ID is required.");
         this.#rest = rest;
         this.#context = context;
         this.#channelId = channelId;
+        this.#allowedMentions = allowedMentions;
     }
     /** Creates a thread from a message. @param messageId Message identifier. @param options Thread creation options. @returns Created thread channel. @throws {Error} If REST rejects the request. */
     public async createFromMessage(
@@ -114,7 +118,14 @@ export class ThreadManager {
         },
     ): Promise<Channel> {
         const { message, appliedTags, reason, ...thread } = options;
-        const { files, ...content } = message;
+        // The first message goes through the same path as every other send,
+        // so it gets the client's allowed_mentions default and alt text.
+        const request = toRequest(message, this.#allowedMentions);
+        const withFiles = "body" in request && "files" in request;
+        const content = withFiles ? request.body : request;
+        const files = withFiles
+            ? (request as { files: RESTFileAttachment[] }).files
+            : undefined;
         const data = await this.#rest.post<ChannelData>(
             Routes.channelThreads(this.#channelId),
             {
@@ -124,7 +135,7 @@ export class ThreadManager {
                 applied_tags: appliedTags,
                 message: content,
             },
-            { files: files?.length ? toAttachments(files) : undefined, reason },
+            { files, reason },
         );
         return createChannel(data, this.#context);
     }

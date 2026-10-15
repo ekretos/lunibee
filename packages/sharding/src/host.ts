@@ -35,6 +35,12 @@ export interface ClusterHostOptions {
     reconnectDelay?: number;
     /** Longest delay between reconnect attempts, in ms. Default 30,000. */
     maxReconnectDelay?: number;
+    /**
+     * Attempts `connect()` makes while the coordinator is busy (it answers
+     * "too many connections" or the hello timed out) before it gives up.
+     * Default 10. A refusal (bad secret, unknown or duplicate id) is final.
+     */
+    connectAttempts?: number;
 }
 
 /** What a {@link ClusterHost} emits. */
@@ -80,6 +86,8 @@ export class ClusterHost {
     #watchdog?: ReturnType<typeof setInterval>;
     #retry?: ReturnType<typeof setTimeout>;
     #delay: number;
+    /** Busy answers to the first connect so far. */
+    #busyAttempts = 0;
     #closed = true;
     #connected = false;
     #firstConnect?: { resolve: () => void; reject: (error: Error) => void };
@@ -165,6 +173,7 @@ export class ClusterHost {
     public connect(): Promise<void> {
         if (!this.#closed) return Promise.resolve();
         this.#closed = false;
+        this.#busyAttempts = 0;
         return new Promise<void>((resolve, reject) => {
             this.#firstConnect = { resolve, reject };
             this.#open();
@@ -432,6 +441,18 @@ export class ClusterHost {
             code === RemoteClose.DuplicateHost ||
             code === RemoteClose.VersionMismatch;
         const first = this.#firstConnect;
+        // A busy coordinator is not a refusal: try again, with backoff.
+        const busy =
+            code === RemoteClose.TooManyConnections ||
+            code === RemoteClose.HelloTimeout;
+        if (
+            first &&
+            busy &&
+            ++this.#busyAttempts < (this.#options.connectAttempts ?? 10)
+        ) {
+            this.#retryLater();
+            return;
+        }
         if (first) {
             this.#firstConnect = undefined;
             this.#closed = true;
@@ -449,6 +470,10 @@ export class ClusterHost {
                     `The coordinator refused this host (${code}: ${reason}).`,
                 ),
             );
+        this.#retryLater();
+    }
+
+    #retryLater(): void {
         const wait = Math.round(this.#delay * (1 + Math.random() * 0.2));
         this.#delay = Math.min(
             this.#options.maxReconnectDelay ?? 30_000,

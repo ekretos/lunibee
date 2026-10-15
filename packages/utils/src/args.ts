@@ -25,7 +25,7 @@ export interface PrefixArgSpec {
     /** For `integer` and `number`: the accepted range. */
     min?: number;
     max?: number;
-    /** Accepted values (compared case-insensitively for strings). */
+    /** Accepted values. Strings match without regard to case and are returned as the choice itself. */
     choices?: readonly (string | number)[];
 }
 
@@ -138,14 +138,20 @@ function readOne(
                 return {
                     error: `must be at most ${spec.maxLength} characters`,
                 };
-            if (
-                spec.choices &&
-                !spec.choices.some(
-                    (choice) =>
-                        String(choice).toLowerCase() === raw.toLowerCase(),
-                )
-            )
-                return { error: `must be one of: ${spec.choices.join(", ")}` };
+            if (spec.choices) {
+                // Matched without regard to case, but the handler gets the
+                // choice itself: code that compares it exactly (as its type
+                // says it may) must not see "ALL" where it expects "all".
+                const lower = raw.toLowerCase();
+                const choice =
+                    spec.choices.find((c) => String(c) === raw) ??
+                    spec.choices.find((c) => String(c).toLowerCase() === lower);
+                if (choice === undefined)
+                    return {
+                        error: `must be one of: ${spec.choices.join(", ")}`,
+                    };
+                return { value: String(choice) };
+            }
             return { value: raw };
         case "integer":
         case "number": {

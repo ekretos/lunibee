@@ -143,8 +143,11 @@ The worker script is the same as for local clusters (a [`ShardManager`](/referen
 | `minHosts` | `number` | `1` | Without `hosts`: how many hosts must join before clusters are placed. Positive integer. |
 | `joinTimeout` | `number` | `60000` | Ms `spawn()` waits for the hosts before it rejects. |
 | `lease` | `number` | `15000` | Fencing lease in ms; at least 30. See [Lease fencing](#lease-fencing). |
-| `helloTimeout` | `number` | `10000` | Ms a new connection has to authenticate before it is closed with `4408`. |
-| `maxUnauthenticated` | `number` | `16` | Connections that may be waiting to authenticate at once. More are closed with `4429`. |
+| `helloTimeout` | `number` | `3000` | Ms a new connection has to authenticate before it is closed with `4408`. |
+| `maxUnauthenticated` | `number` | `16` | Connections that may be waiting to authenticate at once. When full, the one that has waited longest is closed with `4429` to make room. |
+| `maxUnauthenticatedPerAddress` | `number` | `4` | Connections one client address may have waiting at once. Its oldest is closed with `4429` to make room. |
+| `connectionsPerSecond` | `number` | `10` | New connections accepted per second from one address (a token bucket with a burst of the same size). More are refused with HTTP `429` before the upgrade. |
+| `clientAddress` | `(request, peer) => string` | the peer's IP | The address used by the two limits above. Behind a TLS proxy every host shares the proxy's address: return the forwarded address the proxy sets (and only trust it from the proxy). |
 | `local` | `boolean` | `false` | Also run clusters on the coordinator's machine (with `script`). |
 
 | Condition | Error |
@@ -205,6 +208,7 @@ new ClusterHost(options: ClusterHostOptions)
 | `fork` | `(script, env) => ChildProcess` | `child_process.fork(script, [], { env })` | Starts a worker. `env` is the host's environment plus the [worker contract](/reference/cluster-manager/#environment-variables). |
 | `reconnectDelay` | `number` | `1000` | First delay before reconnecting, in ms. |
 | `maxReconnectDelay` | `number` | `30000` | Longest delay between reconnect attempts, in ms. |
+| `connectAttempts` | `number` | `10` | Attempts `connect()` makes while the coordinator closes the first connection as busy (`4429`) or slow (`4408`). |
 
 The constructor throws a `RangeError` for an invalid `id` or a `secret` under 16 characters, and a `TypeError` for a missing `script`, a URL that is not absolute `ws://` or `wss://`, a URL with a user name or password, or `ws://` to another machine without `allowInsecure`. It does not connect.
 
@@ -212,7 +216,7 @@ The constructor throws a `RangeError` for an invalid `id` or a `secret` under 16
 
 | Member | Description |
 |---|---|
-| `connect()` | Connects and resolves once the coordinator accepted this host. Rejects with `The coordinator refused this host (<code>: <reason>).` if the first attempt fails for any reason (bad secret, unknown or duplicate ID, version mismatch, or no coordinator at the address); the host is then closed and `connect()` can be called again. After a successful first connect, a lost connection is retried with backoff until `close()`. Called again while connecting or connected, it resolves at once. |
+| `connect()` | Connects and resolves once the coordinator accepted this host. Rejects with `The coordinator refused this host (<code>: <reason>).` if the first attempt fails (bad secret, unknown or duplicate ID, version mismatch, or no coordinator at the address). A first attempt closed with `4429` or `4408` (the coordinator was busy) is retried with backoff, up to `connectAttempts` connections; the host is then closed and `connect()` can be called again. After a successful first connect, a lost connection is retried with backoff until `close()`. Called again while connecting or connected, it resolves at once. |
 | `close()` | Kills every worker (SIGKILL), closes the connection with `1000` and stops reconnecting. Resolves when the socket has closed. A pending `connect()` rejects with `The host was closed.` |
 | `connected` | Whether the coordinator has accepted this host and the link is open. |
 | `clusters()` | Cluster IDs running on this host, sorted. |
@@ -252,7 +256,7 @@ Every connection is authenticated before it can do anything:
 3. The coordinator checks, in order: the version (`4426`), the ID format and the MAC in constant time (`4401` for either, with the same reason, so a failure never says which), that the ID is in `hosts` when `hosts` is set (`4410`), and that no host with that ID is connected (`4409`).
 4. It answers `{ t: "welcome", leaseMs, pingMs }` and emits `hostJoin`.
 
-A connection that sends anything but a text `hello` first, or does not send it within `helloTimeout`, is closed (`4400`, `4408`). At most `maxUnauthenticated` connections may wait at once.
+A connection that sends anything but a text `hello` first, or does not send it within `helloTimeout`, is closed (`4400`, `4408`). At most `maxUnauthenticated` connections may wait at once, and `maxUnauthenticatedPerAddress` from one address; a new connection closes the longest-waiting one instead of being refused, so a flood of unauthenticated sockets cannot keep a real host out, and one address may open at most `connectionsPerSecond` per second. A flood from the same address as a real host (a shared NAT or proxy) can still delay it: put the coordinator behind a firewall or a TLS proxy that limits connections.
 
 The HMAC proves who a host is. It does not encrypt or sign later frames: that is TLS's job.
 
@@ -300,7 +304,7 @@ WebSocket close codes between a coordinator and a host:
 | `4409` | `DuplicateHost` | A host with this ID is already connected. |
 | `4410` | `UnknownHost` | The ID is not in `remote.hosts`. |
 | `4426` | `VersionMismatch` | The two sides speak different protocol versions. |
-| `4429` | `TooManyConnections` | `maxUnauthenticated` connections are already waiting. |
+| `4429` | `TooManyConnections` | Closed to make room: the connection had waited longest while `maxUnauthenticated` (or its address's `maxUnauthenticatedPerAddress`) connections were waiting. |
 | `4500` | `Shutdown` | The coordinator stopped (`shutdownAll()`, `killAll()`). |
 | `4504` | `HostLost` | Sent by the coordinator after two silent leases, or by the host after one. |
 

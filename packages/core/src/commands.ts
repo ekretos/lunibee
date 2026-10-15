@@ -722,6 +722,81 @@ export class CommandRegistry {
         } as CommandContext<OptionMap>);
     }
 
+    /**
+     * The first channel or role argument that is not in the message's server
+     * (or, for a channel, not one of the option's `kinds`). In a DM a channel
+     * argument may only name the DM itself, and roles are refused.
+     */
+    async #outOfScope(
+        options: OptionMap,
+        values: Record<string, unknown>,
+        message: Message,
+    ): Promise<{ key: string; error: string } | undefined> {
+        const guildId = message.guildId ?? undefined;
+        for (const [key, def] of Object.entries(options)) {
+            const value = values[key];
+            if (value === undefined || value === null) continue;
+            if (def.kind === "channel") {
+                const id = String(value);
+                const channel = await this.#channel(id);
+                const inScope = guildId
+                    ? channel?.guildId === guildId
+                    : id === message.channelId;
+                if (!channel || !inScope)
+                    return {
+                        key,
+                        error: guildId
+                            ? "must be a channel in this server"
+                            : "must be this channel",
+                    };
+                const kinds = (def.config as ChannelConfig).kinds;
+                if (
+                    kinds?.length &&
+                    !channelTypes(kinds).includes(channel.type)
+                )
+                    return {
+                        key,
+                        error: `must be a ${kinds.join(" or ")} channel`,
+                    };
+            }
+            const roleId =
+                def.kind === "role"
+                    ? String(value)
+                    : def.kind === "mentionable" &&
+                        (value as { type?: string }).type === "role"
+                      ? (value as { id: string }).id
+                      : undefined;
+            if (
+                roleId !== undefined &&
+                !(guildId && (await this.#hasRole(guildId, roleId)))
+            )
+                return { key, error: "must be a role in this server" };
+        }
+        return undefined;
+    }
+
+    /** A complete channel from the cache, else from Discord; undefined when there is none the bot can see. */
+    async #channel(id: string) {
+        const cached = this.#bot.channels.get(id);
+        if (cached && !cached.partial) return cached;
+        try {
+            return await this.#bot.channels.fetch(id);
+        } catch {
+            return undefined;
+        }
+    }
+
+    async #hasRole(guildId: string, roleId: string): Promise<boolean> {
+        if (roleId === guildId) return true; // @everyone
+        const roles = this.#bot.guilds.roles(guildId);
+        if (roles.get(roleId)) return true;
+        try {
+            return (await roles.fetchAll()).some((role) => role.id === roleId);
+        } catch {
+            return false;
+        }
+    }
+
     async #runPrefix(message: Message, prefix: string): Promise<void> {
         const text = message.content.slice(prefix.length).trim();
         const [name = "", ...rest] = text.split(/\s+/);
@@ -771,6 +846,20 @@ export class CommandRegistry {
         else {
             await reply(
                 `\`${parsed.arg}\` ${parsed.error}. Usage: \`${found.usage(prefix)}\``,
+            );
+            return;
+        }
+        // Discord resolves a slash command's channel and role options in the
+        // server it runs in; a prefix argument is only an ID, so hold it to
+        // the same rules here.
+        const outOfScope = await this.#outOfScope(
+            found.options,
+            values,
+            message,
+        );
+        if (outOfScope) {
+            await reply(
+                `\`${outOfScope.key}\` ${outOfScope.error}. Usage: \`${found.usage(prefix)}\``,
             );
             return;
         }

@@ -87,9 +87,19 @@ async function deployment(
 async function rawHost(
     port: number,
     id: string,
-    opts: { secret?: string; version?: number; hello?: boolean } = {},
+    opts: {
+        secret?: string;
+        version?: number;
+        hello?: boolean;
+        /** Sent as `x-client`, for tests that key limits by it. */
+        client?: string;
+    } = {},
 ) {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+    const socket = opts.client
+        ? new WebSocket(`ws://127.0.0.1:${port}`, {
+              headers: { "x-client": opts.client },
+          } as never)
+        : new WebSocket(`ws://127.0.0.1:${port}`);
     const received: Record<string, unknown>[] = [];
     let closed: { code: number; reason: string } | undefined;
     socket.addEventListener("message", (event) => {
@@ -1114,26 +1124,197 @@ describe("shutdown", () => {
 });
 
 describe("resource limits", () => {
-    test("connections that have not authenticated are capped", async () => {
+    test("a full listener closes the connection that has waited longest (LUNIBEE-004)", async () => {
         const { port } = await deployment(
             ["a"],
             {},
-            { maxUnauthenticated: 3, helloTimeout: 5000 },
+            {
+                maxUnauthenticated: 3,
+                maxUnauthenticatedPerAddress: 10,
+                helloTimeout: 5000,
+            },
         );
         const sockets: Awaited<ReturnType<typeof rawHost>>[] = [];
-        for (let i = 0; i < 6; i++)
-            sockets.push(await rawHost(port, `x${i}`, { hello: false }));
+        for (let i = 0; i < 6; i++) {
+            const socket = await rawHost(port, `x${i}`, { hello: false });
+            await until(() => socket.find("challenge"));
+            sockets.push(socket);
+        }
         await until(() => sockets.filter((s) => s.closed()).length >= 3);
-        const refused = sockets.filter(
-            (s) => s.closed()?.code === RemoteClose.TooManyConnections,
+        // The three oldest made room; the three newest are waiting.
+        for (const old of sockets.slice(0, 3))
+            expect(old.closed()?.code).toBe(RemoteClose.TooManyConnections);
+        for (const recent of sockets.slice(3))
+            expect(recent.closed()).toBeUndefined();
+        // A newcomer is always given its challenge.
+        const late = await rawHost(port, "late", { hello: false });
+        await until(() => late.find("challenge"));
+    });
+
+    test("one address holds at most maxUnauthenticatedPerAddress pending connections", async () => {
+        const { port } = await deployment(
+            ["a"],
+            {},
+            {
+                maxUnauthenticatedPerAddress: 2,
+                helloTimeout: 5000,
+                clientAddress: (request) =>
+                    request.headers.get("x-client") ?? "host",
+            },
         );
-        expect(refused).toHaveLength(3);
-        // Closing one frees a place.
-        sockets[0]!.socket.close();
-        await tick(30);
-        const again = await rawHost(port, "later", { hello: false });
-        await until(() => again.find("challenge"));
-        expect(again.closed()).toBeUndefined();
+        const fromA: Awaited<ReturnType<typeof rawHost>>[] = [];
+        for (let i = 0; i < 3; i++) {
+            const socket = await rawHost(port, `a${i}`, {
+                hello: false,
+                client: "10.0.0.1",
+            });
+            await until(() => socket.find("challenge"));
+            fromA.push(socket);
+        }
+        const fromB = await rawHost(port, "b", {
+            hello: false,
+            client: "10.0.0.2",
+        });
+        await until(() => fromB.find("challenge"));
+        await until(() => fromA[0]!.closed());
+        expect(fromA[0]!.closed()!.code).toBe(RemoteClose.TooManyConnections);
+        expect(fromA[1]!.closed()).toBeUndefined();
+        expect(fromA[2]!.closed()).toBeUndefined();
+        expect(fromB.closed()).toBeUndefined();
+    });
+
+    test("connectionsPerSecond refuses a burst from one address before the upgrade", async () => {
+        const { port } = await deployment(
+            ["a"],
+            {},
+            {
+                connectionsPerSecond: 3,
+                helloTimeout: 5000,
+                clientAddress: (request) =>
+                    request.headers.get("x-client") ?? "host",
+            },
+        );
+        const burst = await Promise.all(
+            Array.from({ length: 6 }, (_, i) =>
+                rawHost(port, `f${i}`, { hello: false, client: "10.0.0.9" }),
+            ),
+        );
+        await until(() => burst.filter((s) => s.closed()).length >= 3);
+        expect(burst.filter((s) => s.find("challenge"))).toHaveLength(3);
+        // Another address is not affected.
+        const other = await rawHost(port, "o", {
+            hello: false,
+            client: "10.0.0.10",
+        });
+        await until(() => other.find("challenge"));
+    });
+
+    test("LUNIBEE-004: a flood of idle connections from other addresses cannot keep a host out", async () => {
+        const manager = new ClusterManager({
+            token: "t",
+            script: "local.js",
+            shardCount: 2,
+            clusterCount: 1,
+            spawnInterval: 0,
+            fork: fakeFork().fork,
+            remote: {
+                port: 0,
+                secret: SECRET,
+                hosts: ["a"],
+                joinTimeout: 30_000,
+                clientAddress: (request) =>
+                    request.headers.get("x-client") ?? "host",
+            },
+        });
+        cleanup.push(() => manager.killAll());
+        manager.spawn().catch(() => undefined);
+        const port = await until(() => manager.remotePort);
+        let attacking = true;
+        const open = new Set<WebSocket>();
+        const attacker = (address: string): void => {
+            if (!attacking) return;
+            const ws = new WebSocket(`ws://127.0.0.1:${port}`, {
+                headers: { "x-client": address },
+            } as never);
+            open.add(ws);
+            ws.addEventListener("close", () => {
+                open.delete(ws);
+                setTimeout(() => attacker(address), 2);
+            });
+            ws.addEventListener("error", () => {});
+        };
+        for (let a = 0; a < 6; a++)
+            for (let i = 0; i < 12; i++) attacker(`10.1.0.${a}`);
+        cleanup.push(() => {
+            attacking = false;
+            for (const ws of open) ws.close();
+        });
+        await tick(400);
+        const forked = fakeFork();
+        const host = new ClusterHost({
+            url: `ws://127.0.0.1:${port}`,
+            secret: SECRET,
+            id: "a",
+            script: "worker.js",
+            fork: forked.fork,
+            reconnectDelay: 10,
+        });
+        cleanup.push(() => host.close());
+        await host.connect();
+        await until(() => manager.hosts().find((h) => h.id === "a")?.connected);
+    });
+
+    test("a busy coordinator is retried on the first connect; a refusal is final", async () => {
+        let connections = 0;
+        const codes = [
+            RemoteClose.TooManyConnections,
+            RemoteClose.HelloTimeout,
+            RemoteClose.AuthFailed,
+        ];
+        const server = Bun.serve({
+            port: 0,
+            hostname: "127.0.0.1",
+            fetch: (request, srv) =>
+                srv.upgrade(request)
+                    ? undefined
+                    : new Response("", { status: 400 }),
+            websocket: {
+                open: (ws) => {
+                    const code =
+                        codes[Math.min(connections++, codes.length - 1)]!;
+                    ws.close(code, "test");
+                },
+                message: () => {},
+            },
+        });
+        cleanup.push(() => server.stop(true));
+        const host = new ClusterHost({
+            url: `ws://127.0.0.1:${server.port}`,
+            secret: SECRET,
+            id: "a",
+            script: "worker.js",
+            fork: fakeFork().fork,
+            reconnectDelay: 5,
+            maxReconnectDelay: 10,
+        });
+        await expect(host.connect()).rejects.toThrow("4401");
+        expect(connections).toBe(3);
+
+        // A coordinator that stays busy is given up on after connectAttempts.
+        connections = 0;
+        codes.splice(0, codes.length, RemoteClose.TooManyConnections);
+        const patient = new ClusterHost({
+            url: `ws://127.0.0.1:${server.port}`,
+            secret: SECRET,
+            id: "a",
+            script: "worker.js",
+            fork: fakeFork().fork,
+            reconnectDelay: 5,
+            maxReconnectDelay: 10,
+            connectAttempts: 3,
+        });
+        await expect(patient.connect()).rejects.toThrow("4429");
+        expect(connections).toBe(3);
     });
 
     test("a worker cannot queue many IDENTIFY requests for one shard", async () => {

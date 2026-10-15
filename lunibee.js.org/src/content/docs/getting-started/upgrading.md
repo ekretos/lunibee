@@ -21,6 +21,10 @@ description: Code changes needed when upgrading between Lunibee versions, from 0
 - **A bot is held to 50 requests per second** across all buckets (`globalLimit`). Large bots with a raised global limit should set it; `globalLimit: false` turns it off.
 - **After a 401 the token is not used again** until `setToken()`; later requests fail with kind `"authentication"` without being sent. `stopOnInvalidToken: false` turns this off.
 - **Redis failures are logged once per state change**, not once per failed command. Read `store.mode` or `store.diagnostics()`, or pass `telemetry`, to watch them. See [Distributed REST](/core-concepts/distributed-rest/).
+- **Prefix commands are stricter** (security): channel options from another server, of a kind not in `kinds`, or roles from another server are refused with a usage reply; a choice typed in another case is passed as the declared value (`"red"`, not `"RED"`).
+- **`message.channel` may be `partial`** when the channel is not cached; `permissionsFor()` on it returns `null`. Use `bot.channels.fetch(id)` when you need the full channel.
+- **Remote clusters:** `helloTimeout` defaults to 3 s (was 10 s); a coordinator under load closes the longest-waiting unauthenticated connection with `4429`, and `ClusterHost.connect()` retries that (`connectAttempts`). Behind a TLS proxy, pass `clientAddress` so the per-address limits see real addresses.
+- **REST paths** with a control character, a space or `#` throw a `TypeError`. Encode such values (`Routes` does) or pass them as `query`.
 
 ## 0.2.x → 0.3.1
 

@@ -50,10 +50,26 @@ export interface RemoteOptions {
      * a shard never runs in two places. Default 15,000.
      */
     lease?: number;
-    /** Milliseconds a new connection has to authenticate before it is closed. Default 10,000. */
+    /** Milliseconds a new connection has to authenticate before it is closed. Default 3,000. */
     helloTimeout?: number;
-    /** Most connections that may be waiting to authenticate at once; more are closed. Default 16. */
+    /**
+     * Most connections that may be waiting to authenticate at once. When full,
+     * the one that has waited longest is closed to make room: a host answers
+     * the challenge within a round trip, a connection that holds a slot idle
+     * does not. Default 16.
+     */
     maxUnauthenticated?: number;
+    /** The same limit for one client address (see `clientAddress`). Default 4. */
+    maxUnauthenticatedPerAddress?: number;
+    /** New connections one client address may open per second; more are refused. Default 10. */
+    connectionsPerSecond?: number;
+    /**
+     * The client address the per-address limits count by. Default: the peer
+     * address of the TCP connection. Behind a TLS proxy every peer is the
+     * proxy, so return the client address the proxy forwards (only from a
+     * header your proxy sets and overwrites).
+     */
+    clientAddress?: (request: Request, peer: string | undefined) => string;
     /** Also run clusters on the coordinator's own machine. Default false: clusters run on the hosts only. */
     local?: boolean;
 }
@@ -71,8 +87,10 @@ export interface HostStatus {
 
 interface SocketData {
     nonce: string;
+    /** The client address the per-address limits count by. */
+    address: string;
     id?: string;
-    /** Whether this socket is counted in `#unauthenticated`. */
+    /** Whether this socket is counted among the pending (unauthenticated) ones. */
     counted?: boolean;
     helloTimer?: ReturnType<typeof setTimeout>;
 }
@@ -170,8 +188,12 @@ export class RemoteHosts {
     #watchdog?: ReturnType<typeof setInterval>;
     #epoch = 0;
     #ping = 0;
-    /** Sockets that have not said hello yet. */
-    #unauthenticated = 0;
+    /** Sockets that have not said hello yet, oldest first. */
+    readonly #pending = new Set<ServerWebSocket<SocketData>>();
+    /** Pending sockets per client address. */
+    readonly #pendingByAddress = new Map<string, number>();
+    /** Connection allowance per client address (token buckets). */
+    readonly #rates = new Map<string, { tokens: number; at: number }>();
 
     public constructor(options: RemoteOptions, hooks: RemoteHooks) {
         if (typeof options.secret !== "string" || options.secret.length < 16)
@@ -244,9 +266,22 @@ export class RemoteHosts {
             hostname: hostname ?? "127.0.0.1",
             ...(tls ? { tls } : {}),
             fetch: (request, server) => {
+                const peer = server.requestIP(request)?.address;
+                const address =
+                    this.#options.clientAddress?.(request, peer) ??
+                    peer ??
+                    "unknown";
+                // Refused before the upgrade: the cheapest answer to a flood.
+                if (!this.#allowConnection(address))
+                    return new Response("Too many connections.", {
+                        status: 429,
+                    });
                 if (
                     server.upgrade(request, {
-                        data: { nonce: randomBytes(16).toString("hex") },
+                        data: {
+                            nonce: randomBytes(16).toString("hex"),
+                            address,
+                        },
                     })
                 )
                     return undefined;
@@ -382,16 +417,62 @@ export class RemoteHosts {
         }
     }
 
-    #open(ws: ServerWebSocket<SocketData>): void {
-        if (this.#unauthenticated >= (this.#options.maxUnauthenticated ?? 16)) {
-            ws.close(RemoteClose.TooManyConnections, "Too many connections.");
-            return;
+    /** Takes one connection from the address's per-second allowance. */
+    #allowConnection(address: string): boolean {
+        const rate = this.#options.connectionsPerSecond ?? 10;
+        const now = Date.now();
+        let bucket = this.#rates.get(address);
+        if (!bucket) {
+            bucket = { tokens: rate, at: now };
+            this.#rates.set(address, bucket);
+            // A bounded map: forget the address idle longest.
+            if (this.#rates.size > 10_000)
+                this.#rates.delete(this.#rates.keys().next().value as string);
         }
-        this.#unauthenticated++;
+        bucket.tokens = Math.min(
+            rate,
+            bucket.tokens + ((now - bucket.at) / 1000) * rate,
+        );
+        bucket.at = now;
+        if (bucket.tokens < 1) return false;
+        bucket.tokens--;
+        return true;
+    }
+
+    /** Closes a pending socket to make room for a newer one. */
+    #evict(victim: ServerWebSocket<SocketData>): void {
+        this.#uncount(victim);
+        clearTimeout(victim.data.helloTimer);
+        victim.close(RemoteClose.TooManyConnections, "Too many connections.");
+    }
+
+    #open(ws: ServerWebSocket<SocketData>): void {
+        // An address at its limit gives up its oldest pending socket, then
+        // the whole listener does: a connection that holds a slot without
+        // answering cannot keep a host that answers at once from joining.
+        const address = ws.data.address;
+        if (
+            (this.#pendingByAddress.get(address) ?? 0) >=
+            (this.#options.maxUnauthenticatedPerAddress ?? 4)
+        )
+            for (const other of this.#pending)
+                if (other.data.address === address) {
+                    this.#evict(other);
+                    break;
+                }
+        if (this.#pending.size >= (this.#options.maxUnauthenticated ?? 16)) {
+            const oldest = this.#pending.values().next().value;
+            if (oldest) this.#evict(oldest);
+        }
+        this.#pending.add(ws);
+        this.#pendingByAddress.set(
+            address,
+            (this.#pendingByAddress.get(address) ?? 0) + 1,
+        );
         ws.data.counted = true;
         ws.data.helloTimer = setTimeout(
             () => ws.close(RemoteClose.HelloTimeout, "No hello."),
-            this.#options.helloTimeout ?? 10_000,
+            this.#options.helloTimeout ?? 3_000,
         );
         ws.send(
             JSON.stringify({
@@ -506,10 +587,12 @@ export class RemoteHosts {
     }
 
     #uncount(ws: ServerWebSocket<SocketData>): void {
-        if (ws.data.counted) {
-            ws.data.counted = false;
-            this.#unauthenticated--;
-        }
+        if (!ws.data.counted) return;
+        ws.data.counted = false;
+        this.#pending.delete(ws);
+        const left = (this.#pendingByAddress.get(ws.data.address) ?? 1) - 1;
+        if (left > 0) this.#pendingByAddress.set(ws.data.address, left);
+        else this.#pendingByAddress.delete(ws.data.address);
     }
 
     #closed(ws: ServerWebSocket<SocketData>, reason: string): void {
