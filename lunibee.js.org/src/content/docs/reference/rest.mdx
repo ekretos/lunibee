@@ -306,7 +306,7 @@ ioredis and node-redis clients are passed as they are (`client: new Redis(url)`)
 
 | `RedisRateLimitStoreOptions` | Default | Description |
 |---|---|---|
-| `client` | — | Any client with `get`, `mget`, `set` and `del` (ioredis and node-redis both fit; `fromBunRedis()` adapts `Bun.RedisClient`). With `eval`, every reservation, response merge and global extension is one atomic Lua script that reads Redis's own clock (`TIME`). Without it the store is *observational*: workers can race on the last unit. With `evalsha` too (ioredis, node-redis and `fromBunRedis()` have it), each script is sent by its SHA-1 and loaded with `eval` only on `NOSCRIPT`. |
+| `client` | — | Any client with `get`, `mget`, `set` and `del` (ioredis and node-redis both fit; `fromBunRedis()` adapts `Bun.RedisClient`). With `eval`, every reservation, response merge and global extension is one atomic Lua script that reads Redis's own clock (`TIME`). Without it the store is *observational*: workers can race on the last unit. |
 | `prefix` | `"lunibee:rest:"` | Key prefix. Keys are versioned under it (`…v1:bucket:…`, `…v1:global:…`, `…v1:route:…`) and every key has a TTL. On Redis Cluster put a hash tag in it (`"{mybot}:rest:"`). |
 | `failurePolicy` | `"degraded-local"` | While Redis is unreachable: `"degraded-local"` limits from this process's last known state; `"fail-closed"` fails each request with kind `"coordination"` without sending it. Either way the change is logged once, emitted as a `mode` event and shown by `mode` / `diagnostics()`, and the store returns to Redis when it answers. |
 | `commandTimeout` | `2000` | Longest one Redis command may take, in ms, before it counts as failed. |

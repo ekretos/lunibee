@@ -184,7 +184,8 @@ new map is bounded; new regexes are linear.
   stop requests. Fixed (R-14).
 - The proactive global limit (R-15) is a fixed 1 s window: up to 2× the limit can pass around a
   window boundary. Accepted.
-- `EVAL` sent the script text each time: fixed, `EVALSHA` with an `EVAL` fallback on `NOSCRIPT`
-  (unit test with a script flush; the integration suite runs it against real Redis).
+- `EVAL` sends the script text with every command. `EVALSHA` was tried and removed by the
+  maintainer's decision: plain `EVAL` is always correct (no `NOSCRIPT` state after a restart or
+  `SCRIPT FLUSH`). Accepted.
 - No cap on the time a request waits before sending: fixed, `maxQueueWait` (kind `"overloaded"`).
 - Redis Cluster needs a hash-tagged `prefix`; not tested against a cluster. Open (P3).

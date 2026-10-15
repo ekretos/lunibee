@@ -1175,7 +1175,6 @@ describe("Redis adapters and release", () => {
         await c.set("a", "v", "PX", 5);
         await c.del("a", "b");
         await c.eval!("return 1", 1, "k", 2);
-        await c.evalsha!("abc", 0);
         expect(sent).toEqual([
             ["GET", ["a"]],
             ["MGET", ["a"]],
@@ -1183,7 +1182,6 @@ describe("Redis adapters and release", () => {
             ["SET", ["a", "v", "PX", "5"]],
             ["DEL", ["a", "b"]],
             ["EVAL", ["return 1", "1", "k", "2"]],
-            ["EVALSHA", ["abc", "0"]],
         ]);
     });
 
@@ -1550,50 +1548,6 @@ describe("hostile rate-limit headers", () => {
         expect(store.getBucket("k")!.window).toBeUndefined();
         await limiter.applyResponse(res(1, now + 5), "k", "r", "@none");
         expect(store.getBucket("k")!.remaining).toBe(1);
-    });
-});
-
-describe("EVALSHA", () => {
-    test("scripts run by SHA-1 after the first load, and reload after a flush", async () => {
-        const redis = createFakeRedis();
-        const store = new RedisRateLimitStore({ client: redis.client() });
-        await store.reserve!("a");
-        expect(redis.ops.get("EVAL")).toBe(1); // NOSCRIPT once, then loaded
-        await store.reserve!("b");
-        await store.reconcile!("b", { remaining: 1, resetAfterMs: 1000 });
-        await store.reconcile!("b", { remaining: 0, resetAfterMs: 1000 });
-        expect(redis.ops.get("EVAL")).toBe(2); // the reconcile script, once
-        expect(redis.ops.get("EVALSHA")).toBe(4); // two hit NOSCRIPT
-        redis.flushScripts();
-        await store.reserve!("c");
-        expect(redis.ops.get("EVAL")).toBe(3);
-        expect((await store.getBucket("c"))?.probe).toBe(true);
-    });
-
-    test("a client without evalsha uses eval; other errors are not retried as eval", async () => {
-        const redis = createFakeRedis();
-        const plain = new RedisRateLimitStore({
-            client: redis.client({ evalsha: false }),
-        });
-        await plain.reserve!("a");
-        await plain.reserve!("b");
-        expect(redis.ops.get("EVALSHA")).toBeUndefined();
-        expect(redis.ops.get("EVAL")).toBe(2);
-        const failing = new RedisRateLimitStore({
-            client: {
-                ...redis.client(),
-                evalsha: async () => {
-                    throw new Error("ERR something else");
-                },
-            },
-            failurePolicy: "fail-closed",
-        });
-        const before = redis.ops.get("EVAL");
-        expect(failing.reserve!("x")).rejects.toMatchObject({
-            kind: "coordination",
-        });
-        await Bun.sleep(5);
-        expect(redis.ops.get("EVAL")).toBe(before);
     });
 });
 

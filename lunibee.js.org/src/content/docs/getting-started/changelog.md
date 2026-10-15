@@ -91,7 +91,6 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
     - `REST` options `telemetry`, `maxQueued`, `maxQueuedPerBucket`, `globalLimit`, `stopOnInvalidToken` and `maxQueueWait` (also per request); `rest.close()` (graceful shutdown) and `rest.diagnostics()` (including `invalidRequests` over the last ten minutes and `tokenRejected`).
     - `RESTMetrics`: counters, gauges and latency histograms from the telemetry events, with bounded route labels and a Prometheus text export.
     - `parseRateLimitHeaders()`, `headerNumber()`, `requestIdentity()`, `tokenFingerprint()`, `DEFAULT_MAX_BACKOFF_MS`, and the types `Grant`, `BucketUpdate`, `ReserveOptions`, `RateLimitHeaders`, `RateLimitScope`, `RequestIdentity`, `SchedulerOptions`, `ApplyResponseOptions`, `RESTDiagnostics`, `RESTTelemetry`, `RESTTelemetryEvent`, `RESTMetricsSnapshot`, `CoordinationMode`, `RedisFailurePolicy`, `RedisStoreDiagnostics`.
-    - `RedisRateLimitStore` runs its scripts with `EVALSHA` when the client has `evalsha` (new optional `MinimalRedisClient` method; `fromBunRedis()` provides it), falling back to `EVAL` on `NOSCRIPT`.
     - Reaction routes are keyed without the emoji (`/reactions/:emoji`), so they no longer create a key per emoji.
 - **`benchmarks/rest-distributed.ts`**: REST instances in separate processes sharing Redis, against a fake Discord HTTP server that counts every request over the limit.
 
