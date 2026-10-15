@@ -211,20 +211,35 @@ export class Collection<K, V> extends Map<K, V> {
      * a TTL/LRU entry.
      */
     public override set(key: K, value: V, ttl?: number): this {
-        if (ttl === undefined && this.#policy === undefined)
+        let policy = this.#policy;
+        if (ttl === undefined && policy === undefined)
             return super.set(key, value);
-        assertTTL(ttl);
-        let window = ttl ?? this.#policy?.ttl;
-        const jitter = this.#policy?.jitter ?? 0;
-        if (window !== undefined && jitter > 0)
-            window = Math.max(1, window * (1 - jitter * Math.random()));
-        if (window !== undefined) this.#policy ??= newPolicy();
-        if (!this.#policy) return super.set(key, value);
-        // A key that was not stored before has no policy entry.
-        const before = super.size;
+        if (ttl !== undefined) assertTTL(ttl);
+        let window = ttl ?? policy?.ttl;
+        if (window !== undefined && policy !== undefined && policy.jitter > 0)
+            window = Math.max(1, window * (1 - policy.jitter * Math.random()));
+        if (policy === undefined) {
+            if (window === undefined) return super.set(key, value);
+            policy = this.#policy = newPolicy();
+        }
+        const entry = policy.entries.get(key);
         super.set(key, value);
-        this.#track(key, value, window, super.size !== before);
-        this.#enforceCap();
+        // The common rewrite: a timed entry whose deadline only moves later
+        // is a field write; its heap record re-files itself when it surfaces,
+        // and the entry count (so the cap) is unchanged.
+        if (entry !== undefined && window !== undefined && entry.window !== 0) {
+            const deadline = Date.now() + window;
+            if (deadline >= entry.filed) {
+                entry.value = value;
+                entry.deadline = deadline;
+                entry.window = window;
+                if (entry.inLru) this.#promote(policy, entry);
+                return this;
+            }
+        }
+        this.#track(key, value, window, entry);
+        if (policy.maxSize !== undefined && policy.lruSize > policy.maxSize)
+            this.#enforceCap();
         return this;
     }
 
@@ -423,10 +438,15 @@ export class Collection<K, V> extends Map<K, V> {
      * a later one is a number write and the record re-files itself when it
      * surfaces.
      */
-    #track(key: K, value: V, window: number | undefined, isNew: boolean): void {
+    #track(
+        key: K,
+        value: V,
+        window: number | undefined,
+        existing: Entry<K, V> | undefined,
+    ): void {
         const policy = this.#policy!;
         const lru = policy.maxSize !== undefined;
-        let entry = isNew ? undefined : policy.entries.get(key);
+        let entry = existing;
         if (entry) entry.value = value;
         if (window === undefined) {
             if (entry && entry.window !== 0) {
@@ -574,11 +594,19 @@ export class Collection<K, V> extends Map<K, V> {
         while (policy.lruSize > max) {
             const oldest = policy.oldest!;
             const value = policy.onEvict ? super.get(oldest.key) : undefined;
-            this.#unlink(policy, oldest);
+            // Unlink the oldest in place: it is never the only other entry
+            // here, since a cap of at least 1 keeps the newest.
+            const next = oldest.newer;
+            policy.oldest = next;
+            if (next) next.older = undefined;
+            else policy.newest = undefined;
+            oldest.newer = undefined;
+            oldest.inLru = false;
+            policy.lruSize--;
             policy.entries.delete(oldest.key);
             super.delete(oldest.key);
             policy.evicted++;
-            this.#notify(oldest.key, value as V, "evicted");
+            if (policy.onEvict) this.#notify(oldest.key, value as V, "evicted");
         }
     }
 

@@ -213,6 +213,10 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
     ): this {
         return this.off(event, listener);
     }
+    /** Number of listeners for `event`, as Node's `EventEmitter` reports it. */
+    public listenerCount<K extends keyof Events>(event: K): number {
+        return this.#listeners[event]?.size ?? 0;
+    }
     public removeAllListeners<K extends keyof Events>(event?: K): this {
         if (event === undefined) this.#listeners = {};
         else delete this.#listeners[event];
@@ -651,7 +655,9 @@ export class Client
                     .cachedMessages(partial.channel_id)
                     ?.cache.peek(partial.id);
                 if (!cachedMessage) return;
-                const before = this.#snapshot(cachedMessage);
+                const before = this.listenerCount(ClientEvent.MessageUpdate)
+                    ? this.#snapshot(cachedMessage)
+                    : null;
                 if (partial.content !== undefined)
                     cachedMessage.content = partial.content;
                 this.emit(ClientEvent.MessageUpdate, cachedMessage, before);
@@ -776,7 +782,10 @@ export class Client
         });
         this.#gateway.on("GUILD_UPDATE", (data) => {
             const payload = data as APIGuild;
-            const cached = this.guilds.get(payload.id);
+            // The copy of the previous state is only made for a listener.
+            const cached = this.listenerCount(ClientEvent.GuildUpdate)
+                ? this.guilds.get(payload.id)
+                : undefined;
             const previous = cached ? this.#snapshot(cached) : null;
             this.guilds.patch(payload);
             this.emit(ClientEvent.GuildUpdate, payload, previous);
@@ -804,15 +813,16 @@ export class Client
                 ? this.guilds.members(member.guild_id).get(member.user.id)
                 : undefined;
             // A fresh instance keeps the client context (a private field).
-            const previous = cached
-                ? this.#snapshot(
-                      cached,
-                      new GuildMember(
-                          { user: member.user, guild_id: member.guild_id },
-                          this.#resourceContext,
-                      ),
-                  )
-                : null;
+            const previous =
+                cached && this.listenerCount(ClientEvent.GuildMemberUpdate)
+                    ? this.#snapshot(
+                          cached,
+                          new GuildMember(
+                              { user: member.user, guild_id: member.guild_id },
+                              this.#resourceContext,
+                          ),
+                      )
+                    : null;
             this.#upsertMember(member.guild_id, member);
             this.emit(ClientEvent.GuildMemberUpdate, member, previous);
         });
@@ -857,7 +867,10 @@ export class Client
             const cached = this.#cache.roles
                 ? this.guilds.roles(event.guild_id).get(event.role.id)
                 : undefined;
-            const previous = cached ? this.#snapshot(cached) : null;
+            const previous =
+                cached && this.listenerCount(ClientEvent.GuildRoleUpdate)
+                    ? this.#snapshot(cached)
+                    : null;
             this.#upsertRole(event.guild_id, event.role);
             this.emit(ClientEvent.GuildRoleUpdate, event, previous);
         });
@@ -879,9 +892,10 @@ export class Client
             // The event carries the guild's full emoji list.
             if (this.#cache.emojis) {
                 const emojis = this.guilds.emojis(event.guild_id);
-                previous = [...emojis.cache.values()].map((emoji) =>
-                    this.#snapshot(emoji),
-                );
+                if (this.listenerCount(ClientEvent.GuildEmojisUpdate))
+                    previous = [...emojis.cache.values()].map((emoji) =>
+                        this.#snapshot(emoji),
+                    );
                 const current = new Set(event.emojis.map((emoji) => emoji.id));
                 for (const id of [...emojis.cache.keys()])
                     if (!current.has(id)) emojis.delete(id);
@@ -1023,7 +1037,9 @@ export class Client
             this.emit(ClientEvent.ChannelCreate, channel);
         });
         this.#gateway.on("CHANNEL_UPDATE", (data) => {
-            const previous = this.#previousChannel(data as APIChannel);
+            const previous = this.listenerCount(ClientEvent.ChannelUpdate)
+                ? this.#previousChannel(data as APIChannel)
+                : null;
             const channel = this.channels.upsert(data as APIChannel);
             this.emit(ClientEvent.ChannelUpdate, channel, previous);
         });
@@ -1046,7 +1062,9 @@ export class Client
             this.emit(ClientEvent.ThreadCreate, channel);
         });
         this.#gateway.on("THREAD_UPDATE", (data) => {
-            const previous = this.#previousChannel(data as APIThreadEvent);
+            const previous = this.listenerCount(ClientEvent.ThreadUpdate)
+                ? this.#previousChannel(data as APIThreadEvent)
+                : null;
             const channel = this.channels.upsert(data as APIThreadEvent);
             this.emit(ClientEvent.ThreadUpdate, channel, previous);
         });
@@ -1227,7 +1245,13 @@ export class Client
         cached: T,
         blank: T = Object.create(Object.getPrototypeOf(cached)) as T,
     ): T {
-        return Object.assign(blank, cached);
+        // A key loop: Object.assign into an Object.create() object takes the
+        // slow path (about 3x slower for a Guild). Structures hold no
+        // symbol-keyed fields, so own string keys are all there is to copy.
+        const from = cached as Record<string, unknown>;
+        const into = blank as Record<string, unknown>;
+        for (const key of Object.keys(from)) into[key] = from[key];
+        return blank;
     }
 
     /** A copy of the cached channel an update is about to change, or null. */
@@ -1260,9 +1284,13 @@ export class Client
             manager.set(id, next);
             return next;
         }
-        for (const [key, value] of Object.entries(next))
-            if (value !== undefined)
-                (existing as Record<string, unknown>)[key] = value;
+        // A key loop: Object.entries allocates a pair per field, on every event.
+        const from = next as Record<string, unknown>;
+        const into = existing as Record<string, unknown>;
+        for (const key of Object.keys(from)) {
+            const value = from[key];
+            if (value !== undefined) into[key] = value;
+        }
         return existing;
     }
 

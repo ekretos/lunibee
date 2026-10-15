@@ -96,6 +96,15 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 - **`RedisCache`** (`@lunibee/core`, `lunibee`): a shared cache in Redis beside the in-memory one. `attach(client)` mirrors guilds, channels, threads, roles, members and users from the Gateway as raw payloads, and any process reads them with `guild()`, `channels()`, `member()`… Works with `Bun.RedisClient` directly. See [Caching](/core-concepts/caching/#shared-cache-in-redis).
 - **`benchmarks/rest-distributed.ts`**: REST instances in separate processes sharing Redis, against a fake Discord HTTP server that counts every request over the limit.
 
+### ⚡ Performance
+
+Measured against the 2026-09-30 record on the same machine, alternating runs (`docs/perf/runtime-2026-10-15.json`): the runtime benchmark's 150 rows take 0.74× the time on average (geometric mean), with every feature kept.
+
+- **Builders `toJSON()` are 3-5× faster:** a direct copy of the plain payload replaces `structuredClone` (`CreateEmbed` 2.9 µs → 0.55 µs, `CreateButton` 0.71 → 0.15 µs, `CreateActionRow` with 5 buttons 12.8 → 1.9 µs). Values that are not plain JSON still go through `structuredClone`.
+- **Update events are faster, with previous state kept:** the copy of the previous state is made only when the event has a listener (`client.listenerCount()` is new), the copy and the in-place merge use a key loop instead of `Object.assign` / `Object.entries`. Without a listener `GUILD_UPDATE` takes 0.42× the 0.3.1 time, `GUILD_ROLE_UPDATE` 0.60×, `GUILD_MEMBER_UPDATE` 0.57×; with one (and the previous state delivered) they are about 20% faster than 0.3.1 was without.
+- **`Collection.set()`** on a TTL collection is back to the 0.3.1 cost (it had become 1.44× slower) by updating an existing entry in place; LRU eviction is within 8%.
+- `bun run bench:compare` now compares with the new record.
+
 ### 📚 Documentation
 
 - Complete reference pages for [REST](/reference/rest/), [Gateway](/reference/gateway/), sharding ([ShardManager](/reference/shard-manager/), [ShardBus](/reference/shard-bus/), [ClusterManager](/reference/cluster-manager/), [ClusterHost](/reference/cluster-host/)) and [voice](/reference/voice-connection/). Corrected examples that used `Routes.user("@me")`, `error.name === "AbortError"` and Gateway properties that do not exist.

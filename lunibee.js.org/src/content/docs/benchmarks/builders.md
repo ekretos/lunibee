@@ -9,40 +9,40 @@ Each row builds the object and calls `toJSON()`. Builders validate as they go, s
 
 | Operation | Median time |
 | --- | ---: |
-| CreateEmbed | 8.2 µs |
-| CreateButton | 2.6 µs |
-| CreateButton (link) | 1.3 µs |
-| CreateActionRow (5 buttons) | 15.3 µs |
-| CreateStringSelect (3 options) | 6.7 µs |
-| CreateUserSelectMenu | 805 ns |
-| CreateRoleSelectMenu | 717 ns |
-| CreateMentionableSelectMenu | 509 ns |
-| CreateChannelSelectMenu | 2.6 µs |
-| CreateTextInput | 1.4 µs |
-| CreateModal (2 inputs) | 2.5 µs |
-| CreateTextDisplay | 74 ns |
-| CreateSeparator | 80 ns |
-| CreateThumbnail | 230 ns |
-| CreateSection | 307 ns |
-| CreateMediaGallery (2 items) | 4.5 µs |
-| CreateFileComponent | 122 ns |
-| CreateContentInventoryEntry | 129 ns |
-| CreateContainer (text + separator + row) | 4.0 µs |
-| CreateAttachment (no toJSON; construct + set) | 68 ns |
-| CreateStringOption | 5.0 µs |
-| CreateIntegerOption | 1.1 µs |
-| CreateNumberOption | 1.4 µs |
-| CreateBooleanOption | 931 ns |
-| CreateUserOption | 1.1 µs |
-| CreateRoleOption | 1.0 µs |
-| CreateChannelOption | 2.8 µs |
-| CreateMentionableOption | 611 ns |
-| CreateAttachmentOption | 644 ns |
-| CreateSlashCommand (3 options) | 7.3 µs |
-| CreateSubcommand | 3.6 µs |
-| CreateSubcommandGroup | 4.1 µs |
-| CreateContextMenuCommand | 686 ns |
-| CreateUserCommand | 396 ns |
-| CreateMessageCommand | 512 ns |
+| CreateEmbed | 2.0 µs |
+| CreateButton | 430 ns |
+| CreateButton (link) | 718 ns |
+| CreateActionRow (5 buttons) | 2.4 µs |
+| CreateStringSelect (3 options) | 1.3 µs |
+| CreateUserSelectMenu | 329 ns |
+| CreateRoleSelectMenu | 430 ns |
+| CreateMentionableSelectMenu | 566 ns |
+| CreateChannelSelectMenu | 769 ns |
+| CreateTextInput | 679 ns |
+| CreateModal (2 inputs) | 1.9 µs |
+| CreateTextDisplay | 126 ns |
+| CreateSeparator | 109 ns |
+| CreateThumbnail | 195 ns |
+| CreateSection | 555 ns |
+| CreateMediaGallery (2 items) | 769 ns |
+| CreateFileComponent | 469 ns |
+| CreateContentInventoryEntry | 133 ns |
+| CreateContainer (text + separator + row) | 1.4 µs |
+| CreateAttachment (no toJSON; construct + set) | 92 ns |
+| CreateStringOption | 1.0 µs |
+| CreateIntegerOption | 351 ns |
+| CreateNumberOption | 263 ns |
+| CreateBooleanOption | 289 ns |
+| CreateUserOption | 239 ns |
+| CreateRoleOption | 333 ns |
+| CreateChannelOption | 987 ns |
+| CreateMentionableOption | 533 ns |
+| CreateAttachmentOption | 285 ns |
+| CreateSlashCommand (3 options) | 1.8 µs |
+| CreateSubcommand | 789 ns |
+| CreateSubcommandGroup | 1.7 µs |
+| CreateContextMenuCommand | 915 ns |
+| CreateUserCommand | 373 ns |
+| CreateMessageCommand | 177 ns |
 
 `bun run build && bun scripts/bench-runtime.mjs`

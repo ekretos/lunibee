@@ -1,3 +1,4 @@
+import { cloneData } from "./clone.js";
 /** Discord application command option types. */
 export const ApplicationCommandOptionEnum = {
     Subcommand: 1,
@@ -137,7 +138,7 @@ export class CreateSlashCommand {
     }
     /** Serializes the command payload. */
     public toJSON(): Record<string, unknown> {
-        return structuredClone(this.#data);
+        return cloneData(this.#data);
     }
     /** Adds a validated top-level command option. */
     protected addOption(option: CreateCommandOption): this {
@@ -187,7 +188,7 @@ export class CreateCommandOption {
     }
     /** Serializes the option payload. */
     public toJSON(): Record<string, unknown> {
-        return structuredClone(this.data);
+        return cloneData(this.data);
     }
 }
 
@@ -616,7 +617,7 @@ export class CreateContextMenuCommand {
     }
     /** Serializes the command payload for the Discord API. */
     public toJSON(): Record<string, unknown> {
-        return structuredClone(this.data);
+        return cloneData(this.data);
     }
 }
 

@@ -1,3 +1,4 @@
+import { cloneData } from "./clone.js";
 /** Discord API embed field payload. */
 export interface EmbedField {
     /** Field name. */
@@ -218,7 +219,7 @@ export class CreateEmbed {
             throw new RangeError(
                 `An embed cannot contain more than 6000 characters in total (this one has ${total}).`,
             );
-        return structuredClone(data);
+        return cloneData(data);
     }
 }
 /** Validates a bounded Discord string field. @param value Field value. @param max Maximum length. @param field Human-readable field name. @returns Validated value. @throws {RangeError} If length is invalid. */

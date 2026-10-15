@@ -1,7 +1,7 @@
 /**
  * Runs the runtime benchmark and compares it with a committed baseline.
  *
- *   bun scripts/bench-compare.mjs [--baseline docs/perf/runtime-2026-09-30.json]
+ *   bun scripts/bench-compare.mjs [--baseline docs/perf/runtime-2026-10-15.json]
  *                                 [--column bun14] [--threshold 0.15]
  *                                 [--rounds 3] [--fail]
  *
@@ -37,7 +37,7 @@ function runOnce() {
 if (import.meta.main) {
     const baselinePath = option(
         "baseline",
-        "docs/perf/runtime-2026-09-30.json",
+        "docs/perf/runtime-2026-10-15.json",
     );
     const column = option("column", "bun14");
     const threshold = Number(option("threshold", "0.15"));

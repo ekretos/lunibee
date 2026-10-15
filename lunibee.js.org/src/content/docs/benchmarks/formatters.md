@@ -9,26 +9,26 @@ These are string builders; the costs are tens to hundreds of nanoseconds.
 
 | Operation | Median time |
 | --- | ---: |
-| userMention | 83 ns |
-| channelMention | 73 ns |
-| roleMention | 60 ns |
-| timestamp | 101 ns |
-| bold | 31 ns |
-| italic | 29 ns |
-| underline | 32 ns |
-| strikethrough | 26 ns |
-| spoiler | 26 ns |
-| masked | 32 ns |
-| inlineCode | 31 ns |
-| codeBlock | 239 ns |
-| blockQuote | 196 ns |
-| heading | 55 ns |
-| subtext | 32 ns |
-| orderedList | 245 ns |
-| bulletList | 125 ns |
-| escapeMarkdown | 598 ns |
-| parseUserMention | 238 ns |
-| parseRoleMention | 172 ns |
-| parseChannelMention | 225 ns |
+| userMention | 143 ns |
+| channelMention | 106 ns |
+| roleMention | 55 ns |
+| timestamp | 131 ns |
+| bold | 28 ns |
+| italic | 31 ns |
+| underline | 23 ns |
+| strikethrough | 33 ns |
+| spoiler | 24 ns |
+| masked | 25 ns |
+| inlineCode | 28 ns |
+| codeBlock | 179 ns |
+| blockQuote | 107 ns |
+| heading | 59 ns |
+| subtext | 28 ns |
+| orderedList | 120 ns |
+| bulletList | 154 ns |
+| escapeMarkdown | 577 ns |
+| parseUserMention | 183 ns |
+| parseRoleMention | 161 ns |
+| parseChannelMention | 191 ns |
 
 `bun run build && bun scripts/bench-runtime.mjs`

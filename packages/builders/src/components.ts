@@ -1,3 +1,4 @@
+import { cloneData } from "./clone.js";
 import { ButtonType, ComponentEnum } from "@lunibee/types";
 export { ButtonType, ComponentEnum };
 
@@ -272,7 +273,7 @@ export class CreateStringSelect extends CreateSelectMenu {
             throw new RangeError(
                 "max_values cannot exceed the number of options.",
             );
-        return structuredClone(this.#data);
+        return cloneData(this.#data);
     }
 }
 export class CreateButton {
@@ -367,7 +368,7 @@ export class CreateButton {
         }
         if (data.style !== ButtonType.Premium && !data.label && !data.emoji)
             throw new TypeError("Buttons require a label or an emoji.");
-        return structuredClone(data);
+        return cloneData(data);
     }
 }
 export class CreateEntitySelect extends CreateSelectMenu {
@@ -396,7 +397,7 @@ export class CreateEntitySelect extends CreateSelectMenu {
     }
     public toJSON(): APIEntitySelectComponent {
         assertSelect(this.#data);
-        return structuredClone(this.#data);
+        return cloneData(this.#data);
     }
 }
 export class CreateModal {
@@ -499,7 +500,7 @@ export class CreateTextInput {
             data.min_length > data.max_length
         )
             throw new RangeError("min_length cannot exceed max_length.");
-        return structuredClone(data);
+        return cloneData(data);
     }
 }
 
@@ -603,7 +604,7 @@ export class CreateMediaGallery {
     public toJSON(): APIMediaGalleryComponent {
         return {
             type: ComponentEnum.MediaGallery,
-            items: structuredClone(this.#items),
+            items: cloneData(this.#items),
         };
     }
 }

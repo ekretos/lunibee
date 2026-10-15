@@ -1,0 +1,1003 @@
+{
+ "date": "2026-10-15",
+ "iterations": 10000,
+ "rounds": 10,
+ "statistic": "median",
+ "unit": "ns per call",
+ "runtimes": {
+  "bun14": "bun 1.4.2"
+ },
+ "note": "Same machine, alternating with the 2026-09-30 code (column base14), so the two columns are directly comparable.",
+ "results": [
+  {
+   "group": "Collection",
+   "name": "Map.set (reference)",
+   "bun14": 47.4,
+   "base14": 39.43
+  },
+  {
+   "group": "Collection",
+   "name": "Map.get (reference)",
+   "bun14": 28.18,
+   "base14": 30.47
+  },
+  {
+   "group": "Collection",
+   "name": "set",
+   "bun14": 65.92,
+   "base14": 87.99
+  },
+  {
+   "group": "Collection",
+   "name": "get",
+   "bun14": 62.17,
+   "base14": 97.05
+  },
+  {
+   "group": "Collection",
+   "name": "has",
+   "bun14": 66.14,
+   "base14": 64.43
+  },
+  {
+   "group": "Collection",
+   "name": "peek",
+   "bun14": 109.55,
+   "base14": 81.12
+  },
+  {
+   "group": "Collection",
+   "name": "delete + set",
+   "bun14": 181.8,
+   "base14": 285.66
+  },
+  {
+   "group": "Collection",
+   "name": "setWithoutTTL",
+   "bun14": 212.24,
+   "base14": 156.63
+  },
+  {
+   "group": "Collection",
+   "name": "set (ttl)",
+   "bun14": 156.03,
+   "base14": 128.92
+  },
+  {
+   "group": "Collection",
+   "name": "get (ttl, sliding)",
+   "bun14": 112.16,
+   "base14": 154.06
+  },
+  {
+   "group": "Collection",
+   "name": "ttlRemaining",
+   "bun14": 143.63,
+   "base14": 140.97
+  },
+  {
+   "group": "Collection",
+   "name": "purge (ttl, nothing due)",
+   "bun14": 297.74,
+   "base14": 360.03
+  },
+  {
+   "group": "Collection",
+   "name": "set (lru, evicting)",
+   "bun14": 353.77,
+   "base14": 174.84
+  },
+  {
+   "group": "Collection",
+   "name": "get (lru, promoting)",
+   "bun14": 106.13,
+   "base14": 101.14
+  },
+  {
+   "group": "Collection",
+   "name": "first",
+   "bun14": 474.75,
+   "base14": 418.46
+  },
+  {
+   "group": "Collection",
+   "name": "firstKey",
+   "bun14": 440.14,
+   "base14": 445.72
+  },
+  {
+   "group": "Collection",
+   "name": "firstEntry",
+   "bun14": 506.04,
+   "base14": 493.5
+  },
+  {
+   "group": "Collection",
+   "name": "last",
+   "bun14": 4593.05,
+   "base14": 3282
+  },
+  {
+   "group": "Collection",
+   "name": "lastKey",
+   "bun14": 4293.38,
+   "base14": 3153.22
+  },
+  {
+   "group": "Collection",
+   "name": "lastEntry",
+   "bun14": 28283.62,
+   "base14": 28667.99
+  },
+  {
+   "group": "Collection",
+   "name": "at",
+   "bun14": 2647.87,
+   "base14": 15829.97
+  },
+  {
+   "group": "Collection",
+   "name": "keyAt",
+   "bun14": 2487.43,
+   "base14": 12741.61
+  },
+  {
+   "group": "Collection",
+   "name": "random",
+   "bun14": 2452.39,
+   "base14": 14266.87
+  },
+  {
+   "group": "Collection",
+   "name": "randomKey",
+   "bun14": 2514.05,
+   "base14": 12563.9
+  },
+  {
+   "group": "Collection",
+   "name": "find (last item)",
+   "bun14": 16005.67,
+   "base14": 16188.87
+  },
+  {
+   "group": "Collection",
+   "name": "findKey (last item)",
+   "bun14": 16519.89,
+   "base14": 17850.81
+  },
+  {
+   "group": "Collection",
+   "name": "some (last item)",
+   "bun14": 17670.06,
+   "base14": 16803.02
+  },
+  {
+   "group": "Collection",
+   "name": "someEntry (last item)",
+   "bun14": 17933.84,
+   "base14": 16924.71
+  },
+  {
+   "group": "Collection",
+   "name": "every",
+   "bun14": 15091.91,
+   "base14": 15982.32
+  },
+  {
+   "group": "Collection",
+   "name": "filter",
+   "bun14": 44626.16,
+   "base14": 48293.18
+  },
+  {
+   "group": "Collection",
+   "name": "partition",
+   "bun14": 70199.45,
+   "base14": 74423.36
+  },
+  {
+   "group": "Collection",
+   "name": "each",
+   "bun14": 12745.35,
+   "base14": 16389.63
+  },
+  {
+   "group": "Collection",
+   "name": "tap",
+   "bun14": 54,
+   "base14": 42.66
+  },
+  {
+   "group": "Collection",
+   "name": "array",
+   "bun14": 14331.41,
+   "base14": 14482.72
+  },
+  {
+   "group": "Collection",
+   "name": "keyArray",
+   "bun14": 13207.89,
+   "base14": 13509.71
+  },
+  {
+   "group": "Collection",
+   "name": "entriesArray",
+   "bun14": 30594.91,
+   "base14": 30789.27
+  },
+  {
+   "group": "Collection",
+   "name": "toJSON",
+   "bun14": 29998.94,
+   "base14": 29300.92
+  },
+  {
+   "group": "Collection",
+   "name": "clone",
+   "bun14": 53373.5,
+   "base14": 56373
+  },
+  {
+   "group": "Collection",
+   "name": "sorted",
+   "bun14": 112426.93,
+   "base14": 103068.72
+  },
+  {
+   "group": "Collection",
+   "name": "union",
+   "bun14": 131086.39,
+   "base14": 137948.13
+  },
+  {
+   "group": "Collection",
+   "name": "intersection",
+   "bun14": 49624.42,
+   "base14": 49804.45
+  },
+  {
+   "group": "Collection",
+   "name": "difference",
+   "bun14": 53164.93,
+   "base14": 50088.09
+  },
+  {
+   "group": "Collection",
+   "name": "hasAll (3 keys)",
+   "bun14": 72.98,
+   "base14": 65.85
+  },
+  {
+   "group": "Collection",
+   "name": "hasAny (3 keys)",
+   "bun14": 63.16,
+   "base14": 70.67
+  },
+  {
+   "group": "Collection",
+   "name": "sweep (removes none)",
+   "bun14": 16060.56,
+   "base14": 16942.17
+  },
+  {
+   "group": "Builders",
+   "name": "CreateEmbed",
+   "bun14": 2861.33,
+   "base14": 8872.42
+  },
+  {
+   "group": "Builders",
+   "name": "CreateButton",
+   "bun14": 520.04,
+   "base14": 2837.01
+  },
+  {
+   "group": "Builders",
+   "name": "CreateButton (link)",
+   "bun14": 749.88,
+   "base14": 1071.59
+  },
+  {
+   "group": "Builders",
+   "name": "CreateActionRow (5 buttons)",
+   "bun14": 2479.01,
+   "base14": 13956.07
+  },
+  {
+   "group": "Builders",
+   "name": "CreateStringSelect (3 options)",
+   "bun14": 1194.49,
+   "base14": 6625.96
+  },
+  {
+   "group": "Builders",
+   "name": "CreateUserSelectMenu",
+   "bun14": 400.92,
+   "base14": 747.27
+  },
+  {
+   "group": "Builders",
+   "name": "CreateRoleSelectMenu",
+   "bun14": 406.64,
+   "base14": 628.55
+  },
+  {
+   "group": "Builders",
+   "name": "CreateMentionableSelectMenu",
+   "bun14": 268.46,
+   "base14": 574.93
+  },
+  {
+   "group": "Builders",
+   "name": "CreateChannelSelectMenu",
+   "bun14": 808.81,
+   "base14": 2924.64
+  },
+  {
+   "group": "Builders",
+   "name": "CreateTextInput",
+   "bun14": 509.48,
+   "base14": 1334.32
+  },
+  {
+   "group": "Builders",
+   "name": "CreateModal (2 inputs)",
+   "bun14": 1938.2,
+   "base14": 2681.62
+  },
+  {
+   "group": "Builders",
+   "name": "CreateTextDisplay",
+   "bun14": 297.75,
+   "base14": 78.78
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSeparator",
+   "bun14": 152.27,
+   "base14": 105.23
+  },
+  {
+   "group": "Builders",
+   "name": "CreateThumbnail",
+   "bun14": 166.56,
+   "base14": 187.23
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSection",
+   "bun14": 533.69,
+   "base14": 397.27
+  },
+  {
+   "group": "Builders",
+   "name": "CreateMediaGallery (2 items)",
+   "bun14": 1150.25,
+   "base14": 3249.69
+  },
+  {
+   "group": "Builders",
+   "name": "CreateFileComponent",
+   "bun14": 187.79,
+   "base14": 114.86
+  },
+  {
+   "group": "Builders",
+   "name": "CreateContentInventoryEntry",
+   "bun14": 174.45,
+   "base14": 75.51
+  },
+  {
+   "group": "Builders",
+   "name": "CreateContainer (text + separator + row)",
+   "bun14": 1195.29,
+   "base14": 3906.21
+  },
+  {
+   "group": "Builders",
+   "name": "CreateAttachment (no toJSON; construct + set)",
+   "bun14": 260.16,
+   "base14": 82.34
+  },
+  {
+   "group": "Builders",
+   "name": "CreateStringOption",
+   "bun14": 1341.97,
+   "base14": 4189.92
+  },
+  {
+   "group": "Builders",
+   "name": "CreateIntegerOption",
+   "bun14": 541.96,
+   "base14": 882.85
+  },
+  {
+   "group": "Builders",
+   "name": "CreateNumberOption",
+   "bun14": 451.84,
+   "base14": 959.46
+  },
+  {
+   "group": "Builders",
+   "name": "CreateBooleanOption",
+   "bun14": 437.44,
+   "base14": 603.09
+  },
+  {
+   "group": "Builders",
+   "name": "CreateUserOption",
+   "bun14": 571.99,
+   "base14": 753.34
+  },
+  {
+   "group": "Builders",
+   "name": "CreateRoleOption",
+   "bun14": 428.52,
+   "base14": 697.91
+  },
+  {
+   "group": "Builders",
+   "name": "CreateChannelOption",
+   "bun14": 949.81,
+   "base14": 2575.26
+  },
+  {
+   "group": "Builders",
+   "name": "CreateMentionableOption",
+   "bun14": 478.15,
+   "base14": 596.81
+  },
+  {
+   "group": "Builders",
+   "name": "CreateAttachmentOption",
+   "bun14": 369.64,
+   "base14": 720.44
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSlashCommand (3 options)",
+   "bun14": 3037.81,
+   "base14": 7831.24
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSubcommand",
+   "bun14": 1244.72,
+   "base14": 3782.13
+  },
+  {
+   "group": "Builders",
+   "name": "CreateSubcommandGroup",
+   "bun14": 2782.9,
+   "base14": 3769.4
+  },
+  {
+   "group": "Builders",
+   "name": "CreateContextMenuCommand",
+   "bun14": 386.23,
+   "base14": 684.57
+  },
+  {
+   "group": "Builders",
+   "name": "CreateUserCommand",
+   "bun14": 423.4,
+   "base14": 446.72
+  },
+  {
+   "group": "Builders",
+   "name": "CreateMessageCommand",
+   "bun14": 196.03,
+   "base14": 461.6
+  },
+  {
+   "group": "Formatters",
+   "name": "userMention",
+   "bun14": 139.73,
+   "base14": 93.69
+  },
+  {
+   "group": "Formatters",
+   "name": "channelMention",
+   "bun14": 177.06,
+   "base14": 78.13
+  },
+  {
+   "group": "Formatters",
+   "name": "roleMention",
+   "bun14": 103.59,
+   "base14": 56.27
+  },
+  {
+   "group": "Formatters",
+   "name": "timestamp",
+   "bun14": 124.64,
+   "base14": 133.52
+  },
+  {
+   "group": "Formatters",
+   "name": "bold",
+   "bun14": 41.1,
+   "base14": 34.13
+  },
+  {
+   "group": "Formatters",
+   "name": "italic",
+   "bun14": 35.89,
+   "base14": 33.62
+  },
+  {
+   "group": "Formatters",
+   "name": "underline",
+   "bun14": 34.07,
+   "base14": 37.02
+  },
+  {
+   "group": "Formatters",
+   "name": "strikethrough",
+   "bun14": 36.24,
+   "base14": 31.73
+  },
+  {
+   "group": "Formatters",
+   "name": "spoiler",
+   "bun14": 34.85,
+   "base14": 28.87
+  },
+  {
+   "group": "Formatters",
+   "name": "masked",
+   "bun14": 47.21,
+   "base14": 33.41
+  },
+  {
+   "group": "Formatters",
+   "name": "inlineCode",
+   "bun14": 39.46,
+   "base14": 32.1
+  },
+  {
+   "group": "Formatters",
+   "name": "codeBlock",
+   "bun14": 278.38,
+   "base14": 42.54
+  },
+  {
+   "group": "Formatters",
+   "name": "blockQuote",
+   "bun14": 181.31,
+   "base14": 187.68
+  },
+  {
+   "group": "Formatters",
+   "name": "heading",
+   "bun14": 99.05,
+   "base14": 59.72
+  },
+  {
+   "group": "Formatters",
+   "name": "subtext",
+   "bun14": 40.26,
+   "base14": 29.38
+  },
+  {
+   "group": "Formatters",
+   "name": "orderedList",
+   "bun14": 175.85,
+   "base14": 186.46
+  },
+  {
+   "group": "Formatters",
+   "name": "bulletList",
+   "bun14": 180.65,
+   "base14": 178.33
+  },
+  {
+   "group": "Formatters",
+   "name": "escapeMarkdown",
+   "bun14": 846.63,
+   "base14": 704.75
+  },
+  {
+   "group": "Formatters",
+   "name": "parseUserMention",
+   "bun14": 241.01,
+   "base14": 242.45
+  },
+  {
+   "group": "Formatters",
+   "name": "parseRoleMention",
+   "bun14": 231.14,
+   "base14": 252.66
+  },
+  {
+   "group": "Formatters",
+   "name": "parseChannelMention",
+   "bun14": 217.45,
+   "base14": 188.14
+  },
+  {
+   "group": "Gateway events",
+   "name": "READY",
+   "bun14": 1592.27,
+   "base14": 1467.93
+  },
+  {
+   "group": "Gateway events",
+   "name": "RESUMED",
+   "bun14": 356.72,
+   "base14": 310.36
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_CREATE (50 members, 20 roles, 10 channels)",
+   "bun14": 110121.83,
+   "base14": 157750.46
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_UPDATE",
+   "bun14": 1332.26,
+   "base14": 2715.29
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_DELETE",
+   "bun14": 1839.22,
+   "base14": 1720.82
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_MEMBER_ADD",
+   "bun14": 2416.12,
+   "base14": 3112.34
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_MEMBER_UPDATE",
+   "bun14": 2000.62,
+   "base14": 3586.28
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_MEMBER_REMOVE",
+   "bun14": 727.93,
+   "base14": 457.47
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_MEMBERS_CHUNK (10 members)",
+   "bun14": 17968.03,
+   "base14": 36964.7
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_BAN_ADD",
+   "bun14": 471.61,
+   "base14": 586.35
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_BAN_REMOVE",
+   "bun14": 383.53,
+   "base14": 529.83
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_ROLE_CREATE",
+   "bun14": 857.52,
+   "base14": 2469.23
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_ROLE_UPDATE",
+   "bun14": 899.32,
+   "base14": 2386.27
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_ROLE_DELETE",
+   "bun14": 326.55,
+   "base14": 393.56
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_EMOJIS_UPDATE (10 emojis)",
+   "bun14": 9329.98,
+   "base14": 12071.05
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_STICKERS_UPDATE (5 stickers)",
+   "bun14": 2446.42,
+   "base14": 4301.18
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_INTEGRATIONS_UPDATE",
+   "bun14": 156,
+   "base14": 200.7
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_CREATE",
+   "bun14": 389.71,
+   "base14": 594.67
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_UPDATE",
+   "bun14": 393.34,
+   "base14": 524.76
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_DELETE",
+   "bun14": 361.46,
+   "base14": 465.1
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_USER_ADD",
+   "bun14": 539.16,
+   "base14": 619.92
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SCHEDULED_EVENT_USER_REMOVE",
+   "bun14": 458.08,
+   "base14": 503.5
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SOUNDBOARD_SOUND_CREATE",
+   "bun14": 410.96,
+   "base14": 473.87
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SOUNDBOARD_SOUND_UPDATE",
+   "bun14": 371.79,
+   "base14": 403.93
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SOUNDBOARD_SOUND_DELETE",
+   "bun14": 404.39,
+   "base14": 391.46
+  },
+  {
+   "group": "Gateway events",
+   "name": "GUILD_SOUNDBOARD_SOUNDS_UPDATE (5 sounds)",
+   "bun14": 3506.92,
+   "base14": 4566.61
+  },
+  {
+   "group": "Gateway events",
+   "name": "CHANNEL_CREATE",
+   "bun14": 1086.98,
+   "base14": 1912.17
+  },
+  {
+   "group": "Gateway events",
+   "name": "CHANNEL_UPDATE",
+   "bun14": 1241.73,
+   "base14": 2067.94
+  },
+  {
+   "group": "Gateway events",
+   "name": "CHANNEL_DELETE",
+   "bun14": 411.19,
+   "base14": 513.76
+  },
+  {
+   "group": "Gateway events",
+   "name": "CHANNEL_PINS_UPDATE",
+   "bun14": 86.91,
+   "base14": 95.43
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_CREATE",
+   "bun14": 1975.15,
+   "base14": 2928.05
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_UPDATE",
+   "bun14": 1866.74,
+   "base14": 2847.29
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_DELETE",
+   "bun14": 665.07,
+   "base14": 1014.31
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_LIST_SYNC (5 threads)",
+   "bun14": 8064.2,
+   "base14": 12878.25
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_MEMBERS_UPDATE",
+   "bun14": 690.73,
+   "base14": 843.83
+  },
+  {
+   "group": "Gateway events",
+   "name": "THREAD_MEMBER_UPDATE",
+   "bun14": 802.94,
+   "base14": 971.31
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_CREATE",
+   "bun14": 5361.31,
+   "base14": 8458.18
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_UPDATE",
+   "bun14": 3168.44,
+   "base14": 3976.82
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_DELETE",
+   "bun14": 847.57,
+   "base14": 738.7
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_DELETE_BULK (10 ids)",
+   "bun14": 5954.49,
+   "base14": 5894.22
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_REACTION_ADD",
+   "bun14": 435.41,
+   "base14": 586.99
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_REACTION_REMOVE",
+   "bun14": 444.35,
+   "base14": 558.7
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_REACTION_REMOVE_ALL",
+   "bun14": 275.2,
+   "base14": 297.44
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_REACTION_REMOVE_EMOJI",
+   "bun14": 243.39,
+   "base14": 309.42
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_POLL_VOTE_ADD",
+   "bun14": 436.36,
+   "base14": 474.97
+  },
+  {
+   "group": "Gateway events",
+   "name": "MESSAGE_POLL_VOTE_REMOVE",
+   "bun14": 418.22,
+   "base14": 490.49
+  },
+  {
+   "group": "Gateway events",
+   "name": "STAGE_INSTANCE_CREATE",
+   "bun14": 545.06,
+   "base14": 530.17
+  },
+  {
+   "group": "Gateway events",
+   "name": "STAGE_INSTANCE_UPDATE",
+   "bun14": 520.8,
+   "base14": 598.12
+  },
+  {
+   "group": "Gateway events",
+   "name": "STAGE_INSTANCE_DELETE",
+   "bun14": 463.71,
+   "base14": 516.17
+  },
+  {
+   "group": "Gateway events",
+   "name": "INVITE_CREATE",
+   "bun14": 250.63,
+   "base14": 226.66
+  },
+  {
+   "group": "Gateway events",
+   "name": "INVITE_DELETE",
+   "bun14": 203.17,
+   "base14": 252.2
+  },
+  {
+   "group": "Gateway events",
+   "name": "WEBHOOKS_UPDATE",
+   "bun14": 98.84,
+   "base14": 127.57
+  },
+  {
+   "group": "Gateway events",
+   "name": "VOICE_STATE_UPDATE",
+   "bun14": 634.38,
+   "base14": 492.18
+  },
+  {
+   "group": "Gateway events",
+   "name": "VOICE_SERVER_UPDATE",
+   "bun14": 103.23,
+   "base14": 197.94
+  },
+  {
+   "group": "Gateway events",
+   "name": "PRESENCE_UPDATE",
+   "bun14": 446.59,
+   "base14": 413.9
+  },
+  {
+   "group": "Gateway events",
+   "name": "TYPING_START",
+   "bun14": 400.42,
+   "base14": 287.62
+  },
+  {
+   "group": "Gateway events",
+   "name": "AUTO_MODERATION_RULE_CREATE",
+   "bun14": 792.25,
+   "base14": 650.92
+  },
+  {
+   "group": "Gateway events",
+   "name": "AUTO_MODERATION_RULE_UPDATE",
+   "bun14": 667.05,
+   "base14": 808.13
+  },
+  {
+   "group": "Gateway events",
+   "name": "AUTO_MODERATION_RULE_DELETE",
+   "bun14": 555.44,
+   "base14": 795.08
+  },
+  {
+   "group": "Gateway events",
+   "name": "AUTO_MODERATION_ACTION_EXECUTION",
+   "bun14": 462.58,
+   "base14": 491.95
+  },
+  {
+   "group": "Gateway events",
+   "name": "ENTITLEMENT_CREATE",
+   "bun14": 791.95,
+   "base14": 856.8
+  },
+  {
+   "group": "Gateway events",
+   "name": "ENTITLEMENT_UPDATE",
+   "bun14": 783.51,
+   "base14": 970.55
+  },
+  {
+   "group": "Gateway events",
+   "name": "ENTITLEMENT_DELETE",
+   "bun14": 889.21,
+   "base14": 790.71
+  },
+  {
+   "group": "Gateway events",
+   "name": "INTERACTION_CREATE (button)",
+   "bun14": 1430.09,
+   "base14": 1498.63
+  }
+ ]
+}
