@@ -144,3 +144,54 @@ describe("ClusterManager over real forked processes", () => {
         );
     }, 70_000);
 });
+
+describe("ClusterManager with threadFork", () => {
+    test("clusters run as threads: IDENTIFY, routing, restart and a clean exit", async () => {
+        const fixture = new URL(
+            "./fixtures/cluster-threads.ts",
+            import.meta.url,
+        ).pathname;
+        const child = Bun.spawn([process.execPath, fixture], {
+            stdout: "pipe",
+            stderr: "pipe",
+            env: { ...process.env, BUN_OPTIONS: "" },
+        });
+        const timer = setTimeout(() => child.kill("SIGKILL"), 40_000);
+        const [stdout, stderr, code] = await Promise.all([
+            new Response(child.stdout).text(),
+            new Response(child.stderr).text(),
+            child.exited,
+        ]);
+        clearTimeout(timer);
+        expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
+        const results = Object.fromEntries(
+            stdout
+                .trim()
+                .split("\n")
+                .map((line) => {
+                    const { key, value } = JSON.parse(line) as {
+                        key: string;
+                        value: unknown;
+                    };
+                    return [key, value];
+                }),
+        ) as Record<string, any>;
+        expect(results.error).toBeUndefined();
+        expect(results.health.state).toBe("ready");
+        expect(results.health.missingShards).toEqual([]);
+        expect(results.gaps).toHaveLength(3);
+        for (const gap of results.gaps as number[])
+            expect(gap).toBeGreaterThanOrEqual(80);
+        expect(results.broadcast).toEqual([
+            [0, 0],
+            [1, 1],
+            [2, 0],
+            [3, 1],
+        ]);
+        // Threads share the manager's process.
+        expect(results.pid).toBe(true);
+        expect(results.restarts).toBe(1);
+        expect(results.again).toBe(4);
+        expect(results.left).toBe(0);
+    });
+});

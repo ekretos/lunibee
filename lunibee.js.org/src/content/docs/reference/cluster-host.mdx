@@ -149,6 +149,7 @@ The worker script is the same as for local clusters (a [`ShardManager`](/referen
 | `connectionsPerSecond` | `number` | `10` | New connections accepted per second from one address (a token bucket with a burst of the same size). More are refused with HTTP `429` before the upgrade. |
 | `clientAddress` | `(request, peer) => string` | the peer's IP | The address used by the two limits above. Behind a TLS proxy every host shares the proxy's address: return the forwarded address the proxy sets (and only trust it from the proxy). |
 | `local` | `boolean` | `false` | Also run clusters on the coordinator's machine (with `script`). |
+| `moveClusters` *(0.3.2)* | `boolean` | `true` | Restart a lost host's clusters on another place once the lost host has certainly fenced itself. See [Placement](#placement). `false` keeps them waiting for their host. |
 
 | Condition | Error |
 |---|---|
@@ -186,7 +187,12 @@ If they do not join within `joinTimeout`, `spawn()` rejects (`Hosts did not join
 
 The placement list is those host IDs, with `"local"` in front when `remote.local` is true. Cluster `n` runs on `placement[n % placement.length]`. A cluster keeps its place for the life of the spawn: when it crashes it restarts on the same host. `respawn()` keeps the hosts connected and places again.
 
-When a host is away, its clusters' restarts fail at once (the worker "exits" with `SIGHUP`) and are retried after the [restart delay](/reference/cluster-manager/#restarts); when the host reconnects with the same ID, the next restart starts them on it. These failed attempts count towards `supervisor.maxRestarts`. Clusters move to another host only through [`reassignOnGiveUp`](/reference/cluster-manager/#reassignment), which hands a failed cluster's shards to a ready cluster on any host.
+When a host is lost, its clusters exit and are restarted after the [restart delay](/reference/cluster-manager/#restarts):
+
+- **`moveClusters: true` (default, 0.3.2).** A restart waits until the lost host has certainly fenced itself: two leases after the coordinator dropped it (the host kills its workers one lease after it last heard from the coordinator). Then the cluster starts on the connected place (a host, or `"local"` with `remote.local`) that runs the fewest clusters, and `clusterMoved` is emitted with `{ from, to }`. If the host reconnects before that, the cluster starts on it at once. A moved cluster stays where it is when its old host comes back. With no connected place, the restart fails and is retried like a crash.
+- **`moveClusters: false`.** The restart is sent to the same host: while it is away the worker "exits" at once with `SIGHUP` and is retried after the restart delay, counting towards `supervisor.maxRestarts`, until the host reconnects.
+
+[`reassignOnGiveUp`](/reference/cluster-manager/#reassignment) also moves shards across hosts: it hands a failed cluster's shards to a ready cluster on any host.
 
 ## `ClusterHost`
 
@@ -200,7 +206,7 @@ new ClusterHost(options: ClusterHostOptions)
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `url` | `string` | — | The coordinator's address, `wss://host:port`. `ws://` is accepted for this machine (`localhost`, `127.x.x.x`, `::1`), or for another one with `allowInsecure`. Must not contain credentials. |
+| `url` | `string \| string[]` | — | The coordinator's address, `wss://host:port`. `ws://` is accepted for this machine (`localhost`, `127.x.x.x`, `::1`), or for another one with `allowInsecure`. Must not contain credentials. A list (1–16, each checked the same way) names every coordinator of a deployment with a [leader lock](#coordinator-failover): the host tries them in order and moves to the next whenever one cannot be reached or drops it. |
 | `allowInsecure` | `boolean` | `false` | Connect with `ws://` to a coordinator on another machine, over a network you fully trust. |
 | `secret` | `string` | — | The coordinator's shared secret, at least 16 characters. |
 | `id` | `string` | — | This host's [ID](#host-ids). Must be unique in the deployment. |
@@ -273,6 +279,35 @@ The host has always fenced itself before the coordinator lets anything restart, 
 
 Every worker start has an epoch number. Frames and exits from an earlier process of the same cluster are ignored on both sides, so a late message from a replaced worker never reaches its successor.
 
+## Coordinator failover
+
+*(0.3.2)* Run two or more coordinators with the same options and a shared [`leader`](/reference/cluster-manager/#scaling-launching-and-hosts) lock; only the holder runs clusters, and the hosts follow whichever one leads.
+
+```ts
+import { ClusterManager, RedisLeaderLock } from "lunibee";
+
+const manager = new ClusterManager({
+    token: process.env.DISCORD_TOKEN!,
+    script: "./worker.ts",
+    remote: { port: 7000, secret: process.env.CLUSTER_SECRET!, hosts: ["us-1", "us-2"] },
+    leader: { lock: new RedisLeaderLock({ client: new Bun.RedisClient(process.env.REDIS_URL!) }), ttl: 10_000 },
+});
+await manager.spawn(); // resolves once this coordinator leads and started the clusters
+```
+
+On each host: `new ClusterHost({ url: ["wss://coord-a:7000", "wss://coord-b:7000"], … })`.
+
+| Step | What happens |
+|---|---|
+| Standby | `spawn()` tries the lock every `ttl / 2` ms. It does not listen for hosts, so they cannot join it. |
+| Leading | The holder renews the lock every `ttl / 4` ms. When it takes the lock it emits `leaderAcquired` and waits two `remote.lease`s (so hosts of a previous leader have fenced), then opens the listener and starts clusters as usual. |
+| Losing it | If the lock cannot be renewed for `ttl / 2` ms, or another coordinator holds it, the leader kills every cluster at once (SIGKILL, local and remote), closes the listener, emits `leaderLost` and becomes a standby again. That happens by `3/4 × ttl` after its last renewal, before the lock can lapse. |
+| Hosts | A host whose coordinator went away kills its workers and tries the next URL of its list until a leader accepts it. |
+
+So a shard is never owned by two coordinators: the old leader stops before the lock lapses, and the new one waits for the old leader's hosts to fence. `shutdownAll()` and `killAll()` give the lock back, so a standby leads at once; `respawn()` keeps it.
+
+`RedisLeaderLock({ client, key?, token? })` keeps the lock in one Redis key (default `lunibee:cluster:leader`) with an expiry; taking, extending and releasing are single Lua scripts, with the key and token passed as `KEYS`/`ARGV`. `client` is anything with `send(command, args)`: `Bun.RedisClient` as it is, or `{ send: (c, a) => redis.call(c, ...a) }` for ioredis. Any object with `acquire(ttlMs): Promise<boolean>` and `release(): Promise<void>` works as a `LeaderLock`; `acquire` must take the lock when it is free and extend it when this process holds it, atomically.
+
 ## Hosts and `HostStatus`
 
 ```ts
@@ -321,8 +356,9 @@ WebSocket close codes between a coordinator and a host:
 
 ## Limits
 
-- The coordinator is a single process and a single point of failure. If it stops, hosts fence their workers. Run it under a process supervisor.
-- Hosts do not take over for a lost coordinator, and a lost host's clusters do not move to other hosts unless `reassignOnGiveUp` is on.
+- Without a [leader lock](#coordinator-failover) the coordinator is a single point of failure: if it stops, hosts fence their workers. Run it under a process supervisor, or run standbys.
+- Failover relies on timers: a leader whose event loop is blocked for longer than half the lock `ttl` cannot stand down in time. Keep `ttl` well above your longest pause (garbage collection, a busy loop).
+- A moved cluster does not move back when its host returns.
 - The coordinator needs Bun (`Bun.serve`). A `ClusterHost` needs a global `WebSocket` and `child_process.fork` (Bun, or Node.js 22 or later).
 
 ## See also

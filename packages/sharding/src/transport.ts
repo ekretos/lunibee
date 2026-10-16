@@ -1,4 +1,5 @@
 import type { ShardMessage } from "./bus.js";
+import { threadEndpoint } from "./thread.js";
 
 /** Carries {@link ShardMessage}s between the processes or threads that run shards. */
 export interface ShardBusTransport {
@@ -112,10 +113,10 @@ export class IpcTransport implements ShardBusTransport {
 
 /** Picks the transport for a bus: IPC inside a forked cluster, `BroadcastChannel` otherwise. */
 export function defaultTransport(name: string): ShardBusTransport {
-    if (
-        process.env.LUNIBEE_SHARD_BUS === "ipc" &&
-        typeof process.send === "function"
-    )
-        return new IpcTransport();
+    if (process.env.LUNIBEE_SHARD_BUS === "ipc") {
+        if (typeof process.send === "function") return new IpcTransport();
+        const thread = threadEndpoint();
+        if (thread) return new IpcTransport(thread);
+    }
     return new BroadcastChannelTransport(name);
 }

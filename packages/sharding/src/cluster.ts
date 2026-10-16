@@ -23,6 +23,7 @@ import type {
     WorkerReport,
 } from "./health.js";
 import { IdentifyCoordinator, type IdentifyBudget } from "./identify.js";
+import type { LeaderLock } from "./leader.js";
 import {
     CLUSTER_FRAME,
     PARENT_ID,
@@ -115,6 +116,22 @@ export interface ClusterManagerOptions {
      * workers like local ones. See {@link RemoteOptions}.
      */
     remote?: RemoteOptions;
+    /**
+     * Run several coordinators of one deployment, one active at a time, so a
+     * standby takes over when the active one dies (`RedisLeaderLock`, or your
+     * own {@link LeaderLock}). `spawn()` waits until this coordinator holds
+     * the lock. The leader renews it every quarter of `ttl`; if it cannot for
+     * half of `ttl` (or another holds it) it kills every cluster at once,
+     * closes the host listener, and waits to lead again. A new leader waits
+     * two `remote.lease`s before it starts clusters, so the previous leader's
+     * hosts have fenced themselves. Point hosts at every coordinator
+     * (`ClusterHost` `url` as a list).
+     */
+    leader?: {
+        lock: LeaderLock;
+        /** Lock lifetime in ms. Default 10,000; at least 100. */
+        ttl?: number;
+    };
     /** Starts a worker process. Defaults to `child_process.fork()`; replace it for tests or custom launchers. */
     fork?: (
         script: string,
@@ -211,6 +228,12 @@ export interface ClusterManagerEvents {
     hostJoin: [hostId: string];
     /** A host left or was lost. Its clusters are treated as crashed. */
     hostLeave: [hostId: string, reason: string];
+    /** A lost host's cluster is restarting on another host (`remote.moveClusters`). */
+    clusterMoved: [cluster: ClusterInfo, info: { from: string; to: string }];
+    /** This coordinator took the `leader` lock and will start the clusters. */
+    leaderAcquired: [];
+    /** This coordinator lost the `leader` lock and killed its clusters; it waits to lead again. */
+    leaderLost: [reason: string];
     /** An IDENTIFY is waiting for the session-start budget to reset. */
     identifyWait: [info: { shardId: number; waitMs: number }];
     /** Something went wrong that did not stop the deployment (a bad frame, a failed recovery). */
@@ -289,8 +312,17 @@ export class ClusterManager {
     #wasStarted = false;
     /** Set while a deliberate shutdown is in progress so exits are not restarted. */
     #stopping = false;
+    /** Bumped by every stop, so a start that was waiting notices it is stale. */
+    #generation = 0;
+    #leading = false;
+    #renewTimer?: ReturnType<typeof setInterval>;
+    /** When the last successful renewal was sent (epoch ms). */
+    #lastRenew = 0;
+    #renewing = false;
     /** Pending restart timers, kept so shutdown can cancel them. */
     readonly #restartTimers = new Set<ReturnType<typeof setTimeout>>();
+    /** Restarts waiting for a lost host to fence itself, by cluster. */
+    readonly #fencing = new Map<number, ReturnType<typeof setTimeout>>();
     readonly #startTimers = new Map<number, ReturnType<typeof setTimeout>>();
     readonly #pauses = new Set<() => void>();
     readonly #readyWaiters = new Set<{
@@ -367,6 +399,19 @@ export class ClusterManager {
             validateShardIds(options.shardIds, options.shardCount);
 
         this.#auto = options.shardCount === "auto";
+        const ttl = options.leader?.ttl;
+        if (
+            options.leader &&
+            (typeof options.leader.lock?.acquire !== "function" ||
+                typeof options.leader.lock.release !== "function")
+        )
+            throw new TypeError(
+                "leader.lock must have acquire() and release().",
+            );
+        if (ttl !== undefined && (!Number.isInteger(ttl) || ttl < 100))
+            throw new RangeError(
+                "leader.ttl must be an integer of at least 100.",
+            );
         this.#options = { ...options };
         this.#supervisor = new ShardSupervisor({
             restartDelay: options.restartDelay,
@@ -378,7 +423,7 @@ export class ClusterManager {
         );
         if (options.remote)
             this.#remote = new RemoteHosts(options.remote, {
-                join: (id) => this.#emit("hostJoin", id),
+                join: (id) => this.#hostJoined(id),
                 leave: (id, reason) => this.#emit("hostLeave", id, reason),
                 error: (error) => this.#emit("error", error),
             });
@@ -505,8 +550,15 @@ export class ClusterManager {
     }
 
     async #start(): Promise<void> {
+        const generation = this.#generation;
+        const stale = (): boolean =>
+            this.#stopping || generation !== this.#generation;
+        if (this.#options.leader && !this.#leading) {
+            await this.#lead();
+            if (stale()) return;
+        }
         const { count, maxConcurrency, budget } = await this.#resolveGateway();
-        if (this.#stopping) return;
+        if (stale()) return;
 
         const ids =
             this.#options.shardIds ??
@@ -522,10 +574,10 @@ export class ClusterManager {
 
         const placement = await this.#placeHosts().catch((error: unknown) => {
             // A shutdown that interrupts the wait is not a failure of the start.
-            if (this.#stopping) return undefined;
+            if (stale()) return undefined;
             throw error;
         });
-        if (!placement || this.#stopping) return;
+        if (!placement || stale()) return;
 
         this.shardCount = count;
         this.#wasStarted = true;
@@ -556,7 +608,7 @@ export class ClusterManager {
         for (const chunk of active)
             this.#hostOf.set(chunk.id, placement[chunk.id % placement.length]!);
         for (const [index, chunk] of active.entries()) {
-            if (this.#stopping) return;
+            if (stale()) return;
             for (const shard of chunk.shards) this.#owner.set(shard, chunk.id);
             this.#launch(chunk.id, chunk.shards);
             // Spread the CPU cost of starting processes. IDENTIFY pacing is
@@ -564,7 +616,7 @@ export class ClusterManager {
             const gap = this.#options.spawnInterval ?? 500;
             if (index < active.length - 1 && gap > 0) await this.#pause(gap);
         }
-        if (this.#stopping) return;
+        if (stale()) return;
 
         if (this.#options.waitForReady) await this.ready();
         if (
@@ -575,6 +627,126 @@ export class ClusterManager {
                 void this.checkAutoScale();
             }, this.#options.autoScaleInterval);
         }
+    }
+
+    /** Whether this coordinator holds the `leader` lock; always true without `leader`. */
+    public get isLeader(): boolean {
+        return !this.#options.leader || this.#leading;
+    }
+
+    /**
+     * Waits until this coordinator holds the leader lock, then for the
+     * previous leader's hosts to fence themselves.
+     */
+    async #lead(): Promise<void> {
+        const { lock, ttl = 10_000 } = this.#options.leader!;
+        const generation = this.#generation;
+        while (!this.#stopping && generation === this.#generation) {
+            const started = Date.now();
+            let held = false;
+            try {
+                held = await lock.acquire(ttl);
+            } catch (error) {
+                this.#emit("error", asError(error));
+            }
+            if (this.#stopping || generation !== this.#generation) {
+                if (held) void lock.release().catch(() => undefined);
+                return;
+            }
+            if (held) {
+                this.#leading = true;
+                this.#lastRenew = started;
+                this.#startRenewing(ttl);
+                this.#emit("leaderAcquired");
+                const lease = this.#options.remote
+                    ? (this.#options.remote.lease ?? 15_000)
+                    : 0;
+                if (lease > 0) await this.#pause(lease * 2);
+                return;
+            }
+            await this.#pause(Math.floor(ttl / 2));
+        }
+    }
+
+    #startRenewing(ttl: number): void {
+        this.#stopRenewing();
+        const lock = this.#options.leader!.lock;
+        this.#renewTimer = setInterval(
+            () => {
+                // Stand down well before the lock can lapse and another
+                // coordinator can take it: by 3/4 of ttl at the latest.
+                if (Date.now() - this.#lastRenew > ttl / 2) {
+                    this.#standDown("The leader lock could not be renewed.");
+                    return;
+                }
+                if (this.#renewing) return;
+                this.#renewing = true;
+                const started = Date.now();
+                lock.acquire(ttl).then(
+                    (held) => {
+                        this.#renewing = false;
+                        if (!this.#leading) return;
+                        if (held) this.#lastRenew = started;
+                        else
+                            this.#standDown(
+                                "Another coordinator holds the leader lock.",
+                            );
+                    },
+                    (error: unknown) => {
+                        this.#renewing = false;
+                        this.#emit("error", asError(error));
+                    },
+                );
+            },
+            Math.max(10, Math.floor(ttl / 4)),
+        );
+        (this.#renewTimer as { unref?: () => void }).unref?.();
+    }
+
+    #stopRenewing(): void {
+        if (this.#renewTimer) clearInterval(this.#renewTimer);
+        this.#renewTimer = undefined;
+    }
+
+    /** Gives the lock back on a deliberate stop. */
+    async #resign(): Promise<void> {
+        this.#stopRenewing();
+        if (!this.#leading) return;
+        this.#leading = false;
+        try {
+            await this.#options.leader!.lock.release();
+        } catch (error) {
+            this.#emit("error", asError(error));
+        }
+    }
+
+    /**
+     * Lost the lock: kill every cluster now (no grace period, a successor may
+     * already be counting down), close the host listener so hosts fence, and
+     * wait to lead again.
+     */
+    #standDown(reason: string): void {
+        if (!this.#leading) return;
+        this.#stopRenewing();
+        this.#leading = false;
+        this.#stopping = true;
+        this.#halt();
+        for (const cluster of this.#infos.values()) {
+            cluster.state = "stopped";
+            try {
+                cluster.process.kill("SIGKILL");
+            } catch {
+                // Already gone.
+            }
+        }
+        this.clusters.clear();
+        this.#startPromise = undefined;
+        this.#remote?.stop();
+        this.#stopping = false;
+        this.#emit("leaderLost", reason);
+        this.spawn().catch((error: unknown) =>
+            this.#emit("error", asError(error)),
+        );
     }
 
     /** Opens the listener for hosts and waits for them. @returns The places clusters run, in placement order. */
@@ -762,14 +934,79 @@ export class ClusterManager {
                 attempt: info.restarts,
                 delay,
             });
+        this.#restartLater(info, delay);
+    }
+
+    /** Re-forks a restarting cluster after `delay`, on another host if its own is lost. */
+    #restartLater(
+        info: ClusterInfo,
+        delay: number,
+    ): ReturnType<typeof setTimeout> {
         const timer = setTimeout(() => {
             this.#restartTimers.delete(timer);
+            this.#fencing.delete(info.id);
             if (this.#stopping || info.state !== "restarting") return;
-            this.#launch(info.id, info.shards);
+            const wait = this.#relocate(info);
+            if (wait > 0)
+                this.#fencing.set(info.id, this.#restartLater(info, wait));
+            else this.#launch(info.id, info.shards);
         }, delay);
         // Do not hold the event loop open purely for a pending restart.
         (timer as { unref?: () => void }).unref?.();
         this.#restartTimers.add(timer);
+        return timer;
+    }
+
+    /** A host joined: clusters waiting for it to fence start there now. */
+    #hostJoined(hostId: string): void {
+        this.#emit("hostJoin", hostId);
+        for (const [id, timer] of [...this.#fencing]) {
+            const info = this.#infos.get(id);
+            if (this.#hostOf.get(id) !== hostId || !info) continue;
+            clearTimeout(timer);
+            this.#restartTimers.delete(timer);
+            this.#fencing.delete(id);
+            if (!this.#stopping && info.state === "restarting")
+                this.#launch(info.id, info.shards);
+        }
+    }
+
+    /**
+     * Moves a cluster whose host is lost to the connected place running the
+     * fewest clusters (`remote.moveClusters`). Its old workers must be gone
+     * first, so a shard never runs on two hosts.
+     * @returns Milliseconds to wait before the lost host is certainly fenced, or 0.
+     */
+    #relocate(info: ClusterInfo): number {
+        const remote = this.#remote;
+        const host = this.#hostOf.get(info.id) ?? "local";
+        if (
+            !remote ||
+            this.#options.remote?.moveClusters === false ||
+            host === "local" ||
+            remote.isConnected(host)
+        )
+            return 0;
+        const wait = remote.fencedAt(host) - Date.now();
+        if (wait > 0) return wait;
+        const places = this.#options.remote?.local
+            ? ["local", ...remote.connected()]
+            : remote.connected();
+        // Nowhere to go: the launch fails and the supervisor keeps trying.
+        if (places.length === 0) return 0;
+        const load = new Map(places.map((place) => [place, 0]));
+        for (const [cluster, place] of this.#hostOf) {
+            const state = this.#infos.get(cluster)?.state;
+            if (load.has(place) && state !== "failed" && state !== "stopped")
+                load.set(place, load.get(place)! + 1);
+        }
+        const target = places.reduce((best, place) =>
+            load.get(place)! < load.get(best)! ? place : best,
+        );
+        this.#hostOf.set(info.id, target);
+        info.host = target;
+        this.#emit("clusterMoved", info, { from: host, to: target });
+        return 0;
     }
 
     /**
@@ -1443,14 +1680,19 @@ export class ClusterManager {
         for (const cluster of this.#infos.values()) cluster.state = "stopped";
         this.clusters.clear();
         this.#startPromise = undefined;
-        if (!keepRemote) this.#remote?.stop();
+        if (!keepRemote) {
+            this.#remote?.stop();
+            await this.#resign();
+        }
         this.#stopping = false;
     }
 
     /** Cancels everything that could start work or keep the loop alive. */
     #halt(): void {
+        this.#generation++;
         for (const timer of this.#restartTimers) clearTimeout(timer);
         this.#restartTimers.clear();
+        this.#fencing.clear();
         for (const id of [...this.#startTimers.keys()])
             this.#clearStartTimer(id);
         for (const wake of [...this.#pauses]) wake();
@@ -1513,6 +1755,11 @@ export class ClusterManager {
         this.clusters.clear();
         this.#startPromise = undefined;
         this.#remote?.stop();
+        void this.#resign();
         this.#stopping = false;
     }
+}
+
+function asError(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
 }

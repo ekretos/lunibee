@@ -72,6 +72,14 @@ export interface RemoteOptions {
     clientAddress?: (request: Request, peer: string | undefined) => string;
     /** Also run clusters on the coordinator's own machine. Default false: clusters run on the hosts only. */
     local?: boolean;
+    /**
+     * When a host is lost, restart its clusters on the connected host (or
+     * `local`) running the fewest, once the lost host has certainly fenced
+     * itself (two leases after the coordinator dropped it). They stay there
+     * when the host comes back. Default true; `false` restarts them on the
+     * same host only, so they wait for it.
+     */
+    moveClusters?: boolean;
 }
 
 /** A host as the coordinator sees it. */
@@ -182,6 +190,8 @@ export class RemoteHosts {
     > &
         RemoteOptions;
     readonly #links = new Map<string, Link>();
+    /** When each lost host was dropped (epoch ms); cleared when it joins again. */
+    readonly #droppedAt = new Map<string, number>();
     readonly #waiters = new Set<{ check(): void; abort(error: Error): void }>();
     readonly #hooks: RemoteHooks;
     #server?: Server<SocketData>;
@@ -255,6 +265,25 @@ export class RemoteHosts {
     /** Host IDs that are connected now, sorted. */
     public connected(): string[] {
         return [...this.#links.keys()].sort();
+    }
+
+    /** Whether `hostId` is connected now. */
+    public isConnected(hostId: string): boolean {
+        return this.#links.has(hostId);
+    }
+
+    /**
+     * When workers that ran on a lost host are certainly gone (epoch ms), or 0
+     * for a host that is connected or was never dropped. The host fences
+     * itself one lease after it last heard from the coordinator, checking
+     * every third of a lease; the coordinator sends nothing after the drop,
+     * and two leases leave room for the kill itself.
+     */
+    public fencedAt(hostId: string): number {
+        const dropped = this.#droppedAt.get(hostId);
+        return dropped === undefined || this.#links.has(hostId)
+            ? 0
+            : dropped + this.#options.lease * 2;
     }
 
     /** Opens the listener. Safe to call twice. */
@@ -576,6 +605,7 @@ export class RemoteHosts {
             children: new Map(),
         };
         this.#links.set(id, link);
+        this.#droppedAt.delete(id);
         const lease = this.#options.lease;
         this.#post(link, {
             t: "welcome",
@@ -607,6 +637,7 @@ export class RemoteHosts {
     #drop(link: Link, reason: string, code?: number): void {
         if (this.#links.get(link.id) !== link) return;
         this.#links.delete(link.id);
+        this.#droppedAt.set(link.id, Date.now());
         if (code !== undefined)
             try {
                 link.ws.close(code, reason.slice(0, 100));

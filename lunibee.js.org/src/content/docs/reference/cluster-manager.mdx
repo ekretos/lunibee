@@ -192,7 +192,8 @@ A callback or listener that throws is ignored; it cannot break supervision.
 |---|---|---|---|
 | `autoScaleInterval` | `number` | off | With `shardCount: "auto"`, check the recommended count every this many ms and `respawn()` when it changed. Integer of at least 1000. |
 | `onAutoScaleError` | `(error: Error) => void` | none | Called when a background auto-scale check fails. The next tick retries. |
-| `fork` | `(script, env) => ChildProcess` | `child_process.fork(script, [], { env })` | Starts a local worker. `env` is the parent's environment plus the [worker contract](#environment-variables). Replace it for tests or a custom launcher; the returned process needs IPC (`send()`, `message`, `exit`). |
+| `fork` | `(script, env) => ChildProcess` | `child_process.fork(script, [], { env })` | Starts a local worker. `env` is the parent's environment plus the [worker contract](#environment-variables). Replace it for tests or a custom launcher; the returned process needs IPC (`send()`, `message`, `exit`). [`threadFork()`](#clusters-as-threads) runs clusters as worker threads. |
+| `leader` *(0.3.2)* | `{ lock: LeaderLock; ttl?: number }` | off | Several coordinators, one active: `spawn()` waits until this one holds the lock. `ttl` defaults to 10000 (at least 100). See [Coordinator failover](/reference/cluster-host/#coordinator-failover). |
 | `remote` | `RemoteOptions` | off | Accept [`ClusterHost`](/reference/cluster-host/) agents on other machines and place clusters on them. |
 
 ### Validation
@@ -217,6 +218,7 @@ A callback or listener that throws is ignored; it cannot break supervision.
 | `clusters` | `Map<number, ClusterInfo>` | Live clusters (`starting` or `ready`) by ID. A crashed cluster leaves the map until it is restarted. |
 | `shardCount` | `number` | Total shards of the deployment. `0` before the first `spawn()`. |
 | `remotePort` | `number \| undefined` | The port hosts connect to, once the listener is open. Useful with `remote.port: 0`. |
+| `isLeader` *(0.3.2)* | `boolean` | Whether this coordinator holds the `leader` lock. Always `true` without `leader`. |
 
 ## Methods
 
@@ -417,6 +419,9 @@ A `startTimeout` that passes while `starting` kills the process; its exit is han
 | `shardsReassigned` | `{ shardIds: number[]; from: number; to: number }` | A failed cluster's shards were moved to another cluster. |
 | `hostJoin` | `hostId: string` | A host authenticated (also when it reconnects). |
 | `hostLeave` | `hostId: string`, `reason: string` | A host disconnected or was lost. Its clusters exit and are handled as crashes. |
+| `clusterMoved` *(0.3.2)* | `cluster`, `{ from: string; to: string }` | A lost host's cluster is restarting on another place (`remote.moveClusters`). |
+| `leaderAcquired` *(0.3.2)* | — | This coordinator took the `leader` lock. |
+| `leaderLost` *(0.3.2)* | `reason: string` | This coordinator lost the lock, killed its clusters and is a standby again. |
 | `identifyWait` | `{ shardId: number; waitMs: number }` | An IDENTIFY waits for the session-start budget to reset. Repeated waits for the same shard and second are not re-emitted. |
 | `error` | `error: Error` | Something went wrong that did not stop the deployment. See below. |
 
@@ -582,6 +587,28 @@ With `reassignOnGiveUp: true`, a cluster that gives up hands its shards to the `
 2. Only after the worker confirms does ownership move: `clusterForShard()` returns the new owner, the target's `shards` grows, the failed cluster's `shards` becomes empty and `shardsReassigned` is emitted.
 
 The failed process is already dead and ownership moves only after confirmation, so no shard ever has two owners. If no cluster is `ready`, or the worker refuses or times out, an `error` event says so and the shards stay down. Reassignment does not happen for `restartOnExit: false`.
+
+## Clusters as threads
+
+*(0.3.2)* `fork: threadFork(options?)` runs every local cluster as a worker thread of the manager's process instead of a forked process. The worker script does not change: `ShardManager`, `ShardBus` and `ClusterWorker` find the parent through the thread's port, and IDENTIFY coordination, routing, health and restarts work as with processes.
+
+```ts
+import { ClusterManager, threadFork } from "lunibee";
+
+const manager = new ClusterManager({
+    token: process.env.DISCORD_TOKEN!,
+    script: "./worker.ts",
+    shardsPerCluster: 1, // one shard per thread
+    fork: threadFork({ resourceLimits: { maxOldGenerationSizeMb: 512 } }),
+});
+```
+
+- Threads start faster and share one process's memory overhead. A crash that ends the process (out of memory, a native fault) ends every cluster with it, and `ClusterInfo.process.pid` is the thread ID.
+- `kill()` terminates the thread: a thread cannot handle signals, so `shutdownAll()` ends it at once, as `SIGTERM` ends a process without a handler. Its exit reports the signal it was asked for.
+- `env` becomes the thread's `process.env`. Remote hosts still fork processes.
+- `threadEndpoint()` returns the parent link inside such a thread (`undefined` elsewhere), for code that talks to the parent itself.
+
+Process per shard: `shardsPerCluster: 1` gives every shard its own process (or thread).
 
 ## Worker side
 

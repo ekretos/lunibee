@@ -13,8 +13,13 @@ import {
 
 /** Options for a {@link ClusterHost}. */
 export interface ClusterHostOptions {
-    /** The coordinator's address: `wss://host:port`. `ws://` is accepted for this machine, or anywhere with `allowInsecure`. */
-    url: string;
+    /**
+     * The coordinator's address: `wss://host:port`. `ws://` is accepted for
+     * this machine, or anywhere with `allowInsecure`. A list names every
+     * coordinator of a deployment with a `leader` lock: the host tries them in
+     * turn, and moves to the next whenever one cannot be reached or drops it.
+     */
+    url: string | string[];
     /** Connect with `ws://` to a coordinator on another machine, over a network you fully trust. Default false. */
     allowInsecure?: boolean;
     /** The coordinator's shared secret. */
@@ -81,6 +86,13 @@ export class ClusterHost {
         Set<(...args: never[]) => void>
     >();
     #socket?: WebSocket;
+    readonly #urls: string[];
+    /** The coordinator tried next. */
+    #urlIndex = 0;
+    /** Coordinators that could not be reached during the first connect. */
+    #unreachable = 0;
+    /** Whether the coordinator accepted the current socket. */
+    #accepted = false;
     #lease = 15_000;
     #lastRx = 0;
     #watchdog?: ReturnType<typeof setInterval>;
@@ -101,24 +113,34 @@ export class ClusterHost {
             throw new RangeError("secret must be at least 16 characters.");
         if (!options.script?.trim())
             throw new TypeError("A worker script path is required.");
-        let url: URL;
-        try {
-            url = new URL(options.url);
-        } catch {
-            throw new TypeError("url must be an absolute ws:// or wss:// URL.");
+        const urls = Array.isArray(options.url)
+            ? [...options.url]
+            : [options.url];
+        if (urls.length === 0 || urls.length > 16)
+            throw new TypeError("url must list 1 to 16 coordinators.");
+        for (const raw of urls) {
+            let url: URL;
+            try {
+                url = new URL(raw);
+            } catch {
+                throw new TypeError(
+                    "url must be an absolute ws:// or wss:// URL.",
+                );
+            }
+            if (url.protocol !== "ws:" && url.protocol !== "wss:")
+                throw new TypeError("url must start with ws:// or wss://.");
+            if (url.username || url.password)
+                throw new TypeError("url must not contain credentials.");
+            if (
+                url.protocol === "ws:" &&
+                !options.allowInsecure &&
+                !isLoopbackHost(url.hostname)
+            )
+                throw new TypeError(
+                    "url must use wss:// to reach another machine (allowInsecure: true overrides this for a network you fully trust).",
+                );
         }
-        if (url.protocol !== "ws:" && url.protocol !== "wss:")
-            throw new TypeError("url must start with ws:// or wss://.");
-        if (url.username || url.password)
-            throw new TypeError("url must not contain credentials.");
-        if (
-            url.protocol === "ws:" &&
-            !options.allowInsecure &&
-            !isLoopbackHost(url.hostname)
-        )
-            throw new TypeError(
-                "url must use wss:// to reach another machine (allowInsecure: true overrides this for a network you fully trust).",
-            );
+        this.#urls = urls;
         this.#options = options;
         this.#delay = options.reconnectDelay ?? 1000;
     }
@@ -174,6 +196,7 @@ export class ClusterHost {
         if (!this.#closed) return Promise.resolve();
         this.#closed = false;
         this.#busyAttempts = 0;
+        this.#unreachable = 0;
         return new Promise<void>((resolve, reject) => {
             this.#firstConnect = { resolve, reject };
             this.#open();
@@ -206,7 +229,8 @@ export class ClusterHost {
     }
 
     #open(): void {
-        const socket = new WebSocket(this.#options.url);
+        this.#accepted = false;
+        const socket = new WebSocket(this.#urls[this.#urlIndex]!);
         this.#socket = socket;
         socket.addEventListener("message", (event) =>
             this.#message(socket, event.data),
@@ -291,6 +315,7 @@ export class ClusterHost {
                 return;
             case "welcome":
                 this.#lease = message.leaseMs;
+                this.#accepted = true;
                 this.#connected = true;
                 this.#delay = this.#options.reconnectDelay ?? 1000;
                 this.#startWatchdog();
@@ -445,6 +470,20 @@ export class ClusterHost {
         const busy =
             code === RemoteClose.TooManyConnections ||
             code === RemoteClose.HelloTimeout;
+        // With several coordinators, the next one may be the leader now.
+        const accepted = this.#accepted;
+        if (this.#urls.length > 1)
+            this.#urlIndex = (this.#urlIndex + 1) % this.#urls.length;
+        if (
+            first &&
+            !refused &&
+            !busy &&
+            !accepted &&
+            ++this.#unreachable < this.#urls.length
+        ) {
+            this.#open();
+            return;
+        }
         if (
             first &&
             busy &&

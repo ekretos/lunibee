@@ -89,6 +89,9 @@ Earlier findings of this release:
 
 ### ✨ Added
 
+- **Coordinator failover** ([Cluster hosts](/reference/cluster-host/#coordinator-failover)): `ClusterManager({ leader: { lock, ttl } })` runs several coordinators with one active. The leader renews the lock every quarter of `ttl` and, if it cannot for half of `ttl`, kills its clusters and closes the listener before the lock can lapse; a new leader waits two leases so the old leader's hosts have fenced. `RedisLeaderLock` keeps the lock in Redis (`Bun.RedisClient` works as it is); `isLeader`, `leaderAcquired` and `leaderLost` report it. `ClusterHost` takes a list of coordinator URLs and moves to the next one when one cannot be reached or drops it.
+- **A lost host's clusters move to another host** (`remote.moveClusters`, on by default): once the lost host has certainly fenced (two leases after it was dropped), its clusters restart on the connected place running the fewest, with a `clusterMoved` event. A host that reconnects first gets its clusters back at once.
+- **Clusters as threads:** `fork: threadFork()` runs each cluster as a worker thread of the manager's process; worker scripts are unchanged (`ShardManager`, `ShardBus` and `ClusterWorker` use the thread's port, `threadEndpoint()` exposes it). With `shardsPerCluster: 1`, one shard per thread.
 - **`cache.maxMembers`** bounds the members kept per guild (least recently used leave first).
 - **`rest.request({ method, path | fullRoute, body, ... })`** — the single-object form from `@discordjs/rest`, beside the positional one. `MockREST` supports both.
 - **`WebhookClient`:** `avatarURL`, `threadId` and `allowedMentions` aliases; `editMessage()` takes the full message options (components, files, `threadId`); new `fetchMessage()`; `deleteMessage()` accepts `threadId`.

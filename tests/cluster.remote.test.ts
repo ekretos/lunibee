@@ -694,6 +694,77 @@ describe("host loss and fencing", () => {
         await manager.ready(3000);
     });
 
+    test("a lost host's cluster moves to another host once the lost one has fenced", async () => {
+        const lease = 100;
+        const { manager, agents, spawning } = await deployment(
+            ["a", "b"],
+            {},
+            { lease },
+        );
+        await spawning;
+        const a = agents.get("a")!;
+        const b = agents.get("b")!;
+        await until(() => a.children[0] && b.children[0]);
+        a.children[0]!.ready();
+        b.children[0]!.ready();
+        await manager.ready(3000);
+        const moved: string[] = [];
+        manager.on("clusterMoved", (cluster, info) =>
+            moved.push(`${cluster.id}:${info.from}->${info.to}`),
+        );
+
+        const lostAt = Date.now();
+        await b.host.close();
+        await until(() => a.children.length === 2, 3000);
+        // Not before the lost host had two leases to kill its workers.
+        expect(Date.now() - lostAt).toBeGreaterThanOrEqual(lease * 2);
+        expect(moved).toEqual(["1:b->a"]);
+        expect(a.children[1]!.env.CLUSTER_ID).toBe("1");
+        expect(a.children[1]!.env.SHARD_LIST).toBe(
+            b.children[0]!.env.SHARD_LIST,
+        );
+        expect(manager.clusters.get(1)!.host).toBe("a");
+        a.children[1]!.ready();
+        await manager.ready(3000);
+        expect(manager.hosts().find((h) => h.id === "a")!.clusters).toEqual([
+            0, 1,
+        ]);
+    });
+
+    test("moveClusters: false keeps a lost host's cluster waiting for that host", async () => {
+        const { manager, agents, spawning } = await deployment(
+            ["a", "b"],
+            { supervisor: { maxRestarts: 1000 } },
+            { lease: 50, moveClusters: false },
+        );
+        await spawning;
+        const a = agents.get("a")!;
+        const b = agents.get("b")!;
+        await until(() => a.children[0] && b.children[0]);
+        let moved = 0;
+        manager.on("clusterMoved", () => moved++);
+        await b.host.close();
+        await tick(300);
+        expect(moved).toBe(0);
+        expect(a.children.length).toBe(1);
+        expect(manager.clusters.get(1)?.host ?? "b").toBe("b");
+    });
+
+    test("a moved cluster goes to the place running the fewest, local included", async () => {
+        const { manager, agents, spawning } = await deployment(
+            ["a", "b"],
+            { clusterCount: 4, shardCount: 4 },
+            { lease: 50, local: true },
+        );
+        await spawning;
+        // Placement: 0 local, 1 a, 2 b, 3 local.
+        expect(
+            [0, 1, 2, 3].map((id) => manager.clusters.get(id)!.host),
+        ).toEqual(["local", "a", "b", "local"]);
+        await agents.get("b")!.host.close();
+        await until(() => manager.clusters.get(2)?.host === "a", 3000);
+    });
+
     test("a coordinator that goes silent makes the host kill its workers", async () => {
         const server = Bun.serve({
             port: 0,

@@ -4,11 +4,17 @@ import {
     ClusterWorker,
     ShardBus,
     ShardManager,
+    threadEndpoint,
 } from "../../packages/sharding/src/index.ts";
 import { Gateway } from "../../packages/ws/src/index.ts";
 
 Gateway.prototype.connect = async function () {
-    process.send?.({ fixture: "connect", at: Date.now(), pid: process.pid });
+    // A forked worker reports through process.send, a thread through its port.
+    (process.send?.bind(process) ?? threadEndpoint()?.send)?.({
+        fixture: "connect",
+        at: Date.now(),
+        pid: process.pid,
+    });
     setTimeout(() => this.emit("ready"), 5);
 };
 

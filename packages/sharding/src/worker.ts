@@ -1,6 +1,7 @@
 import { readClusterContext, type ClusterContext } from "./context.js";
 import type { WorkerReport } from "./health.js";
 import { CLUSTER_FRAME, parseParentFrame } from "./protocol.js";
+import { threadEndpoint } from "./thread.js";
 
 /** Asks for the right to IDENTIFY, and gives it back. */
 export interface IdentifyGate {
@@ -32,11 +33,12 @@ export class ClusterWorker {
     public static current(): ClusterWorker | undefined {
         if (!ClusterWorker.#current) {
             const context = readClusterContext();
-            if (context && typeof process.send === "function")
-                ClusterWorker.#current = new ClusterWorker(
-                    context,
-                    process as unknown as WorkerEndpoint,
-                );
+            const endpoint =
+                typeof process.send === "function"
+                    ? (process as unknown as WorkerEndpoint)
+                    : threadEndpoint();
+            if (context && endpoint)
+                ClusterWorker.#current = new ClusterWorker(context, endpoint);
         }
         return ClusterWorker.#current;
     }

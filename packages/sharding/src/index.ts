@@ -64,11 +64,23 @@ export {
 } from "./context.js";
 export { ClusterWorker, type IdentifyGate } from "./worker.js";
 export {
+    threadEndpoint,
+    threadFork,
+    type ThreadEndpoint,
+    type ThreadForkOptions,
+} from "./thread.js";
+export {
     ClusterHost,
     type ClusterHostEvents,
     type ClusterHostOptions,
 } from "./host.js";
 export type { HostStatus, RemoteOptions } from "./remote.js";
+export {
+    RedisLeaderLock,
+    type LeaderLock,
+    type LeaderRedisClient,
+    type RedisLeaderLockOptions,
+} from "./leader.js";
 export { RemoteClose, REMOTE_PROTOCOL_VERSION } from "./remote-protocol.js";
 export {
     IdentifyCoordinator,
