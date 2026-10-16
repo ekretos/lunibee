@@ -43,6 +43,11 @@ The external assessment of 2026-10-15 (LUNIBEE-001 to 007; status in [`docs/audi
 - **`codeBlock()` cannot be closed by four or more backticks** (LUNIBEE-006).
 - **Forum posts get the default `allowedMentions`** (LUNIBEE-007). Raw `bot.rest` / `bot.api` calls still send exactly what they are given.
 
+The 0.3.2 security scan ([`docs/audits/security-0.3.2-scan.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.2-scan.md)):
+
+- **A leader lock that never answers no longer hangs `shutdownAll()`:** `acquire()` and `release()` are limited to half of `leader.ttl`.
+- The coordinator's record of lost hosts is bounded (1,000); the docs site's build dependencies were updated (`sharp`, `http-cache-semantics`, `source-map-js`); the smoke test's fake Discord binds `127.0.0.1`.
+
 Earlier findings of this release:
 
 - **A failed reservation can no longer send a request unreserved.** After eight refused reservations `acquire()` returned and the request went out anyway; and on any Redis error a reservation fell back to local state with nothing but a log line per call. A request is now sent only with a granted reservation: a store that errors, replies with something unreadable or refuses without a wait fails it with kind `"coordination"`, and Redis failures follow the explicit `failurePolicy`.

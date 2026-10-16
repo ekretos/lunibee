@@ -18,6 +18,7 @@ let sequence = 0;
 
 const server = Bun.serve({
     port: 0,
+    hostname: "127.0.0.1",
     async fetch(request, srv) {
         const url = new URL(request.url);
         if (url.pathname === "/gateway") {

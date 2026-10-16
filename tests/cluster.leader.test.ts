@@ -281,6 +281,36 @@ describe("leader option", () => {
         expect(a.manager.isLeader).toBe(true);
     });
 
+    test("a lock that never answers cannot hold up a shutdown", async () => {
+        const hung: LeaderLock = {
+            acquire: () => new Promise<boolean>(() => undefined),
+            release: () => new Promise<void>(() => undefined),
+        };
+        const a = coordinator(hung);
+        const errors: string[] = [];
+        a.manager.on("error", (error) => errors.push(error.message));
+        const waiting = a.manager.spawn();
+        await until(() => errors.length > 0);
+        expect(errors[0]).toMatch(/did not answer within 100 ms/);
+        const started = Date.now();
+        await a.manager.shutdownAll(100);
+        await waiting;
+        expect(Date.now() - started).toBeLessThan(1000);
+        expect(a.forked.children.length).toBe(0);
+    });
+
+    test("a release that never answers cannot hold up a shutdown", async () => {
+        const key = new SharedKey();
+        const lock = lockOn(key, "a");
+        lock.release = () => new Promise<void>(() => undefined);
+        const a = coordinator(lock);
+        await a.manager.spawn();
+        const started = Date.now();
+        await a.manager.shutdownAll(100);
+        expect(Date.now() - started).toBeLessThan(1000);
+        expect(a.manager.isLeader).toBe(false);
+    });
+
     test("respawn keeps the lock", async () => {
         const a = coordinator(lockOn(new SharedKey(), "a"));
         await a.manager.spawn();

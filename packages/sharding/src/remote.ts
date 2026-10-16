@@ -638,6 +638,9 @@ export class RemoteHosts {
         if (this.#links.get(link.id) !== link) return;
         this.#links.delete(link.id);
         this.#droppedAt.set(link.id, Date.now());
+        // Bounded: forget the oldest losses (long fenced) past 1,000 hosts.
+        if (this.#droppedAt.size > 1000)
+            this.#droppedAt.delete(this.#droppedAt.keys().next().value!);
         if (code !== undefined)
             try {
                 link.ws.close(code, reason.slice(0, 100));

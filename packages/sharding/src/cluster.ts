@@ -645,7 +645,8 @@ export class ClusterManager {
             const started = Date.now();
             let held = false;
             try {
-                held = await lock.acquire(ttl);
+                // A lock that never answers must not hold up a shutdown.
+                held = await withTimeout(lock.acquire(ttl), ttl / 2);
             } catch (error) {
                 this.#emit("error", asError(error));
             }
@@ -713,8 +714,9 @@ export class ClusterManager {
         this.#stopRenewing();
         if (!this.#leading) return;
         this.#leading = false;
+        const { lock, ttl = 10_000 } = this.#options.leader!;
         try {
-            await this.#options.leader!.lock.release();
+            await withTimeout(lock.release(), ttl / 2);
         } catch (error) {
             this.#emit("error", asError(error));
         }
@@ -1758,6 +1760,23 @@ export class ClusterManager {
         void this.#resign();
         this.#stopping = false;
     }
+}
+
+/** Rejects when `promise` has not settled within `ms`. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+            () =>
+                reject(
+                    new Error(
+                        `The leader lock did not answer within ${ms} ms.`,
+                    ),
+                ),
+            ms,
+        );
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function asError(error: unknown): Error {

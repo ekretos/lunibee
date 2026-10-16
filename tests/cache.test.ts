@@ -117,7 +117,11 @@ describe("Collection jitter", () => {
             jitter: 1,
         });
         for (let i = 0; i < 50; i++) c.set(i, i);
-        const left = [...c.keys()].map((k) => c.ttlRemaining(k)!);
+        // jitter 1 can shorten a TTL to about 1 ms: such an entry may lapse
+        // before it is read, which is also within the limit.
+        const left = [...c.keys()]
+            .map((k) => c.ttlRemaining(k))
+            .filter((n): n is number => n !== undefined);
         expect(Math.max(...left)).toBeLessThanOrEqual(1000);
         expect(
             new Set(left.map((n) => Math.floor(n / 10))).size,

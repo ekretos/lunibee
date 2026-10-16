@@ -32,7 +32,7 @@ and status in `docs/audits/rest-distributed-0.3.2.md`, docs on `/core-concepts/d
 shared Redis mirror of the Gateway cache, and `RedisCollection` (`packages/collection/src/redis.ts`),
 a Collection shared between processes through Redis, are in too.
 The external assessment of 2026-10-15 (LUNIBEE-001 to 007) is fixed; status in
-`docs/audits/security-0.3.1-external.md`.
+`docs/audits/security-0.3.1-external.md`; the 0.3.2 security scan in `docs/audits/security-0.3.2-scan.md`.
 Versions are 0.3.2 and the 0.3.1 docs are archived in the version picker. Left for the
 maintainer: the `0.3.2` tag and `publish:all`.
 
@@ -43,8 +43,8 @@ The workflow release: handles (`bot.guild(id)`, `peek` / `get` / `fetch`), `bot.
 `sync commands`; typed message payloads; previous state on update events; IPC `ShardBus`,
 `ShardSupervisor`, IDENTIFY buckets; `ShardManager` + `ClusterManager` as one system (worker contract, cross-cluster IDENTIFY coordination, readiness, routing, health, recovery); Gateway health and storm backoff; concurrent REST buckets by
 default; the REST coverage audit and its gaps; structure polish. The 0.2.x deprecations are
-removed. Everything is in `.roadmap/0.3.1.md` (the unticked items there are not done: Bun 1.4 as
-the minimum and the pass-through event profiling) and the changelog's "v0.3.1".
+removed. Everything is in `.roadmap/0.3.1.md` (every item ticked as of 2026-10-16, the Bun 1.4
+performance items and Step 6b item 13 delivered in 0.3.2) and the changelog's "v0.3.1".
 Tagged `0.3.1`.
 
 ## 0.2.4 (shipped)
