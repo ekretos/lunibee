@@ -1,7 +1,6 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import starlightTypeDoc, { typeDocSidebarGroup } from "starlight-typedoc";
-import starlightVersions from "starlight-versions";
 import { readFileSync } from "node:fs";
 
 // Source links in the generated API point at the release tag (e.g. 0.2.3), not a commit.
@@ -32,28 +31,11 @@ export default defineConfig({
         },
       ],
       customCss: ["./src/styles/custom.css"],
+      // The version picker (latest release only) sits before the theme switcher.
+      components: { ThemeSelect: "./src/components/ThemeSelect.astro" },
       // Generated API reference (TSDoc) for the public `lunibee` barrel,
       // served under /api/ next to the hand-written guides and reference.
       plugins: [
-        // Archived releases for the version picker. To archive a release, add its
-        // slug here before bumping; the next build snapshots the current pages.
-        starlightVersions({
-          current: { label: `v${version} (latest)` },
-          versions: [
-            { slug: "0.3.1", label: "v0.3.1" },
-            { slug: "0.2.4", label: "v0.2.4" },
-            { slug: "0.2.3", label: "v0.2.3" },
-            { slug: "0.2.2", label: "v0.2.2" },
-            { slug: "0.2.1", label: "v0.2.1" },
-            { slug: "0.2.0", label: "v0.2.0" },
-            { slug: "0.1.8", label: "v0.1.8" },
-            { slug: "0.1.7", label: "v0.1.7" },
-            { slug: "0.1.6", label: "v0.1.6" },
-            { slug: "0.1.5", label: "v0.1.5" },
-            { slug: "0.1.2", label: "v0.1.2" },
-            { slug: "0.1.0", label: "v0.1.0" },
-          ],
-        }),
         starlightTypeDoc({
           entryPoints: ["../packages/lunibee/src/index.ts"],
           tsconfig: "../tsconfig.json",

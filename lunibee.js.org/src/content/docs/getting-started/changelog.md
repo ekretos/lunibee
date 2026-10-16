@@ -3,6 +3,41 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
+## v0.3.3
+
+Coordinator failover, clusters that move off a lost host, clusters as threads, faster cache updates on Bun, a Redis Cluster test, and the fixes of the 0.3.2 security scan.
+
+### ⚠️ Changed
+
+- **A lost host's clusters restart on another host** once it has fenced, instead of waiting for it (`remote.moveClusters: false` keeps the old behaviour).
+
+### ✨ Added
+
+- **Coordinator failover** ([Cluster hosts](/reference/cluster-host/#coordinator-failover)): `ClusterManager({ leader: { lock, ttl } })` runs several coordinators with one active. The leader renews the lock every quarter of `ttl` and, if it cannot for half of `ttl`, kills its clusters and closes the listener before the lock can lapse; a new leader waits two leases so the old leader's hosts have fenced. `RedisLeaderLock` keeps the lock in Redis (`Bun.RedisClient` works as it is); `isLeader`, `leaderAcquired` and `leaderLost` report it. `ClusterHost` takes a list of coordinator URLs and moves to the next one when one cannot be reached or drops it.
+- **A lost host's clusters move to another host** (`remote.moveClusters`, on by default): once the lost host has certainly fenced (two leases after it was dropped), its clusters restart on the connected place running the fewest, with a `clusterMoved` event. A host that reconnects first gets its clusters back at once.
+- **Clusters as threads:** `fork: threadFork()` runs each cluster as a worker thread of the manager's process; worker scripts are unchanged (`ShardManager`, `ShardBus` and `ClusterWorker` use the thread's port, `threadEndpoint()` exposes it). With `shardsPerCluster: 1`, one shard per thread.
+
+### 🔒 Security
+
+- **A leader lock that never answers no longer hangs `shutdownAll()`:** `acquire()` and `release()` are limited to half of `leader.ttl`.
+- **Redis Cluster is tested:** with a hash-tagged `prefix` and a cluster-aware client the shared rate limits hold on a three-node cluster (`REDIS_CLUSTER_NODES=… bun run test:redis`). An untagged prefix makes Redis refuse the scripts (`CROSSSLOT`); the store now warns once with the fix instead of reporting a generic outage. The docs site's `postcss-selector-parser` is pinned to 7.1.6, so `bun audit` is clean there too.
+- The coordinator's record of lost hosts is bounded (1,000); the docs site's build dependencies were updated (`sharp`, `http-cache-semantics`, `source-map-js`); the smoke test's fake Discord binds `127.0.0.1`.
+
+### ⚡ Performance
+
+- **Cache merges no longer use `Object.assign`**, which is about twice as slow on Bun when the target already exists: channel, thread, emoji, message and resource-manager updates copy fields with a key loop. Measured on Bun 1.4.2 with the same payloads: `CHANNEL_CREATE` 0.8–1.0 µs → 0.3–0.37 µs, `CHANNEL_UPDATE` → 0.33–0.46 µs, `GUILD_EMOJIS_UPDATE` (10 emojis) 6.3 → 2.4–2.7 µs; `GUILD_DELETE` no longer copies every cached channel into an array (20 → 13 µs with 500 channels cached).
+- `scripts/bench-runtime.mjs` builds snowflakes without `BigInt`, so Gateway rows measure the event, not the payload; its `link` row no longer throws.
+
+### 📚 Documentation
+
+- Audit reports are no longer kept in the repository; security fixes are listed in these Security sections. `bun scripts/api-coverage.ts` prints the REST coverage table, and `--check` fails CI on any gap.
+- The version picker lists the latest release only.
+
+### 🧪 Testing
+
+- **`bun run smoke:cluster`** (CI package job): the built package runs the basic bot sharded across two forked clusters against a fake Discord Gateway and REST; every shard identifies, commands deploy, `/ping` is answered by the shard that owns it, a killed cluster comes back and shutdown leaves no process.
+- `tests/integration/rest-redis-cluster.test.ts` runs the shared rate limits on a real Redis Cluster (`REDIS_CLUSTER_NODES`).
+
 ## v0.3.2
 
 Fixes from the fifth security audit of 0.3.1, two Components V2 payload bugs, the last REST compatibility gaps, complete reference pages for REST, Gateway, sharding and voice, and distributed REST rate limiting that holds across processes and bots ([Distributed REST](/core-concepts/distributed-rest/)).
@@ -43,13 +78,6 @@ The external assessment of 2026-10-15 (LUNIBEE-001 to 007):
 - **`codeBlock()` cannot be closed by four or more backticks** (LUNIBEE-006).
 - **Forum posts get the default `allowedMentions`** (LUNIBEE-007). Raw `bot.rest` / `bot.api` calls still send exactly what they are given.
 
-The 0.3.2 security scan:
-
-- **A leader lock that never answers no longer hangs `shutdownAll()`:** `acquire()` and `release()` are limited to half of `leader.ttl`.
-- **Redis Cluster is tested:** with a hash-tagged `prefix` and a cluster-aware client the shared rate limits hold on a three-node cluster (`REDIS_CLUSTER_NODES=… bun run test:redis`). An untagged prefix makes Redis refuse the scripts (`CROSSSLOT`); the store now warns once with the fix instead of reporting a generic outage. The docs site's `postcss-selector-parser` is pinned to 7.1.6, so `bun audit` is clean there too.
-- The coordinator's record of lost hosts is bounded (1,000); the docs site's build dependencies were updated (`sharp`, `http-cache-semantics`, `source-map-js`); the smoke test's fake Discord binds `127.0.0.1`.
-
-Earlier findings of this release:
 
 - **A failed reservation can no longer send a request unreserved.** After eight refused reservations `acquire()` returned and the request went out anyway; and on any Redis error a reservation fell back to local state with nothing but a log line per call. A request is now sent only with a granted reservation: a store that errors, replies with something unreadable or refuses without a wait fails it with kind `"coordination"`, and Redis failures follow the explicit `failurePolicy`.
 - **Out-of-range rate-limit headers are ignored:** a window id (`X-RateLimit-Reset`) further than `maxBackoff` from now, and a limit or remaining above 100,000, so a broken proxy cannot make a bucket unlimited or its real responses stale.
@@ -95,9 +123,6 @@ Earlier findings of this release:
 
 ### ✨ Added
 
-- **Coordinator failover** ([Cluster hosts](/reference/cluster-host/#coordinator-failover)): `ClusterManager({ leader: { lock, ttl } })` runs several coordinators with one active. The leader renews the lock every quarter of `ttl` and, if it cannot for half of `ttl`, kills its clusters and closes the listener before the lock can lapse; a new leader waits two leases so the old leader's hosts have fenced. `RedisLeaderLock` keeps the lock in Redis (`Bun.RedisClient` works as it is); `isLeader`, `leaderAcquired` and `leaderLost` report it. `ClusterHost` takes a list of coordinator URLs and moves to the next one when one cannot be reached or drops it.
-- **A lost host's clusters move to another host** (`remote.moveClusters`, on by default): once the lost host has certainly fenced (two leases after it was dropped), its clusters restart on the connected place running the fewest, with a `clusterMoved` event. A host that reconnects first gets its clusters back at once.
-- **Clusters as threads:** `fork: threadFork()` runs each cluster as a worker thread of the manager's process; worker scripts are unchanged (`ShardManager`, `ShardBus` and `ClusterWorker` use the thread's port, `threadEndpoint()` exposes it). With `shardsPerCluster: 1`, one shard per thread.
 - **`cache.maxMembers`** bounds the members kept per guild (least recently used leave first).
 - **`rest.request({ method, path | fullRoute, body, ... })`** — the single-object form from `@discordjs/rest`, beside the positional one. `MockREST` supports both.
 - **`WebhookClient`:** `avatarURL`, `threadId` and `allowedMentions` aliases; `editMessage()` takes the full message options (components, files, `threadId`); new `fetchMessage()`; `deleteMessage()` accepts `threadId`.
@@ -125,8 +150,6 @@ Measured against the 2026-09-30 record on the same machine, alternating runs (`d
 - **Update events are faster, with previous state kept:** the copy of the previous state is made only when the event has a listener (`client.listenerCount()` is new), the copy and the in-place merge use a key loop instead of `Object.assign` / `Object.entries`. Without a listener `GUILD_UPDATE` takes 0.42× the 0.3.1 time, `GUILD_ROLE_UPDATE` 0.60×, `GUILD_MEMBER_UPDATE` 0.57×; with one (and the previous state delivered) they are about 20% faster than 0.3.1 was without.
 - **`Collection.set()`** on a TTL collection is back to the 0.3.1 cost (it had become 1.44× slower) by updating an existing entry in place; LRU eviction is within 8%.
 - `bun run bench:compare` now compares with the new record.
-- **Cache merges no longer use `Object.assign`**, which is about twice as slow on Bun when the target already exists: channel, thread, emoji, message and resource-manager updates copy fields with a key loop. Measured on Bun 1.4.2 with the same payloads: `CHANNEL_CREATE` 0.8–1.0 µs → 0.3–0.37 µs, `CHANNEL_UPDATE` → 0.33–0.46 µs, `GUILD_EMOJIS_UPDATE` (10 emojis) 6.3 → 2.4–2.7 µs; `GUILD_DELETE` no longer copies every cached channel into an array (20 → 13 µs with 500 channels cached).
-- `scripts/bench-runtime.mjs` builds snowflakes without `BigInt`, so Gateway rows measure the event, not the payload; its `link` row no longer throws.
 
 ### 📚 Documentation
 
@@ -139,7 +162,6 @@ Measured against the 2026-09-30 record on the same machine, alternating runs (`d
 ### 🧪 Testing
 
 - Every file in `packages/rest/src` is at 100% line coverage.
-- **`bun run smoke:cluster`** (CI package job): the built package runs the basic bot sharded across two forked clusters against a fake Discord Gateway and REST; every shard identifies, commands deploy, `/ping` is answered by the shard that owns it, a killed cluster comes back and shutdown leaves no process.
 - `tests/rest.coordination.test.ts`: concurrency on one bucket (150 requests), independent buckets, routes sharing a learned bucket, out-of-order responses, global extend vs shorten, several instances and several bots on one store, Redis errors, hangs, restarts and clock skew, persistent refusals and script errors, cancellation at every stage, probes, bursts after a reset, malformed headers and delays, queue limits, shutdown, telemetry without secrets, and bounded memory over 10,000 requests.
 - `tests/integration/rest-redis.test.ts` (`bun run test:redis`, a CI job with a Redis service): the Lua scripts against the JS logic they port, 400 concurrent reservations over 8 connections, one probe across connections, four REST processes for one and for two bots against a fake Discord server with no request over the limit, and an outage through a TCP proxy that degrades (or fails closed) and recovers on reconnect.
 - A regression test for each audit fix.

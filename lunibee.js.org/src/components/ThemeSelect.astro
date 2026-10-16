@@ -1,0 +1,66 @@
+---
+// The version picker: the latest release only. Adds it before Starlight's
+// theme switcher, styled like the rest of the header.
+import { Icon } from "@astrojs/starlight/components";
+import Default from "@astrojs/starlight/components/ThemeSelect.astro";
+import pkg from "../../../package.json";
+---
+
+<label class="version-select">
+    <span class="sr-only">Select a version</span>
+    <Icon name="seti:clock" class="icon label-icon" />
+    <select autocomplete="off">
+        <option selected value="/">v{pkg.version} (latest)</option>
+    </select>
+    <Icon name="down-caret" class="icon caret-icon" />
+</label>
+<Default><slot /></Default>
+
+<style>
+    label {
+        --label-icon-size: 0.875rem;
+        --caret-icon-size: 1.25rem;
+        align-items: center;
+        color: var(--sl-color-gray-1);
+        display: flex;
+        position: relative;
+    }
+    label:hover {
+        color: var(--sl-color-gray-2);
+    }
+    .icon {
+        pointer-events: none;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    .label-icon {
+        font-size: var(--label-icon-size);
+        inset-inline-start: 0;
+    }
+    .caret-icon {
+        font-size: var(--caret-icon-size);
+        inset-inline-end: 0;
+    }
+    select {
+        appearance: none;
+        background-color: transparent;
+        border: 0;
+        color: inherit;
+        cursor: pointer;
+        padding-block: 0.625rem;
+        padding-inline: calc(var(--label-icon-size) + 0.375rem)
+            calc(var(--caret-icon-size) + 0.25rem);
+        text-overflow: ellipsis;
+        width: 11em;
+    }
+    option {
+        background-color: var(--sl-color-bg-nav);
+        color: var(--sl-color-gray-1);
+    }
+    @media (min-width: 50rem) {
+        select {
+            font-size: var(--sl-text-sm);
+        }
+    }
+</style>

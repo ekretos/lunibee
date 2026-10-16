@@ -1,6 +1,6 @@
 {
   "name": "lunibee-docs",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "private": true,
   "scripts": {
@@ -17,9 +17,6 @@
     "starlight-typedoc": "^0.23.1",
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.13.0"
-  },
-  "devDependencies": {
-    "starlight-versions": "0.10.1"
   },
   "overrides": {
     "postcss-selector-parser": "^7.1.6"
