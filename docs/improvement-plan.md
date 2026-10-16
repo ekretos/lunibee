@@ -13,7 +13,7 @@ _Baseline (dev, 2026-09-23): deps graph valid, typecheck clean, 312/312 tests pa
 | 1.4 | Enforce coverage threshold — **done in Phase 3**: per-file `{ lines = 0.9, functions = 0.5 }` in `bunfig.toml` (Bun counts transpiler-generated functions, so a function threshold above 0.5 fails files with 100% line coverage) | prevent regression |
 | 1.5 | Add a lint/format check (`prettier --check`) job | `format` script exists, nothing enforces it |
 
-## Phase 2 — Open reliability backlog (`docs/audits/reliability-backlog.md`) — done
+## Phase 2 — Open reliability backlog — done
 
 | ID | Pri | Item |
 |---|---|---|

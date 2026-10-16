@@ -21,18 +21,17 @@ future sessions should pick up.
 
 ## Next release: 0.3.2
 
-Fixes from the fifth security audit of 0.3.1 (status of every finding in
-`docs/audits/security-0.3.1.md`, "Fifth pass"), the `CreateThumbnail` / `CreateMediaGallery`
+Fixes from the fifth security audit of 0.3.1, the `CreateThumbnail` / `CreateMediaGallery`
 payload bugs, the REST compatibility gaps (`request(options)`, `WebhookClient` aliases),
 100% REST coverage, and complete reference pages for REST, Gateway, sharding and voice. Every
-finding of the 0.3.2 docs review (D-01 to D-26 in that report) is fixed. All in the changelog's
+finding of the 0.3.2 docs review (D-01 to D-26) is fixed. All in the changelog's
 "v0.3.2". Distributed REST coordination (atomic Lua reservations and merges on Redis `TIME`, bot
-identity in keys, probes, `failurePolicy`, telemetry, queue limits, `close()`) is in too: findings
-and status in `docs/audits/rest-distributed-0.3.2.md`, docs on `/core-concepts/distributed-rest`. `RedisCache` (`packages/core/src/redis-cache.ts`), a
+identity in keys, probes, `failurePolicy`, telemetry, queue limits, `close()`) is in too: docs on `/core-concepts/distributed-rest`. `RedisCache` (`packages/core/src/redis-cache.ts`), a
 shared Redis mirror of the Gateway cache, and `RedisCollection` (`packages/collection/src/redis.ts`),
 a Collection shared between processes through Redis, are in too.
-The external assessment of 2026-10-15 (LUNIBEE-001 to 007) is fixed; status in
-`docs/audits/security-0.3.1-external.md`; the 0.3.2 security scan in `docs/audits/security-0.3.2-scan.md`.
+The external assessment of 2026-10-15 (LUNIBEE-001 to 007) and the 0.3.2 security scan are fixed
+(changelog "v0.3.2", Security). Audit reports are not kept in the repository: record findings in
+the changelog and in regression tests.
 Versions are 0.3.2 and the 0.3.1 docs are archived in the version picker. Left for the
 maintainer: the `0.3.2` tag and `publish:all`.
 
@@ -49,8 +48,7 @@ Tagged `0.3.1`.
 
 ## 0.2.4 (shipped)
 
-Security fixes for the 0.2.3 review (H1-H3, M1-M5, L1-L3, L5, L7); status of every finding in
-`docs/audits/security-0.2.3.md`.
+Security fixes for the 0.2.3 review (H1-H3, M1-M5, L1-L3, L5, L7).
 
 ## 0.2.3 (shipped)
 

@@ -591,6 +591,28 @@ describe("concurrency", () => {
 });
 
 describe("Redis failures", () => {
+    test("a CROSSSLOT refusal (untagged prefix on Redis Cluster) is explained once", async () => {
+        const warnings: string[] = [];
+        console.warn = (message: string) => void warnings.push(message);
+        const store = new RedisRateLimitStore({
+            client: {
+                ...createFakeRedis().client(),
+                eval: () =>
+                    Promise.reject(
+                        new Error(
+                            "CROSSSLOT Keys in request don't hash to the same slot",
+                        ),
+                    ),
+            },
+        });
+        await store.reserve!("k");
+        await store.reserve!("k");
+        expect(
+            warnings.filter((w) => w.includes("hash-tagged prefix")),
+        ).toHaveLength(1);
+        expect(store.diagnostics().lastError).toContain("CROSSSLOT");
+    });
+
     test("degraded-local: falls back, says so once, and recovers", async () => {
         const redis = createFakeRedis();
         const events: RESTTelemetryEvent[] = [];

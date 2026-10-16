@@ -257,7 +257,7 @@ Routes.interactionCallback(id, token)      // "/interactions/{id}/{token}/callba
 | Monetisation | `applicationSkus`, `applicationEntitlement(appId, entitlementId?)`, `consumeEntitlement`, `skuSubscription(skuId, subscriptionId?)` |
 | Gateway and voice | `gateway()`, `gatewayBot()`, `voiceRegions()` |
 
-For a route without a builder, write the path yourself; the [path safety](#path-safety) checks still apply. `docs/audits/api-coverage.md` in the repository lists every Discord route and what covers it.
+For a route without a builder, write the path yourself; the [path safety](#path-safety) checks still apply. `bun scripts/api-coverage.ts` in the repository prints every Discord route and what covers it.
 
 ## Rate limits
 

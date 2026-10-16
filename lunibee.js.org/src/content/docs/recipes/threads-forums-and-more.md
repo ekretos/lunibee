@@ -3,7 +3,7 @@ title: Threads, Forums & More
 description: Forum posts and tags, thread members, bulk bans, onboarding, application emojis, role gradients and entitlements.
 ---
 
-New in 0.3.1. Every method below sits on a manager you already have; `docs/audits/api-coverage.md` in the repository lists which Discord routes are covered.
+New in 0.3.1. Every method below sits on a manager you already have; `bun scripts/api-coverage.ts` in the repository lists which Discord routes are covered.
 
 ## Forum and media channels
 

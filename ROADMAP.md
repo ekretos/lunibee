@@ -47,7 +47,7 @@ Done and covered by tests (see the changelog and the audit docs):
 - 0.2.1: `message.member`, member actions, merge-style overwrites, file
   uploads, component/modal collectors, prefix-argument parsing, builder and
   typing fixes.
-- The reliability backlog (`docs/audits/reliability-backlog.md`) and the
+- The reliability backlog and the
   discord.js compatibility gaps (`docs/compatibility/remaining-gaps.md`) are
   closed, apart from the decided divergences.
 
@@ -59,8 +59,8 @@ Done and covered by tests (see the changelog and the audit docs):
 | Messages | No client-wide default `allowed_mentions`; `reply()` cannot return the message in one request; `Message` has no stickers, poll or forwarded snapshots | CLAUDE.md (0.2.2) |
 | Types | Message and reply options are `Record<string, unknown>`; component payload types (`APIComponent`…) are not exported from `lunibee`; `showModal()` rejects `ModalBuilder.toJSON()` output | CLAUDE.md (0.2.2) |
 | Exports | `CDN_BASE` / `cdnURL()` are not exported | CLAUDE.md (0.2.2) |
-| Voice | No encryption or Opus layer and `setSpeaking` sends `ssrc: 0`: the package models connections but cannot carry audio | docs/audits/voice-report.md |
-| Sharding | `ShardBus` uses `BroadcastChannel`, which does not reach clusters forked into other processes | docs/audits/sharding-report.md |
+| Voice | No encryption or Opus layer and `setSpeaking` sends `ssrc: 0`: the package models connections but cannot carry audio | voice review |
+| Sharding | `ShardBus` uses `BroadcastChannel`, which does not reach clusters forked into other processes | sharding review |
 | Gateway | `GatewayDispatcher` and `GatewaySendLimiter` not yet extracted; `compress` cannot be set from `Client` | lunibee-2-architecture.md, reliability-backlog.md (DOC-001) |
 | API surface | No `@internal` / `@experimental` / `@deprecated` markers anywhere yet, so "public API" is not defined | this file |
 

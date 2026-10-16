@@ -36,7 +36,7 @@ Include:
    changelog without more exploit detail than users need.
 4. We release the fix and credit you, if you want to be credited.
 
-Past reviews and the status of every finding are in `docs/audits/`.
+Past security fixes are listed in the changelog's Security sections.
 
 ## Scope and trust boundaries
 

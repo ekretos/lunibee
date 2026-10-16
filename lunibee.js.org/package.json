@@ -20,5 +20,8 @@
   },
   "devDependencies": {
     "starlight-versions": "0.10.1"
+  },
+  "overrides": {
+    "postcss-selector-parser": "^7.1.6"
   }
 }

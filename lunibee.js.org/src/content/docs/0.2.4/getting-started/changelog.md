@@ -6,7 +6,7 @@ slug: 0.2.4/getting-started/changelog
 
 ## v0.2.4
 
-Security release. Fixes the findings of the 0.2.3 security review; the status of each one is in [`docs/audits/security-0.2.3.md`](https://github.com/ekretos/lunibee/blob/0.2.4/docs/audits/security-0.2.3.md). **Upgrade recommended.**
+Security release. Fixes the findings of the 0.2.3 security review. **Upgrade recommended.**
 
 ### 🔒 Security
 

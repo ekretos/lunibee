@@ -5,7 +5,7 @@ description: Lunibee version history and release notes.
 
 ## v0.3.2
 
-Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1.md), "Fifth pass"), two Components V2 payload bugs, the last REST compatibility gaps, complete reference pages for REST, Gateway, sharding and voice, and distributed REST rate limiting that holds across processes and bots ([Distributed REST](/core-concepts/distributed-rest/)).
+Fixes from the fifth security audit of 0.3.1, two Components V2 payload bugs, the last REST compatibility gaps, complete reference pages for REST, Gateway, sharding and voice, and distributed REST rate limiting that holds across processes and bots ([Distributed REST](/core-concepts/distributed-rest/)).
 
 ### ⚠️ Changed
 
@@ -33,7 +33,7 @@ Fixes from the fifth security audit of 0.3.1 ([`docs/audits/security-0.3.1.md`](
 
 ### 🔒 Security
 
-The external assessment of 2026-10-15 (LUNIBEE-001 to 007; status in [`docs/audits/security-0.3.1-external.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1-external.md)):
+The external assessment of 2026-10-15 (LUNIBEE-001 to 007):
 
 - **REST paths with control characters, spaces or `#` are refused** (LUNIBEE-001). A URL parser strips tab, CR and LF before resolving `.`/`..`, so `/channels/1/.\t./x` reached a different endpoint with the bot token.
 - **Prefix channel and role options are checked like slash ones** (LUNIBEE-002): a channel must belong to the message's server (in a DM, be the DM) and match `kinds`; a role must belong to the server.
@@ -43,9 +43,10 @@ The external assessment of 2026-10-15 (LUNIBEE-001 to 007; status in [`docs/audi
 - **`codeBlock()` cannot be closed by four or more backticks** (LUNIBEE-006).
 - **Forum posts get the default `allowedMentions`** (LUNIBEE-007). Raw `bot.rest` / `bot.api` calls still send exactly what they are given.
 
-The 0.3.2 security scan ([`docs/audits/security-0.3.2-scan.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.2-scan.md)):
+The 0.3.2 security scan:
 
 - **A leader lock that never answers no longer hangs `shutdownAll()`:** `acquire()` and `release()` are limited to half of `leader.ttl`.
+- **Redis Cluster is tested:** with a hash-tagged `prefix` and a cluster-aware client the shared rate limits hold on a three-node cluster (`REDIS_CLUSTER_NODES=… bun run test:redis`). An untagged prefix makes Redis refuse the scripts (`CROSSSLOT`); the store now warns once with the fix instead of reporting a generic outage. The docs site's `postcss-selector-parser` is pinned to 7.1.6, so `bun audit` is clean there too.
 - The coordinator's record of lost hosts is bounded (1,000); the docs site's build dependencies were updated (`sharp`, `http-cache-semantics`, `source-map-js`); the smoke test's fake Discord binds `127.0.0.1`.
 
 Earlier findings of this release:
@@ -134,7 +135,6 @@ Measured against the 2026-09-30 record on the same machine, alternating runs (`d
 - **Every TypeScript example in the docs is type-checked** against the real API (`bun run docs:check`, part of `bun run ci`): 502 examples, with the names examples use without declaring (`client`, `interaction`, `message`…) given their real types. It found and fixed examples that used methods or fields that do not exist (`member.roles.add`, `error.url`, `error.rawError`, `client.setVoiceState(guildId, …)`, `Routes.user("@me")`, `timestamp(new Date())`, `iconURL` in embeds, string select-option emoji, `ChatInputCommandInteraction`, `InteractionEnum` from `@lunibee/types`) and raw Gateway payloads used as structures.
 - A [Types](/reference/types/) page lists every exported interface and type alias with a description (`bun run docs:types` regenerates it), and every public export is now described on a hand-written page.
 - The 0.3.1 docs are archived in the version picker.
-- Issues found while writing the reference pages are tracked as D-01 to D-13 in the audit report.
 
 ### 🧪 Testing
 
@@ -161,7 +161,7 @@ A new way to reach Discord, alongside the existing one. Design: [`docs/lunibee-3
 
 ### 🔒 Security
 
-The findings, with severity and status, are in [`docs/audits/security-0.3.1.md`](https://github.com/ekretos/lunibee/blob/v0.3/docs/audits/security-0.3.1.md). A dependency audit of the lockfile and a scan of the tree and of the whole Git history found no vulnerable dependency and no secret.
+A dependency audit of the lockfile and a scan of the tree and of the whole Git history found no vulnerable dependency and no secret.
 
 - **The REST `baseURL` is validated before the bot token is sent to it.** It must be `https:` (or `http:` on this machine), with no credentials, query or fragment; anything else throws a `TypeError` that never repeats the URL's credentials. A cleartext `http://` URL on a network you trust, such as an internal REST proxy, needs `allowInsecureBaseURL: true`. `fetch` is called with `redirect: "error"`, so a redirect cannot carry the token to another host.
 - **Network error causes no longer carry webhook or interaction tokens.** Runtimes put the request URL in the message of a failed `fetch`; the `cause` of a `TransportError` is now a copy with those tokens removed.
@@ -170,7 +170,7 @@ The findings, with severity and status, are in [`docs/audits/security-0.3.1.md`]
 - **Multi-host links are encrypted off this machine by default.** The coordinator binds `127.0.0.1` unless told otherwise and throws if asked to listen on another address without `remote.tls` (`wss://`); `remote.allowInsecure: true` is the explicit opt-in for a trusted network or a TLS proxy. A `ClusterHost` refuses `ws://` to another machine unless `allowInsecure: true`, and refuses URLs with credentials. The default `remote.hostname` changed from `0.0.0.0` to `127.0.0.1`.
 - **Message size limits.** `ClusterManager({ maxMessageBytes })` (default 8 MiB) drops oversized worker messages before relaying them, settles a request whose answer is oversized, ignores an oversized health report, and rejects oversized `request()` / `broadcast()` / `requestCluster()` payloads with a `RangeError`.
 - **REST abort listeners are cleaned up.** `sleep()` and `abortable()` removed their `abort` listener only when the signal fired, so one `AbortSignal` reused for many requests collected a listener per rate-limit wait. Every path now removes it.
-- **The security scan covers more.** It no longer skips long lines, also finds credentials inside URLs and base64-encoded private keys, and `bun run ci` plus the CI workflow run `audit:security`. Its scope and limits are written at the top of `scripts/security-scan.ts` and in the audit report.
+- **The security scan covers more.** It no longer skips long lines, also finds credentials inside URLs and base64-encoded private keys, and `bun run ci` plus the CI workflow run `audit:security`. Its scope and limits are written at the top of `scripts/security-scan.ts`.
 - **Message and frame limits are counted in UTF-8 bytes.** `maxMessageBytes` and the 8 MiB host-link frame limit counted UTF-16 characters, so non-ASCII payloads could exceed the byte limit by up to three times. A string is measured as it travels, anything else as its JSON text.
 - **Security-scan exceptions are narrower.** An exception is now `// security-ok(<rule>): <reason>` (or `#`, `<!-- -->`, `/* */`): it must name the rule, give a reason, sit in a comment, and covers only that rule on that line and only matches before the comment. The old `security-ok: <reason>` form no longer suppresses anything.
 - **Workflow triggers** for CI and Security are `master` and `dev` (push and pull request); `tests/workflows.test.ts` checks the triggers, read-only permissions and SHA-pinned Actions.
@@ -200,7 +200,7 @@ The findings, with severity and status, are in [`docs/audits/security-0.3.1.md`]
 - **Gateway liveness.** `gateway.health()`; reconnect-storm backoff with an `unstable` event (`reconnectStormLimit`, `reconnectStormWindow`); `compress` on `ClientOptions`; `GatewayDispatcher` and `GatewaySendLimiter` (formerly `SendBudget`, still exported) extracted from `Gateway`. A 30-minute fake-clock soak test guards against reconnect loops.
 
 - **More of Discord's REST API.** Forum and media posts (`threads.createForumPost`) and tag CRUD (`createForumTag`, `editForumTag`, `removeForumTag`); standalone threads, thread members (`join`, `leave`, `addMember`, `removeMember`, `fetchMember`, `fetchMembers`) and archived-thread pages; `bans.bulk()`, `members.search()`, `members.editMe()`; `fetchPins()` with paging and `triggerTyping()`; welcome screen and onboarding (`fetchWelcomeScreen`, `editWelcomeScreen`, `fetchOnboarding`, `editOnboarding`); `editVoiceState()`; `removeIntegration()`; `users.fetchGuilds()`; `bot.applicationEmojis`; role icons and gradient `colors` (`role.colors`); `interaction.entitlements` and `hasEntitlement()`. New `Routes` builders cover each path. See [Threads, Forums & More](/recipes/threads-forums-and-more/).
-- **REST coverage audit.** `bun scripts/api-coverage.ts` compares Discord's v10 routes with `Routes` and writes `docs/audits/api-coverage.md` (159 covered, 23 not planned with a reason each, 0 gaps); `bun run audit:coverage` runs in CI.
+- **REST coverage audit.** `bun scripts/api-coverage.ts` compares Discord's v10 routes with `Routes` (159 covered, 23 not planned with a reason each, 0 gaps); `bun run audit:coverage` runs in CI.
 
 - **Structures.** `createdTimestamp` on every snowflake structure; `guild.premiumProgressBarEnabled`; a `Sticker` structure with `url()`; `AuditLogEntry.info` (typed and parsed per action type), `is()` and `change()`, and `AuditLog.find()` / `filter()` by type, target, user and time, via `guilds.fetchAuditLogEntries()`.
 
@@ -235,7 +235,7 @@ Everything deprecated in 0.2.x is gone. `lunibee migrate --fix` renames the old 
 
 ## v0.2.4
 
-Security release. Fixes the findings of the 0.2.3 security review; the status of each one is in [`docs/audits/security-0.2.3.md`](https://github.com/ekretos/lunibee/blob/0.2.4/docs/audits/security-0.2.3.md). **Upgrade recommended.**
+Security release. Fixes the findings of the 0.2.3 security review. **Upgrade recommended.**
 
 ### 🔒 Security
 

@@ -92,7 +92,7 @@ Health endpoint material: `rest.diagnostics()` (`mode`, `queued`, `inFlight`, `b
 
 - **Processes.** Throughput for one bot is bounded by Discord's limits, not by the processes: adding processes adds no capacity on a bucket, only on independent buckets. Coordination cost is about two Redis scripts per request, plus one per refused reservation while a bucket is spent.
 - **Bots.** Any number of bots can share one Redis; each has its own keys and global limit.
-- **Redis.** Each script touches one or two keys of one bot. On Redis Cluster, give each bot (or the fleet) a hash-tagged `prefix` so a script's keys share a slot.
+- **Redis.** Each script touches one or two keys of one bot. On Redis Cluster, give each bot (or the fleet) a hash-tagged `prefix` (`"{mybot}:rest:"`) so a script's keys share a slot, and use a cluster-aware client (one that follows `MOVED`, such as ioredis' `Cluster`, wrapped as `{ send: (c, a) => cluster.call(c, ...a) }` for `fromBunRedis`). Tested on a three-node Redis 7 cluster: four REST instances, no request over the limit. Without a hash tag the scripts fail with `CROSSSLOT`: requests fail with kind `"coordination"` under `fail-closed` (or are limited locally under `degraded-local`), and the store warns once with the fix.
 - **Memory.** The memory store and the in-process route cache are capped at 10,000 entries each; queues are bounded by `maxQueued` / `maxQueuedPerBucket` when set.
 
 ## Benchmarks

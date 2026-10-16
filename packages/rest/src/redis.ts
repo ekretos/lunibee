@@ -300,6 +300,7 @@ export class RedisRateLimitStore implements RateLimitStore {
      */
     readonly #local = new MemoryRateLimitStore();
     #lastError?: unknown;
+    #warnedSlots = false;
     #lastFailureAt?: number;
     #failures = 0;
     #mode: CoordinationMode;
@@ -468,6 +469,13 @@ export class RedisRateLimitStore implements RateLimitStore {
             this.#lastError = error;
             this.#lastFailureAt = Date.now();
             this.#failures++;
+            // A configuration error, not an outage: say how to fix it, once.
+            if (!this.#warnedSlots && /CROSSSLOT/.test(String(error))) {
+                this.#warnedSlots = true;
+                console.warn(
+                    '[lunibee/rest] Redis Cluster refused a script whose keys hash to different slots (CROSSSLOT): use a hash-tagged prefix such as "{mybot}:rest:".',
+                );
+            }
             try {
                 this.#onErrorCallback?.(operation, error);
             } catch {
