@@ -15,6 +15,7 @@
     "@lunibee/structures": "workspace:*",
     "@lunibee/managers": "workspace:*",
     "@lunibee/builders": "workspace:*",
-    "@lunibee/utils": "workspace:*"
+    "@lunibee/utils": "workspace:*",
+    "@lunibee/voice": "workspace:*"
   }
 }

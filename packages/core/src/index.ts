@@ -118,6 +118,7 @@ import {
     type ResourceContext,
 } from "@lunibee/structures";
 import { Gateway } from "@lunibee/ws";
+import { VoiceManager } from "@lunibee/voice";
 import type {
     APIEntitlement,
     APISoundboardSound,
@@ -338,6 +339,12 @@ export class Client
         return this.#gateway;
     }
     public user?: ClientUser;
+    /**
+     * Voice connections, one per guild: `await bot.voice.join({ guildId,
+     * channelId })` resolves when audio can flow. Fed by this client's own
+     * VOICE_STATE_UPDATE and VOICE_SERVER_UPDATE events.
+     */
+    public readonly voice: VoiceManager;
     public readyAt?: Date;
     public state: ClientState = "idle";
     /**
@@ -438,6 +445,19 @@ export class Client
 
     public constructor(public readonly options: ClientOptions) {
         super();
+        const client = this;
+        this.voice = new VoiceManager({
+            get userId() {
+                return client.user?.id;
+            },
+            canSendVoiceState: (guildId) => client.#gateway.ownsGuild(guildId),
+            sendVoiceState: (guildId, channelId, voiceOptions) =>
+                client.#gateway.sendVoiceState(
+                    guildId,
+                    channelId,
+                    voiceOptions,
+                ),
+        });
         if (!options.token?.trim())
             throw new TypeError("Client token is required.");
         this.rest = new REST({ token: options.token, ...options.rest });
@@ -802,6 +822,7 @@ export class Client
             }
             this.guilds.delete(payload.id);
             this.channels.deleteGuildChannels(payload.id);
+            this.voice.handleGuildRemove(payload.id);
             this.emit(ClientEvent.GuildDelete, payload);
         });
 
@@ -1145,14 +1166,20 @@ export class Client
                   null)
                 : null;
             if (state.guild_id) this.#storeVoiceState(state.guild_id, state);
+            this.voice.handleVoiceState({
+                ...state,
+                channel_id: state.channel_id ?? null,
+            });
             this.emit(ClientEvent.VoiceStateUpdate, state, previous);
         });
-        this.#gateway.on("VOICE_SERVER_UPDATE", (data) =>
-            this.emit(
-                ClientEvent.VoiceServerUpdate,
-                data as APIVoiceServerUpdate,
-            ),
-        );
+        this.#gateway.on("VOICE_SERVER_UPDATE", (data) => {
+            const server = data as APIVoiceServerUpdate;
+            this.voice.handleVoiceServer({
+                ...server,
+                endpoint: server.endpoint ?? null,
+            });
+            this.emit(ClientEvent.VoiceServerUpdate, server);
+        });
 
         // ── Presence & Typing ────────────────────────────────────────────────────
         this.#gateway.on("PRESENCE_UPDATE", (data) => {
@@ -1471,6 +1498,8 @@ export class Client
      */
     public destroy(): void {
         this.state = "destroyed";
+        // Leave voice channels while the Gateway can still send op 4.
+        this.voice.destroy();
         this.#gateway.close();
         // Collectors hold timers and listeners, and the caches hold every
         // structure the bot has seen: release both.

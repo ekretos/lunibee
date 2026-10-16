@@ -6,5 +6,25 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lunibee/ws": "workspace:*",
+    "@noble/ciphers": "^1.3.0"
+  },
+  "peerDependencies": {
+    "@snazzah/davey": ">=0.1.9",
+    "opusscript": ">=0.1.1",
+    "@discordjs/opus": ">=0.10.0"
+  },
+  "peerDependenciesMeta": {
+    "@snazzah/davey": {
+      "optional": true
+    },
+    "opusscript": {
+      "optional": true
+    },
+    "@discordjs/opus": {
+      "optional": true
+    }
   }
 }

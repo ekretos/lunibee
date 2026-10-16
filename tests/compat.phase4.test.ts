@@ -15,14 +15,13 @@ import {
     CreateContextMenuCommand,
     createInteraction,
     VoiceConnectionStatus,
-    VoiceConnectionState,
     joinVoiceChannel,
     getVoiceConnection,
     createAudioPlayer,
     createAudioResource,
     entersState,
     AudioPlayer,
-    AudioStream,
+    AudioResource,
     VoiceError,
     type AutocompleteInteraction,
 } from "../packages/lunibee/src/index.ts";
@@ -34,7 +33,6 @@ describe("discord.js-familiar aliases", () => {
         expect(CachedManager).toBe(ResourceManager);
         expect(ShardingManager).toBe(ShardManager);
         expect(CreateStringSelectMenu).toBe(CreateStringSelect);
-        expect(VoiceConnectionStatus).toBe(VoiceConnectionState);
     });
 
     test("entity select menu builders fix their component type", () => {
@@ -136,57 +134,87 @@ describe("interaction guards and getFocused", () => {
 });
 
 describe("@discordjs/voice-style helpers", () => {
+    const adapter = () => {
+        const sent: unknown[] = [];
+        return {
+            sent,
+            adapterCreator: () => ({
+                sendPayload: (payload: unknown) => {
+                    sent.push(payload);
+                    return true;
+                },
+                destroy: () => undefined,
+            }),
+        };
+    };
+
     test("joinVoiceChannel tracks one connection per guild", () => {
-        const first = joinVoiceChannel({ guildId: "1", channelId: "10" });
-        expect(first.state).toBe(VoiceConnectionState.Connected);
+        const { sent, adapterCreator } = adapter();
+        const first = joinVoiceChannel({
+            guildId: "1",
+            channelId: "10",
+            adapterCreator,
+        });
+        expect(first.status).toBe(VoiceConnectionStatus.Signalling);
         expect(getVoiceConnection("1")).toBe(first);
         const moved = joinVoiceChannel({
             guildId: "1",
             channelId: "11",
             selfDeaf: true,
+            adapterCreator,
         });
         expect(moved).toBe(first);
         expect([moved.channelId, moved.selfDeaf]).toEqual(["11", true]);
+        expect(sent.length).toBe(2);
         first.destroy();
         expect(getVoiceConnection("1")).toBeUndefined();
-        const fresh = joinVoiceChannel({ guildId: "1", channelId: "10" });
+        const fresh = joinVoiceChannel({
+            guildId: "1",
+            channelId: "10",
+            adapterCreator,
+        });
         expect(fresh).not.toBe(first);
         fresh.destroy();
-        expect(() => joinVoiceChannel({ guildId: "2", channelId: "" })).toThrow(
-            TypeError,
-        );
+        expect(() =>
+            joinVoiceChannel({ guildId: "2", channelId: "", adapterCreator }),
+        ).toThrow(TypeError);
     });
 
     test("factories build the canonical classes", () => {
         expect(createAudioPlayer()).toBeInstanceOf(AudioPlayer);
         const resource = createAudioResource(new ReadableStream(), {
-            title: "t",
+            inputType: "opus",
+            metadata: { title: "t" },
         });
-        expect(resource).toBeInstanceOf(AudioStream);
-        expect(resource.title).toBe("t");
+        expect(resource).toBeInstanceOf(AudioResource);
+        expect(resource.metadata.title).toBe("t");
+        resource.destroy();
     });
 
     test("entersState resolves on transition and rejects on timeout", async () => {
-        const connection = joinVoiceChannel({ guildId: "3", channelId: "1" });
-        expect(
-            await entersState(connection, VoiceConnectionState.Connected, 10),
-        ).toBe(connection);
+        const connection = joinVoiceChannel({
+            guildId: "3",
+            channelId: "1",
+            ...adapter(),
+        });
         const pending = entersState(
             connection,
-            VoiceConnectionState.Disconnected,
+            VoiceConnectionStatus.Disconnected,
             100,
         );
         connection.disconnect();
         expect(await pending).toBe(connection);
         await expect(
-            entersState(connection, VoiceConnectionState.Connected, 5),
+            entersState(connection, VoiceConnectionStatus.Ready, 5),
         ).rejects.toBeInstanceOf(VoiceError);
         connection.destroy();
 
         const player = createAudioPlayer();
-        const playing = entersState(player, "playing", 100);
-        await player.play(createAudioResource(new ReadableStream()));
-        expect(await playing).toBe(player);
-        await player.stop();
+        const buffering = entersState(player, "buffering", 100);
+        player.play(
+            createAudioResource(new ReadableStream(), { inputType: "opus" }),
+        );
+        expect(await buffering).toBe(player);
+        player.stop(true);
     });
 });
