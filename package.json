@@ -109,7 +109,8 @@
     "publish:all": "bun run scripts/publish.ts",
     "audit:security": "bun scripts/security-scan.ts && bun audit",
     "smoke:install": "bun scripts/smoke-install.ts",
-    "smoke:cluster": "bun scripts/smoke-cluster.ts"
+    "smoke:cluster": "bun scripts/smoke-cluster.ts",
+    "smoke:voice": "bun scripts/smoke-voice.ts"
   },
   "dependencies": {
     "@lunibee/builders": "workspace:*",
