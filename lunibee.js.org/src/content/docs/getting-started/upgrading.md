@@ -1,7 +1,27 @@
 ---
 title: Upgrading
-description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.3.3.
+description: Code changes needed when upgrading between Lunibee versions, from 0.1.8 to 0.4.0.
 ---
+
+## 0.3.3 → 0.4.0
+
+Only `@lunibee/voice` changed. The 0.3 API carried no audio, so most code built on it is replaced rather than ported.
+
+- **Install the voice peers:**
+  - `bun add @snazzah/davey opusscript`;
+  - `ffmpeg` on the `PATH`, for anything that is not Ogg/Opus.
+
+  Discord requires DAVE outside stage channels.
+- **Join through the client:** `await client.voice.join({ guildId, channelId })` replaces `joinVoiceChannel()` + `attachTransports()`. To use `joinVoiceChannel()` without a Lunibee `Client`, pass an `adapterCreator`.
+- **Statuses:** `VoiceConnectionState` → `VoiceConnectionStatus`. `Connected` becomes `"ready"`, a join in progress is `"signalling"` / `"connecting"`, and `disconnected` carries a `disconnectReason`.
+- **Resources:**
+  - `createAudioResource(stream, metadata)` → `createAudioResource(input, { inputType, metadata, inlineVolume })`;
+  - `input` may be a path, URL, bytes or stream;
+  - `AudioStream` is gone.
+- **Player:**
+  - `stopped` is gone (`stop()` goes `idle`); `buffering` and `autopaused` are added.
+  - `play()` no longer returns a promise; listen for `finish`.
+- **Receiver:** `subscribe(userId)` returns a `ReadableStream<Uint8Array>` of Opus packets instead of an `AudioStream`.
 
 ## 0.3.2 → 0.3.3
 

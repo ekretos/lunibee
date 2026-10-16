@@ -19,7 +19,14 @@ future sessions should pick up.
   examples use the new names only. `PermissionFlagsBits`, `GatewayIntentBits`, `Routes`,
   `MessageFlags` and the Gateway code sets keep their names.
 
-## Next release: 0.3.2
+## Next release: 0.4.0
+
+Voice that plays audio (`.roadmap/0.4.0.md`, Steps 1–9 delivered on branch `v0.4`): `client.voice`,
+voice gateway v8, UDP and IP discovery, rtpsize AEAD encryption, DAVE through `@snazzah/davey`,
+Opus, FFmpeg, `AudioPlayer`, `VoiceReceiver`, `examples/music`. All in the changelog's "v0.4.0".
+Left for the maintainer: the real-guild smoke test, the `0.4.0` tag, `publish:all` and the announcement.
+
+## 0.3.2 (shipped)
 
 Fixes from the fifth security audit of 0.3.1, the `CreateThumbnail` / `CreateMediaGallery`
 payload bugs, the REST compatibility gaps (`request(options)`, `WebhookClient` aliases),

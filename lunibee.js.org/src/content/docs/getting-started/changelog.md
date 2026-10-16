@@ -3,6 +3,62 @@ title: Changelog
 description: Lunibee version history and release notes.
 ---
 
+## v0.4.0
+
+Voice that plays audio: a bot can join a voice channel, play a file or stream, and receive audio, end to end and end-to-end encrypted.
+
+### ⚠️ Breaking
+
+- **`@lunibee/voice` is rewritten.** The 0.3 package modelled connections but carried no audio. See [Upgrading](/getting-started/upgrading/#033--040):
+  - `VoiceConnectionState` is gone; `VoiceConnectionStatus` has the values `signalling`, `connecting`, `ready`, `disconnected` and `destroyed`.
+  - `attachTransports()`, `AudioStream`, `VoiceUdpTransport` and `VoiceGatewayTransport` are removed: the package speaks the voice gateway and UDP itself.
+  - `joinVoiceChannel()` needs an `adapterCreator`; with a Lunibee `Client`, use `client.voice.join()`.
+  - `createAudioResource(input, options?)` takes a path, URL, bytes or stream, and returns an `AudioResource`.
+  - The player's statuses are `idle`, `buffering`, `playing`, `paused` and `autopaused`; `stopped` is gone, and `play()` is synchronous.
+  - `receiver.subscribe(userId, options?)` returns a `ReadableStream` of Opus packets.
+
+### ✨ Added
+
+- **`client.voice`** ([Voice](/core-concepts/voice/)): `join()` sends op 4 through the shard that owns the guild, collects the bot's `VOICE_STATE_UPDATE` and `VOICE_SERVER_UPDATE` (in either order, with a timeout), and resolves when audio can flow. `leave()`, `get()` and `connections` are also added. Moves and region changes reconnect. Leaving a guild and `client.destroy()` release every connection.
+- **Voice gateway v8:** IDENTIFY, READY, IP discovery, SELECT_PROTOCOL and SESSION_DESCRIPTION, with binary frames and a heartbeat that carries `seq_ack` (through `@lunibee/ws`'s `GatewayHeartbeat`). It resumes (op 7) on closes below 4000 and on 4015, and follows the close-code table.
+- **Transport encryption:** the `aead_aes256_gcm_rtpsize` and `aead_xchacha20_poly1305_rtpsize` modes. AES-GCM runs on the runtime's synchronous `node:crypto`, since WebCrypto would add a promise to every 20 ms packet. XChaCha20-Poly1305 runs on `@noble/ciphers`, which is audited, pure JS and has no dependencies.
+- **DAVE end-to-end encryption** through the optional peer `@snazzah/davey`. Discord has required it outside stage channels since 1 March 2026; without it the voice server closes with 4017, and the error says what to install. Supported: key packages, MLS commits and welcomes, protocol transitions, per-frame encryption, `endToEndEncrypted` and `voicePrivacyCode`.
+- **Audio:**
+  - `createAudioResource()` passes Ogg/Opus through without re-encoding. It handles raw PCM, Opus packets, and anything FFmpeg reads; FFmpeg is fed on stdin and killed when the resource ends.
+  - `inlineVolume` is optional.
+  - `createOpusCodec()` uses `@discordjs/opus` when it loads, else `opusscript`; both are optional peers.
+- **`AudioPlayer`:**
+  - a 20 ms clock that corrects its drift, and no timer while idle or paused;
+  - five silence frames on stop and pause;
+  - `noSubscriber` and `maxMissedFrames`, with the `stateChange`, `finish` and `error` events.
+- **`VoiceReceiver`:**
+  - decrypts incoming RTP (transport and DAVE) and maps SSRC to user from op 5;
+  - per-user streams end after silence; buffers are bounded (`highWaterMark`) and released on unsubscribe.
+- `entersState()` and `generateDependencyReport()`.
+- `examples/music`: `/play`, `/skip`, `/queue`, `/stop` and `/leave`.
+
+### 🐛 Fixed
+
+- `setSpeaking` sends the negotiated SSRC instead of `0`.
+- A paused player no longer polls every 25 ms.
+- The `assertUsable` indirection is removed.
+- The optional peers (`@snazzah/davey`, `opusscript`, `@discordjs/opus`) are loaded at run time, so a bundle of an app that uses `lunibee` does not inline their native or WebAssembly binaries.
+
+### 📚 Documentation
+
+- New [Voice](/core-concepts/voice/) guide and [Voice reference](/reference/voice-connection/).
+
+### 🧪 Testing
+
+- A scripted fake voice server (WebSocket v8 and UDP, with its own rtpsize encryption) covers:
+  - the handshake, resume, region change and close codes;
+  - IP discovery, encrypted playback and receive end to end.
+- DAVE is tested with a scripted module and real `@snazzah/davey` key packages.
+- Encryption test vectors and sequence/timestamp wraparound are tested.
+- Opus round trip, Ogg demux, FFmpeg and player timing are tested.
+- 100 join/leave cycles leave no sockets, timers or listeners behind.
+- The fake server is scripted, not a capture of Discord; playing in a real guild is the release smoke test.
+
 ## v0.3.3
 
 Coordinator failover, clusters that move off a lost host, clusters as threads, faster cache updates on Bun, a Redis Cluster test, and the fixes of the 0.3.2 security scan.

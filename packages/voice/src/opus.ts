@@ -39,7 +39,8 @@ interface NativeEncoder {
 
 /** `opusscript`: libopus compiled to WebAssembly; works on every runtime. */
 const wasm: CodecFactory = async () => {
-    const mod = (await import("opusscript")) as unknown as {
+    const name = "opusscript";
+    const mod = (await import(name)) as unknown as {
         default: ScriptConstructor;
     };
     const OpusScript = mod.default;

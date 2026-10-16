@@ -7,7 +7,7 @@ description: Every type the lunibee package exports, grouped by package, with a 
 
 Every interface and type alias that `lunibee` exports, with what it is for. Each name links to its full definition in the generated API reference. The classes and functions that use these types are described on the other reference pages.
 
-334 types in 12 packages.
+339 types in 12 packages.
 
 ## `@lunibee/builders`
 
@@ -198,6 +198,9 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`IdentifyCoordinatorOptions`](/api/interfaces/identifycoordinatoroptions/) | interface | Options for an IdentifyCoordinator. |
 | [`IdentifyGate`](/api/interfaces/identifygate/) | interface | Asks for the right to IDENTIFY, and gives it back. |
 | [`IpcEndpoint`](/api/interfaces/ipcendpoint/) | interface | The part of `process` (or a child process handle) the IPC transport uses. |
+| [`LeaderLock`](/api/interfaces/leaderlock/) | interface | Leadership between several coordinators, so a standby `ClusterManager` can take over when the active one dies. |
+| [`LeaderRedisClient`](/api/interfaces/leaderredisclient/) | interface | The part of a Redis client the lock uses. |
+| [`RedisLeaderLockOptions`](/api/interfaces/redisleaderlockoptions/) | interface | Options for RedisLeaderLock. |
 | [`RemoteOptions`](/api/interfaces/remoteoptions/) | interface | Where, and how, a coordinator listens for hosts. |
 | [`RequestOptions`](/api/interfaces/requestoptions/) | interface | Options for a request to a shard or cluster. |
 | [`ShardBusOptions`](/api/interfaces/shardbusoptions/) | interface | Options for a ShardBus. |
@@ -209,6 +212,8 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`ShardMessage`](/api/interfaces/shardmessage/) | interface | Message envelope exchanged between Lunibee shards. |
 | [`ShardReply`](/api/interfaces/shardreply/) | interface | A reply collected by ShardBus.broadcastRequest. |
 | [`SupervisorOptions`](/api/interfaces/supervisoroptions/) | interface | How a crashed cluster is restarted. |
+| [`ThreadEndpoint`](/api/interfaces/threadendpoint/) | interface | The parent link of a cluster thread: the part of `process` a worker uses. |
+| [`ThreadForkOptions`](/api/interfaces/threadforkoptions/) | interface | Options for threadFork. |
 | [`WorkerMetrics`](/api/interfaces/workermetrics/) | interface | Process numbers a worker adds to a health report. |
 | [`WorkerReport`](/api/interfaces/workerreport/) | interface | What a cluster worker reports about itself. |
 | [`ClusterState`](/api/type-aliases/clusterstate/) | type | Lifecycle of a cluster process. |

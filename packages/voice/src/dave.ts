@@ -41,7 +41,9 @@ let davey: DaveyModule | null | undefined;
 export async function loadDave(): Promise<DaveyModule | null> {
     if (davey !== undefined) return davey;
     try {
-        const mod = (await import("@snazzah/davey")) as unknown as {
+        // Optional peer: a variable keeps bundlers from inlining its native binaries.
+        const name = "@snazzah/davey";
+        const mod = (await import(name)) as unknown as {
             default?: DaveyModule;
         } & DaveyModule;
         davey = mod.default?.DAVESession ? mod.default : mod;
