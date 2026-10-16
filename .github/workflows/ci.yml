@@ -189,3 +189,6 @@ jobs:
 
       - name: Pack every package and install it into an empty project
         run: bun run smoke:install
+
+      - name: Run the basic bot sharded across two forked clusters against a fake Discord
+        run: bun run build && bun run smoke:cluster

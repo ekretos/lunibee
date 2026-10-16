@@ -134,6 +134,7 @@ Measured against the 2026-09-30 record on the same machine, alternating runs (`d
 ### 🧪 Testing
 
 - Every file in `packages/rest/src` is at 100% line coverage.
+- **`bun run smoke:cluster`** (CI package job): the built package runs the basic bot sharded across two forked clusters against a fake Discord Gateway and REST; every shard identifies, commands deploy, `/ping` is answered by the shard that owns it, a killed cluster comes back and shutdown leaves no process.
 - `tests/rest.coordination.test.ts`: concurrency on one bucket (150 requests), independent buckets, routes sharing a learned bucket, out-of-order responses, global extend vs shorten, several instances and several bots on one store, Redis errors, hangs, restarts and clock skew, persistent refusals and script errors, cancellation at every stage, probes, bursts after a reset, malformed headers and delays, queue limits, shutdown, telemetry without secrets, and bounded memory over 10,000 requests.
 - `tests/integration/rest-redis.test.ts` (`bun run test:redis`, a CI job with a Redis service): the Lua scripts against the JS logic they port, 400 concurrent reservations over 8 connections, one probe across connections, four REST processes for one and for two bots against a fake Discord server with no request over the limit, and an outage through a TCP proxy that degrades (or fails closed) and recovers on reconnect.
 - A regression test for each audit fix.
