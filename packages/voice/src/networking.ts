@@ -51,8 +51,8 @@ export interface VoiceNetworkingOptions {
     socketFactory?: VoiceSocketFactory;
     /** Opens the UDP socket (tests). */
     udpFactory?: UdpSocketFactory;
-    /** Overrides the voice gateway URL built from the endpoint (tests). */
-    url?: string;
+    /** Overrides the voice gateway URL built from the endpoint (tests): a URL, or a function of the endpoint. */
+    url?: string | ((endpoint: string) => string);
     debug?: (message: string) => void;
     /** @internal A DAVE implementation in place of `@snazzah/davey` (tests). */
     daveModule?: Awaited<ReturnType<typeof loadDave>>;
@@ -144,7 +144,9 @@ export class VoiceNetworking {
 
     #openGateway(sequence?: number): VoiceGateway {
         return new VoiceGateway(
-            this.#options.url ?? voiceGatewayURL(this.#info.endpoint),
+            typeof this.#options.url === "function"
+                ? this.#options.url(this.#info.endpoint)
+                : (this.#options.url ?? voiceGatewayURL(this.#info.endpoint)),
             {
                 open: () => void this.#onOpen(),
                 packet: (packet) => this.#onPacket(packet),

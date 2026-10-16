@@ -1,146 +1,117 @@
 ---
 title: Voice
-description: Voice session state, audio playback and receiving with lunibee (voice).
+description: Join a voice channel, play files and streams, and receive audio with Lunibee — end-to-end encrypted (DAVE), Opus, FFmpeg.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+From 0.4.0 a bot can join a voice channel and play audio, end to end: `client.voice.join()` connects to Discord's voice server (voice gateway v8, UDP, transport encryption, DAVE end-to-end encryption), an `AudioPlayer` sends 20 ms Opus frames, and a receiver gives you other users' audio.
 
-`lunibee` (voice) tracks voice sessions and moves audio through a player and receiver.
-It is transport-agnostic: it does not open the voice WebSocket or UDP socket, encrypt
-packets or run a voice heartbeat. You attach transports that do that, and Lunibee handles
-lifecycle, speaking state and audio routing.
+## Install
 
-## Joining a channel
+```sh
+bun add lunibee @snazzah/davey opusscript
+```
 
-`joinVoiceChannel` keeps one connection per guild: calling it again moves the existing
-connection instead of creating a second one. It only updates local state: it does not tell
-Discord to join. Send the voice state update yourself with `bot.sendVoiceState()` (see
-[Voice integration](/core-concepts/voice-integration/)), and attach your transports once they
-have completed the voice handshake.
+| Package | Needed for |
+|---|---|
+| `@snazzah/davey` | **Required in voice and stage-less channels.** Since 1 March 2026 Discord only lets clients that speak DAVE (end-to-end encrypted voice) into calls. Without it the voice server closes with `4017`. |
+| `opusscript` *or* `@discordjs/opus` | Encoding PCM, and `inlineVolume`. Not needed to play Ogg/Opus files, or anything FFmpeg converts. `@discordjs/opus` is native and about 1.2× faster under Node, but its prebuilt binary does not load under Bun; `opusscript` (WebAssembly) works everywhere. |
+| `ffmpeg` on the `PATH` | Any format other than Ogg/Opus (MP3, WAV, AAC, URLs…). |
 
-<Tabs>
-<TabItem label="TypeScript">
+`generateDependencyReport()` tells you what this runtime can load. Your bot also needs the `GuildVoiceStates` intent.
+
+## Play a file
+
 ```ts
-import {
-  joinVoiceChannel,
-  getVoiceConnection,
-  VoiceConnectionState,
-} from "lunibee";
+import { Client, GatewayIntentBits, createAudioPlayer, createAudioResource } from "lunibee";
 
-bot.sendVoiceState("123456789012345678", "987654321098765432", { selfDeaf: true });
+const bot = new Client({ token: process.env.DISCORD_TOKEN!, intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
+await bot.login();
 
-const connection = joinVoiceChannel({
-  guildId: "123456789012345678",
-  channelId: "987654321098765432",
-  selfDeaf: true,
-});
-connection.attachTransports(myVoiceGatewayTransport, myUdpTransport);
-connection.state === VoiceConnectionState.Connected; // true: joinVoiceChannel() connects synchronously
+const connection = await bot.voice.join({ guildId, channelId, selfDeaf: true });
+const player = createAudioPlayer();
+connection.subscribe(player);
+player.play(createAudioResource("./music/track.ogg"));
 
-getVoiceConnection("123456789012345678") === connection; // true
+player.on("finish", () => bot.voice.leave(guildId));
 ```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import {
-  joinVoiceChannel,
-  getVoiceConnection,
-  VoiceConnectionState,
-} from "lunibee";
 
-bot.sendVoiceState("123456789012345678", "987654321098765432", { selfDeaf: true });
+`bot.voice.join()` sends the Voice State Update (op 4) through the shard that owns the guild, waits for Discord's `VOICE_STATE_UPDATE` and `VOICE_SERVER_UPDATE`, connects to the voice server and resolves once audio can flow. It rejects after `timeout` (15 s by default), or at once when the guild is on another shard. Joining again in the same guild moves the same connection.
 
-const connection = joinVoiceChannel({
-  guildId: "123456789012345678",
-  channelId: "987654321098765432",
-  selfDeaf: true,
+`examples/music` in the repository is a complete bot: `/play`, `/skip`, `/queue`, `/stop` and `/leave`.
+
+## Audio resources
+
+`createAudioResource(input, options?)` takes a file path, an `http(s)` URL (through FFmpeg), bytes, a `ReadableStream` or an async iterable. `inputType` says what it holds:
+
+| `inputType` | Input | Needs |
+|---|---|---|
+| `"ogg/opus"` | An Ogg/Opus file or stream. Played as it is (passthrough), no re-encoding. Default for `.ogg` / `.opus` paths. | nothing |
+| `"arbitrary"` | Anything FFmpeg reads. Default for other paths and for streams. FFmpeg is killed when the resource ends or is destroyed. | `ffmpeg` |
+| `"raw"` | 48 kHz stereo s16le PCM. Default for `.pcm` / `.raw`. | an Opus library |
+| `"opus"` | One 20 ms Opus packet per chunk. | nothing |
+
+```ts
+import { createAudioResource } from "lunibee";
+
+const resource = createAudioResource("https://example.com/stream.mp3", {
+  inputType: "arbitrary",
+  inlineVolume: true,          // decodes and re-encodes: costs CPU
+  metadata: { title: "Radio" },
 });
-connection.attachTransports(myVoiceGatewayTransport, myUdpTransport);
-connection.state === VoiceConnectionState.Connected; // true: joinVoiceChannel() connects synchronously
-
-getVoiceConnection("123456789012345678") === connection; // true
+resource.volume?.set(0.5);     // or setDecibels(-6)
 ```
-</TabItem>
-</Tabs>
 
-You can also construct `new VoiceConnection({ guildId, channelId, selfMute, selfDeaf })`
-directly and call `connect()`; such a connection is not tracked by `getVoiceConnection()`.
-`connect()` performs no handshake: it moves through `connecting` to `connected` at once.
+A resource plays once; create another to play the same input again. A file name is never passed to FFmpeg as an argument (the file is piped to its stdin), so a path cannot be read as an FFmpeg option or protocol.
+
+## The player
+
+`createAudioPlayer({ noSubscriber?, maxMissedFrames? })`. Statuses:
+
+| Status | Meaning |
+|---|---|
+| `idle` | Nothing to play. |
+| `buffering` | The next frame is not ready yet (FFmpeg starting, a slow stream). |
+| `playing` | A frame every 20 ms. |
+| `paused` | `pause()`. Five silence frames go out first, then nothing. |
+| `autopaused` | No subscribed connection can send (`noSubscriber: "pause"`, the default). Resumes when one is ready. |
+
+`play(resource)` replaces (and destroys) the current resource, `pause()` / `unpause()` (`resume()`), `stop(force?)`. Events: `stateChange(from, to)`, `finish(resource)` when a resource plays to its end, `error(error, resource)` when it fails. The clock corrects its own drift and runs only while there is something to send: an idle or paused player has no timer.
+
+## Receiving
+
+```ts
+const stream = connection.receiver.subscribe(userId, { end: { behavior: "silence", duration: 1000 } });
+for await (const opusPacket of stream) {
+  // 20 ms Opus packets; decode with createOpusCodec() if you need PCM
+}
+```
+
+`receiver.on("start" | "end", userId => …)` tells you who is talking. A stream keeps at most `highWaterMark` (50) packets for a slow reader and drops newer ones; it ends after a second of silence unless `end.behavior` is `"manual"`. Packets are decrypted (transport and DAVE) before you get them.
+
+## End-to-end encryption (DAVE)
+
+With `@snazzah/davey` installed, the connection offers DAVE and follows the protocol on its own: key packages, the MLS group, commits and welcomes, protocol transitions, and per-frame encryption. `connection.endToEndEncrypted` says whether frames are encrypted now, and `connection.voicePrivacyCode` is the code users can compare in Discord's call details. Pass `dave: false` only for stage channels, the one place Discord still allows unencrypted media.
 
 ## Lifecycle
 
-States are `disconnected`, `connecting`, `connected` and `destroyed`
-(`VoiceConnectionState`, alias `VoiceConnectionStatus`).
+- **One connection per guild.** `bot.voice.get(guildId)`, `bot.voice.connections`.
+- **Moves and region changes reconnect.** A moderator moving the bot, or Discord moving the guild to another voice server, opens a new voice session; a subscribed player waits in `autopaused` and continues.
+- **Network blips resume.** A voice gateway close Discord allows resuming (below 4000, or 4015) resumes the session (op 7) without a new handshake.
+- **Statuses:** `signalling` → `connecting` → `ready`; `disconnected` (with `disconnectReason`: `left`, `removed`, `timeout`, `closed`, `unsent`) until `rejoin()`; `destroyed`.
+- **Cleanup.** `bot.voice.leave(guildId)` or `connection.destroy()` closes the voice gateway, the UDP socket, the DAVE state, receiver streams and timers. Leaving a guild and `bot.destroy()` do the same for every connection.
 
-<Tabs>
-<TabItem label="TypeScript">
-```ts
-// VoiceConnection passes the NEW state first.
-connection.on("stateChange", (newState, oldState) => {
-  console.log(`Voice: ${oldState} → ${newState}`);
-});
-connection.on("error", (error) => console.error(error));
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-// VoiceConnection passes the NEW state first.
-connection.on("stateChange", (newState, oldState) => {
-  console.log(`Voice: ${oldState} → ${newState}`);
-});
-connection.on("error", (error) => console.error(error));
-```
-</TabItem>
-</Tabs>
+## Using your own voice client
 
-## Playing audio
+To run Lavalink or another voice stack instead, do not call `bot.voice.join()` in those guilds; feed it from the events on [Voice integration](/core-concepts/voice-integration/).
 
-`AudioPlayer` reads an `AudioStream` and passes each chunk to `onChunk()`. Override it to
-send audio to your UDP transport. The player does no encoding or pacing: the stream should
-yield encoded frames at the rate they should be sent. `AudioPlayer`'s `stateChange` passes the **old** state
-first: `(from, to)`.
+## Troubleshooting
 
-<Tabs>
-<TabItem label="TypeScript">
-```ts
-import { AudioPlayer, createAudioResource, SpeakingFlags } from "lunibee";
+| Symptom | Cause |
+|---|---|
+| Closed with `4017` | Discord requires DAVE: install `@snazzah/davey`. |
+| `join()` rejects with "another shard" | Join from the client (or shard) that owns the guild. |
+| `join()` times out | The bot lacks Connect permission, the channel is full, or the `GuildVoiceStates` intent is missing. |
+| "needs an Opus library" | Install `opusscript` (PCM input or `inlineVolume`). |
+| Nothing plays from an MP3 | `ffmpeg` is not on the `PATH`. |
 
-class UdpPlayer extends AudioPlayer {
-  protected override onChunk(chunk: Uint8Array): void {
-    myUdpTransport.send(chunk, host, port);
-  }
-}
-
-const player = new UdpPlayer();
-connection.setSpeaking(SpeakingFlags.Microphone);
-await player.play(createAudioResource(opusStream, { title: "Track" }));
-player.on("finish", () => connection.setSpeaking(0));
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import { AudioPlayer, createAudioResource, SpeakingFlags } from "lunibee";
-
-class UdpPlayer extends AudioPlayer {
-  onChunk(chunk) {
-    myUdpTransport.send(chunk, host, port);
-  }
-}
-
-const player = new UdpPlayer();
-connection.setSpeaking(SpeakingFlags.Microphone);
-await player.play(createAudioResource(opusStream, { title: "Track" }));
-player.on("finish", () => connection.setSpeaking(0));
-```
-</TabItem>
-</Tabs>
-
-## Receiving audio
-
-A UDP transport with `onMessage` feeds `connection.receiver` automatically; otherwise call
-`connection.receiver.onPacket(packet)` yourself. Packets must already be decrypted. Map SSRCs
-to users with `mapSsrc(ssrc, userId)`, then `subscribe(userId)` for that user's `AudioStream`
-of RTP payloads (normally Opus).
-
-See the [VoiceConnection & AudioPlayer reference](/reference/voice-connection/) for
-every method.
+See the [Voice reference](/reference/voice-connection/) for every option.

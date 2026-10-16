@@ -138,6 +138,8 @@ export class VoiceConnection extends Emitter<VoiceConnectionEvents> {
     readonly #adapter: VoiceAdapter;
     #networking?: VoiceNetworking;
     #sessionId?: string;
+    /** The channel the current voice session (networking) was opened for. */
+    #sessionChannel?: string;
     #userId?: string;
     #token?: string;
     #endpoint?: string;
@@ -276,12 +278,15 @@ export class VoiceConnection extends Emitter<VoiceConnectionEvents> {
             this.#networking?.destroy();
             this.#networking = undefined;
             this.receiver.close();
+            this.#sessionChannel = undefined;
             this.#setStatus("disconnected", {
                 reason: this.#leaving ? "left" : "removed",
             });
             return;
         }
-        const moved = data.channel_id !== this.channelId;
+        // Compare with the channel the current voice session was opened for:
+        // rejoin() has already updated channelId when the move was ours.
+        const moved = data.channel_id !== this.#sessionChannel;
         const newSession = data.session_id !== this.#sessionId;
         this.#sessionId = data.session_id;
         this.#userId = data.user_id;
@@ -311,6 +316,7 @@ export class VoiceConnection extends Emitter<VoiceConnectionEvents> {
         const token = this.#token;
         const endpoint = this.#endpoint;
         if (!sessionId || !userId || !token || !endpoint) return;
+        this.#sessionChannel = channelId;
         this.#networking?.destroy();
         this.#setStatus("connecting");
         // The join's timer covers a first connect; a reconnect gets its own.

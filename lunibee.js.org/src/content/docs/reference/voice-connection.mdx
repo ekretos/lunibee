@@ -1,503 +1,154 @@
 ---
-title: VoiceConnection & AudioPlayer
-description: Voice session state, transports, speaking, audio playback and receiving in @lunibee/voice, and what the package leaves to you.
+title: Voice reference
+description: client.voice, VoiceConnection, AudioPlayer, AudioResource, VoiceReceiver, and the protocol layer of @lunibee/voice (voice gateway v8, UDP, encryption, DAVE).
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+Every name below is exported from `lunibee` and `@lunibee/voice`. Start with the [Voice guide](/core-concepts/voice/).
 
-`@lunibee/voice` is a transport-agnostic voice layer. It gives you:
+## `client.voice` (`VoiceManager`)
 
-- `VoiceConnection`: one guild's voice session state (`disconnected` / `connecting` / `connected` / `destroyed`), channel and self mute/deaf flags, the attached transports and a speaking update;
-- `VoiceReceiver`: routes incoming RTP packets to per-user streams by SSRC;
-- `AudioPlayer` and `AudioStream`: a play / pause / resume / stop state machine that reads a `ReadableStream<Uint8Array>` and hands each chunk to a method you override;
-- `@discordjs/voice`-style helpers: `joinVoiceChannel`, `getVoiceConnection`, `createAudioPlayer`, `createAudioResource`, `entersState`.
-
-## What it does not do
-
-The package contains no networking or audio code. You bring the transports and the codec.
-
-| Not included | Who does it |
+| Member | Description |
 |---|---|
-| Sending the main Gateway voice state update (op 4) to join, move or leave a channel | You: `client.sendVoiceState(guildId, channelId, options)`. `joinVoiceChannel()`, `setChannel()` and `setSuppression()` only change local state. See [Voice integration](/core-concepts/voice-integration/). |
-| Reading `VOICE_STATE_UPDATE` / `VOICE_SERVER_UPDATE` (session ID, token, endpoint) | You: the `voiceStateUpdate` / `voiceServerUpdate` client events. |
-| Opening the voice WebSocket, IDENTIFY, SELECT_PROTOCOL, voice heartbeats, resume | Your `VoiceGatewayTransport`. The library never calls `VoiceGatewayTransport.connect()`. |
-| Opening the UDP socket, IP discovery, encryption and decryption | Your `VoiceUdpTransport`. |
-| Opus encoding/decoding, FFmpeg, resampling, volume | Your code, before the `AudioStream` / after the receiver. |
-| Pacing audio into 20 ms frames | Your source stream. `AudioPlayer` reads as fast as the stream yields. |
-| Sending audio | Your `AudioPlayer.onChunk()` override. The base method does nothing. |
-| Mapping SSRCs from voice gateway op 5 | You: call `receiver.mapSsrc(ssrc, userId)`. |
+| `join(options)` | `Promise<VoiceConnection>`. Joins (or moves the guild's connection) and resolves when `ready`. Rejects with a `VoiceError` when the guild is on another shard, when the connection ends up `disconnected` or `destroyed`, or after `timeout`. |
+| `leave(guildId)` | Destroys the guild's connection (sends op 4 with no channel). Returns whether there was one. |
+| `get(guildId)` | The guild's connection, or `undefined`. |
+| `connections` | `ReadonlyMap<string, VoiceConnection>`. |
+| `destroy(leave = true)` | Destroys every connection. `client.destroy()` calls it. |
 
-`connect()` does not perform a handshake: it moves straight from `disconnected` through `connecting` to `connected`, synchronously. Treat `connected` as "your code says this session is up", not as a confirmation from Discord.
+`VoiceJoinOptions`:
 
-The only things the library sends itself are the op 5 speaking payload from `setSpeaking()` (through your gateway transport) and `close()` calls on your transports.
+| Option | Default | Description |
+|---|---|---|
+| `guildId`, `channelId` | required | |
+| `selfMute`, `selfDeaf` | `false` | |
+| `timeout` | `15000` | Ms to wait for Discord's events and the voice server, on join and on each reconnect. |
+| `dave` | `true` | Offer DAVE (needs `@snazzah/davey`). `false` only works in stage channels. |
+| `debug` | none | `(message) => void` for handshake and DAVE details. |
+| `networking` | none | Test seams: `url` (string, or a function of the endpoint), `socketFactory`, `udpFactory`. |
 
-## Import
-
-<Tabs>
-<TabItem label="TypeScript">
-```ts
-import {
-  VoiceConnection,
-  VoiceConnectionState,
-  VoiceConnectionStatus,
-  VoiceReceiver,
-  VoiceError,
-  SpeakingFlags,
-  AudioPlayer,
-  AudioStream,
-  joinVoiceChannel,
-  getVoiceConnection,
-  createAudioPlayer,
-  createAudioResource,
-  entersState,
-  type VoiceConnectionOptions,
-  type VoiceGatewayTransport,
-  type VoiceGatewayPayload,
-  type VoiceUdpTransport,
-  type VoiceEvents,
-  type AudioPlayerState,
-} from "@lunibee/voice";
-// everything is also re-exported from "lunibee"
-```
-</TabItem>
-<TabItem label="JavaScript">
-```js
-import {
-  VoiceConnection,
-  VoiceConnectionState,
-  VoiceConnectionStatus,
-  VoiceReceiver,
-  VoiceError,
-  SpeakingFlags,
-  AudioPlayer,
-  AudioStream,
-  joinVoiceChannel,
-  getVoiceConnection,
-  createAudioPlayer,
-  createAudioResource,
-  entersState,
-} from "@lunibee/voice";
-// everything is also re-exported from "lunibee"
-```
-</TabItem>
-</Tabs>
-
-The examples below are TypeScript; the JavaScript is the same without type annotations.
-
-## Quick start
-
-```ts
-import {
-  joinVoiceChannel,
-  AudioPlayer,
-  createAudioResource,
-  SpeakingFlags,
-  type VoiceGatewayTransport,
-  type VoiceUdpTransport,
-} from "lunibee";
-
-declare const voiceGateway: VoiceGatewayTransport; // your voice WebSocket
-declare const udp: VoiceUdpTransport;               // your encrypted UDP socket
-declare const opusFrames: ReadableStream<Uint8Array>; // paced, encoded frames
-
-// 1. Ask Discord to put the bot in the channel (main Gateway, op 4).
-bot.sendVoiceState(guildId, channelId, { selfDeaf: true });
-
-// 2. Track the session locally.
-const connection = joinVoiceChannel({ guildId, channelId, selfDeaf: true });
-
-// 3. Once your transports have completed the voice handshake, attach them.
-connection.attachTransports(voiceGateway, udp);
-
-// 4. Play.
-import { AudioPlayer } from "lunibee";
-
-class UdpPlayer extends AudioPlayer {
-  protected override onChunk(chunk: Uint8Array): void {
-    void udp.send(chunk, host, port); // your transport frames and encrypts it
-  }
-}
-const player = new UdpPlayer();
-player.on("finish", () => connection.setSpeaking(0));
-connection.setSpeaking(SpeakingFlags.Microphone);
-await player.play(createAudioResource(opusFrames, { title: "Track" }));
-```
-
----
+The client forwards its own `VOICE_STATE_UPDATE` and `VOICE_SERVER_UPDATE` to the manager, and drops a guild's connection (without sending op 4) when the bot leaves the guild.
 
 ## `VoiceConnection`
 
-Tracks one guild's voice session.
+| Property | Description |
+|---|---|
+| `status` | `VoiceConnectionStatus`: `"signalling"`, `"connecting"`, `"ready"`, `"disconnected"`, `"destroyed"`. |
+| `guildId`, `channelId`, `selfMute`, `selfDeaf` | The join configuration; `channelId` follows moves. |
+| `disconnectReason` | While `disconnected`: `{ reason, code?, message? }`, `reason` one of `"left"` (`disconnect()`), `"removed"` (moved out or kicked), `"timeout"`, `"closed"` (the voice server ended the session, `code` is its close code), `"unsent"` (op 4 could not be sent). |
+| `receiver` | The [`VoiceReceiver`](#voicereceiver). |
+| `ping` | Voice gateway heartbeat round trip in ms, or `-1`. |
+| `endToEndEncrypted` | Whether frames are DAVE-encrypted right now. |
+| `voicePrivacyCode` | The DAVE voice privacy code, or `null`. |
+| `subscription` | The `PlayerSubscription` (`{ connection, player, unsubscribe() }`), if any. |
 
-### Constructor
+| Method | Description |
+|---|---|
+| `subscribe(player)` | Plays `player` on this connection, replacing any other player. Returns a `PlayerSubscription`. |
+| `rejoin({ channelId?, selfMute?, selfDeaf? })` | Joins again, moves, or changes mute/deaf. A mute/deaf change on a ready connection sends op 4 without reconnecting. Throws a `VoiceError` when destroyed. |
+| `disconnect()` | Leaves the channel (op 4, `channel_id: null`); `rejoin()` brings it back. |
+| `destroy(leave = true)` | Leaves and releases the voice gateway, UDP socket, DAVE state, receiver streams, timers and the subscription. Final. |
+| `setSpeaking(speaking)` | Sends op 5 (players do this themselves). |
+| `playOpusPacket(frame)` | Sends one 20 ms Opus frame now, for your own audio pipeline. Returns whether it was sent. |
+| `on(event, listener)`, `off(…)` | Events: `stateChange(next, previous)` (note the order), `error(error)`, `debug(message)`. |
 
-```ts
-new VoiceConnection(guildId: string)
-new VoiceConnection(options: VoiceConnectionOptions)
-```
+### `joinVoiceChannel(options)` and `getVoiceConnection(guildId)`
 
-```ts
-interface VoiceConnectionOptions {
-  guildId: string;
-  channelId?: string;
-  selfMute?: boolean;
-  selfDeaf?: boolean;
-}
-```
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `guildId` | `string` | — | Required. An empty or whitespace-only ID throws `TypeError`. |
-| `channelId` | `string` | `undefined` | Initial voice channel. Not validated by the constructor. |
-| `selfMute` | `boolean` | `false` | Initial self mute flag. |
-| `selfDeaf` | `boolean` | `false` | Initial self deaf flag. |
-
-A new connection starts in `disconnected`.
-
-### Properties
-
-| Property | Type | Description |
-|---|---|---|
-| `state` | `VoiceConnectionState` | Current state. |
-| `guildId` | `string` (readonly) | Guild of this session. |
-| `channelId` | `string \| undefined` | Current voice channel. Cleared by `destroy()`. |
-| `selfMute` | `boolean` | Self mute flag. |
-| `selfDeaf` | `boolean` | Self deaf flag. |
-| `gateway` | `VoiceGatewayTransport \| undefined` | Attached voice gateway transport. |
-| `udp` | `VoiceUdpTransport \| undefined` | Attached UDP transport. |
-| `receiver` | `VoiceReceiver` (readonly) | Incoming audio router, created with the connection. |
-
-### `VoiceConnectionState`
-
-A TypeScript string `enum`. `VoiceConnectionStatus` is an alias of the same enum (the `@discordjs/voice` name); its members and values are Lunibee's, not discord.js's (there is no `Signalling` or `Ready`).
-
-| Member | Value | Meaning |
-|---|---|---|
-| `Disconnected` | `"disconnected"` | Initial state, and the state after `disconnect()`. |
-| `Connecting` | `"connecting"` | Passed through during `connect()`. |
-| `Connected` | `"connected"` | Reached at the end of `connect()`. |
-| `Destroyed` | `"destroyed"` | Terminal. The connection cannot be reused. |
-
-```text
-disconnected ──connect()──▶ connecting ──▶ connected
-     ▲                                         │
-     └──────────────disconnect()───────────────┘
-any state ──destroy()──▶ destroyed (terminal)
-```
-
-### Methods
-
-| Method | Returns | Description |
-|---|---|---|
-| `connect()` | `void` | Emits `disconnected → connecting`, then `connecting → connected`, synchronously. Does nothing if already `connected`. If a `stateChange` listener moves the connection away from `connecting` (for example by calling `disconnect()`), `connected` is not reached. Throws `VoiceError` once destroyed. |
-| `disconnect()` | `void` | Closes both transports, closes the receiver (ends subscriber streams, clears SSRC mappings) and moves to `disconnected`. The connection can be connected again. No-op once destroyed. |
-| `destroy()` | `void` | Closes both transports, closes the receiver, clears `channelId`, moves to `destroyed`, then removes every listener. Idempotent. |
-| `attachTransports(gateway, udp)` | `this` | Attaches a voice gateway and a UDP transport. See [Transports](#transports). |
-| `setChannel(channelId)` | `void` | Sets `channelId`. Throws `TypeError` for an empty ID and `VoiceError` once destroyed. Sends nothing. |
-| `setSuppression({ selfMute?, selfDeaf? })` | `void` | Updates the flags that are given; omitted ones keep their value. Throws `VoiceError` once destroyed. Sends nothing. |
-| `setSpeaking(flags?, ssrc?)` | `void` | Sends `{ op: 5, d: { speaking: flags, delay: 0, ssrc } }` through the gateway transport and emits `speaking`. `flags` defaults to `SpeakingFlags.Microphone`; pass `0` to stop speaking. Pass the `ssrc` your voice gateway assigned in its READY (default `0`). Throws `VoiceError` when destroyed or when no gateway transport is attached. |
-| `on(event, listener)` | `this` | Adds a listener. Throws `TypeError` if `listener` is not a function. |
-| `off(event, listener)` | `this` | Removes a listener. |
-
-Pass the SSRC from your voice gateway's READY as the second argument; Discord uses it to match the audio to this user.
-
-### Events
+`joinVoiceChannel(JoinVoiceChannelOptions)` creates (or moves) a guild's connection with your own adapter and tracks it; `getVoiceConnection(guildId)` returns it. Options are `VoiceJoinOptions` plus `adapterCreator`:
 
 ```ts
-interface VoiceEvents {
-  stateChange: [VoiceConnectionState, VoiceConnectionState]; // (next, previous)
-  speaking: [number, number];                                 // (flags, ssrc)
-  error: [VoiceError];
-}
+type VoiceAdapterCreator = (methods: VoiceAdapterMethods) => VoiceAdapter;
+// methods: onVoiceStateUpdate(data), onVoiceServerUpdate(data), destroy()
+// adapter: sendPayload(payload: VoiceStatePayload): boolean, destroy(): void
 ```
 
-| Event | Arguments | Emitted when |
-|---|---|---|
-| `stateChange` | `(next, previous)` | The state changes. **The new state comes first**, which is the opposite of `AudioPlayer`. Not emitted when the state does not change. |
-| `speaking` | `(flags, ssrc)` | `setSpeaking()` sent a payload, with the SSRC it was given. |
-| `error` | `(error: VoiceError)` | A transport's `close()` threw during cleanup (`"Voice gateway cleanup failed."` / `"Voice UDP cleanup failed."`, original error in `cause`), or a `stateChange` listener threw (`"Voice event listener failed."`). A thrown `VoiceError` is passed as is. |
-
-```ts
-connection.on("stateChange", (next, previous) => {
-  console.log(`voice ${connection.guildId}: ${previous} → ${next}`);
-});
-connection.on("error", (error) => console.error(error.message, error.cause));
-```
-
-Listener behaviour:
-
-- Listeners are called synchronously. A throwing `stateChange` listener is reported through `error`; a throwing `speaking` or `error` listener is ignored. Returned promises are not awaited.
-- If a `stateChange` listener changes the state again, the remaining listeners for the older transition are skipped (except for a transition to `destroyed`, which every listener sees).
-- `destroy()` removes all listeners after emitting `stateChange` to `destroyed`, so nothing is emitted after that.
-
-### Transports
-
-```ts
-interface VoiceGatewayTransport {
-  connect(endpoint: string, sessionId: string): Promise<void>;
-  send(payload: VoiceGatewayPayload): void;
-  close(code?: number, reason?: string): void;
-}
-
-interface VoiceGatewayPayload {
-  op: number;
-  d: Record<string, string | number | boolean | null>;
-}
-
-interface VoiceUdpTransport {
-  send(packet: Uint8Array, host: string, port: number): Promise<void> | void;
-  close(): void;
-  onMessage?(listener: (packet: Uint8Array) => void): void;
-}
-```
-
-| Member | Called by Lunibee? | Notes |
-|---|---|---|
-| `VoiceGatewayTransport.connect` | No | Part of the interface for your own code; call it yourself with the endpoint and session ID from `voiceServerUpdate` / `voiceStateUpdate`. |
-| `VoiceGatewayTransport.send` | `setSpeaking()` | Receives the op 5 payload. |
-| `VoiceGatewayTransport.close` | `disconnect()`, `destroy()`, replacing transports | Called as `close(1000, "Voice connection replaced or closed")`. |
-| `VoiceUdpTransport.send` | No | Call it from your `AudioPlayer.onChunk()`. |
-| `VoiceUdpTransport.close` | `disconnect()`, `destroy()`, replacing transports | |
-| `VoiceUdpTransport.onMessage` | `attachTransports()` | Optional. If present, Lunibee registers one listener that feeds `receiver.onPacket()`. Deliver **decrypted** RTP packets: the receiver does not decrypt. |
-
-`attachTransports(gateway, udp)`:
-
-- throws `VoiceError` once destroyed, and `TypeError` if either transport is missing;
-- attaching the **same pair** that is already attached is a no-op (it does not close them);
-- attaching a different pair first closes the old pair (both `close()` calls, failures reported through `error`), then stores the new one;
-- registers the `onMessage` listener at most once per UDP transport object, so a transport that is attached again later does not deliver each datagram twice. A replaced transport's listener cannot be unregistered (the interface has no removal method), but its packets are ignored while another transport is attached;
-- does not change `state` and does not call `connect()` on the gateway transport.
-
----
-
-## `VoiceReceiver`
-
-Available as `connection.receiver` (`new VoiceReceiver(connection)` is public, but the connection already creates one). Routes incoming RTP packets to per-user streams.
-
-| Member | Returns | Description |
-|---|---|---|
-| `connection` | `VoiceConnection` | The owning connection. |
-| `mapSsrc(ssrc, userId)` | `void` | Associates an SSRC with a user ID. You call this, usually from the voice gateway's op 5 speaking event; Lunibee does not parse voice gateway messages. |
-| `subscribe(userId)` | `AudioStream` | A new stream of that user's audio payloads, titled `` `User ${userId} Audio` ``. Several subscribers to the same user each get every packet. Throws `VoiceError` once the connection is destroyed. |
-| `onPacket(packet)` | `void` | Processes one packet. Called for you by the attached UDP transport's `onMessage`; call it yourself if your transport has none. |
-| `close()` | `void` | Ends every subscriber stream and forgets all SSRC mappings. `disconnect()` and `destroy()` call it. |
-
-`onPacket()` drops a packet when:
-
-- it is shorter than 12 bytes;
-- it is not RTP version 2 (`(packet[0] & 0xc0) !== 0x80`);
-- its SSRC is not mapped, or the mapped user has no subscribers;
-- it is too short for its CSRC list or header extension.
-
-Otherwise it strips the RTP header (the 12-byte fixed header, the CSRC list and, when the X bit is set, the extension header) and enqueues the remaining bytes. Padding is not removed and nothing is decrypted or decoded: subscribers receive whatever payload your transport delivered, normally Opus.
-
-Backpressure: each subscriber stream buffers at most about 50 packets (about one second of 20 ms frames). When a reader falls further behind, new packets for that reader are dropped instead of growing memory.
-
-```ts
-connection.receiver.mapSsrc(ssrc, userId); // from your voice gateway's op 5
-const audio = connection.receiver.subscribe(userId);
-for await (const opusPacket of audio.stream) {
-  decoder.write(opusPacket);
-}
-// the loop ends when the connection disconnects or is destroyed
-```
-
-After `disconnect()` you can subscribe again; SSRCs must be mapped again too.
-
----
-
-## `AudioStream`
-
-Wraps a `ReadableStream<Uint8Array>` with optional metadata. There is no separate `AudioResource` class: `createAudioResource()` returns an `AudioStream`.
-
-```ts
-new AudioStream(stream: ReadableStream<Uint8Array>, metadata?: { title?: string; duration?: number })
-```
-
-| Property | Type | Description |
-|---|---|---|
-| `stream` | `ReadableStream<Uint8Array>` | The audio data. |
-| `title` | `string \| undefined` | Optional title. |
-| `duration` | `number \| undefined` | Optional duration hint, in seconds. Not used by the player. |
-
-```ts
-const file = Bun.file("./track.opus-frames");
-const audio = new AudioStream(file.stream(), { title: "Track", duration: 180 });
-```
-
-`AudioPlayer` reads the stream as fast as it yields chunks. Each chunk is passed to `onChunk()` as is, so the stream should yield one encoded frame per chunk at the rate it should be sent (every 20 ms for Discord voice).
-
----
+Forward only the bot's own `VOICE_STATE_UPDATE` (`VoiceStateData`: `channel_id`, `user_id`, `session_id`) and every `VOICE_SERVER_UPDATE` (`VoiceServerData`: `guild_id`, `token`, `endpoint`, which is `null` while Discord moves the guild to another server).
 
 ## `AudioPlayer`
 
-Reads an `AudioStream` chunk by chunk and calls `onChunk(chunk)` for each one. The base `onChunk()` does nothing: subclass `AudioPlayer` and override it to send audio.
+`createAudioPlayer(options?)` or `new AudioPlayer(options?)`.
 
-```ts
-import { AudioPlayer } from "lunibee";
+| Option | Default | Description |
+|---|---|---|
+| `noSubscriber` | `"pause"` | With no ready connection: `"pause"` waits (`autopaused`), `"play"` keeps consuming the resource, `"stop"` stops. |
+| `maxMissedFrames` | `250` | Late frames in a row (5 s) before playback fails with an `error`. |
 
-class UdpPlayer extends AudioPlayer {
-  protected override onChunk(chunk: Uint8Array): void {
-    void udp.send(chunk, host, port);
-  }
-}
-```
-
-`onChunk()` is synchronous; its return value is not awaited. If it throws, the player emits `error` and stops reading that stream (the state stays as it was; call `stop()`).
-
-### `AudioPlayerState`
-
-```ts
-type AudioPlayerState = "idle" | "playing" | "paused" | "stopped";
-```
-
-| State | Meaning |
+| Member | Description |
 |---|---|
-| `"idle"` | Nothing loaded: initial state, and the state after a stream ends naturally. |
-| `"playing"` | Reading the stream. |
-| `"paused"` | Reading is suspended; `resume()` continues it. |
-| `"stopped"` | `stop()` discarded the stream. `play()` loads a new one. |
+| `state` | `AudioPlayerStatus`: `"idle"`, `"buffering"`, `"playing"`, `"paused"`, `"autopaused"`. |
+| `resource` | The resource loaded, if any. |
+| `subscribers` | The connections it sends to. |
+| `ticking` | Whether its clock runs (diagnostics). |
+| `play(resource)` | Plays, replacing and destroying the current resource. Throws a `VoiceError` for a resource that already played. |
+| `pause(silence = true)` | Returns whether it paused. With `silence`, five silence frames go out first. |
+| `unpause()` / `resume()` | Returns whether it resumed. |
+| `stop(force = false)` | Destroys the resource and goes `idle`; five silence frames follow unless `force`. Returns whether anything was playing. |
 
-### Properties
+Events: `stateChange(from, to)`, `finish(resource)` (played to its end), `error(error, resource)` (the resource failed; the player goes `idle`).
 
-| Property | Type | Description |
+Timing: one frame every 20 ms on a clock that corrects its drift; when the event loop stalls for more than 100 ms the clock restarts instead of sending a burst. The clock stops when the player is idle, paused or autopaused.
+
+## `AudioResource`
+
+`createAudioResource(input, options?)` — see [Audio resources](/core-concepts/voice/#audio-resources) for input types.
+
+| Option | Default | Description |
 |---|---|---|
-| `state` | `AudioPlayerState` (getter) | Current state. |
-| `current` | `AudioStream \| undefined` (getter) | The loaded stream. Cleared by `stop()` and when the stream ends. |
+| `inputType` | from the extension, else `"arbitrary"` | `"arbitrary"`, `"ogg/opus"`, `"opus"`, `"raw"`. |
+| `inlineVolume` | `false` | Adds `resource.volume` (`VolumeControl`): `set(gain)`, `setDecibels(db)`, `volume`. Decodes and re-encodes. |
+| `metadata` | none | Kept as `resource.metadata`. |
+| `ffmpegPath` | `"ffmpeg"` | |
+| `prefetch` | `10` | Frames read ahead (200 ms). |
 
-### Methods
-
-| Method | Returns | Description |
-|---|---|---|
-| `play(audioStream)` | `Promise<void>` | If `playing` or `paused`, awaits `stop()` first. Then locks the stream (`getReader()`), moves to `playing` and starts reading. The promise resolves once playback has started, not when it ends; listen for `finish`. |
-| `pause()` | `void` | `playing → paused`. No-op in any other state. |
-| `resume()` | `void` | `paused → playing`, waking the existing read loop. No-op in any other state. There is no `unpause()`. |
-| `stop()` | `Promise<void>` | From `playing` or `paused`: moves to `stopped`, discards the stream and cancels its reader. Resolves once the cancellation has settled (cancellation errors are ignored). No-op when `idle` or `stopped`. |
-| `on(event, listener)` | `this` | Adds a listener. |
-| `off(event, listener)` | `this` | Removes a listener. |
-| `onChunk(chunk)` | `void` | Protected. Override to deliver audio. |
-
-`createAudioPlayer()` is the same as `new AudioPlayer()`, so it returns a player whose `onChunk()` does nothing. To send audio, construct your subclass instead.
-
-### Events
-
-| Event | Arguments | Emitted when |
-|---|---|---|
-| `stateChange` | `(from, to)` | The state changes. **The old state comes first**, which is the opposite of `VoiceConnection`. |
-| `finish` | `()` | The stream ended on its own (not through `stop()`). Emitted after `stateChange` to `"idle"`. |
-| `error` | `(error: Error)` | Reading the stream rejected or `onChunk()` threw. Non-`Error` values are wrapped in `VoiceError`. |
-
-Listeners are called synchronously; a throwing listener is ignored.
-
-```ts
-player.on("stateChange", (from, to) => console.log(`player: ${from} → ${to}`));
-player.on("finish", () => playNext());
-player.on("error", (error) => console.error(error));
-```
-
-### Replacing a stream
-
-`play()` on a busy player stops the current stream before starting the new one, and the transitions are `playing → stopped → playing`. The old stream's read loop is retired: a chunk it was reading when the switch happened is dropped, and the old stream ending later does not emit `finish` or change the state.
-
-When several `play()` calls overlap (a later call arrives while an earlier one is still awaiting `stop()` of the previous stream), the **last call wins**. Each superseded call cancels its own stream without reading from it and resolves without changing the state.
-
-```ts
-void player.play(a);
-await Promise.all([player.play(b), player.play(c)]);
-player.current === c; // true; b was cancelled and never read
-```
-
-`await player.stop()` followed by `play()` never leaves a read loop from the first stream running.
-
----
-
-## Helpers
-
-These mirror `@discordjs/voice` names. Behaviour is Lunibee's.
-
-| Helper | Returns | Description |
-|---|---|---|
-| `joinVoiceChannel(options)` | `VoiceConnection` | See below. |
-| `getVoiceConnection(guildId)` | `VoiceConnection \| undefined` | The connection `joinVoiceChannel()` tracks for the guild. |
-| `createAudioPlayer()` | `AudioPlayer` | `new AudioPlayer()`. |
-| `createAudioResource(stream, metadata?)` | `AudioStream` | `new AudioStream(stream, metadata)`. |
-| `entersState(target, state, timeoutMs)` | `Promise<target>` | See below. |
-
-### `joinVoiceChannel`
-
-```ts
-joinVoiceChannel(options: VoiceConnectionOptions & { channelId: string }): VoiceConnection
-```
-
-1. Throws `TypeError` for an empty `channelId`, before anything is created or tracked.
-2. Reuses the guild's tracked connection, or creates one and tracks it, and calls `setChannel(channelId)`.
-3. Calls `setSuppression(options)`, so omitted `selfMute` / `selfDeaf` keep the connection's current values.
-4. Calls `connect()`, so the connection is `connected` when the function returns.
-
-It does **not** send a voice state update to Discord and does not open any transport. Call `client.sendVoiceState()` yourself, and attach transports with `attachTransports()`.
-
-Registry rules:
-
-- One connection per guild ID, in a module-level map.
-- A connection stays tracked after `disconnect()`; the next `joinVoiceChannel()` for the guild reuses and reconnects it.
-- It is removed only when it is destroyed. The next `joinVoiceChannel()` then creates a new connection.
-- Connections created with `new VoiceConnection()` are never tracked.
-
-```ts
-const connection = joinVoiceChannel({ guildId, channelId, selfDeaf: true });
-getVoiceConnection(guildId) === connection; // true
-connection.disconnect();
-getVoiceConnection(guildId) === connection; // still true
-connection.destroy();
-getVoiceConnection(guildId); // undefined
-```
-
-### `entersState`
-
-```ts
-entersState<T extends VoiceConnection | AudioPlayer>(
-  target: T,
-  status: T extends VoiceConnection ? VoiceConnectionState : AudioPlayerState,
-  timeoutMs: number,
-): Promise<T>
-```
-
-- Resolves at once with `target` if it is already in `status`.
-- Otherwise listens for `stateChange` and resolves with `target` when the new state equals `status` (it reads the right argument for each class: `next` for a connection, `to` for a player).
-- Rejects with `VoiceError` `Did not enter state "<state>" within <timeoutMs>ms.` on timeout, and removes its listener.
-- `Infinity` and any value above 2,147,483,647 ms (about 24.8 days) are clamped to 2,147,483,647 ms, so they do not fire immediately.
-- A destroyed connection has no listeners and never changes state again, so waiting on one only ends at the timeout.
-
-Because `connect()` is synchronous, `entersState(connection, VoiceConnectionState.Connected, ms)` after `joinVoiceChannel()` resolves immediately. It is most useful for waiting on a player:
-
-```ts
-await player.play(resource);
-await entersState(player, "idle", 10 * 60_000); // until the track ends
-```
-
----
-
-## `SpeakingFlags`
-
-```ts
-const SpeakingFlags = {
-  Microphone: 1,
-  Soundshare: 2,
-  Priority: 4,
-} as const;
-```
-
-Combine with `|`: `connection.setSpeaking(SpeakingFlags.Microphone | SpeakingFlags.Priority)`.
-
-## `VoiceError`
-
-`class VoiceError extends Error` with `name === "VoiceError"`; the constructor takes `(message, options?: ErrorOptions)`, so `cause` is set for wrapped failures.
-
-| Thrown or emitted by | Message |
+| Member | Description |
 |---|---|
-| Any mutating `VoiceConnection` method after `destroy()`, `receiver.subscribe()` after `destroy()` | `Voice connection has been destroyed.` |
-| `setSpeaking()` without a gateway transport | `A voice gateway transport is required to change speaking state.` |
-| `entersState()` timeout | `Did not enter state "<state>" within <ms>ms.` |
-| Connection `error` event | `Voice gateway cleanup failed.`, `Voice UDP cleanup failed.`, `Voice event listener failed.` |
+| `read()` | The next Opus frame; `undefined` while buffering, `null` once ended. The player calls it. |
+| `ended`, `readable`, `started`, `error` | State. `error` is why it ended early. |
+| `playbackDuration` | Ms the player has sent. |
+| `destroy()` | Ends FFmpeg and the input and frees the codec. |
 
-Argument errors (empty guild or channel ID, missing transport, non-function listener) are `TypeError`s.
+## `VoiceReceiver`
+
+`connection.receiver`.
+
+| Member | Description |
+|---|---|
+| `subscribe(userId, { end?, highWaterMark? })` | A `ReadableStream<Uint8Array>` of the user's Opus packets. `end`: `{ behavior: "silence", duration? }` (default, 1000 ms without audio; silence frames count as none) or `{ behavior: "manual" }`. `highWaterMark` (50) bounds the backlog; newer packets are dropped beyond it. Cancelling the stream unsubscribes. |
+| `unsubscribe(userId)` | Ends the user's streams. |
+| `ssrcOf(userId)` | The user's SSRC, once they spoke. |
+| `speaking` | Users who sent audio in the last 100 ms. |
+| `on("start" \| "end", userId => …)` | A user started or stopped sending audio. |
+
+## Codecs and helpers
+
+| Export | Description |
+|---|---|
+| `createOpusCodec()` | `Promise<OpusCodec>` from `@discordjs/opus`, else `opusscript`: `encode(pcm)` (one 3,840-byte 20 ms frame), `decode(packet)`, `destroy()`, `library`. Throws a `VoiceError` when neither is installed. |
+| `demuxOggOpus(chunks)` | An async generator of Opus packets from an Ogg/Opus byte stream; throws a `VoiceError` for anything that is not Ogg/Opus. |
+| `entersState(target, status, timeoutMs)` | Resolves when a connection or player reaches `status`, rejects with a `VoiceError` after `timeoutMs`. |
+| `generateDependencyReport()` | `{ dave, opus, ffmpeg }`: what this runtime can load, or `null` for each that it cannot. |
+| `SILENCE_FRAME`, `FRAME_DURATION_MS` (20), `FRAME_SAMPLES` (960), `PCM_FRAME_BYTES` (3,840), `SpeakingFlags` | Constants. |
+| `VoiceError` | Every voice failure. |
+
+## Protocol layer
+
+The pieces `VoiceConnection` is built from, exported for custom stacks and tests.
+
+| Export | Description |
+|---|---|
+| `VoiceNetworking` | One voice server session: IDENTIFY → READY → IP discovery → SELECT_PROTOCOL → SESSION_DESCRIPTION, resume on a recoverable close, DAVE, `sendFrame(frame)`, `setSpeaking()`, `destroy()`. States `opening`, `identifying`, `discovering`, `selecting`, `ready`, `resuming`, `closed`. |
+| `VoiceGateway`, `voiceGatewayURL(endpoint)` | The voice WebSocket (v8): JSON and binary frames, `seq_ack`, heartbeat (`@lunibee/ws`'s `GatewayHeartbeat`). A missed heartbeat ACK closes with `HEARTBEAT_TIMEOUT_CLOSE` (3001), which resumes. |
+| `VoiceUdp` | The UDP socket (`Bun.udpSocket`): `discover(ssrc)`, a keepalive every 5 s, `close()`. `discoveryRequest`, `parseDiscoveryResponse`. |
+| `PacketCipher`, `chooseEncryptionMode`, `SUPPORTED_ENCRYPTION_MODES` | The "rtpsize" AEAD modes: `aead_aes256_gcm_rtpsize` (preferred; synchronous `node:crypto`, since WebCrypto would add a promise to every 20 ms packet) and `aead_xchacha20_poly1305_rtpsize` (`@noble/ciphers`). The RTP header is authenticated; the 32-bit nonce counter is appended to each packet. |
+| `rtpHeader`, `parseRtpHeader` | RTP v2 headers, payload type `RTP_OPUS_PAYLOAD_TYPE` (0x78). |
+| `DaveSession`, `loadDave`, `maxDaveProtocolVersion` | The DAVE flow over `@snazzah/davey`. |
+| `VoiceOpcodes`, `VoiceCloseCodes`, `canResumeVoice(code)`, `VOICE_GATEWAY_VERSION` | Protocol constants. Resumable: codes below 4000 and 4015. |
+
+### Close codes
+
+| Code | Name | What happens |
+|---|---|---|
+| below 4000, `4015` | network / `VoiceServerCrashed` | Resumes (op 7). |
+| `4006` | `SessionNoLongerValid` | `disconnected` (`closed`); `rejoin()`. |
+| `4014` | `Disconnected` | Removed from the channel; `disconnected`. |
+| `4017` | `DaveProtocolRequired` | Install `@snazzah/davey`; the error says so. |
+| other 4xxx | | `disconnected` (`closed`), with the code. |

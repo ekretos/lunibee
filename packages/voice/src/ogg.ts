@@ -40,6 +40,8 @@ export async function* demuxOggOpus(
     let partial: Uint8Array[] = [];
     let partialSize = 0;
     let sawHead = false;
+    /** Bytes read without finding any Ogg page. */
+    let skipped = 0;
 
     const take = (bytes: Uint8Array): Uint8Array | undefined => {
         // A segment shorter than 255 bytes ends the packet.
@@ -119,8 +121,11 @@ export async function* demuxOggOpus(
             }
             offset = cursor;
         }
+        if (!sawHead && findCapture(buffer, 0) === -1) skipped += offset;
         buffer = buffer.slice(offset);
-        if (buffer.length > MAX_PAGE)
+        if (buffer.length > MAX_PAGE || skipped > MAX_PAGE)
             throw new VoiceError("The input is not an Ogg stream.");
     }
+    if (!sawHead && (skipped > 0 || buffer.length > 0))
+        throw new VoiceError("The input is not an Ogg/Opus stream.");
 }

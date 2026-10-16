@@ -49,7 +49,7 @@ Layer 0:  @lunibee/types, @lunibee/utils, @lunibee/formatters
 | [`@lunibee/structures`](/packages/structures/) | Guild, Channel, Message, User, and Member resources |
 | [`@lunibee/collection`](/packages/collection/) | In-memory collections and bounded caches |
 | [`@lunibee/sharding`](/packages/sharding/) | Multi-shard management and inter-shard communication |
-| [`@lunibee/voice`](/packages/voice/) | Discord Voice connection and audio primitives |
+| [`@lunibee/voice`](/packages/voice/) | Voice: join channels, play and receive audio (voice gateway v8, UDP, encryption, DAVE, Opus, FFmpeg) |
 | [`@lunibee/formatters`](/packages/formatters/) | Mentions, timestamps, and Markdown helpers |
 | [`@lunibee/utils`](/packages/utils/) | Shared low-level utilities |
 | [`@lunibee/types`](/packages/types/) | Discord API v10 types and constants |

@@ -183,7 +183,7 @@ export default defineConfig({
             {
               label: "Voice",
               items: [
-                { label: "VoiceConnection & AudioPlayer", link: "/reference/voice-connection" },
+                { label: "Voice", link: "/reference/voice-connection" },
               ],
             },
             {

@@ -1,48 +1,30 @@
 ---
 title: "@lunibee/voice"
-description: Transport-agnostic voice session, audio playback and receive abstractions.
+description: Discord voice for Bun — voice gateway v8, UDP, transport and DAVE end-to-end encryption, Opus, FFmpeg, player and receiver.
 ---
 
-`@lunibee/voice` tracks voice sessions and moves audio through a player and receiver.
-It does not open the voice WebSocket or UDP socket, encrypt packets or run the voice
-heartbeat. You attach transports that do that with `attachTransports(gateway, udp)`.
-
-## Installation
-
-```bash
-bun add @lunibee/voice
-```
-
-## Connect to voice
+`@lunibee/voice` connects a bot to Discord voice and plays audio: the voice gateway (v8), IP discovery and RTP over UDP, transport encryption (`aead_aes256_gcm_rtpsize`, `aead_xchacha20_poly1305_rtpsize`), DAVE end-to-end encryption through `@snazzah/davey`, Ogg/Opus passthrough, Opus encoding, FFmpeg, a 20 ms player and a receiver. `lunibee` wires it to the client as `client.voice`.
 
 ```ts
-import { joinVoiceChannel, entersState, VoiceConnectionState } from "@lunibee/voice";
-
-const voice = joinVoiceChannel({
-  guildId: "123456789012345678",
-  channelId: "987654321098765432",
-  selfDeaf: true,
-});
-voice.attachTransports(myVoiceGatewayTransport, myUdpTransport);
-
-voice.on("stateChange", (newState, oldState) => {
-  console.log(`Voice state: ${oldState} → ${newState}`);
-});
-await entersState(voice, VoiceConnectionState.Connected, 5_000);
+const connection = await bot.voice.join({ guildId, channelId });
 ```
 
-## What's included
+Without a Lunibee `Client`, give `joinVoiceChannel()` an adapter that sends op 4 and forwards the bot's voice events:
 
-- `VoiceConnection`: lifecycle state, channel and self mute/deaf, speaking updates, transport ownership.
-- `AudioPlayer` / `AudioStream`: play, pause, resume and stop; override `onChunk()` to send audio.
-- `VoiceReceiver`: routes incoming packets to per-user streams by SSRC.
-- `@discordjs/voice`-style helpers: `joinVoiceChannel`, `getVoiceConnection`, `createAudioPlayer`, `createAudioResource`, `entersState`, `VoiceConnectionStatus`.
+```ts
+import { joinVoiceChannel } from "@lunibee/voice";
 
-## When to use this package
+declare function sendOp4(payload: unknown): boolean;
+const connection = joinVoiceChannel({
+  guildId,
+  channelId,
+  adapterCreator: (methods) => {
+    // call methods.onVoiceStateUpdate / onVoiceServerUpdate from your Gateway
+    return { sendPayload: (payload) => sendOp4(payload), destroy: () => {} };
+  },
+});
+```
 
-Use `@lunibee/voice` when you need direct control over the voice connection or audio
-pipeline. Text-only bots don't need it.
+Dependencies: `@noble/ciphers` (XChaCha20-Poly1305, audited, pure JS; AES-GCM uses the runtime's `node:crypto`) and `@lunibee/ws` (heartbeat). Optional peers: `@snazzah/davey` (DAVE, required by Discord outside stage channels), `opusscript` or `@discordjs/opus` (Opus encoding).
 
-## What's New in 0.2.0
-
-Receiver streams end on disconnect/destroy; `subscribe()` throws after destroy.
+Guide: [Voice](/core-concepts/voice/). Reference: [Voice reference](/reference/voice-connection/).
