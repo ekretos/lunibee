@@ -7,7 +7,7 @@ description: Every type the lunibee package exports, grouped by package, with a 
 
 Every interface and type alias that `lunibee` exports, with what it is for. Each name links to its full definition in the generated API reference. The classes and functions that use these types are described on the other reference pages.
 
-339 types in 12 packages.
+372 types in 12 packages.
 
 ## `@lunibee/builders`
 
@@ -374,12 +374,45 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 
 | Type | Kind | Description |
 |---|---|---|
-| [`VoiceConnectionOptions`](/api/interfaces/voiceconnectionoptions/) | interface | Options used to establish a voice session. |
-| [`VoiceEvents`](/api/interfaces/voiceevents/) | interface | Voice session event payloads. |
-| [`VoiceGatewayPayload`](/api/interfaces/voicegatewaypayload/) | interface | A JSON frame for the voice gateway, e.g. |
-| [`VoiceGatewayTransport`](/api/interfaces/voicegatewaytransport/) | interface | Voice Gateway transport abstraction. |
-| [`VoiceUdpTransport`](/api/interfaces/voiceudptransport/) | interface | UDP transport supplied by the runtime-specific voice implementation. |
-| [`AudioPlayerState`](/api/type-aliases/audioplayerstate/) | type | Audio player lifecycle states. |
+| [`AudioPlayerEvents`](/api/interfaces/audioplayerevents/) | interface | What AudioPlayer emits. |
+| [`AudioPlayerOptions`](/api/interfaces/audioplayeroptions/) | interface | Options for AudioPlayer. |
+| [`AudioResourceOptions`](/api/interfaces/audioresourceoptions/) | interface | Options for createAudioResource. |
+| [`AudioSink`](/api/interfaces/audiosink/) | interface | A destination for a player's frames: a voice connection. |
+| [`DaveSessionHooks`](/api/interfaces/davesessionhooks/) | interface | What a DaveSession asks its connection to send. |
+| [`DisconnectReason`](/api/interfaces/disconnectreason/) | interface | Why a connection is disconnected. |
+| [`JoinVoiceChannelOptions`](/api/interfaces/joinvoicechanneloptions/) | interface | Options for joinVoiceChannel. |
+| [`OpusCodec`](/api/interfaces/opuscodec/) | interface | One 48 kHz stereo Opus encoder and decoder. |
+| [`PlayerSubscription`](/api/interfaces/playersubscription/) | interface | A player subscribed to a connection. |
+| [`ReceiveOptions`](/api/interfaces/receiveoptions/) | interface | Options for VoiceReceiver.subscribe. |
+| [`RtpHeader`](/api/interfaces/rtpheader/) | interface | A parsed RTP packet header. |
+| [`UdpSocketLike`](/api/interfaces/udpsocketlike/) | interface | The parts of a UDP socket VoiceUdp uses; `Bun.udpSocket` provides them. |
+| [`VoiceAdapter`](/api/interfaces/voiceadapter/) | interface | How a connection reaches the main Gateway: send op 4, and be told about voice events. |
+| [`VoiceAdapterMethods`](/api/interfaces/voiceadaptermethods/) | interface | What a connection gives its adapter. |
+| [`VoiceBinaryPacket`](/api/interfaces/voicebinarypacket/) | interface | A binary voice gateway frame (DAVE): sequence, opcode and payload. |
+| [`VoiceConnectionEvents`](/api/interfaces/voiceconnectionevents/) | interface | What a VoiceConnection emits. |
+| [`VoiceGatewayHandlers`](/api/interfaces/voicegatewayhandlers/) | interface | What a VoiceGateway reports to its owner. |
+| [`VoiceManagerClient`](/api/interfaces/voicemanagerclient/) | interface | What a VoiceManager needs from its client. |
+| [`VoiceNetworkingHandlers`](/api/interfaces/voicenetworkinghandlers/) | interface | What a VoiceNetworking reports. |
+| [`VoiceNetworkingOptions`](/api/interfaces/voicenetworkingoptions/) | interface | Options for VoiceNetworking. |
+| [`VoicePacket`](/api/interfaces/voicepacket/) | interface | A JSON voice gateway frame. |
+| [`VoiceServerData`](/api/interfaces/voiceserverdata/) | interface | VOICE_SERVER_UPDATE. |
+| [`VoiceServerInfo`](/api/interfaces/voiceserverinfo/) | interface | What Discord sent for one voice session (VOICE_STATE_UPDATE + VOICE_SERVER_UPDATE). |
+| [`VoiceSocketLike`](/api/interfaces/voicesocketlike/) | interface | The parts of a WebSocket VoiceGateway uses; the global `WebSocket` provides them. |
+| [`VoiceStateData`](/api/interfaces/voicestatedata/) | interface | The bot's own VOICE_STATE_UPDATE, as the adapter forwards it. |
+| [`VoiceStatePayload`](/api/interfaces/voicestatepayload/) | interface | An op 4 (Voice State Update) payload. |
+| [`AudioInput`](/api/type-aliases/audioinput/) | type | What createAudioResource can play. |
+| [`AudioPlayerStatus`](/api/type-aliases/audioplayerstatus/) | type | Where an AudioPlayer is. |
+| [`NetworkingState`](/api/type-aliases/networkingstate/) | type | Where a VoiceNetworking is in its handshake. |
+| [`ReceiveEnd`](/api/type-aliases/receiveend/) | type | When a VoiceReceiver.subscribe stream ends. |
+| [`StreamType`](/api/type-aliases/streamtype/) | type | What an input holds: - `"arbitrary"`: any format FFmpeg reads (needs `ffmpeg` on the PATH); - `"ogg/opus"`: an Ogg/Opus file or stream, played without re-encoding; - `"opus"`: one Opus packet (20 ms) per chunk; - `"raw"`: 48 kHz stereo s16le PCM (needs an Opus library). |
+| [`UdpSocketFactory`](/api/type-aliases/udpsocketfactory/) | type | Opens a UDP socket that calls `onData` for each datagram. |
+| [`VoiceAdapterCreator`](/api/type-aliases/voiceadaptercreator/) | type | Builds an adapter for a guild. |
+| [`VoiceCloseCodes`](/api/type-aliases/voiceclosecodes/) | type | Voice gateway close codes. |
+| [`VoiceConnectionStatus`](/api/type-aliases/voiceconnectionstatus/) | type | Where a VoiceConnection is. |
+| [`VoiceEncryptionMode`](/api/type-aliases/voiceencryptionmode/) | type | Transport encryption modes this package implements. |
+| [`VoiceJoinOptions`](/api/type-aliases/voicejoinoptions/) | type | Options for VoiceManager.join. |
+| [`VoiceOpcodes`](/api/type-aliases/voiceopcodes/) | type | Voice gateway opcodes (v8, with the DAVE opcodes 21-31). |
+| [`VoiceSocketFactory`](/api/type-aliases/voicesocketfactory/) | type | Opens a WebSocket. |
 
 ## `@lunibee/ws`
 

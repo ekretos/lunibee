@@ -1,4 +1,5 @@
-import { SILENCE_FRAME } from "./protocol.js";
+import { OggOpusWriter } from "./ogg.js";
+import { FRAME_DURATION_MS, SILENCE_FRAME } from "./protocol.js";
 
 /** When a {@link VoiceReceiver.subscribe} stream ends. */
 export type ReceiveEnd =
@@ -13,11 +14,25 @@ export interface ReceiveOptions {
     highWaterMark?: number;
 }
 
+/** Options for {@link VoiceReceiver.record}. */
+export interface RecordOptions {
+    /** When the recording ends. Default `{ behavior: "manual" }`: on `unsubscribe()`, cancel, or when the connection ends. */
+    end?: ReceiveEnd;
+    /** Bytes kept for a slow reader; audio beyond it is replaced by silence. Default 1 MiB. */
+    highWaterMark?: number;
+}
+
 interface Subscription {
-    controller: ReadableStreamDefaultController<Uint8Array>;
     end: ReceiveEnd;
     timer?: ReturnType<typeof setTimeout>;
+    deliver(frame: Uint8Array): void;
+    close(): void;
 }
+
+/** Gaps longer than this are filled with silence; shorter ones are network jitter. */
+const GAP_MS = 60;
+/** The longest gap one packet fills: an hour of silence frames (about 720 KB). */
+const MAX_GAP_FRAMES = 3_600_000 / FRAME_DURATION_MS;
 
 function isSilence(frame: Uint8Array): boolean {
     return (
@@ -90,12 +105,16 @@ export class VoiceReceiver {
         return new ReadableStream<Uint8Array>(
             {
                 start: (controller) => {
-                    subscription = { controller, end };
-                    let set = this.#subscriptions.get(userId);
-                    if (!set)
-                        this.#subscriptions.set(userId, (set = new Set()));
-                    set.add(subscription);
-                    this.#arm(userId, subscription);
+                    subscription = {
+                        end,
+                        deliver: (frame) => {
+                            // A reader that falls behind loses the newest frames, not memory.
+                            if ((controller.desiredSize ?? 1) > 0)
+                                controller.enqueue(frame);
+                        },
+                        close: () => controller.close(),
+                    };
+                    this.#add(userId, subscription);
                 },
                 cancel: () => {
                     if (subscription) this.#remove(userId, subscription);
@@ -103,6 +122,70 @@ export class VoiceReceiver {
             },
             { highWaterMark: options.highWaterMark ?? 50 },
         );
+    }
+
+    /**
+     * Records `userId` as an Ogg/Opus stream (48 kHz stereo) that players and
+     * FFmpeg read: write it to a file with `Bun.write(path, new Response(stream))`.
+     * The audio is not re-encoded. Time the user is silent is kept as silence,
+     * counted from the start of the recording, so recordings of several users
+     * started together line up.
+     */
+    public record(
+        userId: string,
+        options: RecordOptions = {},
+    ): ReadableStream<Uint8Array> {
+        const end = options.end ?? { behavior: "manual" };
+        const writer = new OggOpusWriter();
+        let subscription: Subscription | undefined;
+        return new ReadableStream<Uint8Array>(
+            {
+                start: (controller) => {
+                    const emit = (bytes: Uint8Array): void => {
+                        if (bytes.length > 0) controller.enqueue(bytes);
+                    };
+                    emit(writer.header());
+                    let last = performance.now();
+                    subscription = {
+                        end,
+                        deliver: (frame) => {
+                            // Full: drop the frame; the gap becomes silence once there is room.
+                            if ((controller.desiredSize ?? 1) <= 0) return;
+                            const now = performance.now();
+                            const gap = now - last;
+                            if (gap > GAP_MS) {
+                                const missing = Math.min(
+                                    Math.round(gap / FRAME_DURATION_MS) - 1,
+                                    MAX_GAP_FRAMES,
+                                );
+                                for (let i = 0; i < missing; i++)
+                                    emit(writer.write(SILENCE_FRAME));
+                            }
+                            last = now;
+                            emit(writer.write(frame));
+                        },
+                        close: () => {
+                            emit(writer.end());
+                            controller.close();
+                        },
+                    };
+                    this.#add(userId, subscription);
+                },
+                cancel: () => {
+                    if (subscription) this.#remove(userId, subscription);
+                },
+            },
+            new ByteLengthQueuingStrategy({
+                highWaterMark: options.highWaterMark ?? 1024 * 1024,
+            }),
+        );
+    }
+
+    #add(userId: string, subscription: Subscription): void {
+        let set = this.#subscriptions.get(userId);
+        if (!set) this.#subscriptions.set(userId, (set = new Set()));
+        set.add(subscription);
+        this.#arm(userId, subscription);
     }
 
     /** Ends every stream of `userId`. @returns Whether there was one. */
@@ -132,7 +215,7 @@ export class VoiceReceiver {
     #close(userId: string, subscription: Subscription): void {
         this.#remove(userId, subscription);
         try {
-            subscription.controller.close();
+            subscription.close();
         } catch {
             // Already closed or cancelled.
         }
@@ -157,11 +240,8 @@ export class VoiceReceiver {
         if (!set) return;
         for (const subscription of set) {
             if (!silent) this.#arm(userId, subscription);
-            const { controller } = subscription;
-            // A reader that falls behind loses the newest frames, not memory.
-            if ((controller.desiredSize ?? 1) <= 0) continue;
             try {
-                controller.enqueue(frame);
+                subscription.deliver(frame);
             } catch {
                 // Closed by the consumer.
             }

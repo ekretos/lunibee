@@ -1,6 +1,6 @@
 ---
 title: Voice
-description: Join a voice channel, play files and streams, and receive audio with Lunibee — end-to-end encrypted (DAVE), Opus, FFmpeg.
+description: Join a voice channel, play files and streams, receive and record audio, and apply effects with Lunibee — end-to-end encrypted (DAVE), Opus, FFmpeg.
 ---
 
 From 0.4.0 a bot can join a voice channel and play audio, end to end: `client.voice.join()` connects to Discord's voice server (voice gateway v8, UDP, transport encryption, DAVE end-to-end encryption), an `AudioPlayer` sends 20 ms Opus frames, and a receiver gives you other users' audio.
@@ -87,6 +87,49 @@ for await (const opusPacket of stream) {
 ```
 
 `receiver.on("start" | "end", userId => …)` tells you who is talking. A stream keeps at most `highWaterMark` (50) packets for a slow reader and drops newer ones; it ends after a second of silence unless `end.behavior` is `"manual"`. Packets are decrypted (transport and DAVE) before you get them.
+
+## Recording
+
+```ts
+const recording = connection.receiver.record(userId); // Ogg/Opus, ends on unsubscribe()
+const saved = Bun.write(`./${userId}.ogg`, new Response(recording));
+// later
+connection.receiver.unsubscribe(userId);
+await saved;
+```
+
+`receiver.record(userId, { end?, highWaterMark? })` writes the user's packets as an Ogg/Opus stream (48 kHz stereo) without re-encoding; any player or FFmpeg reads it. Time the user is silent is kept as silence, counted from the start of the recording, so the recordings of several users started together line up. It ends on `unsubscribe()`, when the connection ends, or after silence with `end: { behavior: "silence", duration }`. A reader that stalls beyond `highWaterMark` (1 MiB) loses audio, which becomes silence, not memory. `OggOpusWriter` is the muxer underneath, for packets from anywhere.
+
+Record only people who know they are being recorded: Discord's Developer Policy requires their consent.
+
+## Effects and a live voice changer
+
+`effects` runs PCM effects on every frame of a resource, in order: `pitchShift(semitones)`, `robot(frequency?)`, `echo({ delay, feedback, mix })`, `gain(factor)`, or your own `{ process(samples: Int16Array) }`. Like `inlineVolume` they decode and re-encode, and `resource.effects` can be changed while it plays.
+
+```ts
+import { createAudioResource, pitchShift, robot } from "lunibee";
+
+player.play(createAudioResource("./song.ogg", { effects: [pitchShift(3)] }));
+```
+
+A voice changer bot plays a user's voice back through effects. `live: true` tells the player that a quiet source is not a failure, and drops frames that pile up beyond 100 ms so the delay stays low:
+
+```ts
+const voice = connection.receiver.subscribe(userId, { end: { behavior: "manual" } });
+const changed = createAudioResource(voice, {
+  inputType: "opus",
+  live: true,
+  effects: [pitchShift(7)],          // or [robot()], [pitchShift(-5), echo()]
+});
+player.play(changed);
+changed.effects!.splice(0, 1, robot()); // switch effect on the fly
+```
+
+The bot speaks as itself in the channel; it cannot change what other people hear from a user's own microphone. That needs a voice changer on the user's computer.
+
+## Video and Go Live
+
+Not supported: Discord does not let bot accounts send video or stream (Go Live). Only user accounts can, and automating a user account breaks Discord's Terms of Service.
 
 ## End-to-end encryption (DAVE)
 

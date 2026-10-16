@@ -35,6 +35,11 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
   - decrypts incoming RTP (transport and DAVE) and maps SSRC to user from op 5;
   - per-user streams end after silence; buffers are bounded (`highWaterMark`) and released on unsubscribe.
 - `entersState()` and `generateDependencyReport()`.
+- **Recording:** `receiver.record(userId)` gives an Ogg/Opus stream of a user, not re-encoded, with silence kept so recordings line up. `OggOpusWriter` is the muxer it uses.
+- **Effects and a live voice changer:**
+  - `effects` on `createAudioResource()`: `pitchShift()`, `robot()`, `echo()`, `gain()`, or your own; they can be changed while playing.
+  - `live: true` plays a user's voice back through effects without failing on their silence and keeps the delay low.
+  - Video and Go Live stay unsupported: Discord does not allow them for bot accounts.
 - `examples/music`: `/play`, `/skip`, `/queue`, `/stop` and `/leave`.
 
 ### 🐛 Fixed

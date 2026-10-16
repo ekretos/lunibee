@@ -257,6 +257,11 @@ export class AudioPlayer extends Emitter<AudioPlayerEvents> {
         const frame = resource.read();
         if (frame === null) return this.#end(resource);
         if (frame === undefined) {
+            // A live source is quiet while its user is; that is not a failure.
+            if (resource.live) {
+                if (!resource.started) this.#transition("buffering");
+                return this.#schedule();
+            }
             this.#transition("buffering");
             if (++this.#missed > this.#options.maxMissedFrames) {
                 this.#fail(

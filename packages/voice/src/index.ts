@@ -58,7 +58,15 @@ export {
     type VoiceServerInfo,
 } from "./networking.js";
 export { createOpusCodec, type OpusCodec } from "./opus.js";
-export { demuxOggOpus } from "./ogg.js";
+export { demuxOggOpus, OggOpusWriter } from "./ogg.js";
+export {
+    pitchShift,
+    robot,
+    echo,
+    gain,
+    type AudioEffect,
+    type EchoOptions,
+} from "./effects.js";
 export {
     AudioResource,
     VolumeControl,
@@ -79,6 +87,7 @@ export {
     VoiceReceiver,
     type ReceiveEnd,
     type ReceiveOptions,
+    type RecordOptions,
 } from "./receiver.js";
 export {
     VoiceConnection,

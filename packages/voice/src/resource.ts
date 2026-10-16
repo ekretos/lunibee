@@ -1,3 +1,4 @@
+import { applyEffects, type AudioEffect } from "./effects.js";
 import { demuxOggOpus } from "./ogg.js";
 import { createOpusCodec, type OpusCodec } from "./opus.js";
 import { PCM_FRAME_BYTES, VoiceError } from "./protocol.js";
@@ -28,9 +29,24 @@ export interface AudioResourceOptions<T = unknown> {
     metadata?: T;
     /** FFmpeg executable. Default `"ffmpeg"`. */
     ffmpegPath?: string;
-    /** Frames read ahead of playback. Default 10 (200 ms). */
+    /** Frames read ahead of playback. Default 10 (200 ms); 1 when `live`. */
     prefetch?: number;
+    /**
+     * PCM effects (`pitchShift`, `robot`, `echo`, `gain`, or your own), run in
+     * order on every frame. Like `inlineVolume`, they decode and re-encode.
+     * `resource.effects` can be changed while it plays.
+     */
+    effects?: AudioEffect[];
+    /**
+     * A live source (a user's voice from `receiver.subscribe()`): the player
+     * waits for it without counting missed frames, and frames that pile up
+     * beyond 100 ms are dropped to keep the delay low. Default false.
+     */
+    live?: boolean;
 }
+
+/** Most frames a live resource keeps queued before it drops the oldest (100 ms). */
+const LIVE_BACKLOG = 5;
 
 /** Inline volume of a resource created with `inlineVolume: true`. */
 export class VolumeControl {
@@ -122,6 +138,10 @@ export class AudioResource<T = unknown> {
     public readonly metadata: T;
     /** Inline volume, when created with `inlineVolume: true`. */
     public readonly volume?: VolumeControl;
+    /** The effects in use, when created with `effects`. Changes apply from the next frame. */
+    public readonly effects?: AudioEffect[];
+    /** Whether it is a live source (`live: true`). */
+    public readonly live: boolean;
     /** Milliseconds of this resource the player has sent. */
     public playbackDuration = 0;
     /** Whether the player took its first frame. */
@@ -140,6 +160,8 @@ export class AudioResource<T = unknown> {
         options: {
             metadata?: T;
             volume?: VolumeControl;
+            effects?: AudioEffect[];
+            live?: boolean;
             prefetch?: number;
             cleanup?: () => void;
         },
@@ -147,7 +169,11 @@ export class AudioResource<T = unknown> {
         this.#frames = frames;
         this.metadata = options.metadata as T;
         this.volume = options.volume;
-        this.#prefetch = Math.max(1, options.prefetch ?? 10);
+        this.effects = options.effects;
+        this.live = options.live ?? false;
+        this.#prefetch = this.live
+            ? Math.max(1, options.prefetch ?? 1)
+            : Math.max(1, options.prefetch ?? 10);
         if (options.cleanup) this.#cleanup.push(options.cleanup);
         this.#fill();
     }
@@ -172,13 +198,20 @@ export class AudioResource<T = unknown> {
         this.#filling = true;
         void (async () => {
             try {
-                while (!this.#done && this.#queue.length < this.#prefetch) {
+                while (
+                    !this.#done &&
+                    (this.live || this.#queue.length < this.#prefetch)
+                ) {
                     const next = await this.#frames.next();
                     if (next.done) {
                         this.#finish();
                         break;
                     }
-                    if (!this.#done) this.#queue.push(next.value);
+                    if (this.#done) break;
+                    this.#queue.push(next.value);
+                    // Live: keep up with the source; old frames would only add delay.
+                    if (this.live && this.#queue.length > LIVE_BACKLOG)
+                        this.#queue.shift();
                 }
             } catch (error) {
                 this.#error =
@@ -320,6 +353,12 @@ export function createAudioResource<T = unknown>(
         options.inputType ??
         (typeof input === "string" ? inferType(input) : "arbitrary");
     const volume = options.inlineVolume ? new VolumeControl() : undefined;
+    const effects = options.effects ? [...options.effects] : undefined;
+    const pcmOut = Boolean(volume || effects);
+    const transform = (pcm: Uint8Array): Uint8Array => {
+        const out = effects ? applyEffects(effects, pcm) : pcm;
+        return volume ? volume.apply(out) : out;
+    };
     const cleanups: (() => void)[] = [];
     let chunks: AsyncIterable<Uint8Array>;
 
@@ -327,11 +366,11 @@ export function createAudioResource<T = unknown>(
         const ffmpeg = spawnFFmpeg(
             input,
             options.ffmpegPath ?? "ffmpeg",
-            volume ? "raw" : "ogg/opus",
+            pcmOut ? "raw" : "ogg/opus",
         );
         cleanups.push(ffmpeg.kill);
         chunks = chunksOf(ffmpeg.stdout);
-        type = volume ? "raw" : "ogg/opus";
+        type = pcmOut ? "raw" : "ogg/opus";
     } else if (typeof input === "string") {
         if (/^https?:\/\//i.test(input))
             throw new VoiceError(`A URL needs inputType "arbitrary" (FFmpeg).`);
@@ -355,16 +394,16 @@ export function createAudioResource<T = unknown>(
         frames = (async function* () {
             for await (const pcm of source) {
                 const c = await getCodec();
-                yield c.encode(volume ? volume.apply(pcm) : pcm);
+                yield c.encode(transform(pcm));
             }
         })();
     } else {
         const packets = type === "ogg/opus" ? demuxOggOpus(chunks) : chunks;
-        frames = volume
+        frames = pcmOut
             ? (async function* () {
                   for await (const packet of packets) {
                       const c = await getCodec();
-                      yield c.encode(volume.apply(c.decode(packet)));
+                      yield c.encode(transform(c.decode(packet)));
                   }
               })()
             : (async function* () {
@@ -374,6 +413,8 @@ export function createAudioResource<T = unknown>(
     return new AudioResource<T>(frames, {
         metadata: options.metadata,
         volume,
+        effects,
+        live: options.live,
         prefetch: options.prefetch,
         cleanup: () => {
             for (const cleanup of cleanups) cleanup();

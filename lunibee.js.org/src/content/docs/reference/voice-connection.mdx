@@ -1,6 +1,6 @@
 ---
 title: Voice reference
-description: client.voice, VoiceConnection, AudioPlayer, AudioResource, VoiceReceiver, and the protocol layer of @lunibee/voice (voice gateway v8, UDP, encryption, DAVE).
+description: client.voice, VoiceConnection, AudioPlayer, AudioResource, VoiceReceiver, effects, and the protocol layer of @lunibee/voice (voice gateway v8, UDP, encryption, DAVE).
 ---
 
 Every name below is exported from `lunibee` and `@lunibee/voice`. Start with the [Voice guide](/core-concepts/voice/).
@@ -97,12 +97,15 @@ Timing: one frame every 20 ms on a clock that corrects its drift; when the event
 | `inlineVolume` | `false` | Adds `resource.volume` (`VolumeControl`): `set(gain)`, `setDecibels(db)`, `volume`. Decodes and re-encodes. |
 | `metadata` | none | Kept as `resource.metadata`. |
 | `ffmpegPath` | `"ffmpeg"` | |
-| `prefetch` | `10` | Frames read ahead (200 ms). |
+| `prefetch` | `10` (`1` when `live`) | Frames read ahead (200 ms). |
+| `effects` | none | `AudioEffect[]` run in order on every frame (decodes and re-encodes). Kept as `resource.effects`; changes apply from the next frame. |
+| `live` | `false` | A live source (a user's voice): the player waits through silence without counting missed frames, and frames queued beyond 100 ms are dropped. |
 
 | Member | Description |
 |---|---|
 | `read()` | The next Opus frame; `undefined` while buffering, `null` once ended. The player calls it. |
 | `ended`, `readable`, `started`, `error` | State. `error` is why it ended early. |
+| `effects`, `live` | As created. |
 | `playbackDuration` | Ms the player has sent. |
 | `destroy()` | Ends FFmpeg and the input and frees the codec. |
 
@@ -113,16 +116,31 @@ Timing: one frame every 20 ms on a clock that corrects its drift; when the event
 | Member | Description |
 |---|---|
 | `subscribe(userId, { end?, highWaterMark? })` | A `ReadableStream<Uint8Array>` of the user's Opus packets. `end`: `{ behavior: "silence", duration? }` (default, 1000 ms without audio; silence frames count as none) or `{ behavior: "manual" }`. `highWaterMark` (50) bounds the backlog; newer packets are dropped beyond it. Cancelling the stream unsubscribes. |
-| `unsubscribe(userId)` | Ends the user's streams. |
+| `record(userId, { end?, highWaterMark? })` | A `ReadableStream<Uint8Array>` of Ogg/Opus bytes (48 kHz stereo, not re-encoded). Silence is kept as silence frames, from the start of the recording. `end` defaults to `{ behavior: "manual" }`; `highWaterMark` (1 MiB of bytes) bounds the backlog, beyond which audio becomes silence. |
+| `unsubscribe(userId)` | Ends the user's streams and recordings. |
 | `ssrcOf(userId)` | The user's SSRC, once they spoke. |
 | `speaking` | Users who sent audio in the last 100 ms. |
 | `on("start" \| "end", userId => …)` | A user started or stopped sending audio. |
+
+## Effects
+
+Each returns an `AudioEffect` (`{ process(samples: Int16Array): void }`, one 20 ms frame of 48 kHz stereo interleaved samples, changed in place). Effects keep state: use one instance per resource.
+
+| Export | Description |
+|---|---|
+| `pitchShift(semitones)` | -24 to 24; +12 is an octave up. Granular delay-line shifter (about 40 ms latency); speed is unchanged. |
+| `robot(frequency = 50)` | Ring modulation with a 1 to 2,000 Hz carrier. |
+| `echo({ delay = 250, feedback = 0.4, mix = 0.5 })` | `delay` 1 to 2,000 ms, `feedback` 0 to 0.95, `mix` 0 to 1. |
+| `gain(factor)` | 0 to 16, clipped. |
+
+Out-of-range values throw a `RangeError`.
 
 ## Codecs and helpers
 
 | Export | Description |
 |---|---|
 | `createOpusCodec()` | `Promise<OpusCodec>` from `@discordjs/opus`, else `opusscript`: `encode(pcm)` (one 3,840-byte 20 ms frame), `decode(packet)`, `destroy()`, `library`. Throws a `VoiceError` when neither is installed. |
+| `OggOpusWriter` | Ogg/Opus muxer: `header()`, `write(packet)` (a page every 50 packets), `flush()`, `end()`. Each packet counts as 20 ms. |
 | `demuxOggOpus(chunks)` | An async generator of Opus packets from an Ogg/Opus byte stream; throws a `VoiceError` for anything that is not Ogg/Opus. |
 | `entersState(target, status, timeoutMs)` | Resolves when a connection or player reaches `status`, rejects with a `VoiceError` after `timeoutMs`. |
 | `generateDependencyReport()` | `{ dave, opus, ffmpeg }`: what this runtime can load, or `null` for each that it cannot. |

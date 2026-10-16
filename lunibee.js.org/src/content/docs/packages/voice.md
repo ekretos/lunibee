@@ -3,7 +3,7 @@ title: "@lunibee/voice"
 description: Discord voice for Bun — voice gateway v8, UDP, transport and DAVE end-to-end encryption, Opus, FFmpeg, player and receiver.
 ---
 
-`@lunibee/voice` connects a bot to Discord voice and plays audio: the voice gateway (v8), IP discovery and RTP over UDP, transport encryption (`aead_aes256_gcm_rtpsize`, `aead_xchacha20_poly1305_rtpsize`), DAVE end-to-end encryption through `@snazzah/davey`, Ogg/Opus passthrough, Opus encoding, FFmpeg, a 20 ms player and a receiver. `lunibee` wires it to the client as `client.voice`.
+`@lunibee/voice` connects a bot to Discord voice and plays audio: the voice gateway (v8), IP discovery and RTP over UDP, transport encryption (`aead_aes256_gcm_rtpsize`, `aead_xchacha20_poly1305_rtpsize`), DAVE end-to-end encryption through `@snazzah/davey`, Ogg/Opus passthrough, Opus encoding, FFmpeg, a 20 ms player, a receiver, recording to Ogg/Opus, and effects (pitch shift, robot, echo) for a live voice changer. `lunibee` wires it to the client as `client.voice`.
 
 ```ts
 const connection = await bot.voice.join({ guildId, channelId });
