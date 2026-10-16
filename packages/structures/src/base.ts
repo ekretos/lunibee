@@ -253,7 +253,7 @@ export class Channel extends BaseStructure {
     public constructor(
         data: import("@lunibee/types").APIChannel,
         context?: ResourceContext,
-        options: { partial?: boolean } = {},
+        options?: { partial?: boolean },
     ) {
         super(data.id);
         if (!Number.isInteger(data.type) || data.type < 0)
@@ -271,7 +271,7 @@ export class Channel extends BaseStructure {
         this.permissionOverwrites = (data.permission_overwrites ?? []).map(
             (overwrite) => ({ ...overwrite }),
         );
-        this.partial = options.partial ?? false;
+        this.partial = options?.partial ?? false;
         this.#context = context;
     }
 

@@ -1,4 +1,4 @@
-import { Manager, ResourceManager, splitReason } from "./base.js";
+import { Manager, ResourceManager, assignFields, splitReason } from "./base.js";
 export { Manager, ResourceManager } from "./base.js";
 /** Discord.js-familiar alias for {@link ResourceManager}. */
 export { ResourceManager as CachedManager } from "./base.js";
@@ -180,7 +180,7 @@ export class ChannelManager extends Manager<string, Channel> {
     #merge(channel: Channel): Channel {
         const existing = this.get(channel.id);
         if (existing && existing.type === channel.type) {
-            Object.assign(existing, channel);
+            assignFields(existing, channel);
             return existing;
         }
         this.set(channel.id, channel);
@@ -191,10 +191,13 @@ export class ChannelManager extends Manager<string, Channel> {
     }
     /** Removes every cached channel that belongs to a guild. @returns Number removed. */
     public deleteGuildChannels(guildId: string): number {
+        // Walks the cache once without copying it into an array first.
+        const ids: string[] = [];
+        this.cache.forEach((channel, id) => {
+            if (channel.guildId === guildId) ids.push(id);
+        });
         let removed = 0;
-        for (const channel of this.values())
-            if (channel.guildId === guildId && this.delete(channel.id))
-                removed++;
+        for (const id of ids) if (this.delete(id)) removed++;
         return removed;
     }
     /** Ends a poll now; returns the updated message. */

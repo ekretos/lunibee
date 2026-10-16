@@ -1,4 +1,4 @@
-import { Manager, splitReason } from "./base.js";
+import { Manager, assignFields, splitReason } from "./base.js";
 import { Emoji } from "@lunibee/structures";
 import { Routes, type REST } from "@lunibee/rest";
 
@@ -103,7 +103,7 @@ export class EmojiManager extends Manager<string, Emoji> {
     #merge(key: string, emoji: Emoji): Emoji {
         const existing = this.get(key);
         if (existing) {
-            Object.assign(existing, emoji);
+            assignFields(existing, emoji);
             return existing;
         }
         this.set(key, emoji);

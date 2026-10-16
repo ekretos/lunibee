@@ -1,5 +1,18 @@
 import { Collection } from "@lunibee/collection";
 
+/**
+ * Copies a structure's own fields onto the cached instance. A key loop: on Bun,
+ * Object.assign into an existing object is about twice as slow, on every event.
+ * Structures hold no symbol-keyed fields.
+ * @internal
+ */
+export function assignFields<T extends object>(into: T, from: T): T {
+    const target = into as Record<string, unknown>;
+    const source = from as Record<string, unknown>;
+    for (const key of Object.keys(source)) target[key] = source[key];
+    return into;
+}
+
 /** Splits the audit-log `reason` off an options object, so it becomes a header, not a body field. */
 export function splitReason<T extends { reason?: string }>(
     options: T,
@@ -156,7 +169,7 @@ export class ResourceManager<K, V> extends Manager<K, V> {
             typeof existing === "object" &&
             existing !== null
         ) {
-            Object.assign(existing, resource);
+            assignFields(existing, resource as typeof existing);
             this.set(key, existing);
             return existing;
         }

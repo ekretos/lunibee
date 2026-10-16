@@ -116,6 +116,8 @@ Measured against the 2026-09-30 record on the same machine, alternating runs (`d
 - **Update events are faster, with previous state kept:** the copy of the previous state is made only when the event has a listener (`client.listenerCount()` is new), the copy and the in-place merge use a key loop instead of `Object.assign` / `Object.entries`. Without a listener `GUILD_UPDATE` takes 0.42× the 0.3.1 time, `GUILD_ROLE_UPDATE` 0.60×, `GUILD_MEMBER_UPDATE` 0.57×; with one (and the previous state delivered) they are about 20% faster than 0.3.1 was without.
 - **`Collection.set()`** on a TTL collection is back to the 0.3.1 cost (it had become 1.44× slower) by updating an existing entry in place; LRU eviction is within 8%.
 - `bun run bench:compare` now compares with the new record.
+- **Cache merges no longer use `Object.assign`**, which is about twice as slow on Bun when the target already exists: channel, thread, emoji, message and resource-manager updates copy fields with a key loop. Measured on Bun 1.4.2 with the same payloads: `CHANNEL_CREATE` 0.8–1.0 µs → 0.3–0.37 µs, `CHANNEL_UPDATE` → 0.33–0.46 µs, `GUILD_EMOJIS_UPDATE` (10 emojis) 6.3 → 2.4–2.7 µs; `GUILD_DELETE` no longer copies every cached channel into an array (20 → 13 µs with 500 channels cached).
+- `scripts/bench-runtime.mjs` builds snowflakes without `BigInt`, so Gateway rows measure the event, not the payload; its `link` row no longer throws.
 
 ### 📚 Documentation
 

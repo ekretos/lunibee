@@ -240,7 +240,7 @@ for (const [name, run] of [
     ["strikethrough", () => lunibee.strikethrough("text")],
     ["spoiler", () => lunibee.spoiler("text")],
     ["masked", () => lunibee.masked("text", "https://example.com")],
-    ["link", () => lunibee.link("https://example.com")],
+    ["link", () => lunibee.link("text", "https://example.com")],
     ["inlineCode", () => lunibee.inlineCode("code")],
     ["codeBlock", () => lunibee.codeBlock("ts", "const a = 1;")],
     ["blockQuote", () => lunibee.blockQuote("quote")],
@@ -259,7 +259,9 @@ for (const [name, run] of [
 
 const client = new Client({ token: "a.b", intents: [] });
 const gateway = client.gateway;
-const sf = (n) => String(200_000_000_000_000_000n + BigInt(n));
+// 2 followed by n in 17 digits: the same ids as 200000000000000000n + n, without
+// BigInt, so the payload costs little next to the event it feeds (n < 10^17).
+const sf = (n) => "2" + String(n).padStart(17, "0");
 const guildId = sf(1);
 const channelId = sf(2);
 const user = (n) => ({ id: sf(1_000_000 + n), username: `u${n}`, discriminator: "0", avatar: null, global_name: null });

@@ -1,4 +1,5 @@
 import { Collection } from "@lunibee/collection";
+import { assignFields } from "./base.js";
 
 /** Opt-in per-channel message cache. Messages are temporary data, so they
  * use bounded TTL/LRU storage rather than permanent resource storage. */
@@ -164,7 +165,7 @@ export class MessageManager {
         const existing = this.cache.peek(data.id);
         const message = new Message(data, this.#context);
         if (existing) {
-            Object.assign(existing, message);
+            assignFields(existing, message);
             return existing;
         }
         if (this.#caching) this.cache.set(message.id, message);
