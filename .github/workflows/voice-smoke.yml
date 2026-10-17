@@ -1,0 +1,53 @@
+name: Voice smoke test (real Discord)
+
+# Manual only: joins a real voice channel, plays a 1-minute file and leaves.
+# Needs the `voice-smoke` environment (add required reviewers to protect it) with
+# the secrets DISCORD_TOKEN, VOICE_GUILD_ID and VOICE_CHANNEL_ID: a test bot in a
+# test guild, with Connect and Speak in that channel.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voice-smoke
+  cancel-in-progress: false
+
+jobs:
+  voice:
+    name: Real-guild voice (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    environment: voice-smoke
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 1 # one bot, one voice connection at a time
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: bun run ci:install
+
+      - name: Build
+        run: bun run build
+
+      - name: Play a 1-minute file in a test guild and leave
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          VOICE_GUILD_ID: ${{ secrets.VOICE_GUILD_ID }}
+          VOICE_CHANNEL_ID: ${{ secrets.VOICE_CHANNEL_ID }}
+        run: bun run smoke:voice
