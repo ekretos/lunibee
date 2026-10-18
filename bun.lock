@@ -28,14 +28,14 @@
     },
     "packages/builders": {
       "name": "@lunibee/builders",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
     },
     "packages/cli": {
       "name": "@lunibee/cli",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "bin": {
         "lunibee": "./dist/index.js",
       },
@@ -45,11 +45,11 @@
     },
     "packages/collection": {
       "name": "@lunibee/collection",
-      "version": "0.3.1",
+      "version": "0.3.3",
     },
     "packages/core": {
       "name": "@lunibee/core",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@lunibee/builders": "workspace:*",
         "@lunibee/collection": "workspace:*",
@@ -63,22 +63,22 @@
     },
     "packages/create": {
       "name": "@lunibee/create",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "bin": {
         "create-lunibee": "./dist/cli.js",
       },
     },
     "packages/formatters": {
       "name": "@lunibee/formatters",
-      "version": "0.3.1",
+      "version": "0.3.3",
     },
     "packages/handlers": {
       "name": "@lunibee/handlers",
-      "version": "0.3.1",
+      "version": "0.3.3",
     },
     "packages/managers": {
       "name": "@lunibee/managers",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@lunibee/collection": "workspace:*",
         "@lunibee/rest": "workspace:*",
@@ -88,28 +88,28 @@
     },
     "packages/rest": {
       "name": "@lunibee/rest",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
     },
     "packages/sharding": {
       "name": "@lunibee/sharding",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@lunibee/ws": "workspace:*",
       },
     },
     "packages/structures": {
       "name": "@lunibee/structures",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
     },
     "packages/testing": {
       "name": "@lunibee/testing",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@lunibee/builders": "workspace:*",
         "@lunibee/collection": "workspace:*",
@@ -125,19 +125,19 @@
     },
     "packages/types": {
       "name": "@lunibee/types",
-      "version": "0.3.1",
+      "version": "0.3.3",
     },
     "packages/utils": {
       "name": "@lunibee/utils",
-      "version": "0.3.1",
+      "version": "0.3.3",
     },
     "packages/voice": {
       "name": "@lunibee/voice",
-      "version": "0.3.1",
+      "version": "0.3.3",
     },
     "packages/ws": {
       "name": "@lunibee/ws",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@lunibee/types": "workspace:*",
       },
@@ -224,7 +224,7 @@
 
     "bun-types": ["bun-types@1.4.2", "", { "dependencies": { "@types/node": "*" } }, "sha512-bxV1FgK7yBIzjRe5zBozIM4Bem11ZJcCXSrjWRG3YWLt8yFDePu4cLjpebO8OvPeIE9trbyPF4fuj3Cia4Fj3w=="],
 
-    "prettier": ["prettier@3.9.9", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg=="],
+    "prettier": ["prettier@3.9.10", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA=="],
 
     "typescript": ["typescript@7.0.2", "", { "optionalDependencies": { "@typescript/typescript-aix-ppc64": "7.0.2", "@typescript/typescript-darwin-arm64": "7.0.2", "@typescript/typescript-darwin-x64": "7.0.2", "@typescript/typescript-freebsd-arm64": "7.0.2", "@typescript/typescript-freebsd-x64": "7.0.2", "@typescript/typescript-linux-arm": "7.0.2", "@typescript/typescript-linux-arm64": "7.0.2", "@typescript/typescript-linux-loong64": "7.0.2", "@typescript/typescript-linux-mips64el": "7.0.2", "@typescript/typescript-linux-ppc64": "7.0.2", "@typescript/typescript-linux-riscv64": "7.0.2", "@typescript/typescript-linux-s390x": "7.0.2", "@typescript/typescript-linux-x64": "7.0.2", "@typescript/typescript-netbsd-arm64": "7.0.2", "@typescript/typescript-netbsd-x64": "7.0.2", "@typescript/typescript-openbsd-arm64": "7.0.2", "@typescript/typescript-openbsd-x64": "7.0.2", "@typescript/typescript-sunos-x64": "7.0.2", "@typescript/typescript-win32-arm64": "7.0.2", "@typescript/typescript-win32-x64": "7.0.2" }, "bin": { "tsc": "bin/tsc" } }, "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA=="],
 
