@@ -87,8 +87,11 @@ describe("Gateway resume / reconnect behaviour", () => {
         await Bun.sleep(10);
         const next = FakeWebSocket.instances.at(-1)!;
         expect(next).not.toBe(socket);
-        // Reconnect targets the resume URL, then RESUMEs the same session.
-        expect(next.url).toBe("wss://gateway-us-east1-b.discord.gg");
+        // Reconnect targets the resume URL (with the connect URL's query),
+        // then RESUMEs the same session.
+        expect(next.url).toBe(
+            "wss://gateway-us-east1-b.discord.gg/?v=10&encoding=json",
+        );
         next.open();
         next.receive({
             op: GatewayOpcodes.Hello,

@@ -82,6 +82,7 @@ describe("shutdown", () => {
     test("a closed Gateway sends no heartbeats and opens no sockets", async () => {
         const g = gateway({ reconnect: true });
         const socket = await ready(g, 15);
+        socket.autoAck = true;
         await wait(60);
         expect(heartbeats(socket)).toBeGreaterThan(0);
         g.close();
@@ -96,6 +97,7 @@ describe("lifecycle", () => {
     test("a second HELLO does not start a second heartbeat loop", async () => {
         const g = gateway({ reconnect: false });
         const socket = await ready(g, 20);
+        socket.autoAck = true;
         socket.receive({
             op: GatewayOpcodes.Hello,
             d: { heartbeat_interval: 20 },

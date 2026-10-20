@@ -208,8 +208,11 @@ describe("connection attempt coordination", () => {
 });
 
 /** Connects a Gateway and drives it to READY with a resumable session. */
-async function connectReady(gateway: Gateway): Promise<FakeWebSocket> {
-    const connecting = gateway.connect("wss://main.test");
+async function connectReady(
+    gateway: Gateway,
+    url = "wss://main.test",
+): Promise<FakeWebSocket> {
+    const connecting = gateway.connect(url);
     const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]!;
     socket.open();
     await connecting;
@@ -260,19 +263,25 @@ describe("Gateway reconnect wiring", () => {
         gateway.close();
     });
 
-    test("6: a resumable close reconnects to the resume host", async () => {
+    test("6: a resumable close reconnects to the resume host, keeping the connect URL's query", async () => {
         const gateway = new Gateway({
             token: "token",
             intents: [1],
             reconnect: true,
             reconnectBaseDelay: 5,
             reconnectMaxDelay: 5,
+            compress: true,
         });
-        const socket = await connectReady(gateway);
+        const socket = await connectReady(
+            gateway,
+            "wss://main.test/?v=10&encoding=json",
+        );
         socket.close(1006);
         await wait(40);
+        // READY's resume_gateway_url is a bare host: v, encoding and compress
+        // come from the URL the Gateway connected with.
         expect(FakeWebSocket.instances[1]!.url).toBe(
-            "wss://gateway-us-east1-b.discord.gg",
+            "wss://gateway-us-east1-b.discord.gg/?v=10&encoding=json&compress=zlib-stream",
         );
         gateway.close();
     });
@@ -294,7 +303,8 @@ describe("Gateway reconnect wiring", () => {
         await wait(40);
 
         const second = FakeWebSocket.instances[1]!;
-        expect(second.url).not.toBe("wss://gateway-us-east1-b.discord.gg");
+        // IDENTIFY reconnects dial the caller's URL, not Discord's default.
+        expect(second.url).toBe("wss://main.test");
         second.open();
         second.receive({
             op: GatewayOpcodes.Hello,

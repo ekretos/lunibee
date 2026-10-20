@@ -538,7 +538,9 @@ describe("Gateway integration lifecycle", () => {
         await Bun.sleep(10);
 
         const socket2 = FakeWebSocket.instances[1]!;
-        expect(socket2.url).toBe("wss://gateway-us-east1-b.discord.gg");
+        expect(socket2.url).toBe(
+            "wss://gateway-us-east1-b.discord.gg/?v=10&encoding=json",
+        );
         socket2.open();
 
         socket2.receive({

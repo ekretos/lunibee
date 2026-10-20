@@ -379,7 +379,9 @@ describe("Gateway session wiring", () => {
         await new Promise((resolve) => setTimeout(resolve, 40));
 
         const second = FakeWebSocket.instances[1]!;
-        expect(second.url).toBe("wss://gateway-us-east1-b.discord.gg");
+        expect(second.url).toBe(
+            "wss://gateway-us-east1-b.discord.gg/?compress=zlib-stream",
+        );
         second.open();
         second.receive({
             op: GatewayOpcodes.Hello,

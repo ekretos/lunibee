@@ -38,6 +38,8 @@ export class FakeWebSocket {
     closeCode?: number;
     closeReason?: string;
     closeCalls: Array<{ code: number; reason: string }> = [];
+    /** Answer every heartbeat (op 1) with an ACK (op 11), like a healthy Gateway. */
+    autoAck = false;
     readonly #listeners = new Map<string, Set<Listener>>();
 
     constructor(url: string) {
@@ -55,6 +57,11 @@ export class FakeWebSocket {
         if (this.readyState !== FakeWebSocket.OPEN)
             throw new Error("socket is not open");
         this.sent.push(data);
+        if (this.autoAck && (JSON.parse(data) as { op?: number }).op === 1)
+            queueMicrotask(() => {
+                if (this.readyState === FakeWebSocket.OPEN)
+                    this.receive({ op: 11 });
+            });
     }
 
     close(code = 1000, reason = ""): void {

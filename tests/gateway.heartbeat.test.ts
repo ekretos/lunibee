@@ -20,7 +20,12 @@ interface Harness {
 }
 
 function harness(
-    options: { ackTimeout?: number; zombieTimeout?: number } = {},
+    options: {
+        ackTimeout?: number;
+        zombieTimeout?: number;
+        /** Acknowledge every beat on the next microtask, like a healthy Gateway. */
+        autoAck?: boolean;
+    } = {},
 ): Harness {
     const sent: Array<number | null> = [];
     const timeouts: HeartbeatTimeout[] = [];
@@ -35,6 +40,7 @@ function harness(
         send: (value) => {
             if (failing) return false;
             sent.push(value);
+            if (options.autoAck) queueMicrotask(() => heartbeat.acknowledge());
             return true;
         },
         sequence: () => sequence,
@@ -110,7 +116,7 @@ describe("GatewayHeartbeat beating", () => {
     });
 
     test("start() beats on the interval after a jittered first beat", async () => {
-        const h = harness();
+        const h = harness({ autoAck: true });
         h.heartbeat.start(30);
         expect(h.heartbeat.interval).toBe(30);
         await wait(80);
@@ -123,7 +129,7 @@ describe("GatewayHeartbeat beating", () => {
     });
 
     test("restarting replaces the previous interval instead of stacking", async () => {
-        const h = harness();
+        const h = harness({ autoAck: true });
         h.heartbeat.start(1000);
         h.heartbeat.start(20);
         await wait(70);
@@ -248,7 +254,11 @@ describe("GatewayHeartbeat cadence (P0 audit)", () => {
     test("the interval starts after the jittered first beat, so beats never bunch up", async () => {
         const originalRandom = Math.random;
         Math.random = () => 0.9;
-        const h = harness({ ackTimeout: 200, zombieTimeout: 400 });
+        const h = harness({
+            ackTimeout: 200,
+            zombieTimeout: 400,
+            autoAck: true,
+        });
         try {
             h.heartbeat.start(40);
             await wait(45);

@@ -61,7 +61,7 @@ describe("Gateway connect idempotency (P1: duplicate sockets)", () => {
         gateway.close();
     });
 
-    test("a manual connect cancels a pending reconnect instead of racing it", async () => {
+    test("a manual connect joins a pending reconnect instead of racing or cancelling it", async () => {
         const gateway = new Gateway({
             token: "token",
             intents: [1],
@@ -76,9 +76,12 @@ describe("Gateway connect idempotency (P1: duplicate sockets)", () => {
 
         // Drop the connection so a reconnect is scheduled.
         first.close(1006);
-        // Reconnect immediately by hand, then let the scheduled timer elapse.
+        // Reconnect by hand: no socket opens until the backoff elapses.
         const manual = gateway.connect("wss://example.test");
-        FakeWebSocket.instances[1]?.open();
+        expect(FakeWebSocket.instances).toHaveLength(1);
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        expect(FakeWebSocket.instances).toHaveLength(2);
+        FakeWebSocket.instances[1]!.open();
         await manual;
         await new Promise((resolve) => setTimeout(resolve, 60));
 

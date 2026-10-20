@@ -211,6 +211,10 @@ export class Gateway {
     #closed = false;
     /** Whether the next IDENTIFY follows a `connect()`, which its caller paced. */
     #paced = false;
+    /** The URL of the last `connect()`, with compression applied; reconnects derive from it. */
+    #connectURL = DEFAULT_GATEWAY_URL;
+    /** True while `close` listeners run for a close that will arm a reconnect. */
+    #arming = false;
     /**
      * Close classification, backoff, scheduling, and the coordination that
      * keeps at most one logical connection attempt in flight.
@@ -280,6 +284,7 @@ export class Gateway {
             throw new RangeError(
                 "Gateway zombieTimeout must be greater than heartbeatAckTimeout",
             );
+        this.#connectURL = this.#withCompression(DEFAULT_GATEWAY_URL);
         this.#transport = new WebSocketTransport({
             compress: this.#options.compress,
             createSocket: options.createSocket,
@@ -353,8 +358,14 @@ export class Gateway {
         );
     }
 
-    /** Opens the Gateway connection. @param url Gateway WebSocket URL. @returns Promise fulfilled when the socket opens; it rejects with a GatewayError if the Gateway was permanently closed or cannot connect. */
-    public connect(url = DEFAULT_GATEWAY_URL): Promise<void> {
+    /**
+     * Opens the Gateway connection.
+     * @param url Gateway WebSocket URL. Defaults to the URL of the last `connect()`, else Discord's main Gateway.
+     * It is remembered: reconnects that IDENTIFY dial it again, and every reconnect (including a RESUME
+     * on `resume_gateway_url`) carries its query parameters (`v`, `encoding`, `compress`).
+     * @returns Promise fulfilled when the socket opens; it rejects with a GatewayError if the Gateway was permanently closed or cannot connect.
+     */
+    public connect(url?: string): Promise<void> {
         if (this.state === GatewayState.Closed)
             return Promise.reject(
                 new GatewayError("Gateway has been permanently closed."),
@@ -368,19 +379,43 @@ export class Gateway {
         // interleaves two sequence streams (corrupting a later RESUME) and
         // sends a second IDENTIFY on the same session.
         if (this.#transport.live) return Promise.resolve();
-        // A manual connect supersedes a scheduled reconnect; leaving the timer
-        // armed would open a second socket once it fires.
-        this.#reconnect.cancel();
+        if (url !== undefined) this.#connectURL = this.#withCompression(url);
+        // A reconnect is already armed: join it rather than cancelling its
+        // backoff. Cancelling let a caller that reconnects on every `close`
+        // dial in a tight loop, past the backoff and storm detection.
+        if (this.#reconnect.pending || this.#arming)
+            return this.#reconnect.attempt(() => {});
         this.#closed = false;
         this.#paced = true;
         this.#setState(GatewayState.Connect);
-        // Append compression parameter if enabled
-        const connectURL = this.#options.compress
-            ? url.includes("compress=")
-                ? url
-                : `${url}${url.includes("?") ? "&" : "?"}compress=zlib-stream`
-            : url;
+        const connectURL = this.#connectURL;
         return this.#reconnect.attempt(() => this.#open(connectURL));
+    }
+    /** `url` with `compress=zlib-stream` added when compression is enabled. */
+    #withCompression(url: string): string {
+        if (!this.#options.compress || url.includes("compress=")) return url;
+        return `${url}${url.includes("?") ? "&" : "?"}compress=zlib-stream`;
+    }
+    /**
+     * Where a reconnect dials: the trusted resume host when the session can
+     * resume, else the URL the caller connected to. A resume host from READY
+     * is a bare host, so the connect URL's query (`v`, `encoding`, `compress`)
+     * is carried over; without it Discord would apply its defaults.
+     */
+    #reconnectURL(): string {
+        const base = this.#connectURL;
+        const target = this.#session.connectURL(base);
+        if (target === base) return base;
+        try {
+            const from = new URL(base);
+            if (!from.search) return target;
+            const to = new URL(target);
+            for (const [key, value] of from.searchParams)
+                if (!to.searchParams.has(key)) to.searchParams.set(key, value);
+            return to.toString();
+        } catch {
+            return target;
+        }
     }
     /** Permanently closes the Gateway connection. */
     public close(): void {
@@ -743,7 +778,15 @@ export class Gateway {
             code,
             this.#session.canResume,
         );
-        this.#emit("close", { code, action });
+        // A `close` listener that calls connect() must join the reconnect this
+        // close is about to arm, not dial ahead of its backoff.
+        this.#arming =
+            !this.#closed && this.#reconnect.enabled && action !== "stop";
+        try {
+            this.#emit("close", { code, action });
+        } finally {
+            this.#arming = false;
+        }
         if (this.#closed || !this.#reconnect.enabled || action === "stop") {
             // A fatal close is terminal: the condition behind 4004/4013/4014
             // cannot fix itself, so the Gateway settles as CLOSED rather than
@@ -763,7 +806,7 @@ export class Gateway {
         }
         if (action === "identify")
             // Fresh IDENTIFY: drop the session AND its resume host so the
-            // reconnect targets the main Gateway, not a stale resume URL.
+            // reconnect targets the connect URL, not a stale resume URL.
             this.#session.invalidate(token, "session-timeout");
         this.#setState(GatewayState.Reconnect);
         this.#scheduleReconnect();
@@ -771,7 +814,7 @@ export class Gateway {
     #scheduleReconnect(): void {
         if (this.#closed) return;
         const result = this.#reconnect.schedule(() =>
-            this.#open(this.#session.connectURL(DEFAULT_GATEWAY_URL)),
+            this.#open(this.#reconnectURL()),
         );
         if (result.scheduled) {
             this.#reconnects++;

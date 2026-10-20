@@ -60,6 +60,8 @@ export class GatewayHeartbeat {
     #latency = -1;
     #lastMessageAt = 0;
     #zombieReported = false;
+    /** Whether a heartbeat reached the wire and has not been acknowledged yet. */
+    #awaitingAck = false;
     #timer?: ReturnType<typeof setInterval>;
     #initialTimer?: ReturnType<typeof setTimeout>;
     #ackTimer?: ReturnType<typeof setTimeout>;
@@ -143,14 +145,34 @@ export class GatewayHeartbeat {
         this.#clearBeatTimers();
         this.#interval = interval;
         this.#acknowledged = true;
+        this.#awaitingAck = false;
         // The regular cadence starts from the first beat, not from HELLO:
         // arming both at once can fire two beats back to back when the
         // jitter lands near the full interval.
         this.#initialTimer = setTimeout(() => {
             this.#initialTimer = undefined;
             this.sendHeartbeat();
-            this.#timer = setInterval(() => this.sendHeartbeat(), interval);
+            this.#timer = setInterval(() => this.#scheduledBeat(), interval);
         }, Math.random() * interval);
+    }
+
+    /**
+     * A regular beat. Discord's rule: a heartbeat still unacknowledged when the
+     * next one is due means the connection is a zombie. Without this check, an
+     * `ackTimeout` at or above the interval was re-armed by every beat and
+     * never fired, so a link that kept dispatching but never ACKed lived on.
+     */
+    #scheduledBeat(): void {
+        if (this.#awaitingAck) {
+            // Report once: the owner closes, and the next HELLO restarts beating.
+            this.#clearBeatTimers();
+            this.#options.onTimeout({
+                type: "ack",
+                elapsedMs: this.#now() - this.#sentAt,
+            });
+            return;
+        }
+        this.sendHeartbeat();
     }
 
     /** Stops every timer. Safe to call more than once. */
@@ -172,6 +194,7 @@ export class GatewayHeartbeat {
             );
             return;
         }
+        this.#awaitingAck = true;
         this.#clearAckTimer();
         this.#ackTimer = setTimeout(() => {
             if (this.#acknowledged) return;
@@ -187,6 +210,7 @@ export class GatewayHeartbeat {
         // An ACK with no heartbeat outstanding carries no round trip to measure.
         if (this.#acknowledged) return;
         this.#acknowledged = true;
+        this.#awaitingAck = false;
         this.#latency = this.#now() - this.#sentAt;
         this.#clearAckTimer();
     }
