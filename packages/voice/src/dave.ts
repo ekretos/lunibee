@@ -93,6 +93,8 @@ export class DaveSession {
     #lastTransition?: number;
     #downgraded = false;
     #reinitializing = false;
+    /** An upgrade from transport-only (op 24, epoch 1) is pending: media stays unencrypted until it executes. */
+    #upgrading = false;
     #failures = 0;
 
     public constructor(
@@ -178,6 +180,7 @@ export class DaveSession {
             this.#session?.setPassthroughMode(true, TRANSITION_EXPIRY_S);
         }
         this.#reinitializing = false;
+        this.#upgrading = false;
         this.#lastTransition = transitionId;
         this.#pending.delete(transitionId);
         this.#hooks.debug?.(
@@ -189,6 +192,8 @@ export class DaveSession {
     /** Op 24. */
     public prepareEpoch(epoch: number, protocolVersion: number): void {
         if (epoch === 1) {
+            if (this.protocolVersion === 0 && protocolVersion > 0)
+                this.#upgrading = true;
             this.protocolVersion = protocolVersion;
             this.reinit();
         }
@@ -240,10 +245,18 @@ export class DaveSession {
         this.reinit();
     }
 
-    /** End-to-end encrypts an outgoing Opus frame (silence frames stay as they are). */
-    public encrypt(frame: Uint8Array): Uint8Array {
-        if (!this.active || equalBytes(frame, SILENCE_FRAME)) return frame;
-        return this.#session!.encryptOpus(Buffer.from(frame));
+    /**
+     * End-to-end encrypts an outgoing Opus frame. Silence frames, frames
+     * without DAVE (protocol version 0) and frames during an upgrade from
+     * transport-only stay as they are. @returns The frame to send, or `null`
+     * to drop it: DAVE is required but the MLS group is not ready (joining, or
+     * recovering from an invalid commit), so it must not leave unencrypted.
+     */
+    public encrypt(frame: Uint8Array): Uint8Array | null {
+        if (this.protocolVersion === 0 || equalBytes(frame, SILENCE_FRAME))
+            return frame;
+        if (!this.#session?.ready) return this.#upgrading ? frame : null;
+        return this.#session.encryptOpus(Buffer.from(frame));
     }
 
     /** Decrypts a frame from `userId`. @returns The Opus frame, or `null` to drop it. */

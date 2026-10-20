@@ -85,7 +85,7 @@ export interface JoinVoiceChannelOptions {
     /** Socket factories and URL override, for tests. */
     networking?: Pick<
         VoiceNetworkingOptions,
-        "socketFactory" | "udpFactory" | "url" | "daveModule"
+        "socketFactory" | "udpFactory" | "url" | "daveModule" | "resume"
     >;
 }
 
@@ -293,6 +293,12 @@ export class VoiceConnection extends Emitter<VoiceConnectionEvents> {
         this.channelId = data.channel_id;
         // A move (by us or a moderator) changes the DAVE group: reconnect.
         if (moved || newSession || !this.#networking) this.#connect();
+        // op 4 for the channel the live session is already in: nothing to reconnect.
+        else if (
+            this.status === "signalling" &&
+            this.#networking.state === "ready"
+        )
+            this.#setStatus("ready");
     }
 
     #onServer(data: VoiceServerData): void {
@@ -302,6 +308,9 @@ export class VoiceConnection extends Emitter<VoiceConnectionEvents> {
             this.#networking?.destroy();
             this.#networking = undefined;
             if (this.status === "ready") this.#setStatus("connecting");
+            // The new server may never come: the same time limit as a reconnect.
+            if (this.status === "connecting" && !this.#timer)
+                this.#armReconnectTimeout();
             return;
         }
         this.#token = data.token;
@@ -335,8 +344,10 @@ export class VoiceConnection extends Emitter<VoiceConnectionEvents> {
                 state: (state: NetworkingState) => {
                     if (this.#networking !== networking) return;
                     if (state === "ready") this.#setStatus("ready");
-                    else if (state === "resuming")
+                    else if (state === "resuming") {
                         this.#setStatus("connecting");
+                        if (!this.#timer) this.#armReconnectTimeout();
+                    }
                 },
                 close: (code, reason) => {
                     if (this.#networking !== networking) return;
@@ -354,7 +365,11 @@ export class VoiceConnection extends Emitter<VoiceConnectionEvents> {
                             ),
                         );
                 },
-                error: (error) => this.emit("error", error),
+                // A replaced or destroyed session's late failures are not this connection's.
+                error: (error) => {
+                    if (this.#networking === networking)
+                        this.emit("error", error);
+                },
                 audio: (user, frame) => this.receiver.push(user, frame),
                 speaking: (user, ssrc) => this.receiver.mapUser(user, ssrc),
                 clientDisconnect: (user) => this.receiver.forgetUser(user),
@@ -404,8 +419,12 @@ export class VoiceConnection extends Emitter<VoiceConnectionEvents> {
         }
         if (options.selfMute !== undefined) this.selfMute = options.selfMute;
         if (options.selfDeaf !== undefined) this.selfDeaf = options.selfDeaf;
-        // Only mute/deaf changed on a live connection: no reconnect needed.
-        if (this.status === "ready" && options.channelId === undefined)
+        // Same channel (or only mute/deaf) on a live connection: no reconnect needed.
+        if (
+            this.status === "ready" &&
+            (options.channelId === undefined ||
+                options.channelId === this.#sessionChannel)
+        )
             return this.#send(this.channelId);
         return this.#signal();
     }

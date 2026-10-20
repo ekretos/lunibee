@@ -250,9 +250,9 @@ describe("@snazzah/davey", () => {
         session.reinit();
         expect(packages.length).toBe(1);
         expect(packages[0]!.length).toBeGreaterThan(100);
-        // Not in a group yet: frames pass through unencrypted.
+        // Not in a group yet: DAVE is required, so frames are dropped, not sent in the clear.
         expect(session.active).toBe(false);
-        expect([...session.encrypt(Uint8Array.of(1, 2, 3))]).toEqual([1, 2, 3]);
+        expect(session.encrypt(Uint8Array.of(1, 2, 3))).toBeNull();
         session.destroy();
     });
 });

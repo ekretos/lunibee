@@ -158,7 +158,14 @@ export class VoiceReceiver {
                                     Math.round(gap / FRAME_DURATION_MS) - 1,
                                     MAX_GAP_FRAMES,
                                 );
-                                for (let i = 0; i < missing; i++)
+                                // Bounded by highWaterMark like audio: a long
+                                // gap is cut short rather than queued whole.
+                                for (
+                                    let i = 0;
+                                    i < missing &&
+                                    (controller.desiredSize ?? 1) > 0;
+                                    i++
+                                )
                                     emit(writer.write(SILENCE_FRAME));
                             }
                             last = now;

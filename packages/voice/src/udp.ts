@@ -66,6 +66,8 @@ export class VoiceUdp {
     readonly #port: number;
     readonly #keepalive: ReturnType<typeof setInterval>;
     readonly #listeners = new Set<(packet: Uint8Array) => void>();
+    /** Pending `discover()` calls, ended by `close()`. */
+    readonly #discoveries = new Set<() => void>();
     #counter = 0;
     #closed = false;
 
@@ -121,22 +123,28 @@ export class VoiceUdp {
         timeoutMs = DISCOVERY_TIMEOUT_MS,
     ): Promise<{ ip: string; port: number }> {
         return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
+            const settle = (
+                error?: Error,
+                found?: { ip: string; port: number },
+            ): void => {
+                clearTimeout(timer);
                 remove();
-                reject(new VoiceError("IP discovery timed out."));
-            }, timeoutMs);
+                this.#discoveries.delete(abort);
+                if (error) reject(error);
+                else resolve(found!);
+            };
+            const abort = (): void =>
+                settle(new VoiceError("The voice UDP socket is closed."));
+            const timer = setTimeout(
+                () => settle(new VoiceError("IP discovery timed out.")),
+                timeoutMs,
+            );
             const remove = this.onPacket((packet) => {
                 const found = parseDiscoveryResponse(packet);
-                if (!found) return;
-                clearTimeout(timer);
-                remove();
-                resolve(found);
+                if (found) settle(undefined, found);
             });
-            if (!this.send(discoveryRequest(ssrc))) {
-                clearTimeout(timer);
-                remove();
-                reject(new VoiceError("The voice UDP socket is closed."));
-            }
+            this.#discoveries.add(abort);
+            if (!this.send(discoveryRequest(ssrc))) abort();
         });
     }
 
@@ -162,6 +170,8 @@ export class VoiceUdp {
         if (this.#closed) return;
         this.#closed = true;
         clearInterval(this.#keepalive);
+        // A pending discovery ends now, not when its timer fires.
+        for (const abort of [...this.#discoveries]) abort();
         this.#listeners.clear();
         try {
             this.#socket.close();

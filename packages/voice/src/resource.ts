@@ -43,6 +43,8 @@ export interface AudioResourceOptions<T = unknown> {
      * beyond 100 ms are dropped to keep the delay low. Default false.
      */
     live?: boolean;
+    /** @internal Creates the Opus codec in place of {@link createOpusCodec} (tests). */
+    codecFactory?: () => Promise<OpusCodec>;
 }
 
 /** Most frames a live resource keeps queued before it drops the oldest (100 ms). */
@@ -264,7 +266,12 @@ function spawnFFmpeg(
     input: AudioInput,
     path: string,
     output: "ogg/opus" | "raw",
-): { stdout: ReadableStream<Uint8Array>; kill: () => void } {
+): {
+    stdout: ReadableStream<Uint8Array>;
+    kill: () => void;
+    /** Resolves when FFmpeg exited cleanly (or was killed); rejects with its error output otherwise. */
+    exited: () => Promise<void>;
+} {
     const fromURL = typeof input === "string" && /^https?:\/\//i.test(input);
     const args = [
         path,
@@ -299,8 +306,23 @@ function spawnFFmpeg(
     const proc = Bun.spawn(args, {
         stdin: fromURL ? "ignore" : "pipe",
         stdout: "pipe",
-        stderr: "ignore",
+        stderr: "pipe",
     });
+    let killed = false;
+    // The last 1,000 characters of FFmpeg's error output, for the error message.
+    const stderr = (async () => {
+        let tail = "";
+        const decoder = new TextDecoder();
+        try {
+            for await (const chunk of proc.stderr as ReadableStream<Uint8Array>)
+                tail = (tail + decoder.decode(chunk, { stream: true })).slice(
+                    -1000,
+                );
+        } catch {
+            // Killed.
+        }
+        return tail.trim();
+    })();
     if (!fromURL) {
         const sink = proc.stdin as unknown as {
             write(chunk: Uint8Array): unknown;
@@ -327,11 +349,20 @@ function spawnFFmpeg(
     return {
         stdout: proc.stdout as ReadableStream<Uint8Array>,
         kill: () => {
+            killed = true;
             try {
                 proc.kill();
             } catch {
                 // Already exited.
             }
+        },
+        exited: async () => {
+            const code = await proc.exited;
+            if (code === 0 || killed) return;
+            const output = await stderr;
+            throw new VoiceError(
+                `FFmpeg exited with code ${code}${output ? `: ${output}` : "."}`,
+            );
         },
     };
 }
@@ -369,7 +400,12 @@ export function createAudioResource<T = unknown>(
             pcmOut ? "raw" : "ogg/opus",
         );
         cleanups.push(ffmpeg.kill);
-        chunks = chunksOf(ffmpeg.stdout);
+        // An FFmpeg failure (bad input, unreachable URL) ends its output early:
+        // report it as the resource's error, not as a normal end.
+        chunks = (async function* () {
+            yield* chunksOf(ffmpeg.stdout);
+            await ffmpeg.exited();
+        })();
         type = pcmOut ? "raw" : "ogg/opus";
     } else if (typeof input === "string") {
         if (/^https?:\/\//i.test(input))
@@ -379,13 +415,20 @@ export function createAudioResource<T = unknown>(
 
     // The codec loads with the first frame that needs it, so this stays synchronous.
     let codec: OpusCodec | undefined;
-    const getCodec = async (): Promise<OpusCodec> => {
+    let destroyed = false;
+    /** @returns The codec, or `undefined` once the resource is destroyed (nothing may be encoded then). */
+    const getCodec = async (): Promise<OpusCodec | undefined> => {
         if (!codec) {
-            codec = await createOpusCodec();
-            const created = codec;
+            const created = await (options.codecFactory ?? createOpusCodec)();
+            // Destroyed while the library loaded: cleanup already ran, so free it here.
+            if (destroyed) {
+                created.destroy();
+                return undefined;
+            }
+            codec = created;
             cleanups.push(() => created.destroy());
         }
-        return codec;
+        return destroyed ? undefined : codec;
     };
 
     let frames: AsyncGenerator<Uint8Array>;
@@ -394,6 +437,7 @@ export function createAudioResource<T = unknown>(
         frames = (async function* () {
             for await (const pcm of source) {
                 const c = await getCodec();
+                if (!c) return;
                 yield c.encode(transform(pcm));
             }
         })();
@@ -403,6 +447,7 @@ export function createAudioResource<T = unknown>(
             ? (async function* () {
                   for await (const packet of packets) {
                       const c = await getCodec();
+                      if (!c) return;
                       yield c.encode(transform(c.decode(packet)));
                   }
               })()
@@ -417,6 +462,7 @@ export function createAudioResource<T = unknown>(
         live: options.live,
         prefetch: options.prefetch,
         cleanup: () => {
+            destroyed = true;
             for (const cleanup of cleanups) cleanup();
         },
     });

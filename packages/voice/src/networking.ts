@@ -56,7 +56,15 @@ export interface VoiceNetworkingOptions {
     debug?: (message: string) => void;
     /** @internal A DAVE implementation in place of `@snazzah/davey` (tests). */
     daveModule?: Awaited<ReturnType<typeof loadDave>>;
+    /** @internal Resume backoff (tests): attempts before giving up, first delay and cap in ms. */
+    resume?: { attempts?: number; delay?: number; maxDelay?: number };
 }
+
+/** Resume attempts after a recoverable close before the session is closed for good. */
+const RESUME_ATTEMPTS = 5;
+/** First resume delay; it doubles per attempt (with jitter) up to {@link RESUME_MAX_DELAY_MS}. */
+const RESUME_DELAY_MS = 250;
+const RESUME_MAX_DELAY_MS = 10_000;
 
 /** What a {@link VoiceNetworking} reports. */
 export interface VoiceNetworkingHandlers {
@@ -96,6 +104,10 @@ export class VoiceNetworking {
     #sequence = Math.floor(Math.random() * 0x10000);
     #timestamp = Math.floor(Math.random() * 0x100000000);
     #speaking = false;
+    #resumeAttempts = 0;
+    #resumeTimer?: ReturnType<typeof setTimeout>;
+    /** An outgoing frame failed to encrypt; reported once until one succeeds. */
+    #encryptFailing = false;
     readonly #users = new Map<number, string>();
     readonly #connected = new Set<string>();
 
@@ -204,6 +216,7 @@ export class VoiceNetworking {
             case VoiceOpcodes.Resumed:
                 if (this.state === "resuming") {
                     this.#speaking = false;
+                    this.#resumeAttempts = 0;
                     this.#setState("ready");
                 }
                 return;
@@ -323,6 +336,8 @@ export class VoiceNetworking {
             });
             this.#setState("selecting");
         } catch (error) {
+            // destroy() during the handshake: the failure is ours, not news.
+            if (this.state === "closed") return;
             this.#error(error);
             this.destroy();
             this.#handlers.close?.(
@@ -378,9 +393,35 @@ export class VoiceNetworking {
             canResumeVoice(code) &&
             (this.state === "ready" || this.state === "resuming")
         ) {
-            this.#debug(`Voice gateway closed (${code}); resuming.`);
-            this.#setState("resuming");
-            this.#gateway = this.#openGateway(this.#gateway.sequence);
+            const resume = this.#options.resume ?? {};
+            if (this.#resumeAttempts < (resume.attempts ?? RESUME_ATTEMPTS)) {
+                // Exponential backoff with jitter: a voice server that is gone
+                // (every socket closes at once with 1006) must not become a busy loop.
+                const base = Math.min(
+                    (resume.delay ?? RESUME_DELAY_MS) *
+                        2 ** this.#resumeAttempts,
+                    resume.maxDelay ?? RESUME_MAX_DELAY_MS,
+                );
+                const delay = Math.round(base / 2 + (Math.random() * base) / 2);
+                this.#resumeAttempts++;
+                this.#debug(
+                    `Voice gateway closed (${code}); resuming in ${delay} ms (attempt ${this.#resumeAttempts}).`,
+                );
+                this.#setState("resuming");
+                const sequence = this.#gateway.sequence;
+                this.#resumeTimer = setTimeout(() => {
+                    this.#resumeTimer = undefined;
+                    if (this.state === "resuming")
+                        this.#gateway = this.#openGateway(sequence);
+                }, delay);
+                (this.#resumeTimer as { unref?: () => void }).unref?.();
+                return;
+            }
+            this.destroy();
+            this.#handlers.close?.(
+                code,
+                `${reason ? `${reason} ` : ""}Could not resume the voice session after ${this.#resumeAttempts} attempts.`,
+            );
             return;
         }
         this.destroy();
@@ -418,7 +459,8 @@ export class VoiceNetworking {
 
     /**
      * Encrypts one 20 ms Opus frame (DAVE, then transport) and sends it.
-     * Sequence and timestamp advance by one frame either way.
+     * Sequence and timestamp advance by one frame either way. A frame DAVE
+     * cannot end-to-end encrypt yet (the MLS group is not ready) is dropped.
      * @returns Whether it was sent.
      */
     public sendFrame(frame: Uint8Array): boolean {
@@ -429,7 +471,24 @@ export class VoiceNetworking {
         const header = rtpHeader(this.#sequence, this.#timestamp, this.ssrc);
         this.#sequence = (this.#sequence + 1) & 0xffff;
         this.#timestamp = (this.#timestamp + FRAME_SAMPLES) >>> 0;
-        const payload = this.#dave ? this.#dave.encrypt(frame) : frame;
+        let payload: Uint8Array | null = frame;
+        if (this.#dave)
+            try {
+                payload = this.#dave.encrypt(frame);
+                this.#encryptFailing = false;
+            } catch (error) {
+                if (!this.#encryptFailing)
+                    this.#error(
+                        new VoiceError(
+                            `DAVE could not encrypt a frame; frames are dropped until it can: ${error instanceof Error ? error.message : String(error)}`,
+                            { cause: error },
+                        ),
+                    );
+                this.#encryptFailing = true;
+                return false;
+            }
+        // Never sent unencrypted while end-to-end encryption is required.
+        if (!payload) return false;
         return udp.send(cipher.seal(header, payload));
     }
 
@@ -437,6 +496,8 @@ export class VoiceNetworking {
     public destroy(): void {
         if (this.state === "closed") return;
         this.#setState("closed");
+        if (this.#resumeTimer) clearTimeout(this.#resumeTimer);
+        this.#resumeTimer = undefined;
         this.#gateway.close(1000, "Voice session ended.");
         this.#udp?.close();
         this.#udp = undefined;
