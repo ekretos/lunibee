@@ -120,10 +120,14 @@ export class RequestScheduler {
         });
         this.#queues.set(key, gate);
         let released = false;
+        let started = false;
         const release = (): void => {
             if (released) return;
             released = true;
-            open();
+            // Aborted while waiting: the request ahead may still be running, so
+            // the next one waits for it too instead of starting alongside it.
+            if (!started && previous) previous.then(open, open);
+            else open();
             // Drop our entry so idle buckets do not accumulate, but only if it
             // is still ours: a later request may already have replaced it.
             if (this.#queues.get(key) === gate) this.#queues.delete(key);
@@ -141,6 +145,7 @@ export class RequestScheduler {
                     else this.#waiting.delete(key);
                 }
             } else await abortable(Promise.resolve(), signal, path);
+            started = true;
             return await task(release);
         } finally {
             release();

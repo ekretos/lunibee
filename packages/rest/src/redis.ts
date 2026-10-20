@@ -611,7 +611,16 @@ export class RedisRateLimitStore implements RateLimitStore {
                     options.globalLimit ?? 0,
                     GLOBAL_WINDOW_MS,
                 );
-                return parseReservation(result);
+                const reservation = parseReservation(result);
+                // Count the unit locally too, so "degraded-local" limits from
+                // what this process has actually used if Redis goes away.
+                if (
+                    reservation.granted &&
+                    reservation.known &&
+                    this.#local.getBucket(key)
+                )
+                    this.#local.reserve(key, { probeMs: options.probeMs });
+                return reservation;
             },
             () => this.#local.reserve(key, options),
             true,

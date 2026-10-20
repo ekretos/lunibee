@@ -26,6 +26,8 @@ export interface Grant {
     known: boolean;
     /** The window the unit came from (store clock), when the store reports it. */
     resetAt?: number;
+    /** The bucket key the unit came from, when `acquire` moved to another one (see `resolve`). */
+    key?: string;
 }
 
 /** Context for {@link RateLimiter.applyResponse} beyond the response itself. */
@@ -176,26 +178,36 @@ export class RateLimiter {
      *   broken store, `"rateLimited"` when waiting would exceed `maxBackoff`.
      */
     public async acquire(
-        bucketKey: string,
+        initialKey: string,
         signal: AbortSignal | undefined,
         path: string,
-        options: { global?: string } = {},
+        options: {
+            global?: string;
+            /**
+             * Resolves the request's bucket key again. Called after waiting on
+             * another worker's probe: its response may have revealed the shared
+             * bucket, whose key differs from the route-derived one.
+             */
+            resolve?: () => Promise<string>;
+        } = {},
     ): Promise<Grant> {
         const store = this.#store;
         // Callers that name no scope get the default one, as before scopes.
         const global = "global" in options ? options.global : "";
         if (!store.reserve) {
-            await this.#waitGlobal(global ?? "", signal, path);
-            if (global !== undefined)
-                await this.#localGlobalSlot(global, signal, path);
+            // The bucket wait comes first, so the global slot is taken right
+            // before sending, not a bucket reset earlier.
             const bucket = await this.#call(path, "getBucket", () =>
-                store.getBucket(bucketKey),
+                store.getBucket(initialKey),
             );
             if (bucket) {
                 const delay = bucket.resetAt - Date.now();
                 if (bucket.remaining <= 0 && delay > 0)
                     await this.#wait("bucket", delay, signal, path);
             }
+            await this.#waitGlobal(global ?? "", signal, path);
+            if (global !== undefined)
+                await this.#localGlobalSlot(global, signal, path);
             return {
                 reserved: false,
                 known: !!bucket && bucket.resetAt > Date.now(),
@@ -203,6 +215,7 @@ export class RateLimiter {
         }
         const started = performance.now();
         let idle = 0;
+        let bucketKey = initialKey;
         for (;;) {
             if (global !== undefined && !store.reservesGlobal) {
                 await this.#waitGlobal(global, signal, path);
@@ -243,7 +256,12 @@ export class RateLimiter {
                     known,
                     latencyMs: performance.now() - asked,
                 });
-                return { reserved: true, known, resetAt: reservation.resetAt };
+                return {
+                    reserved: true,
+                    known,
+                    resetAt: reservation.resetAt,
+                    ...(bucketKey === initialKey ? {} : { key: bucketKey }),
+                };
             }
             emitTelemetry(this.#telemetry, {
                 type: "reservation",
@@ -281,6 +299,12 @@ export class RateLimiter {
                 signal,
                 path,
             );
+            if (reservation.reason === "probe" && options.resolve)
+                bucketKey = await this.#call(
+                    path,
+                    "getBucketHash",
+                    options.resolve,
+                );
         }
     }
 

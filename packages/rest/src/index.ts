@@ -52,6 +52,11 @@ function assertSafePath(path: string): void {
     const pathname = end === -1 ? path : path.slice(0, end);
     if (pathname.includes("\\"))
         throw new TypeError("REST paths must not contain backslashes.");
+    // `//webhooks/…` would slip past token redaction and webhook detection.
+    if (pathname.includes("//"))
+        throw new TypeError(
+            "REST paths must not contain empty segments ('//').",
+        );
     for (const segment of pathname.split("/")) {
         let decoded: string;
         try {
@@ -702,8 +707,17 @@ export class REST {
                     bucketKey,
                     waitSignal,
                     path,
-                    { global: identity.global },
+                    {
+                        global: identity.global,
+                        resolve: () =>
+                            this.#limiter.resolveBucketKey(
+                                route.route,
+                                route.major,
+                                identity.bucket,
+                            ),
+                    },
                 );
+                if (grant.key) bucketKey = grant.key;
             } catch (error) {
                 if (error instanceof RESTError && error.kind === "aborted")
                     emitTelemetry(this.#telemetry, {
