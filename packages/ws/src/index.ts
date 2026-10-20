@@ -125,6 +125,21 @@ export interface GatewayOptions {
      * Injected to run the Gateway on an alternative transport, or on a stub.
      */
     createSocket?: SocketFactory;
+    /**
+     * Asked before every IDENTIFY the Gateway sends on its own (a reconnect
+     * after a session it cannot resume). The first IDENTIFY after `connect()`
+     * is not gated: whoever called `connect()` already paced it.
+     * `ShardManager` sets it to its cluster's IDENTIFY coordinator.
+     * @internal
+     */
+    identifyGate?: GatewayIdentifyGate;
+}
+/** Hands out IDENTIFY slots to a Gateway; see `GatewayOptions.identifyGate`. @internal */
+export interface GatewayIdentifyGate {
+    /** Resolves when the Gateway may IDENTIFY now. A rejection closes the socket, and the reconnect asks again. */
+    acquire(): Promise<void>;
+    /** The IDENTIFY was sent (or abandoned). */
+    release(): void;
 }
 /** Discord's main Gateway endpoint, used when no resume host is known. */
 /**
@@ -157,6 +172,7 @@ export class Gateway {
             | "presence"
             | "compress"
             | "createSocket"
+            | "identifyGate"
             | "intents"
             | "reconnectStormLimit"
             | "reconnectStormWindow"
@@ -167,6 +183,7 @@ export class Gateway {
         properties?: GatewayProperties;
         presence?: GatewayPresence;
         compress?: boolean;
+        identifyGate?: GatewayIdentifyGate;
     };
     /**
      * The socket this connection runs on.
@@ -192,6 +209,8 @@ export class Gateway {
      */
     readonly #heartbeat: GatewayHeartbeat;
     #closed = false;
+    /** Whether the next IDENTIFY follows a `connect()`, which its caller paced. */
+    #paced = false;
     /**
      * Close classification, backoff, scheduling, and the coordination that
      * keeps at most one logical connection attempt in flight.
@@ -353,6 +372,7 @@ export class Gateway {
         // armed would open a second socket once it fires.
         this.#reconnect.cancel();
         this.#closed = false;
+        this.#paced = true;
         this.#setState(GatewayState.Connect);
         // Append compression parameter if enabled
         const connectURL = this.#options.compress
@@ -672,6 +692,39 @@ export class Gateway {
             return;
         }
         this.#setState(GatewayState.Identify);
+        const gate = this.#options.identifyGate;
+        if (gate && !this.#paced) {
+            this.#gatedIdentify(gate);
+            return;
+        }
+        this.#paced = false;
+        this.#sendIdentify();
+    }
+    /** Waits for a slot, then identifies on the socket that asked, if it is still the live one. */
+    #gatedIdentify(gate: GatewayIdentifyGate): void {
+        const token = this.#token;
+        const current = (): boolean =>
+            token === this.#token && !this.#closed && this.#session.owns(token);
+        gate.acquire().then(
+            () => {
+                try {
+                    if (current()) this.#sendIdentify();
+                } finally {
+                    gate.release();
+                }
+            },
+            (error: unknown) => {
+                if (!current()) return;
+                this.#emitError(
+                    new GatewayError(
+                        `No IDENTIFY slot: ${error instanceof Error ? error.message : String(error)}`,
+                    ),
+                );
+                this.#transport.close(RESUMABLE_CLOSE_CODE, "No IDENTIFY slot");
+            },
+        );
+    }
+    #sendIdentify(): void {
         this.#dispatch(
             identifyPayload({
                 token: this.#options.token,

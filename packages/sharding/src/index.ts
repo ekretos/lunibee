@@ -255,6 +255,8 @@ export class ShardManager {
     #resolved = false;
     /** Whether this manager is currently destroyed. */
     #destroyed = false;
+    /** Bumped by `destroy()`, so a start that is still running notices it is stale. */
+    #generation = 0;
     /** Whether the manager was created in auto shard-count mode. Preserved across reshards so auto-scaling keeps running. */
     readonly #auto: boolean;
     /** The shard count when it is not "auto" (from the options or the cluster context). */
@@ -462,15 +464,22 @@ export class ShardManager {
     }
     /** Starts the given shards: through the coordinated IDENTIFY gate when there is one, else in paced rounds. */
     async #start(ids: number[], destroyOnFailure = true): Promise<void> {
+        // A `destroy()` (or `reshard()`) while this runs makes it stale: it
+        // then stops quietly, and never touches the shard set that replaced
+        // the one it was started for.
+        const generation = this.#generation;
+        const stale = (): boolean => generation !== this.#generation;
+        const gateways = new Map(ids.map((id) => [id, this.shards.get(id)!]));
         const gate = this.#gate;
         if (gate) {
             const timeout = this.#options.handshakeTimeout ?? 15_000;
             const results = await Promise.allSettled(
                 ids.map(async (id) => {
-                    const gateway = this.shards.get(id)!;
+                    const gateway = gateways.get(id)!;
                     this.#setStatus(id, "connecting");
                     await gate.acquire(id);
                     try {
+                        if (stale()) return;
                         await gateway.connect();
                         await handshakeSent(gateway, timeout);
                     } finally {
@@ -478,6 +487,7 @@ export class ShardManager {
                     }
                 }),
             );
+            if (stale()) return;
             const failed = results.findIndex(
                 (result) => result.status === "rejected",
             );
@@ -518,13 +528,15 @@ export class ShardManager {
             ...[...buckets.values()].map((bucket) => bucket.length),
         );
         for (let index = 0; index < rounds; index++) {
+            if (stale()) return;
             const round = [...buckets.values()]
                 .map((bucket) => bucket[index])
                 .filter((id): id is number => id !== undefined);
             for (const id of round) this.#setStatus(id, "connecting");
             const results = await Promise.allSettled(
-                round.map((id) => this.shards.get(id)!.connect()),
+                round.map((id) => gateways.get(id)!.connect()),
             );
+            if (stale()) return;
             const failed = results.findIndex(
                 (result) => result.status === "rejected",
             );
@@ -553,7 +565,7 @@ export class ShardManager {
                 await Promise.all(
                     round.map((id) =>
                         handshakeSent(
-                            this.shards.get(id)!,
+                            gateways.get(id)!,
                             this.#options.handshakeTimeout ?? 15_000,
                         ),
                     ),
@@ -591,6 +603,7 @@ export class ShardManager {
         this.#announced = false;
         this.#resolved = false;
         this.#destroyed = true;
+        this.#generation++;
         if (this.#autoScaleTimer) {
             clearInterval(this.#autoScaleTimer);
             this.#autoScaleTimer = undefined;
@@ -713,10 +726,11 @@ export class ShardManager {
     async #ensureInitialized(): Promise<void> {
         if (this.#resolved) return;
         if (this.#destroyed) this.#destroyed = false;
+        // A number here is the constructor's or the last `reshard()`'s.
         const count =
             this.#options.shardCount === "auto"
                 ? await this.fetchRecommendedShardCount()
-                : this.#fixedCount;
+                : (this.#options.shardCount ?? this.#fixedCount);
         this.#initialize(count);
     }
     /** Creates every shard for a resolved shard count. @param count Number of shards. @returns Nothing. */
@@ -736,6 +750,15 @@ export class ShardManager {
             shardId: id,
             shardCount: count,
             reconnect: this.#options.reconnect ?? true,
+            // A re-IDENTIFY after a lost session takes a slot like the first.
+            ...(this.#gate
+                ? {
+                      identifyGate: {
+                          acquire: () => this.#gate!.acquire(id),
+                          release: () => this.#gate!.release(id),
+                      },
+                  }
+                : {}),
         });
         gateway.on("ready", () => {
             this.#setStatus(id, "ready");

@@ -8,9 +8,9 @@ export interface SupervisorOptions {
     maxDelay?: number;
     /** Random spread added to each delay, as a fraction of it (0-1, default 0). */
     jitter?: number;
-    /** Give up after this many restarts inside `window` (default unlimited). */
+    /** Give up after this many restarts without a stable `window` between them (default unlimited). */
     maxRestarts?: number;
-    /** The time over which restarts are counted, and after which a stable cluster is forgiven (default 60,000). */
+    /** How long a restarted cluster must run before its earlier crashes are forgiven (default 60,000). */
     window?: number;
 }
 
@@ -21,7 +21,11 @@ export interface SupervisorOptions {
  */
 export class ShardSupervisor {
     readonly #options: Required<SupervisorOptions>;
-    readonly #restarts = new Map<number, number[]>();
+    /** Restarts since the cluster last ran for a whole window, and when the last one starts. */
+    readonly #restarts = new Map<
+        number,
+        { count: number; restartAt: number }
+    >();
     readonly #random: () => number;
 
     public constructor(
@@ -59,24 +63,30 @@ export class ShardSupervisor {
     public next(id: number, now = Date.now()): number | null {
         const { window, maxRestarts, restartDelay, backoff, maxDelay, jitter } =
             this.#options;
-        const recent = (this.#restarts.get(id) ?? []).filter(
-            (at) => now - at < window,
-        );
-        if (recent.length >= maxRestarts) {
+        // A cluster is forgiven only after it ran for a whole `window` since
+        // its last restart. Counting from the crash instead would let the
+        // backoff delay itself age crashes out, so a crash-on-boot loop
+        // would never reach `maxRestarts` or `maxDelay`.
+        let history = this.#restarts.get(id);
+        if (history && now - history.restartAt >= window) history = undefined;
+        const count = history?.count ?? 0;
+        if (count >= maxRestarts) {
             this.#restarts.delete(id);
             return null;
         }
-        recent.push(now);
-        this.#restarts.set(id, recent);
-        const base = Math.min(
-            maxDelay,
-            restartDelay * backoff ** (recent.length - 1),
-        );
+        const base = Math.min(maxDelay, restartDelay * backoff ** count);
         // The cap applies after jitter: `maxDelay` is the longest wait, always.
-        return Math.min(
+        const delay = Math.min(
             maxDelay,
             Math.round(base * (1 + jitter * this.#random())),
         );
+        this.#restarts.set(id, { count: count + 1, restartAt: now + delay });
+        return delay;
+    }
+
+    /** Restarts of a cluster since it last ran stably for a whole `window`. */
+    public attempts(id: number): number {
+        return this.#restarts.get(id)?.count ?? 0;
     }
 
     /** Forgets a cluster's crashes, e.g. after a deliberate respawn. */

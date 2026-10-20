@@ -319,6 +319,8 @@ export class ClusterManager {
     /** When the last successful renewal was sent (epoch ms). */
     #lastRenew = 0;
     #renewing = false;
+    /** Bumped by every leadership term, so a late renewal of an old one is ignored. */
+    #term = 0;
     /** Pending restart timers, kept so shutdown can cancel them. */
     readonly #restartTimers = new Set<ReturnType<typeof setTimeout>>();
     /** Restarts waiting for a lost host to fence itself, by cluster. */
@@ -521,7 +523,9 @@ export class ClusterManager {
                 info,
                 this.#options,
             );
-        } else if (fetchLimits)
+        } else if (fetchLimits || this.#auto)
+            // A respawn of an "auto" deployment has a number by now, but it
+            // still needs `max_concurrency` and the session budget.
             try {
                 info = await fetchGatewayBot(this.#options.token);
             } catch (error) {
@@ -672,6 +676,10 @@ export class ClusterManager {
     #startRenewing(ttl: number): void {
         this.#stopRenewing();
         const lock = this.#options.leader!.lock;
+        // Each term renews on its own: a renewal of an earlier term that
+        // settles late (or never) must neither block nor end this one.
+        const term = ++this.#term;
+        this.#renewing = false;
         this.#renewTimer = setInterval(
             () => {
                 // Stand down well before the lock can lapse and another
@@ -683,8 +691,9 @@ export class ClusterManager {
                 if (this.#renewing) return;
                 this.#renewing = true;
                 const started = Date.now();
-                lock.acquire(ttl).then(
+                withTimeout(lock.acquire(ttl), ttl / 4).then(
                     (held) => {
+                        if (term !== this.#term) return;
                         this.#renewing = false;
                         if (!this.#leading) return;
                         if (held) this.#lastRenew = started;
@@ -694,6 +703,7 @@ export class ClusterManager {
                             );
                     },
                     (error: unknown) => {
+                        if (term !== this.#term) return;
                         this.#renewing = false;
                         this.#emit("error", asError(error));
                     },
@@ -885,8 +895,12 @@ export class ClusterManager {
         signal: NodeJS.Signals | null,
     ): void {
         // Only act on the process still registered as this cluster: a
-        // restart or respawn may already have replaced it.
-        if (info.process !== child) return;
+        // restart or respawn may already have replaced it, and after
+        // `killAll()` + `spawn()` a new `ClusterInfo` holds the same id.
+        if (!this.#current(info, child)) {
+            child.removeAllListeners("message");
+            return;
+        }
         child.removeAllListeners("message");
         this.#clearStartTimer(info.id);
         this.#coordinator?.drop(info.id, `Cluster ${info.id} exited.`);
@@ -931,7 +945,8 @@ export class ClusterManager {
         info.state = "restarting";
         info.restarts++;
         this.#emit("clusterRestart", info, { delay, attempt: info.restarts });
-        if (info.restarts >= 3)
+        // Unstable means recent: crashes forgiven after a stable run do not count.
+        if (this.#supervisor.attempts(info.id) >= 3)
             this.#emit("clusterUnstable", info, {
                 attempt: info.restarts,
                 delay,
@@ -1091,8 +1106,13 @@ export class ClusterManager {
                 this.#sendFrame(cluster, { [PEER_DOWN_FRAME]: shards });
     }
 
+    /** Whether `child` is the process of the cluster as this deployment knows it now. */
+    #current(info: ClusterInfo, child: ChildProcess): boolean {
+        return info.process === child && this.#infos.get(info.id) === info;
+    }
+
     #onFrame(info: ClusterInfo, child: ChildProcess, frame: unknown): void {
-        if (info.process !== child) return;
+        if (!this.#current(info, child)) return;
         if (!frame || typeof frame !== "object") return;
         if (BUS_FRAME in frame) {
             this.#onBus(info, (frame as Record<string, unknown>)[BUS_FRAME]);
@@ -1139,7 +1159,7 @@ export class ClusterManager {
             }
             case "identify": {
                 const reply = (body: Record<string, unknown>): void => {
-                    if (info.process === child)
+                    if (this.#current(info, child))
                         this.#sendFrame(info, { [CLUSTER_FRAME]: body });
                 };
                 if (!this.#coordinator) {

@@ -109,7 +109,11 @@ export class ClusterWorker {
             const id = ++this.#counter;
             return new Promise<void>((resolve, reject) => {
                 this.#waiting.set(id, { resolve, reject });
-                this.#send({ kind: "identify", id, shardId });
+                const error = this.#send({ kind: "identify", id, shardId });
+                if (error) {
+                    this.#waiting.delete(id);
+                    reject(error);
+                }
             });
         },
         release: (shardId) => this.#send({ kind: "identify-done", shardId }),
@@ -144,13 +148,23 @@ export class ClusterWorker {
         this.#failAll("The cluster worker closed.");
     }
 
-    #send(body: Record<string, unknown>): void {
+    /** @returns The error when the frame could not be sent. */
+    #send(body: Record<string, unknown>): Error | undefined {
         try {
             this.#endpoint.send!({ [CLUSTER_FRAME]: body });
-        } catch (error) {
-            this.#failAll(
-                error instanceof Error ? error.message : String(error),
-            );
+            return undefined;
+        } catch (thrown) {
+            const error =
+                thrown instanceof Error ? thrown : new Error(String(thrown));
+            // Only a closed channel ends every wait. A frame that cannot be
+            // serialized (a BigInt under JSON IPC) fails on its own.
+            const endpoint = this.#endpoint as { connected?: boolean };
+            if (
+                endpoint.connected === false ||
+                (error as { code?: unknown }).code === "ERR_IPC_CHANNEL_CLOSED"
+            )
+                this.#failAll(error.message);
+            return error;
         }
     }
 
@@ -190,11 +204,18 @@ export class ClusterWorker {
         }
         void (async () => {
             try {
-                this.#send({
+                const failed = this.#send({
                     kind: "reply",
                     id,
                     result: await handler(parsed.data),
                 });
+                // Answer anyway, so the caller sees why instead of a timeout.
+                if (failed)
+                    this.#send({
+                        kind: "reply",
+                        id,
+                        error: `The reply could not be sent: ${failed.message}`,
+                    });
             } catch (error) {
                 this.#send({
                     kind: "reply",
