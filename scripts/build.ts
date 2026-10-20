@@ -73,28 +73,45 @@ const targets: BuildTarget[] = [
 async function build(): Promise<void> {
   await rm("dist", { recursive: true, force: true });
 
-  for (const target of targets) {
-    const outdir = join("dist", target.output);
+  // One build with shared chunks: every entry point (`lunibee`, `lunibee/rest`, …)
+  // uses the same class objects, so `instanceof` and private fields work across them.
+  const entries = ".build-entries";
+  await rm(entries, { recursive: true, force: true });
+  try {
+    const entrypoints: string[] = [];
+    for (const target of targets) {
+      const entry = join(entries, target.output, "index.ts");
+      await mkdir(dirname(entry), { recursive: true });
+      const source = relative(dirname(entry), resolve(target.source)).replace(/\\/g, "/");
+      await writeFile(entry, `export * from "${source}";\n`);
+      entrypoints.push(entry);
+    }
     const result = await Bun.build({
-      entrypoints: [target.source],
-      outdir,
+      entrypoints,
+      root: entries,
+      outdir: "dist",
       target: "bun",
       format: "esm",
       sourcemap: "external",
       minify: false,
-      splitting: false,
+      splitting: true,
+      naming: { entry: "[dir]/[name].[ext]", chunk: "chunks/[name]-[hash].[ext]" },
       plugins: [workspaceResolver],
     });
-
     if (!result.success) {
       const errors = result.logs
         .filter((log) => log.level === "error")
         .map((log) => log.message)
         .join("\n");
-      throw new Error(`Failed to build ${target.source}:\n${errors}`);
+      throw new Error(`Failed to build:\n${errors}`);
     }
+  } finally {
+    await rm(entries, { recursive: true, force: true });
+  }
 
+  for (const target of targets) {
     // Write .d.ts declaration forwarder
+    const outdir = join("dist", target.output);
     const dtsPath = join(outdir, "index.d.ts");
     await mkdir(dirname(dtsPath), { recursive: true });
     const relSource = relative(dirname(dtsPath), resolve(target.source)).replace(/\\/g, "/");
