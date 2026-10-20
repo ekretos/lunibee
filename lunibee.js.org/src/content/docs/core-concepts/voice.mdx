@@ -5,6 +5,10 @@ description: Join a voice channel, play files and streams, receive and record au
 
 From 0.4.0 a bot can join a voice channel and play audio, end to end: `client.voice.join()` connects to Discord's voice server (voice gateway v8, UDP, transport encryption, DAVE end-to-end encryption), an `AudioPlayer` sends 20 ms Opus frames, and a receiver gives you other users' audio.
 
+:::caution[Experimental]
+Voice is tested against a scripted voice server in CI, not yet against a real Discord guild. Treat it as experimental until the release smoke test (`bun run smoke:voice`) has passed.
+:::
+
 ## Install
 
 ```sh

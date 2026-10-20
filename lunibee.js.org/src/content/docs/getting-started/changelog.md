@@ -17,6 +17,24 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
   - The player's statuses are `idle`, `buffering`, `playing`, `paused` and `autopaused`; `stopped` is gone, and `play()` is synchronous.
   - `receiver.subscribe(userId, options?)` returns a `ReadableStream` of Opus packets.
 
+### ⚠️ Changed (reliability audit)
+
+- **Interactions:**
+  - `followUp()` throws before the interaction is acknowledged.
+  - `update()` and `deferUpdate()` reject on interactions that are not components, or modals opened from one.
+  - `editReply()`, `deleteReply()` and `fetchReply()` throw after a modal or autocomplete answer.
+  - A Discord 40060 ("already acknowledged") marks the interaction acknowledged.
+- **Restart limits:** `ShardSupervisor`'s `maxRestarts` counts restarts with no stable `window` between them. Before, it counted restarts inside a sliding window, which the backoff itself could empty. `clusterUnstable` uses the same count.
+- **Gateway:**
+  - A heartbeat that is not acknowledged by the next one closes the connection (4900) and resumes, even with a long `heartbeatAckTimeout`.
+  - `connect()` while a reconnect is pending joins it instead of skipping the backoff.
+  - Reconnects keep the connect URL's query (`v`, `encoding`, `compress`), and IDENTIFY reconnects use the caller's URL.
+- **Voice:**
+  - While DAVE is required but its group is not ready yet, Opus frames are dropped; they are no longer sent with transport encryption only.
+  - Resumable voice closes back off (250 ms doubling to 10 s, 5 attempts), then end as `disconnected` (`closed`).
+  - An FFmpeg failure is the resource's `error`, not a `finish`.
+- **REST:** paths with an empty segment (`//`) are refused.
+
 ### ✨ Added
 
 - **`client.voice`** ([Voice](/core-concepts/voice/)): `join()` sends op 4 through the shard that owns the guild, collects the bot's `VOICE_STATE_UPDATE` and `VOICE_SERVER_UPDATE` (in either order, with a timeout), and resolves when audio can flow. `leave()`, `get()` and `connections` are also added. Moves and region changes reconnect. Leaving a guild and `client.destroy()` release every connection.
@@ -43,6 +61,42 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
 - `examples/music`: `/play`, `/skip`, `/queue`, `/stop` and `/leave`.
 
 ### 🐛 Fixed
+- **Reliability audit.** These fixes came from an audit of every area, with a reproduction for each finding, now kept as regression tests:
+  - `rest.hardening`
+  - `voice.hardening`
+  - `sharding.recovery`
+  - `cache.races`
+  - `interactions.lifecycle`
+  - `gateway.hardening`
+- **REST:**
+  - Aborting a queued request no longer lets the next one run beside the head of its bucket.
+  - A worker that waited on another's probe uses the bucket that probe revealed, instead of sending again under the route.
+  - With a store that has no `reserve`, the global slot is taken after the bucket wait.
+  - `degraded-local` counts the units this process reserved in Redis.
+- **Voice:**
+  - The resume loop is bounded (it could open sockets in a busy loop).
+  - `join()` for the current channel keeps the session.
+  - DAVE encrypt failures are reported once per failure streak.
+  - No late "IP discovery timed out" error after a leave.
+  - `endpoint: null` times out.
+  - The Opus codec is freed when a resource is destroyed while it loads, and frames are never encoded after that.
+  - `record()`'s silence fill respects `highWaterMark`.
+- **Sharding:**
+  - A late exit of a killed child no longer unregisters the cluster that replaced it.
+  - `reshard(n)` uses `n`, so auto-scaling no longer collapses to one shard.
+  - A reshard or destroy during `connect()` no longer drives or destroys the new shard set.
+  - Re-IDENTIFYs after a lost session take a slot from the cross-cluster IDENTIFY gate.
+  - A leader-lock renewal that never settles costs at most one term.
+  - A worker's failed send rejects only its own wait.
+  - An auto-scale respawn keeps `max_concurrency`.
+- **Cache:**
+  - A REST fetch in flight no longer overwrites a newer Gateway update (members, roles, guilds, channels, users).
+  - A message deleted during a fetch is not cached again.
+  - `members.*` and `roles.*` REST results merge into the cached instance.
+  - With the `Guilds` intent, member and ban events of a guild the bot left create no per-guild state.
+  - New opt-in `cache.maxUsers` bounds `client.users` (LRU).
+- **Interactions:** `editReply()`, `deleteReply()` and `followUp()` use the interaction's application ID, not the bot user's.
+- **Packaging:** `lunibee` and its subpaths (`lunibee/rest`, …) share one copy of each class, and one declaration of each type, so `instanceof` and assignments work across them.
 
 - `setSpeaking` sends the negotiated SSRC instead of `0`.
 - A paused player no longer polls every 25 ms.
@@ -62,7 +116,8 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
 - Encryption test vectors and sequence/timestamp wraparound are tested.
 - Opus round trip, Ogg demux, FFmpeg and player timing are tested.
 - 100 join/leave cycles leave no sockets, timers or listeners behind.
-- The fake server is scripted, not a capture of Discord; playing in a real guild is the release smoke test.
+- The fake server is scripted, not a capture of Discord; playing in a real guild is the release smoke test (`bun run smoke:voice`, or the manual "Voice smoke test" workflow).
+- CI also runs the tests on ARM64 and on the minimum Bun (1.4.0).
 
 ## v0.3.3
 

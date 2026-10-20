@@ -22,6 +22,12 @@ Only `@lunibee/voice` changed. The 0.3 API carried no audio, so most code built 
   - `stopped` is gone (`stop()` goes `idle`); `buffering` and `autopaused` are added.
   - `play()` no longer returns a promise; listen for `finish`.
 - **Receiver:** `subscribe(userId)` returns a `ReadableStream<Uint8Array>` of Opus packets instead of an `AudioStream`.
+- **Interactions:**
+  - Call `followUp()` only after `reply()` or `defer()`.
+  - Use `update()` / `deferUpdate()` only on component interactions, or modals opened from a component.
+  - Do not call `editReply()` after `showModal()`.
+- **Sharding restart limits:** `maxRestarts` now trips for a cluster that keeps crashing with backoff in between. If you raised `window` to work around that, you can lower it again.
+- **Gateway:** if you reconnect yourself from a `close` handler, `connect()` now waits for the scheduled backoff.
 
 ## 0.3.2 → 0.3.3
 
