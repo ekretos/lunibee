@@ -50,17 +50,22 @@ export interface InteractionClient {
         token: string,
         response: InteractionResponse,
     ): Promise<unknown>;
-    /** Edits the original interaction response. @param token Interaction token. @param data Message payload. @returns Discord response. @throws {Error} When REST fails. */
+    /** Edits the original interaction response. @param token Interaction token. @param data Message payload. @param applicationId The interaction's `application_id`, which the webhook route needs. @returns Discord response. @throws {Error} When REST fails. */
     editInteractionReply(
         token: string,
         data: InteractionReplyOptions,
+        applicationId?: string,
     ): Promise<unknown>;
-    /** Deletes the original interaction response. @param token Interaction token. @returns Promise fulfilled after deletion. @throws {Error} When REST fails. */
-    deleteInteractionReply(token: string): Promise<void>;
-    /** Sends a follow-up interaction webhook message. @param token Interaction token. @param data Message payload. @returns Discord response. @throws {Error} When REST fails. */
+    /** Deletes the original interaction response. @param token Interaction token. @param applicationId The interaction's `application_id`. @returns Promise fulfilled after deletion. @throws {Error} When REST fails. */
+    deleteInteractionReply(
+        token: string,
+        applicationId?: string,
+    ): Promise<void>;
+    /** Sends a follow-up interaction webhook message. @param token Interaction token. @param data Message payload. @param applicationId The interaction's `application_id`. @returns Discord response. @throws {Error} When REST fails. */
     followUpInteraction(
         token: string,
         data: InteractionReplyOptions,
+        applicationId?: string,
     ): Promise<unknown>;
     /** Reads, edits or deletes an interaction webhook message (`@original` or a follow-up ID). Optional; required for {@link Interaction.fetchReply}, {@link Interaction.editFollowUp} and {@link Interaction.deleteFollowUp}. */
     interactionWebhookMessage?(
@@ -181,6 +186,8 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     readonly #client: InteractionClient;
     /** An initial response is in flight; a second one must not be sent. */
     #acknowledging = false;
+    /** Callback type of the initial response, once sent. */
+    #responseType?: number;
     /** Creates an interaction from a Gateway payload. @param client Interaction transport. @param data Gateway interaction payload. @throws {TypeError} If required identifiers are missing. */
     public constructor(client: InteractionClient, data: TData) {
         if (!data.id || !data.token)
@@ -346,7 +353,17 @@ export class Interaction<TData extends InteractionData = InteractionData> {
         try {
             const result = await this.postResponse(response);
             this[state] = true;
+            this.#responseType = response.type;
             return result;
+        } catch (error) {
+            // 40060: Discord already holds a response (one sent before a
+            // timeout, or by another handler). Record that, so editReply()
+            // and followUp() can still reach it.
+            if ((error as { code?: unknown } | null)?.code === 40060) {
+                this[state] = true;
+                this.#responseType = response.type;
+            }
+            throw error;
         } finally {
             this.#acknowledging = false;
         }
@@ -408,7 +425,7 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     }
     /** Fetches the original response message. */
     public fetchReply(): Promise<unknown> {
-        this.assertAcknowledged();
+        this.assertHasReply();
         return this.#webhookMessage("GET", "@original");
     }
     /** Edits a follow-up message. @param messageId Follow-up message ID. */
@@ -426,6 +443,17 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     protected assertAcknowledged(): void {
         if (!this.replied && !this.deferred)
             throw new Error("Interaction has not been acknowledged.");
+    }
+    /** Ensures there is an original response message: a modal or autocomplete answer has none. @throws {Error} When not acknowledged, or answered without a message. */
+    protected assertHasReply(): void {
+        this.assertAcknowledged();
+        if (
+            this.#responseType === InteractionResponseEnum.Modal ||
+            this.#responseType === InteractionResponseEnum.Autocomplete
+        )
+            throw new Error(
+                "Interaction was answered with a modal or autocomplete choices and has no reply message.",
+            );
     }
     /** Posts a raw interaction response callback. */
     protected postResponse(response: InteractionResponse): Promise<unknown> {
@@ -506,24 +534,30 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     }
     /** Edits the original response. @param options Replacement message options. @returns Discord response. @throws {Error} When not acknowledged or REST fails. */
     public editReply(options: InteractionReplyOptions): Promise<unknown> {
-        this.assertAcknowledged();
+        this.assertHasReply();
         return this.#client.editInteractionReply(
             this.token,
             toMessageData(options),
+            this.applicationId,
         );
     }
     /** Deletes the original response. @returns Promise fulfilled after deletion. @throws {Error} When not acknowledged or REST fails. */
     public deleteReply(): Promise<void> {
-        this.assertAcknowledged();
-        return this.#client.deleteInteractionReply(this.token);
+        this.assertHasReply();
+        return this.#client.deleteInteractionReply(
+            this.token,
+            this.applicationId,
+        );
     }
-    /** Sends a follow-up message using the interaction webhook. @param options Follow-up message options. @returns Discord response. @throws {Error} When REST fails. */
+    /** Sends a follow-up message using the interaction webhook. @param options Follow-up message options. @returns Discord response. @throws {Error} When not acknowledged (Discord has no webhook before the initial response) or REST fails. */
     public followUp(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
+        this.assertAcknowledged();
         return this.#client.followUpInteraction(
             this.token,
             toMessageData(options),
+            this.applicationId,
         );
     }
     /**
@@ -539,6 +573,7 @@ export class Interaction<TData extends InteractionData = InteractionData> {
     public async update(
         options: InteractionReplyOptions | string,
     ): Promise<unknown> {
+        this.assertOnMessage("update");
         const { withResponse, rest } = splitWithResponse(options);
         return this.acknowledgeWith(
             new InteractionResponse(
@@ -547,6 +582,17 @@ export class Interaction<TData extends InteractionData = InteractionData> {
             ),
             "replied",
             withResponse,
+        );
+    }
+    /** Ensures a message-update response fits: a component, or a modal opened from one. @throws {Error} Otherwise. */
+    protected assertOnMessage(method: string): void {
+        if (
+            this.type === InteractionEnum.MessageComponent ||
+            (this.type === InteractionEnum.ModalSubmit && this.data.message)
+        )
+            return;
+        throw new Error(
+            `Interaction ${method}() only works on component interactions and modals opened from a component; use reply() instead.`,
         );
     }
     /** Opens a modal dialog in the user's client. @param modal Modal builder output or raw modal callback data. @returns Discord response. @throws {Error} When already acknowledged or REST fails. */
@@ -697,6 +743,7 @@ export class ComponentInteraction extends Interaction {
     public async deferUpdate(
         options: { withResponse?: boolean } = {},
     ): Promise<Message | null | void> {
+        this.assertOnMessage("deferUpdate");
         const withResponse = options.withResponse === true;
         const result = await this.acknowledgeWith(
             new InteractionResponse(

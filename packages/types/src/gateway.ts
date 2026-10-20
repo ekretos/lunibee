@@ -210,6 +210,8 @@ export interface ClientOptions {
         presences?: boolean;
         /** Most members kept per guild (least recently used leave first). Default: unbounded, so a big guild's member list stays whole. */
         maxMembers?: number;
+        /** Most users kept in `client.users` (least recently used leave first). Default: unbounded. */
+        maxUsers?: number;
     };
     /**
      * Default `allowed_mentions` for every message the client sends (channel

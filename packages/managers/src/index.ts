@@ -181,6 +181,8 @@ export class ChannelManager extends Manager<string, Channel> {
         const existing = this.get(channel.id);
         if (existing && existing.type === channel.type) {
             assignFields(existing, channel);
+            // Marks a fetch in flight as stale, so it cannot undo this update.
+            this.set(existing.id, existing);
             return existing;
         }
         this.set(channel.id, channel);

@@ -64,12 +64,13 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
             `${Routes.guildMembersSearch(this.guildId)}?${params}`,
         );
         return found.map((data) => {
-            const member = new GuildMember(
-                { ...data, guild_id: this.guildId },
-                this.#context(),
+            // Merged into the cached instance, so references to it stay current.
+            return this.upsert(
+                new GuildMember(
+                    { ...data, guild_id: this.guildId },
+                    this.#context(),
+                ),
             );
-            this.set(member.user.id, member);
-            return member;
         });
     }
 
@@ -84,12 +85,12 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
             payload,
             { reason },
         );
-        const member = new GuildMember(
-            { ...data, guild_id: this.guildId },
-            this.#context(),
+        return this.upsert(
+            new GuildMember(
+                { ...data, guild_id: this.guildId },
+                this.#context(),
+            ),
         );
-        this.set(member.user.id, member);
-        return member;
     }
 
     /** Kicks a member from the guild. @param reason Audit-log reason. */
@@ -128,12 +129,12 @@ export class GuildMemberManager extends ResourceManager<string, GuildMember> {
         >(Routes.guildMember(this.guildId, userId), payload, {
             reason: optionsReason,
         });
-        const member = new GuildMember(
-            { ...data, guild_id: this.guildId },
-            this.#context(),
+        return this.upsert(
+            new GuildMember(
+                { ...data, guild_id: this.guildId },
+                this.#context(),
+            ),
         );
-        this.set(member.user.id, member);
-        return member;
     }
 
     /** Adds a role to a member. @param reason Audit-log reason. */

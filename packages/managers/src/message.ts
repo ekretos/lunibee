@@ -150,11 +150,53 @@ export class MessageManager {
         );
         return this.upsert(data);
     }
-    public async fetch(messageId: string): Promise<Message> {
-        const data = await this.#rest.get<
-            ConstructorParameters<typeof Message>[0]
-        >(Routes.message(this.#channelId, messageId));
-        return this.upsert(data);
+    /** In-flight fetches; `dirty` is set when the message is written or deleted meanwhile. */
+    readonly #inflight = new Map<
+        string,
+        { promise: Promise<Message>; dirty: boolean }
+    >();
+    /**
+     * Fetches a message. Concurrent fetches of one message share a request.
+     * If the message is stored or deleted (e.g. by a Gateway event) while the
+     * request is in flight, the result is returned but not cached, so it
+     * cannot overwrite fresher state or bring back a deleted message.
+     */
+    public fetch(messageId: string): Promise<Message> {
+        const pending = this.#inflight.get(messageId);
+        if (pending) return pending.promise;
+        const entry: { promise: Promise<Message>; dirty: boolean } = {
+            promise: Promise.resolve(null as never),
+            dirty: false,
+        };
+        this.#inflight.set(messageId, entry);
+        entry.promise = this.#rest
+            .get<ConstructorParameters<typeof Message>[0]>(
+                Routes.message(this.#channelId, messageId),
+            )
+            .then(
+                (data) => {
+                    this.#inflight.delete(messageId);
+                    return entry.dirty
+                        ? (this.cache.peek(messageId) ??
+                              new Message(data, this.#context))
+                        : this.upsert(data);
+                },
+                (error: unknown) => {
+                    this.#inflight.delete(messageId);
+                    throw error;
+                },
+            );
+        return entry.promise;
+    }
+    #markDirty(messageId: string): void {
+        const pending = this.#inflight.get(messageId);
+        if (pending) pending.dirty = true;
+    }
+    /** Stores a message as the cached version (when caching is on), replacing any cached one. @returns This manager. */
+    public set(messageId: string, message: Message): this {
+        this.#markDirty(messageId);
+        if (this.#caching) this.cache.set(messageId, message);
+        return this;
     }
     public fetchMany(messageIds: Iterable<string>): Promise<Message[]> {
         return Promise.all(
@@ -162,6 +204,7 @@ export class MessageManager {
         );
     }
     public upsert(data: ConstructorParameters<typeof Message>[0]): Message {
+        this.#markDirty(data.id);
         const existing = this.cache.peek(data.id);
         const message = new Message(data, this.#context);
         if (existing) {
@@ -172,6 +215,7 @@ export class MessageManager {
         return message;
     }
     public delete(messageId: string): boolean {
+        this.#markDirty(messageId);
         return this.cache.delete(messageId);
     }
 }

@@ -1022,6 +1022,8 @@ describe("100% Comprehensive Codebase Coverage", () => {
         }) as CommandInteraction;
         expect(cmdInteraction.isChatInputCommand()).toBe(true);
         expect(cmdInteraction.commandName).toBe("ping");
+        // A follow-up needs the initial response first.
+        cmdInteraction.deferred = true;
         await cmdInteraction.followUp("followed up");
 
         const compInteraction = createInteraction(mockClient, {
@@ -1132,7 +1134,8 @@ describe("100% Comprehensive Codebase Coverage", () => {
             id: "990000000000000000",
             application_id: "a",
             token: "t",
-            type: 99,
+            // update() needs a component interaction.
+            type: 3,
             data: {},
         });
         await baseInteraction.update("base update");
@@ -1142,7 +1145,7 @@ describe("100% Comprehensive Codebase Coverage", () => {
             id: "100000000000000000",
             application_id: "a",
             token: "t",
-            type: 99,
+            type: 3,
             data: {},
         });
         await baseInteraction2.update({ content: "base obj" });

@@ -75,6 +75,8 @@ describe("Interaction lifecycle", () => {
     test("ephemeral maps to flags on follow-ups and edits", async () => {
         const { client, calls } = mockClient();
         const interaction = createInteraction(client, payload());
+        // A follow-up needs the initial response first.
+        interaction.deferred = true;
         await interaction.followUp({ content: "x", ephemeral: true });
         await interaction.editFollowUp(ID, { content: "y", ephemeral: true });
         await interaction.deleteFollowUp(ID);
@@ -82,6 +84,7 @@ describe("Interaction lifecycle", () => {
             "follow",
             "tok",
             { content: "x", flags: 64 },
+            APP,
         ]);
         expect(calls[1]).toEqual([
             "webhook",

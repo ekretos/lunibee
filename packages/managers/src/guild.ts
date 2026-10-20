@@ -210,6 +210,8 @@ export class GuildManager extends ResourceManager<string, Guild> {
             const value = from[key];
             if (value !== undefined) into[key] = value;
         }
+        // Marks a fetch in flight as stale, so it cannot undo this update.
+        this.set(existing.id, existing);
         return existing;
     }
 

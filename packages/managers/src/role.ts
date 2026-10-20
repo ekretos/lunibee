@@ -54,11 +54,7 @@ export class RoleManager extends ResourceManager<string, Role> {
         const data = await this.#rest.get<APIRole[]>(
             Routes.guildRoles(this.guildId),
         );
-        return data.map((item) => {
-            const role = new Role(item);
-            this.set(role.id, role);
-            return role;
-        });
+        return data.map((item) => this.upsert(new Role(item)));
     }
 
     /** Creates a new role in the guild. */
@@ -83,10 +79,9 @@ export class RoleManager extends ResourceManager<string, Role> {
         return this.#store(data);
     }
 
+    /** Merges into the cached instance, so references to it stay current. */
     #store(data: APIRole): Role {
-        const role = new Role(data);
-        this.set(role.id, role);
-        return role;
+        return this.upsert(new Role(data));
     }
 
     /** Deletes a role. @param reason Audit-log reason. */
@@ -113,11 +108,7 @@ export class RoleManager extends ResourceManager<string, Role> {
             positions.map(({ id, position }) => ({ id, position })),
             { reason },
         );
-        return data.map((item) => {
-            const role = new Role(item);
-            this.set(role.id, role);
-            return role;
-        });
+        return data.map((item) => this.upsert(new Role(item)));
     }
 }
 

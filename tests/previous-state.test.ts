@@ -250,6 +250,8 @@ describe("cache.maxMembers (F-D3)", () => {
             intents: [513],
             cache: { maxMembers: 2 },
         });
+        // With the Guilds intent, members are kept only for cached guilds.
+        client.ws.emit("GUILD_CREATE", { id: GUILD, name: "g" });
         for (const id of ["1", "2", "3"])
             client.ws.emit("GUILD_MEMBER_ADD", {
                 guild_id: GUILD,

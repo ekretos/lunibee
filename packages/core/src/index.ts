@@ -92,7 +92,11 @@ export {
     type GatewayIntentResolvable,
 } from "@lunibee/types";
 
-import { ActivityEnum } from "@lunibee/types";
+import {
+    ActivityEnum,
+    GatewayIntentBits,
+    resolveGatewayIntents,
+} from "@lunibee/types";
 import {
     ApplicationCommandManager,
     ChannelManager,
@@ -439,9 +443,11 @@ export class Client
     /** Which resources Gateway events are allowed to cache. */
     readonly #collectors = new Set<{ stop(reason?: string): void }>();
     readonly #cache: Required<
-        Omit<NonNullable<ClientOptions["cache"]>, "maxMembers">
+        Omit<NonNullable<ClientOptions["cache"]>, "maxMembers" | "maxUsers">
     >;
     readonly #resourceContext: ResourceContext;
+    /** Whether the `Guilds` intent is on, so `client.guilds` lists every guild the bot is in. */
+    readonly #guildsIntent: boolean;
 
     public constructor(public readonly options: ClientOptions) {
         super();
@@ -469,7 +475,14 @@ export class Client
             presences: false,
             ...options.cache,
         };
-        this.users = new UserManager(this.rest);
+        this.#guildsIntent =
+            Array.isArray(options.intents) &&
+            (resolveGatewayIntents(options.intents) &
+                GatewayIntentBits.Guilds) !==
+                0;
+        this.users = new UserManager(this.rest, {
+            maxSize: options.cache?.maxUsers,
+        });
         this.guilds = new GuildManager(this.rest, {
             maxMembers: options.cache?.maxMembers,
         });
@@ -696,7 +709,7 @@ export class Client
             // the previous version intact alongside the new one.
             const messages = this.channels.cachedMessages(message.channelId);
             const previous = messages?.cache.peek(message.id);
-            if (previous) messages!.cache.set(message.id, message);
+            if (previous) messages!.set(message.id, message);
             this.emit(ClientEvent.MessageUpdate, message, previous ?? null);
         });
         this.#gateway.on("MESSAGE_DELETE", (data) => {
@@ -834,9 +847,10 @@ export class Client
         });
         this.#gateway.on("GUILD_MEMBER_UPDATE", (data) => {
             const member = data as GuildMemberEvent;
-            const cached = this.#cache.members
-                ? this.guilds.members(member.guild_id).get(member.user.id)
-                : undefined;
+            const cached =
+                this.#cache.members && !this.#guildGone(member.guild_id)
+                    ? this.guilds.members(member.guild_id).get(member.user.id)
+                    : undefined;
             // A fresh instance keeps the client context (a private field).
             const previous =
                 cached && this.listenerCount(ClientEvent.GuildMemberUpdate)
@@ -853,7 +867,10 @@ export class Client
         });
         this.#gateway.on("GUILD_MEMBER_REMOVE", (data) => {
             const member = data as GuildMemberEvent;
-            this.guilds.members(member.guild_id).delete(member.user.id);
+            // A guild the bot has left has no per-guild state to clean up;
+            // creating it here would leak an empty manager for that guild.
+            if (!this.#guildGone(member.guild_id))
+                this.guilds.members(member.guild_id).delete(member.user.id);
             this.emit(ClientEvent.GuildMemberRemove, member);
         });
         this.#gateway.on("GUILD_MEMBERS_CHUNK", (data) => {
@@ -866,18 +883,21 @@ export class Client
         // ── Guild Bans ───────────────────────────────────────────────────────────
         this.#gateway.on("GUILD_BAN_ADD", (data) => {
             const ban = data as APIGuildBanEvent;
-            const bans = this.guilds.bans(ban.guild_id);
-            // Keep a reason already fetched over REST; the event carries none.
-            bans.set(ban.user.id, {
-                reason: bans.get(ban.user.id)?.reason ?? null,
-                user: ban.user,
-            });
-            this.guilds.members(ban.guild_id).delete(ban.user.id);
+            if (!this.#guildGone(ban.guild_id)) {
+                const bans = this.guilds.bans(ban.guild_id);
+                // Keep a reason already fetched over REST; the event carries none.
+                bans.set(ban.user.id, {
+                    reason: bans.get(ban.user.id)?.reason ?? null,
+                    user: ban.user,
+                });
+                this.guilds.members(ban.guild_id).delete(ban.user.id);
+            }
             this.emit(ClientEvent.GuildBanAdd, ban);
         });
         this.#gateway.on("GUILD_BAN_REMOVE", (data) => {
             const ban = data as APIGuildBanEvent;
-            this.guilds.bans(ban.guild_id).delete(ban.user.id);
+            if (!this.#guildGone(ban.guild_id))
+                this.guilds.bans(ban.guild_id).delete(ban.user.id);
             this.emit(ClientEvent.GuildBanRemove, ban);
         });
 
@@ -1239,7 +1259,9 @@ export class Client
         );
         if (this.#cache.users)
             this.#merge(this.users, member.user.id, member.user);
-        if (!this.#cache.members) return member;
+        // Members of a guild the bot has left are not kept: they would sit
+        // in a per-guild manager nothing prunes.
+        if (!this.#cache.members || this.#guildGone(guildId)) return member;
         const members = this.guilds.members(guildId);
         const known = members.get(member.user.id);
         const timedOutUntil = known?.timedOutUntil;
@@ -1253,6 +1275,15 @@ export class Client
         )
             merged.timedOutUntil = timedOutUntil;
         return merged;
+    }
+
+    /**
+     * Whether a guild is known not to be the bot's: with the `Guilds` intent
+     * every guild arrives in `GUILD_CREATE` first, so an uncached one was left
+     * (or never joined). Without that intent nothing is known, so nothing is.
+     */
+    #guildGone(guildId: string): boolean {
+        return this.#guildsIntent && !this.guilds.has(guildId);
     }
 
     /** A voice state without a channel means the user left voice. */
@@ -1322,6 +1353,9 @@ export class Client
             const value = from[key];
             if (value !== undefined) into[key] = value;
         }
+        // Storing it again marks a REST fetch in flight for this key as
+        // stale, so the older REST answer cannot undo this update.
+        manager.set(id, existing);
         return existing;
     }
 
@@ -1546,29 +1580,39 @@ export class Client
     public editInteractionReply(
         token: string,
         data: Record<string, unknown>,
+        applicationId?: string,
     ): Promise<unknown> {
-        if (!this.user)
+        // The interaction's application ID, which differs from the bot user's
+        // ID for some older applications.
+        const appId = applicationId ?? this.user?.id;
+        if (!appId)
             return Promise.reject(new Error("Client is unauthenticated."));
         return this.rest.patch(
-            Routes.interactionOriginalResponse(this.user.id, token),
+            Routes.interactionOriginalResponse(appId, token),
             toRequest(data, this.options.allowedMentions),
         );
     }
-    public deleteInteractionReply(token: string): Promise<void> {
-        if (!this.user)
+    public deleteInteractionReply(
+        token: string,
+        applicationId?: string,
+    ): Promise<void> {
+        const appId = applicationId ?? this.user?.id;
+        if (!appId)
             return Promise.reject(new Error("Client is unauthenticated."));
         return this.rest.delete(
-            Routes.interactionOriginalResponse(this.user.id, token),
+            Routes.interactionOriginalResponse(appId, token),
         );
     }
     public async followUpInteraction(
         token: string,
         data: Record<string, unknown>,
+        applicationId?: string,
     ): Promise<unknown> {
-        if (!this.user)
+        const appId = applicationId ?? this.user?.id;
+        if (!appId)
             return Promise.reject(new Error("Client is unauthenticated."));
         return this.rest.post(
-            Routes.webhook(this.user.id, token),
+            Routes.webhook(appId, token),
             toRequest(data, this.options.allowedMentions),
         );
     }

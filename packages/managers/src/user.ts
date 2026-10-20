@@ -24,11 +24,13 @@ export interface UserEditOptions {
 
 export class UserManager extends ResourceManager<string, User> {
     readonly #rest: REST;
-    public constructor(rest: REST) {
+    /** @param options.maxSize Most users kept; the least recently used go first. Default: unbounded. */
+    public constructor(rest: REST, options: { maxSize?: number } = {}) {
         super(
             async (id) =>
                 new User(await rest.get<UserData>(Routes.userById(id))),
             (user) => user.id,
+            options.maxSize,
         );
         this.#rest = rest;
     }
