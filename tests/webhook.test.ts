@@ -128,14 +128,14 @@ describe("REST gaps closed", () => {
         });
     };
 
-    test("webhook send accepts avatarURL, threadId and allowedMentions", async () => {
+    test("webhook send takes the wire names", async () => {
         install();
         try {
             await new WebhookClient({ id: "1", token: "t" }).send({
                 content: "hi",
-                avatarURL: "https://a.test/a.png",
-                threadId: "77",
-                allowedMentions: { parse: [] },
+                avatar_url: "https://a.test/a.png",
+                thread_id: "77",
+                allowed_mentions: { parse: [] },
             });
             expect(seen[0]!.url).toContain("thread_id=77");
             const body = JSON.parse(String(seen[0]!.init.body));
@@ -143,31 +143,37 @@ describe("REST gaps closed", () => {
                 avatar_url: "https://a.test/a.png",
                 allowed_mentions: { parse: [] },
             });
-            expect(body).not.toHaveProperty("threadId");
-            expect(body).not.toHaveProperty("avatarURL");
+            expect(body).not.toHaveProperty("thread_id");
         } finally {
             globalThis.fetch = original;
         }
     });
 
-    test("request() accepts the single-object form", async () => {
+    test("request() takes method, path, body and options", async () => {
         install();
         try {
             const { REST } = await import("../packages/rest/src/index.ts");
             const rest = new REST({ token: "a.b.c-token-0123456789" });
-            await rest.request({
-                method: "POST",
-                path: "/channels/1/messages",
-                body: { content: "x" },
-                query: new URLSearchParams({ a: "1" }),
-            });
-            await rest.request({ method: "GET", fullRoute: "/users/@me" });
+            await rest.request(
+                "POST",
+                "/channels/1/messages",
+                { content: "x" },
+                { query: new URLSearchParams({ a: "1" }) },
+            );
+            await rest.request("GET", "/users/@me");
             expect(seen[0]!.url).toContain("/channels/1/messages?a=1");
             expect(seen[0]!.init.method).toBe("POST");
             expect(String(seen[0]!.init.body)).toContain('"content":"x"');
             expect(seen[1]!.url).toContain("/users/@me");
+            // The removed single-object form is refused.
+            const legacy = rest.request.bind(rest) as unknown as (
+                options: unknown,
+            ) => Promise<unknown>;
             await expect(
-                rest.request({ method: "GET" } as never),
+                legacy({ method: "GET", path: "/users/@me" }),
+            ).rejects.toThrow(TypeError);
+            await expect(
+                rest.request("GET", undefined as never),
             ).rejects.toThrow(TypeError);
         } finally {
             globalThis.fetch = original;
@@ -190,7 +196,7 @@ describe("webhook messages in threads", () => {
             const client = new WebhookClient({ id: "1", token: "t" });
             await client.editMessage("9", {
                 content: "x",
-                threadId: "77",
+                thread_id: "77",
                 components: [],
             });
             await client.fetchMessage("9", { threadId: "77" });

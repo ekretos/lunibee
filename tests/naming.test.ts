@@ -14,7 +14,7 @@ const renamed: Record<string, string> = {
     ButtonBuilder: "CreateButton",
     ButtonStyle: "ButtonType",
     ChannelOptionBuilder: "CreateChannelOption",
-    ChannelSelectMenuBuilder: "CreateChannelSelectMenu",
+    ChannelSelectMenuBuilder: "CreateChannelSelect",
     ChannelType: "ChannelEnum",
     CommandOptionBuilder: "CreateCommandOption",
     ComponentType: "ComponentEnum",
@@ -29,13 +29,13 @@ const renamed: Record<string, string> = {
     InteractionType: "InteractionEnum",
     MediaGalleryBuilder: "CreateMediaGallery",
     MentionableOptionBuilder: "CreateMentionableOption",
-    MentionableSelectMenuBuilder: "CreateMentionableSelectMenu",
+    MentionableSelectMenuBuilder: "CreateMentionableSelect",
     MessageCommandBuilder: "CreateMessageCommand",
     ModalBuilder: "CreateModal",
     NumberOptionBuilder: "CreateNumberOption",
     PermissionOverwriteType: "PermissionOverwriteEnum",
     RoleOptionBuilder: "CreateRoleOption",
-    RoleSelectMenuBuilder: "CreateRoleSelectMenu",
+    RoleSelectMenuBuilder: "CreateRoleSelect",
     SectionBuilder: "CreateSection",
     SeparatorBuilder: "CreateSeparator",
     SlashCommandBuilder: "CreateSlashCommand",
@@ -43,7 +43,7 @@ const renamed: Record<string, string> = {
     StickerType: "StickerEnum",
     StringOptionBuilder: "CreateStringOption",
     StringSelectBuilder: "CreateStringSelect",
-    StringSelectMenuBuilder: "CreateStringSelectMenu",
+    StringSelectMenuBuilder: "CreateStringSelect",
     SubcommandBuilder: "CreateSubcommand",
     SubcommandGroupBuilder: "CreateSubcommandGroup",
     TextDisplayBuilder: "CreateTextDisplay",
@@ -52,13 +52,38 @@ const renamed: Record<string, string> = {
     ThumbnailBuilder: "CreateThumbnail",
     UserCommandBuilder: "CreateUserCommand",
     UserOptionBuilder: "CreateUserOption",
-    UserSelectMenuBuilder: "CreateUserSelectMenu",
+    UserSelectMenuBuilder: "CreateUserSelect",
     WebhookType: "WebhookEnum",
 };
 
 test("new names are exported and the removed names are gone", () => {
     const exports = lunibee as unknown as Record<string, unknown>;
     for (const [old, current] of Object.entries(renamed)) {
+        expect(exports[current]).toBeDefined();
+        expect(exports[old]).toBeUndefined();
+    }
+});
+
+// 0.4.0 removed the discord.js-style compatibility aliases.
+const removedIn040: Record<string, string> = {
+    Events: "ClientEvent",
+    CreateStringSelectMenu: "CreateStringSelect",
+    CreateUserSelectMenu: "CreateUserSelect",
+    CreateRoleSelectMenu: "CreateRoleSelect",
+    CreateMentionableSelectMenu: "CreateMentionableSelect",
+    CreateChannelSelectMenu: "CreateChannelSelect",
+    CachedManager: "ResourceManager",
+    DiscordAPIError: "RESTError",
+    ShardingManager: "ShardManager",
+    Intents: "IntentBits",
+    SendBudget: "GatewaySendLimiter",
+    Status: "GatewayState",
+    IntentsBitField: "GatewayIntentBits",
+};
+
+test("the discord.js-style aliases removed in 0.4.0 are gone", () => {
+    const exports = lunibee as unknown as Record<string, unknown>;
+    for (const [old, current] of Object.entries(removedIn040)) {
         expect(exports[current]).toBeDefined();
         expect(exports[old]).toBeUndefined();
     }

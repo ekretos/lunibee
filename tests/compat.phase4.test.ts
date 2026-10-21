@@ -1,17 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
-    Events,
-    ClientEvent,
-    CachedManager,
-    ResourceManager,
-    ShardingManager,
-    ShardManager,
-    CreateStringSelectMenu,
-    CreateStringSelect,
-    CreateUserSelectMenu,
-    CreateRoleSelectMenu,
-    CreateMentionableSelectMenu,
-    CreateChannelSelectMenu,
+    CreateUserSelect,
+    CreateRoleSelect,
+    CreateMentionableSelect,
+    CreateChannelSelect,
     CreateContextMenuCommand,
     createInteraction,
     VoiceConnectionStatus,
@@ -26,21 +18,13 @@ import {
     type AutocompleteInteraction,
 } from "../packages/lunibee/src/index.ts";
 
-describe("discord.js-familiar aliases", () => {
-    test("top-level aliases point at the canonical exports", () => {
-        expect(Events).toBe(ClientEvent);
-        expect(Events.MessageCreate).toBe(ClientEvent.MessageCreate);
-        expect(CachedManager).toBe(ResourceManager);
-        expect(ShardingManager).toBe(ShardManager);
-        expect(CreateStringSelectMenu).toBe(CreateStringSelect);
-    });
-
+describe("builders", () => {
     test("entity select menu builders fix their component type", () => {
         const types = [
-            new CreateUserSelectMenu(),
-            new CreateRoleSelectMenu(),
-            new CreateMentionableSelectMenu(),
-            new CreateChannelSelectMenu(),
+            new CreateUserSelect(),
+            new CreateRoleSelect(),
+            new CreateMentionableSelect(),
+            new CreateChannelSelect(),
         ].map((b) => (b.setCustomId("id").toJSON() as { type: number }).type);
         expect(types).toEqual([5, 6, 7, 8]);
     });

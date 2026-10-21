@@ -13,7 +13,6 @@ Lunibee supports specifying intents as arrays or bitwise OR combinations. The pu
 
 - `IntentBits` — idiomatic camelCase constants.
 - `GatewayIntentBits` — Discord-standard PascalCase constants.
-- `Intents` — alias for `IntentBits`.
 
 ### Using `IntentBits` (Recommended)
 <Tabs>
@@ -78,24 +77,6 @@ const client = new Client({
 ```
 </TabItem>
 </Tabs>
-
-### Using `IntentsBitField`
-
-A discord.js-style bitfield, accepted anywhere intents are:
-
-```ts
-import { Client, IntentsBitField } from "lunibee";
-
-const intents = new IntentsBitField([
-  IntentsBitField.Flags.Guilds,
-  "GuildMessages",
-]).add("MessageContent");
-
-intents.has("Guilds");  // true
-intents.toArray();      // ["Guilds", "GuildMessages", "MessageContent"]
-
-const client = new Client({ token: process.env.DISCORD_TOKEN!, intents: intents.toArray() });
-```
 
 ## Gateway Intents Reference
 

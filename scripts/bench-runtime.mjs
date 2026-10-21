@@ -21,7 +21,7 @@ const {
     CreateBooleanOption,
     CreateButton,
     CreateChannelOption,
-    CreateChannelSelectMenu,
+    CreateChannelSelect,
     CreateContainer,
     CreateContentInventoryEntry,
     CreateContextMenuCommand,
@@ -30,12 +30,12 @@ const {
     CreateIntegerOption,
     CreateMediaGallery,
     CreateMentionableOption,
-    CreateMentionableSelectMenu,
+    CreateMentionableSelect,
     CreateMessageCommand,
     CreateModal,
     CreateNumberOption,
     CreateRoleOption,
-    CreateRoleSelectMenu,
+    CreateRoleSelect,
     CreateSection,
     CreateSeparator,
     CreateSlashCommand,
@@ -48,7 +48,7 @@ const {
     CreateThumbnail,
     CreateUserCommand,
     CreateUserOption,
-    CreateUserSelectMenu,
+    CreateUserSelect,
 } = lunibee;
 
 const ITERATIONS = Number(process.env.BENCH_ITERATIONS ?? 10_000);
@@ -158,10 +158,10 @@ bench("Builders", "CreateActionRow (5 buttons)", () =>
 bench("Builders", "CreateStringSelect (3 options)", () =>
     new CreateStringSelect().setCustomId("s").setPlaceholder("Pick").setMinValues(1).setMaxValues(2).addOptions(option, option, option).toJSON(),
 );
-bench("Builders", "CreateUserSelectMenu", () => new CreateUserSelectMenu().setCustomId("u").setMaxValues(5).toJSON());
-bench("Builders", "CreateRoleSelectMenu", () => new CreateRoleSelectMenu().setCustomId("r").setMaxValues(5).toJSON());
-bench("Builders", "CreateMentionableSelectMenu", () => new CreateMentionableSelectMenu().setCustomId("m").toJSON());
-bench("Builders", "CreateChannelSelectMenu", () => new CreateChannelSelectMenu().setCustomId("c").setDefaultValues({ id: "1", type: "channel" }).toJSON());
+bench("Builders", "CreateUserSelect", () => new CreateUserSelect().setCustomId("u").setMaxValues(5).toJSON());
+bench("Builders", "CreateRoleSelect", () => new CreateRoleSelect().setCustomId("r").setMaxValues(5).toJSON());
+bench("Builders", "CreateMentionableSelect", () => new CreateMentionableSelect().setCustomId("m").toJSON());
+bench("Builders", "CreateChannelSelect", () => new CreateChannelSelect().setCustomId("c").setDefaultValues({ id: "1", type: "channel" }).toJSON());
 bench("Builders", "CreateTextInput", () =>
     new CreateTextInput().setCustomId("t").setLabel("Label").setStyle(2).setPlaceholder("…").setMinLength(1).setMaxLength(100).setRequired(true).toJSON(),
 );

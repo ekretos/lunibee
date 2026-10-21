@@ -88,9 +88,8 @@ const row = new CreateActionRow<CreateStringSelect>().addComponents(
 );
 ```
 
-Entity pickers: `CreateUserSelectMenu`, `CreateRoleSelectMenu`,
-`CreateChannelSelectMenu`, `CreateMentionableSelectMenu`. `CreateStringSelectMenu` is an
-alias of `CreateStringSelect`. Context menu commands: `CreateContextMenuCommand`
+Entity pickers: `CreateUserSelect`, `CreateRoleSelect`,
+`CreateChannelSelect`, `CreateMentionableSelect`. Context menu commands: `CreateContextMenuCommand`
 (`setType(2 | 3)`), `CreateUserCommand`, `CreateMessageCommand`.
 
 ## Modals

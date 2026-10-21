@@ -7,7 +7,7 @@ bun add @lunibee/rest
 ```
 
 ```ts
-import { REST, Routes, DiscordAPIError } from "@lunibee/rest";
+import { REST, Routes, RESTError } from "@lunibee/rest";
 
 const rest = new REST({ token: process.env.DISCORD_TOKEN! });
 
@@ -20,7 +20,7 @@ try {
         { reason: "greeting", signal: AbortSignal.timeout(5_000) },
     );
 } catch (error) {
-    if (error instanceof DiscordAPIError) console.error(error.status, error.message);
+    if (error instanceof RESTError) console.error(error.status, error.message);
 }
 ```
 

@@ -74,7 +74,7 @@ const client = new Client({
 | `client.stageInstances` | `StageInstanceManager` | Stage instances, cached by stage channel ID. |
 | `client.applicationEmojis` | `ApplicationEmojiManager \| undefined` | The application's own emojis; set on READY. |
 | `client.options` | `ClientOptions` | The options the client was created with. |
-| `client.user` | `ClientUser \| undefined` | Authenticated bot user (available after `ready`). |
+| `client.user` | `UserData \| undefined` | Authenticated bot user (available after `ready`). |
 | `client.state` | `ClientState` | Current lifecycle state: `"idle"`, `"connecting"`, `"ready"`, or `"destroyed"`. |
 | `client.ping` | `number` | Current WebSocket heartbeat latency in ms. |
 | `client.uptime` | `number \| null` | Milliseconds since the client became ready, or `null`. |

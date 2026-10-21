@@ -44,6 +44,33 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
   - An FFmpeg failure is the resource's `error`, not a `finish`.
 - **REST:** paths with an empty segment (`//`) are refused.
 
+### 🗑️ Removed
+
+Old compatibility layers are gone. `lunibee migrate --fix` renames what it can and lists the rest ([Upgrading](/getting-started/upgrading/#033--040)).
+
+- **discord.js-style aliases** (old → use):
+  - `Events` → `ClientEvent`
+  - `ShardingManager` → `ShardManager`
+  - `DiscordAPIError` → `RESTError`
+  - `CachedManager` → `ResourceManager`
+  - `CreateStringSelectMenu` → `CreateStringSelect`
+  - `CreateUserSelectMenu` / `CreateRoleSelectMenu` / `CreateMentionableSelectMenu` / `CreateChannelSelectMenu` → `CreateUserSelect` / `CreateRoleSelect` / `CreateMentionableSelect` / `CreateChannelSelect` (renamed)
+  - `Intents` → `IntentBits`
+  - `SendBudget` → `GatewaySendLimiter`
+  - `Status` → `GatewayState`
+  - types: `CreateMessageOptions` → `MessageCreateOptions`; `ClientUser` → `UserData`; `InteractionUpdateOptions` and `FollowUpOptions` → `InteractionReplyOptions`
+  - `IntentsBitField`: pass an array of `GatewayIntentBits`.
+- **REST call forms:**
+  - `rest.post/put/patch(path, { body, … })` → `rest.post/put/patch(path, body, options)`. The old form is refused with a `TypeError` naming the fix, rather than sending the wrapper as the body.
+  - `rest.request({ method, path | fullRoute, … })` → `rest.request(method, path, body, options)`.
+  - `toRequest()` always returns `{ body, files? }`.
+- **WebhookClient payload aliases:** `avatarURL`, `threadId` and `allowedMentions` → `avatar_url`, `thread_id` and `allowed_mentions`.
+- **CLI:**
+  - Removed commands: `create handler`, `create command`, `sync handlers`, `sync commands` and `handler --fix`, the generated-binder layout. `lunibee init` projects find their commands and events at runtime.
+  - `lunibee migrate` now migrates code to 0.4.0; the 0.3.1 renames are no longer handled.
+- **`@lunibee/create`:** use `bunx @lunibee/cli init my-bot`.
+- **Docs:** the changelog and upgrade guide cover 0.4.0 only; earlier releases are in the Git history.
+
 ### ✨ Added
 
 - **`client.voice`** ([Voice](/core-concepts/voice/)): `join()` sends op 4 through the shard that owns the guild, collects the bot's `VOICE_STATE_UPDATE` and `VOICE_SERVER_UPDATE` (in either order, with a timeout), and resolves when audio can flow. `leave()`, `get()` and `connections` are also added. Moves and region changes reconnect. Leaving a guild and `client.destroy()` release every connection.

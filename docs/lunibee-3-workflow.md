@@ -131,6 +131,9 @@ export default command({
 
 ## 5. CLI
 
+> Removed in 0.4.0: these commands and the generated `src/commands/index.ts` binder are gone.
+> `lunibee init` projects find commands and events at runtime (see the CLI docs).
+
 ```sh
 lunibee create command timeout            # slash command (default)
 lunibee create command timeout --prefix   # prefix command only

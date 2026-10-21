@@ -122,18 +122,17 @@ const row = new CreateActionRow().addComponents(select);
 ## Entity Select Menus
 
 For user, role, mentionable and channel pickers, use the fixed-type builders (or
-`CreateEntitySelect` with a component type). `CreateStringSelectMenu` is an alias of
-`CreateStringSelect`.
+`CreateEntitySelect` with a component type).
 
 ```ts
 import {
-  CreateUserSelectMenu,
-  CreateRoleSelectMenu,
-  CreateChannelSelectMenu,
-  CreateMentionableSelectMenu,
+  CreateUserSelect,
+  CreateRoleSelect,
+  CreateChannelSelect,
+  CreateMentionableSelect,
 } from "lunibee";
 
-const pickUser = new CreateUserSelectMenu().setCustomId("pick_user");
+const pickUser = new CreateUserSelect().setCustomId("pick_user");
 ```
 
 ## Context Menu Commands

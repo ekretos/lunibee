@@ -322,7 +322,7 @@ resolvable at the seam that had been silently forwarding it.
 
 ## Stage 1B — remaining, in priority order
 2. ✅ **`GatewayDispatcher`** (0.3.1, `packages/ws/src/dispatcher.ts`) — the listener map and emission.
-3. ✅ **`GatewaySendLimiter`** (0.3.1, `send-budget.ts`, formerly `SendBudget`, still exported under that name) — the 115/60s budget with privileged heartbeats, IDENTIFY and RESUME.
+3. ✅ **`GatewaySendLimiter`** (0.3.1, `send-budget.ts`, formerly `SendBudget`; that name was removed in 0.4.0) — the 115/60s budget with privileged heartbeats, IDENTIFY and RESUME.
 4. ✅ **`ShardSupervisor`** (0.3.1, `packages/sharding/src/supervisor.ts`) — the restart/backoff policy lifted out of `ClusterManager`, so `Fleet` can reuse it per `FleetNode`.
 
 ## Open architectural debts this direction should absorb

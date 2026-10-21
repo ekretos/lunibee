@@ -37,6 +37,3 @@ export class GatewaySendLimiter {
         this.#timestamps.push(now);
     }
 }
-
-/** The limiter's name before 0.3.1. */
-export const SendBudget = GatewaySendLimiter;

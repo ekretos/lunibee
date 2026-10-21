@@ -87,17 +87,15 @@ export function assertAllowedMentions(mentions: AllowedMentions): void {
 export function toRequest(
     options: MessageCreateOptions,
     allowedMentions?: AllowedMentions,
-):
-    | Omit<MessageCreateOptions, "files">
-    | {
-          body: Omit<MessageCreateOptions, "files">;
-          files: RESTFileAttachment[];
-      } {
+): {
+    body: Omit<MessageCreateOptions, "files">;
+    files?: RESTFileAttachment[];
+} {
     const { files, ...body } = options;
     if (allowedMentions !== undefined && body.allowed_mentions === undefined)
         body.allowed_mentions = allowedMentions;
     if (body.allowed_mentions) assertAllowedMentions(body.allowed_mentions);
-    if (!files?.length) return body;
+    if (!files?.length) return { body };
     // Alt text travels in the payload's `attachments`, matched by index.
     if (body.attachments === undefined && files.some((f) => f.description))
         body.attachments = files.map((file, id) =>
@@ -142,12 +140,10 @@ export class MessageManager {
         return this.cache.get(messageId) ?? this.fetch(messageId);
     }
     public async send(options: MessageCreateOptions): Promise<Message> {
+        const { body, files } = toRequest(options, this.#allowedMentions);
         const data = await this.#rest.post<
             ConstructorParameters<typeof Message>[0]
-        >(
-            Routes.channelMessages(this.#channelId),
-            toRequest(options, this.#allowedMentions),
-        );
+        >(Routes.channelMessages(this.#channelId), body, { files });
         return this.upsert(data);
     }
     /** In-flight fetches; `dirty` is set when the message is written or deleted meanwhile. */

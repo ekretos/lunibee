@@ -18,8 +18,6 @@ export interface UserData {
     system?: boolean;
     public_flags?: number;
 }
-/** Current authenticated bot user. */
-export type ClientUser = UserData;
 /** Discord Gateway payload envelope. */
 export interface GatewayPayload<T = unknown> {
     op: number;
@@ -354,12 +352,6 @@ export interface InteractionReplyOptions extends MessagePayload {
     /** On `reply()` / `update()`: return the created message (one request, no `fetchReply()`). */
     withResponse?: boolean;
 }
-
-/** What `update()` on a component interaction takes. */
-export type InteractionUpdateOptions = InteractionReplyOptions;
-
-/** What `followUp()` takes. */
-export type FollowUpOptions = InteractionReplyOptions;
 
 // ─── Attachments ─────────────────────────────────────────────────────────────
 

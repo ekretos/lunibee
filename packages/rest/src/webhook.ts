@@ -14,7 +14,7 @@ export interface WebhookClientOptions {
     url?: string;
 }
 
-/** A webhook message for `send()` and `editMessage()`; camelCase aliases (`avatarURL`, `threadId`, `allowedMentions`) are accepted beside the wire names. */
+/** A webhook message for `send()` and `editMessage()`, in Discord's wire names. */
 export interface WebhookMessageOptions {
     content?: string;
     username?: string;
@@ -26,12 +26,6 @@ export interface WebhookMessageOptions {
     files?: RESTFileAttachment[];
     flags?: number;
     thread_id?: string;
-    /** Discord.js-familiar alias of `avatar_url`. */
-    avatarURL?: string;
-    /** Discord.js-familiar alias of `thread_id`. */
-    threadId?: string;
-    /** Discord.js-familiar alias of `allowed_mentions`. */
-    allowedMentions?: AllowedMentions;
     allowed_mentions?: AllowedMentions;
 }
 
@@ -66,7 +60,7 @@ export class WebhookClient {
         this.#rest = new REST(restOptions);
     }
 
-    /** Splits a message payload into its query, JSON body and files, resolving the camelCase aliases and builders. */
+    /** Splits a message payload into its query, JSON body and files, resolving builders. */
     #prepare(
         options: string | WebhookMessageOptions,
         base: Record<string, string> = {},
@@ -77,23 +71,7 @@ export class WebhookClient {
     } {
         const payload =
             typeof options === "string" ? { content: options } : options;
-        const {
-            thread_id: threadWire,
-            threadId,
-            avatarURL,
-            allowedMentions,
-            files,
-            ...body
-        } = payload;
-        const thread_id = threadWire ?? threadId;
-        // The wire names win when both spellings are given.
-        if (avatarURL !== undefined && body.avatar_url === undefined)
-            body.avatar_url = avatarURL;
-        if (
-            allowedMentions !== undefined &&
-            body.allowed_mentions === undefined
-        )
-            body.allowed_mentions = allowedMentions;
+        const { thread_id, files, ...body } = payload;
         const params = new URLSearchParams(base);
         if (thread_id) params.set("thread_id", String(thread_id));
         const json: Record<string, unknown> = { ...body };

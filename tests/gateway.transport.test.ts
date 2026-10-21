@@ -403,12 +403,12 @@ describe("ZlibStreamDecoder", () => {
     });
 });
 
-import { SendBudget } from "../packages/ws/src/send-budget.ts";
+import { GatewaySendLimiter } from "../packages/ws/src/send-budget.ts";
 import type { FakeSocketEvent } from "./helpers/fake-websocket.ts";
 
-describe("SendBudget", () => {
+describe("GatewaySendLimiter", () => {
     test("caps application sends per window but never privileged ones", () => {
-        const budget = new SendBudget(2, 1000);
+        const budget = new GatewaySendLimiter(2, 1000);
         expect(budget.allows(false, 0)).toBe(true);
         budget.record(0);
         budget.record(10);

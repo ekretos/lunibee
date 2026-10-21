@@ -1,8 +1,4 @@
-import {
-    REST,
-    type RequestOptionsObject,
-    type RetryPolicy,
-} from "@lunibee/rest";
+import { REST, type RetryPolicy } from "@lunibee/rest";
 
 /** A recorded REST request used by integration-style tests. */
 export interface RecordedRequest {
@@ -29,25 +25,11 @@ export class MockREST extends REST {
             this.#responses.set(path, response);
     }
     /** Records and returns a configured response. @param method HTTP method. @param path API path. @param body Optional request body. @returns Configured response. @throws {Error} If no configured response exists. */
-    public override request<T>(options: RequestOptionsObject): Promise<T>;
-    public override request<T>(
+    public override async request<T>(
         method: string,
         path: string,
         body?: unknown,
-    ): Promise<T>;
-    public override async request<T>(
-        methodOrOptions: string | RequestOptionsObject,
-        pathArg?: string,
-        bodyArg?: unknown,
     ): Promise<T> {
-        const [method, path, body] =
-            typeof methodOrOptions === "object"
-                ? [
-                      methodOrOptions.method,
-                      methodOrOptions.path ?? methodOrOptions.fullRoute ?? "",
-                      methodOrOptions.body,
-                  ]
-                : [methodOrOptions, pathArg as string, bodyArg];
         this.requests.push({ method, path, body });
         if (!this.#responses.has(path))
             throw new Error(`No mock response configured for ${path}`);

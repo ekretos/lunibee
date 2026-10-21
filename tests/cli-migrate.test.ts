@@ -137,6 +137,19 @@ describe("scanSource: renames", () => {
 });
 
 describe("scanSource: reported for a hand change", () => {
+    test("toRequest(), whose result changed shape", () => {
+        const { manual } = scanSource(
+            'import { toRequest } from "lunibee";\nconst r = toRequest(data);\n',
+        );
+        expect(manual.map((f) => [f.line, f.found])).toEqual([
+            [1, "toRequest"],
+            [2, "toRequest"],
+        ]);
+        expect(manual[0]!.use).toStartWith(
+            "check: toRequest() now always returns",
+        );
+    });
+
     test("IntentsBitField, at the import and each use", () => {
         const input =
             'import { IntentsBitField as Bits, Client } from "lunibee";\nconst i = new Bits([Bits.Flags.Guilds]);\nnew Client({ intents: i });\n';

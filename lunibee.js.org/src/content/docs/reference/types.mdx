@@ -7,7 +7,7 @@ description: Every type the lunibee package exports, grouped by package, with a 
 
 Every interface and type alias that `lunibee` exports, with what it is for. Each name links to its full definition in the generated API reference. The classes and functions that use these types are described on the other reference pages.
 
-375 types in 12 packages.
+376 types in 12 packages.
 
 ## `@lunibee/builders`
 
@@ -131,7 +131,6 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`StageInstanceCreateOptions`](/api/interfaces/stageinstancecreateoptions/) | interface | Options for creating a stage instance. |
 | [`ApplicationCommandInput`](/api/type-aliases/applicationcommandinput/) | type | Command data, or a builder such as `CreateSlashCommand` (its `toJSON()` is sent). |
 | [`ChannelEditOptions`](/api/type-aliases/channeleditoptions/) | type | Audit-log reason. |
-| [`CreateMessageOptions`](/api/type-aliases/createmessageoptions/) | type | Discord.js-familiar name for `MessageCreateOptions`. |
 | [`GuildScheduledEventOptions`](/api/type-aliases/guildscheduledeventoptions/) | type | Fields accepted when creating or editing a scheduled event. |
 | [`PermissionOverwriteTargetType`](/api/type-aliases/permissionoverwritetargettype/) | type | Overwrite target type: 0 = role, 1 = member. |
 
@@ -159,16 +158,15 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`RateLimitStore`](/api/interfaces/ratelimitstore/) | interface | Interface for distributed or local rate limit synchronization. |
 | [`RedisRateLimitStoreOptions`](/api/interfaces/redisratelimitstoreoptions/) | interface | Options for `RedisRateLimitStore`. |
 | [`RedisStoreDiagnostics`](/api/interfaces/redisstorediagnostics/) | interface | The store's health, for diagnostics endpoints. |
-| [`RequestData`](/api/interfaces/requestdata/) | interface | Discord.js-familiar request payload. |
+| [`RequestData`](/api/interfaces/requestdata/) | interface | Request options plus `files` (which upgrade the request to multipart) and, for `get()` and `delete()` (which take no positional body), an optional `body`. |
 | [`RequestIdentity`](/api/interfaces/requestidentity/) | interface | Who a request's rate limits belong to. |
-| [`RequestOptionsObject`](/api/interfaces/requestoptionsobject/) | interface | The single-object form of REST.request, matching `@discordjs/rest`: the route is `path` (or its Discord.js name, `fullRoute`). |
 | [`ReserveOptions`](/api/interfaces/reserveoptions/) | interface | Options for RateLimitStore.reserve. |
 | [`RetryPolicy`](/api/interfaces/retrypolicy/) | interface | Configures which REST failures may be retried. |
 | [`RouteKey`](/api/interfaces/routekey/) | interface | Identity of a request as Discord's rate limiter sees it. |
 | [`SchedulerOptions`](/api/interfaces/scheduleroptions/) | interface | Limits for RequestScheduler. |
 | [`TransportRequest`](/api/interfaces/transportrequest/) | interface | One HTTP attempt, fully resolved: no routing, retry or rate-limit concerns. |
 | [`WebhookClientOptions`](/api/interfaces/webhookclientoptions/) | interface | Where a `WebhookClient` sends: a Discord webhook `url`, or its `id` and `token`. |
-| [`WebhookMessageOptions`](/api/interfaces/webhookmessageoptions/) | interface | A webhook message for `send()` and `editMessage()`; camelCase aliases (`avatarURL`, `threadId`, `allowedMentions`) are accepted beside the wire names. |
+| [`WebhookMessageOptions`](/api/interfaces/webhookmessageoptions/) | interface | A webhook message for `send()` and `editMessage()`, in Discord's wire names. |
 | [`CoordinationMode`](/api/type-aliases/coordinationmode/) | type | How a store enforces limits right now. |
 | [`FetchLike`](/api/type-aliases/fetchlike/) | type | Minimal fetch shape the transport depends on, so a stub needs no extras. |
 | [`RESTErrorCode`](/api/type-aliases/resterrorcode/) | type | One RESTErrorCode value, usable as a type. |
@@ -192,11 +190,16 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`ClusterManagerEvents`](/api/interfaces/clustermanagerevents/) | interface | What `ClusterManager` emits. |
 | [`ClusterManagerHealth`](/api/interfaces/clustermanagerhealth/) | interface | Health of the whole deployment. |
 | [`ClusterManagerOptions`](/api/interfaces/clustermanageroptions/) | interface | Configuration for managing multiple shard clusters. |
+| [`ClusterPlan`](/api/interfaces/clusterplan/) | interface | The result of planClusters. |
+| [`ClusterPlanInfo`](/api/interfaces/clusterplaninfo/) | interface | What the `plan` event reports. |
+| [`ClusterPlanOptions`](/api/interfaces/clusterplanoptions/) | interface | Options for planClusters; set `clusterCount` or `shardsPerCluster`, not both. |
 | [`GatewayBotInfo`](/api/interfaces/gatewaybotinfo/) | interface | `/gateway/bot` information used to pace shard startup. |
 | [`HostStatus`](/api/interfaces/hoststatus/) | interface | A host as the coordinator sees it. |
 | [`IdentifyBudget`](/api/interfaces/identifybudget/) | interface | What `/gateway/bot` says about the session budget. |
 | [`IdentifyCoordinatorOptions`](/api/interfaces/identifycoordinatoroptions/) | interface | Options for an IdentifyCoordinator. |
+| [`IdentifyEvent`](/api/interfaces/identifyevent/) | interface | One change in the IDENTIFY queue. |
 | [`IdentifyGate`](/api/interfaces/identifygate/) | interface | Asks for the right to IDENTIFY, and gives it back. |
+| [`IdentifySlotGate`](/api/interfaces/identifyslotgate/) | interface | An IDENTIFY slot source: a cluster worker's `identifyGate`. |
 | [`IpcEndpoint`](/api/interfaces/ipcendpoint/) | interface | The part of `process` (or a child process handle) the IPC transport uses. |
 | [`LeaderLock`](/api/interfaces/leaderlock/) | interface | Leadership between several coordinators, so a standby `ClusterManager` can take over when the active one dies. |
 | [`LeaderRedisClient`](/api/interfaces/leaderredisclient/) | interface | The part of a Redis client the lock uses. |
@@ -216,6 +219,7 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`ThreadForkOptions`](/api/interfaces/threadforkoptions/) | interface | Options for threadFork. |
 | [`WorkerMetrics`](/api/interfaces/workermetrics/) | interface | Process numbers a worker adds to a health report. |
 | [`WorkerReport`](/api/interfaces/workerreport/) | interface | What a cluster worker reports about itself. |
+| [`ClusterCountSource`](/api/type-aliases/clustercountsource/) | type | How planClusters chose the cluster count. |
 | [`ClusterState`](/api/type-aliases/clusterstate/) | type | Lifecycle of a cluster process. |
 | [`ShardBusErrorHandler`](/api/type-aliases/shardbuserrorhandler/) | type | Listener for errors thrown or rejected by shard message handlers. |
 | [`ShardMessageHandler`](/api/type-aliases/shardmessagehandler/) | type | Handler invoked for shard messages. |
@@ -348,12 +352,9 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 | [`ButtonType`](/api/type-aliases/buttontype/) | type | One ButtonType value, usable as a type: `style: ButtonType`. |
 | [`ChannelEnum`](/api/type-aliases/channelenum/) | type | One ChannelEnum value, usable as a type. |
 | [`ChannelKind`](/api/type-aliases/channelkind/) | type | The name of a kind of channel, such as `"text"` or `"voice"`. |
-| [`ClientUser`](/api/type-aliases/clientuser/) | type | Current authenticated bot user. |
 | [`ComponentEnum`](/api/type-aliases/componentenum/) | type | One ComponentEnum value, usable as a type. |
-| [`FollowUpOptions`](/api/type-aliases/followupoptions/) | type | What `followUp()` takes. |
 | [`GatewayIntentResolvable`](/api/type-aliases/gatewayintentresolvable/) | type | Gateway intents: an array of intent bits or names, e.g. |
 | [`InteractionResponseEnum`](/api/type-aliases/interactionresponseenum/) | type | One InteractionResponseEnum value, usable as a type. |
-| [`InteractionUpdateOptions`](/api/type-aliases/interactionupdateoptions/) | type | What `update()` on a component interaction takes. |
 | [`MessageFlags`](/api/type-aliases/messageflags/) | type | One MessageFlags value, usable as a type. |
 | [`Snowflake`](/api/type-aliases/snowflake/) | type | Discord API snowflake identifier. |
 | [`StickerEnum`](/api/type-aliases/stickerenum/) | type | One StickerEnum value, usable as a type. |

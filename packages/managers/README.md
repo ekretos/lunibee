@@ -43,8 +43,7 @@ console.log(page.messages.length, page.hasMore);
 | `StageInstanceManager` | `client.stageInstances` |
 | `ApplicationCommandManager` | `client.application.commands` (`set`, `create`, `setGuild`, …) |
 
-`Manager` and `ResourceManager` are the base classes; `CachedManager` is an alias of
-`ResourceManager`.
+`Manager` and `ResourceManager` are the base classes.
 
 ## What's new in 0.2.1
 

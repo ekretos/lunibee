@@ -72,12 +72,12 @@ export {
 } from "./session.js";
 
 export { GatewayDispatcher, type GatewayListener } from "./dispatcher.js";
-export { GatewaySendLimiter, SendBudget } from "./send-budget.js";
+export { GatewaySendLimiter } from "./send-budget.js";
 export { GatewayOpcodes } from "./opcodes.js";
 
 export { GatewayCloseCodes } from "./close-codes.js";
 
-export { GatewayState, Status, GatewayError } from "./state.js";
+export { GatewayState, GatewayError } from "./state.js";
 import { GatewayState, GatewayError } from "./state.js";
 import { GatewayDispatcher, type GatewayListener } from "./dispatcher.js";
 import { GatewaySendLimiter } from "./send-budget.js";

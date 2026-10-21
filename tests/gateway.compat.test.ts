@@ -4,16 +4,15 @@ import {
     GatewayCloseCodes,
     GatewayOpcodes,
     GatewayState,
-    Status,
 } from "../packages/ws/src/index.ts";
 import { FakeWebSocket, installWebSocket } from "./helpers/fake-websocket.ts";
 
 /**
- * Discord.js-familiarity + reconnect/resume regression suite for the Gateway.
+ * Close-code + reconnect/resume regression suite for the Gateway.
  *
  * Complements `tests/gateway.integration.test.ts` (owned lifecycle coverage)
  * with the compatibility guarantees Vikram (T3-gateway) is accountable for:
- * the additive `Status` / `GatewayCloseCodes` surface, resumable INVALID_SESSION
+ * the `GatewayCloseCodes` surface, resumable INVALID_SESSION
  * handling, RESUMED backoff reset, and identify-path resume-URL hygiene.
  */
 
@@ -58,12 +57,7 @@ afterEach(() => {
     globalThis.WebSocket = OriginalWebSocket;
 });
 
-describe("Gateway Discord.js-familiar surface", () => {
-    test("Status is an additive alias of GatewayState", () => {
-        expect(Status).toBe(GatewayState);
-        expect(Status.Ready).toBe(GatewayState.Ready);
-    });
-
+describe("Gateway close codes", () => {
     test("GatewayCloseCodes match the Discord protocol values", () => {
         expect(GatewayCloseCodes.AuthenticationFailed).toBe(4004);
         expect(GatewayCloseCodes.InvalidSeq).toBe(4007);

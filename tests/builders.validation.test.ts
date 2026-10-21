@@ -11,7 +11,7 @@ import {
     CreateIntegerOption,
     CreateNumberOption,
     CreateStringOption,
-    CreateUserSelectMenu,
+    CreateUserSelect,
 } from "../packages/builders/src/index.ts";
 
 describe("component validation on toJSON", () => {
@@ -122,7 +122,7 @@ describe("shared option rules", () => {
             .setMinValues(1)
             .setMaxValues(1)
             .addOptions({ label: "a", value: "a" });
-        const user = new CreateUserSelectMenu()
+        const user = new CreateUserSelect()
             .setCustomId("u")
             .setPlaceholder("p")
             .setDisabled();

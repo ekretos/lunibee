@@ -19,16 +19,6 @@ export enum GatewayState {
     /** Gateway is permanently closed. */
     Closed = "CLOSED",
 }
-/**
- * Discord.js-familiar alias for {@link GatewayState}.
- *
- * Discord.js exposes connection status via a `Status` enum. Lunibee's canonical
- * name is {@link GatewayState}; this is an additive alias so `discord.js` users
- * find the expected name. Note the *values* remain Lunibee's string states
- * (e.g. `"READY"`), not Discord.js's numeric `Status` members — an intentional
- * divergence documented in the compatibility matrix.
- */
-export { GatewayState as Status };
 /** Gateway protocol error. */
 export class GatewayError extends Error {
     /** Gateway close/error code. */

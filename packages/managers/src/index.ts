@@ -1,7 +1,5 @@
-import { Manager, ResourceManager, assignFields, splitReason } from "./base.js";
+import { Manager, assignFields, splitReason } from "./base.js";
 export { Manager, ResourceManager } from "./base.js";
-/** Discord.js-familiar alias for {@link ResourceManager}. */
-export { ResourceManager as CachedManager } from "./base.js";
 import { REST, Routes } from "@lunibee/rest";
 import type {
     AllowedMentions,
@@ -340,10 +338,12 @@ export class ChannelManager extends Manager<string, Channel> {
         messageId: string,
         options: MessageEditOptions,
     ): Promise<Message> {
+        const { body, files } = toRequest(options, this.#allowedMentions);
         return this.messages(channelId).upsert(
             await this.#rest.patch<ConstructorParameters<typeof Message>[0]>(
                 Routes.message(channelId, messageId),
-                toRequest(options, this.#allowedMentions),
+                body,
+                { files },
             ),
         );
     }
@@ -663,8 +663,6 @@ function isMessageQuery(
         !(Symbol.iterator in value)
     );
 }
-/** Discord.js-familiar name for `MessageCreateOptions`. */
-export type CreateMessageOptions = MessageCreateOptions;
 export {
     MessageManager,
     toRequest,

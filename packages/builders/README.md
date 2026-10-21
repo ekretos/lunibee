@@ -12,7 +12,7 @@ import {
     CreateActionRow,
     CreateButton,
     ButtonType,
-    CreateStringSelectMenu,
+    CreateStringSelect,
     CreateSlashCommand,
 } from "@lunibee/builders";
 
@@ -27,7 +27,7 @@ const buttons = new CreateActionRow().addComponents(
 );
 
 const menu = new CreateActionRow().addComponents(
-    new CreateStringSelectMenu()
+    new CreateStringSelect()
         .setCustomId("role")
         .addOptions({ label: "Developer", value: "dev" }),
 );
@@ -46,7 +46,7 @@ console.log(embed.toJSON(), buttons.toJSON(), menu.toJSON(), ping.toJSON());
 |---|---|
 | Embeds | `CreateEmbed` |
 | Buttons & rows | `CreateButton`, `CreateActionRow` |
-| Select menus | `CreateStringSelect` (alias `CreateStringSelectMenu`), `CreateEntitySelect`, `CreateUserSelectMenu`, `CreateRoleSelectMenu`, `CreateChannelSelectMenu`, `CreateMentionableSelectMenu` |
+| Select menus | `CreateStringSelect`, `CreateEntitySelect`, `CreateUserSelect`, `CreateRoleSelect`, `CreateChannelSelect`, `CreateMentionableSelect` |
 | Modals | `CreateModal`, `CreateTextInput` |
 | Slash commands | `CreateSlashCommand`, `CreateSubcommand`, `CreateSubcommandGroup`, option builders |
 | Context menus | `CreateContextMenuCommand` (`setType(2 \| 3)`), `CreateUserCommand`, `CreateMessageCommand` |

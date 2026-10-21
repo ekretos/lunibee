@@ -916,6 +916,3 @@ export class ShardManager {
         return gateway;
     }
 }
-
-/** Discord.js-familiar alias for {@link ShardManager}. */
-export { ShardManager as ShardingManager };

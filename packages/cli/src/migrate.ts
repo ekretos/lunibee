@@ -33,6 +33,8 @@ const REMOVED: Readonly<Record<string, string>> = {
     AudioStream: `nothing: createAudioResource(input, { inputType }) takes a path, URL, bytes or stream, and receiver.subscribe() returns a ReadableStream (${VOICE_GUIDE})`,
     VoiceGatewayTransport: `nothing: the voice package speaks the voice gateway itself (${VOICE_GUIDE})`,
     VoiceUdpTransport: `nothing: the voice package speaks UDP itself (${VOICE_GUIDE})`,
+    toRequest:
+        "check: toRequest() now always returns { body, files? }; call rest.post(path, r.body, { files: r.files })",
 };
 
 /** WebhookClient payload keys renamed to Discord's. */

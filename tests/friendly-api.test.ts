@@ -455,9 +455,9 @@ describe("permission overwrites", () => {
 
 describe("messages", () => {
     test("files become an upload", () => {
-        expect(toRequest({ content: "x" })).toEqual({ content: "x" });
+        expect(toRequest({ content: "x" })).toEqual({ body: { content: "x" } });
         expect(toRequest({ content: "x", files: [] })).toEqual({
-            content: "x",
+            body: { content: "x" },
         });
         const upload = toRequest({
             content: "x",
@@ -477,9 +477,15 @@ describe("messages", () => {
 
     test("channel send uploads files", async () => {
         let body: unknown;
+        let options: { files?: unknown[] } | undefined;
         const rest = {
-            post: async (_path: string, requestBody: unknown) => {
+            post: async (
+                _path: string,
+                requestBody: unknown,
+                requestOptions?: { files?: unknown[] },
+            ) => {
                 body = requestBody;
+                options = requestOptions;
                 return {
                     id: "123456789012345675",
                     channel_id: CHANNEL,
@@ -492,7 +498,8 @@ describe("messages", () => {
             content: "x",
             files: [{ name: "a.txt", data: "hi" }],
         });
-        expect((body as { body: unknown }).body).toEqual({ content: "x" });
+        expect(body).toEqual({ content: "x" });
+        expect(options?.files).toHaveLength(1);
     });
 
     test("component collectors need a client", () => {

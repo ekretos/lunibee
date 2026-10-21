@@ -24,6 +24,10 @@ future sessions should pick up.
 Voice that plays audio (`.roadmap/0.4.0.md`, Steps 1–9 delivered on branch `v0.4`): `client.voice`,
 voice gateway v8, UDP and IP discovery, rtpsize AEAD encryption, DAVE through `@snazzah/davey`,
 Opus, FFmpeg, `AudioPlayer`, `VoiceReceiver`, `examples/music`. All in the changelog's "v0.4.0".
+Also in 0.4.0: the discord.js-style aliases, the REST `{ body }` / object `request()` forms, the
+WebhookClient payload aliases, the CLI binder commands and `@lunibee/create` are removed;
+`lunibee migrate` migrates to 0.4.0, and `lunibee init` creates projects. The changelog and
+upgrade guide keep 0.4.0 only.
 Left for the maintainer: the real-guild smoke test, the `0.4.0` tag, `publish:all` and the announcement.
 
 ## 0.3.2 (shipped)

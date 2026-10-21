@@ -9,16 +9,13 @@ bun add @lunibee/types
 ```ts
 import {
     GatewayIntentBits,
-    IntentsBitField,
     resolveGatewayIntents,
     ChannelEnum,
     MessageFlags,
     type APIMessage,
 } from "@lunibee/types";
 
-const intents = new IntentsBitField(["Guilds", "GuildMessages"]);
-intents.add(GatewayIntentBits.MessageContent);
-resolveGatewayIntents(["Guilds", "GuildMessages"]); // number bitfield
+resolveGatewayIntents([GatewayIntentBits.Guilds, "GuildMessages"]); // number bitfield
 
 function isText(message: APIMessage, channelType: number): boolean {
     return channelType === ChannelEnum.GuildText && !(message.flags! & MessageFlags.Ephemeral);
@@ -33,8 +30,8 @@ function isText(message: APIMessage, channelType: number): boolean {
 - Enums/consts: `ChannelEnum`, `ComponentEnum`, `ButtonType`, `MessageFlags`,
   `ApplicationCommandEnum`, `ApplicationCommandOptionEnum`,
   `InteractionResponseEnum`, `VerificationLevel`, `PremiumTier`, `StickerEnum`, …
-- Intents: `GatewayIntentBits` (PascalCase), `IntentBits` / `Intents` (camelCase),
-  `IntentsBitField`, `resolveGatewayIntents`, `GatewayIntentResolvable`.
+- Intents: `GatewayIntentBits` (PascalCase), `IntentBits` (camelCase),
+  `resolveGatewayIntents`, `GatewayIntentResolvable`.
 - Gateway config types: `GatewayOptions`, `GatewayPresence`, `GatewayProperties`.
 
 The package has no runtime dependencies.

@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-    IntentsBitField,
     GatewayIntentBits,
     resolveGatewayIntents,
     Gateway,
@@ -14,36 +13,16 @@ import {
     Client,
 } from "../packages/lunibee/src/index.ts";
 
-describe("IntentsBitField", () => {
-    test("resolves, mutates and lists intents", () => {
-        const intents = new IntentsBitField([
-            IntentsBitField.Flags.Guilds,
-            "GuildMessages",
-        ]);
-        expect(intents.bitfield).toBe(
+describe("intents", () => {
+    test("an array of intents is accepted wherever intents are", () => {
+        const array = [GatewayIntentBits.Guilds, "GuildMessages"];
+        expect(resolveGatewayIntents(array)).toBe(
             GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages,
         );
-        expect(intents.has("Guilds")).toBe(true);
-        expect(intents.has(["Guilds", "GuildMembers"])).toBe(false);
-        expect(intents.any(["Guilds", "GuildMembers"])).toBe(true);
-        intents.add("GuildMembers").remove("Guilds");
-        expect(intents.toArray()).toEqual(["GuildMembers", "GuildMessages"]);
-        expect(intents.equals(["GuildMembers", "GuildMessages"])).toBe(true);
-        expect(+intents).toBe(intents.bitfield);
-        expect(JSON.stringify({ intents })).toBe(
-            `{"intents":${intents.bitfield}}`,
-        );
-        expect(new IntentsBitField().bitfield).toBe(0);
-    });
-
-    test("is accepted wherever intents are", () => {
-        const intents = new IntentsBitField(["Guilds"]);
-        const array = intents.toArray();
-        expect(resolveGatewayIntents(array)).toBe(GatewayIntentBits.Guilds);
         expect(() => new Gateway({ token: "t", intents: array })).not.toThrow();
         expect(() => new Client({ token: "t", intents: array })).not.toThrow();
-        // @ts-expect-error the bitfield object itself is not accepted
-        expect(() => new Client({ token: "t", intents })).toThrow(TypeError);
+        // @ts-expect-error an OR-ed bitfield is not accepted
+        expect(() => new Client({ token: "t", intents: 1 })).toThrow(TypeError);
     });
 });
 

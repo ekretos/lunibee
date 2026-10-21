@@ -31,7 +31,7 @@ console.log(replies.reduce((sum, reply) => sum + (reply.result ?? 0), 0));
 
 ## What's inside
 
-- **`ShardManager`** (alias `ShardingManager`): one `Gateway` per shard, IDENTIFY pacing,
+- **`ShardManager`**: one `Gateway` per shard, IDENTIFY pacing,
   optional auto-scaling (`autoScaleInterval`), `getShardIdForGuild()`, `destroy()`.
 - **`ClusterManager`**: orchestrates cluster processes (`child_process.fork`, Node and Bun). It
   assigns shards deterministically (`SHARD_LIST`, `SHARD_COUNT`, `CLUSTER_ID`, `CLUSTER_COUNT` env

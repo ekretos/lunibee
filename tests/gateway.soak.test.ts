@@ -4,7 +4,6 @@ import {
     GatewayDispatcher,
     GatewayOpcodes,
     GatewaySendLimiter,
-    SendBudget,
 } from "../packages/ws/src/index.ts";
 import { GatewayReconnect } from "../packages/ws/src/reconnect.ts";
 import { FakeWebSocket, installWebSocket } from "./helpers/fake-websocket.ts";
@@ -206,8 +205,7 @@ describe("extracted gateway pieces", () => {
         dispatcher.emit("none", 0);
     });
 
-    test("GatewaySendLimiter keeps its old name", () => {
-        expect(SendBudget).toBe(GatewaySendLimiter);
+    test("GatewaySendLimiter caps application sends per window", () => {
         const limiter = new GatewaySendLimiter(1, 1000);
         limiter.record(0);
         expect(limiter.allows(false, 10)).toBe(false);

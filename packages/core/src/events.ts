@@ -35,7 +35,7 @@ import type {
     APIVoiceServerUpdate,
     APIVoiceState,
     APIWebhooksUpdate,
-    ClientUser,
+    UserData,
 } from "@lunibee/types";
 import type {
     Channel,
@@ -158,7 +158,7 @@ export type ClientListener<K extends ClientEventName> = (
 /** Every `Client` event name mapped to its listener arguments. */
 export type ClientEvents = {
     // ── Lifecycle ──────────────────────────────────────────────────────────────
-    ready: [user: ClientUser];
+    ready: [user: UserData];
     resumed: [];
     invalidSession: [isRecoverable: boolean];
     raw: [data: { event: string; data: unknown }];

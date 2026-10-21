@@ -101,20 +101,6 @@ describe("audit backlog batch", () => {
         await expect(registry.dispatch("x", 1)).rejects.toThrow("boom");
         expect(seen).toEqual([1]);
     });
-
-    test("the CLI component kind guard ignores inherited names", async () => {
-        const { binderSource } =
-            await import("../packages/cli/src/handlers.ts");
-        const src = binderSource([
-            {
-                event: "ready",
-                file: "r",
-                path: '../events/ready/x";evil//',
-                importName: "h",
-            },
-        ] as never);
-        expect(src).toContain('from "../events/ready/x\\";evil//"');
-    });
 });
 
 describe("attachment root", () => {

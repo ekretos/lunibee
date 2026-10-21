@@ -1,4 +1,4 @@
-import { REST, Routes, type RESTFileAttachment } from "@lunibee/rest";
+import { REST, Routes } from "@lunibee/rest";
 import {
     Channel,
     createChannel,
@@ -120,12 +120,10 @@ export class ThreadManager {
         const { message, appliedTags, reason, ...thread } = options;
         // The first message goes through the same path as every other send,
         // so it gets the client's allowed_mentions default and alt text.
-        const request = toRequest(message, this.#allowedMentions);
-        const withFiles = "body" in request && "files" in request;
-        const content = withFiles ? request.body : request;
-        const files = withFiles
-            ? (request as { files: RESTFileAttachment[] }).files
-            : undefined;
+        const { body: content, files } = toRequest(
+            message,
+            this.#allowedMentions,
+        );
         const data = await this.#rest.post<ChannelData>(
             Routes.channelThreads(this.#channelId),
             {

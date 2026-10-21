@@ -222,7 +222,7 @@ gateway.on("RAW", (raw) => metrics.inc(`gateway.${(raw as { event: string }).eve
 
 ## States
 
-`GatewayState` (also exported as `Status`, for Discord.js users) is a string enum:
+`GatewayState` is a string enum:
 
 | State | Meaning |
 |---|---|
@@ -379,6 +379,6 @@ The Gateway is assembled from exported parts you can use or test on their own:
 | `GatewaySession` | Session id, sequence, resume URL and the IDENTIFY-or-RESUME decision. |
 | `GatewayHeartbeat` | Heartbeat timer, acknowledgement deadline and zombie watch. |
 | `GatewayReconnect` | Close classification, backoff, storm detection and the single in-flight attempt. |
-| `GatewaySendLimiter`, `SendBudget` | The 115-per-60 s application budget. |
+| `GatewaySendLimiter` | The 115-per-60 s application budget. |
 | `GatewayDispatcher` | The listener registry. |
 | `GatewayOpcodes`, `GatewayCloseCodes` | Protocol constants. |

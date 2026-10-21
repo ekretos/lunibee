@@ -5,7 +5,25 @@ description: Code changes needed when upgrading Lunibee from 0.3.3 to 0.4.0.
 
 ## 0.3.3 → 0.4.0
 
-Only `@lunibee/voice` changed. The 0.3 API carried no audio, so most code built on it is replaced rather than ported.
+Start with the migration tool:
+
+```sh
+bunx @lunibee/cli migrate          # lists what needs changing
+bunx @lunibee/cli migrate --fix    # renames the removed aliases, then lists the rest
+```
+
+It renames the removed discord.js-style names (`Events` → `ClientEvent`, `ShardingManager` → `ShardManager`, `DiscordAPIError` → `RESTError`, …) in files that import them from Lunibee. It lists, with file and line, what needs a hand change:
+- `IntentsBitField`: use an array of `GatewayIntentBits`.
+- REST calls in the removed `rest.post(path, { body })` / `rest.request({ method, path })` forms: use `rest.post(path, body, options)` and `rest.request(method, path, body, options)`.
+- WebhookClient `avatarURL` / `threadId` / `allowedMentions`: use `avatar_url` / `thread_id` / `allowed_mentions`.
+- `toRequest()` results.
+- The 0.3 voice API, below.
+
+It exits 1 while anything is left. The full list is in the [changelog](/getting-started/changelog/).
+
+- **Projects made with `@lunibee/create` or the generated binders** (`src/handlers/event.ts`, `src/commands/index.ts`): those commands are gone. Generate a new project with `bunx @lunibee/cli init my-bot` and move your command and event files into its `src/commands` and `src/events`; they are found at runtime.
+
+The voice package changed the most. The 0.3 API carried no audio, so most code built on it is replaced rather than ported.
 
 - **Install the voice peers:**
   - `bun add @snazzah/davey opusscript`;

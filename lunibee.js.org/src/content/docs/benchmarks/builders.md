@@ -14,10 +14,10 @@ Each row builds the object and calls `toJSON()`. Builders validate as they go, s
 | CreateButton (link) | 718 ns |
 | CreateActionRow (5 buttons) | 2.4 µs |
 | CreateStringSelect (3 options) | 1.3 µs |
-| CreateUserSelectMenu | 329 ns |
-| CreateRoleSelectMenu | 430 ns |
-| CreateMentionableSelectMenu | 566 ns |
-| CreateChannelSelectMenu | 769 ns |
+| CreateUserSelect | 329 ns |
+| CreateRoleSelect | 430 ns |
+| CreateMentionableSelect | 566 ns |
+| CreateChannelSelect | 769 ns |
 | CreateTextInput | 679 ns |
 | CreateModal (2 inputs) | 1.9 µs |
 | CreateTextDisplay | 126 ns |

@@ -10,7 +10,7 @@ type Mentions = { allowed_mentions?: { parse?: string[] } };
 type Call = {
     method: string;
     path: string;
-    body: Mentions & { body?: Mentions; data?: Mentions };
+    body: Mentions & { data?: Mentions };
 };
 
 function client(allowedMentions?: {
@@ -73,7 +73,7 @@ describe("client-wide default allowed_mentions", () => {
             content: "file",
             files: [{ name: "a.txt", data: "a" }],
         });
-        expect(calls[0]!.body.body?.allowed_mentions).toEqual({ parse: [] });
+        expect(calls[0]!.body.allowed_mentions).toEqual({ parse: [] });
     });
 
     test("interaction replies, edits and follow-ups get it; deferrals and modals do not", async () => {

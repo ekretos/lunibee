@@ -726,28 +726,26 @@ function validateLength(value: number, field: string, max = 4000): void {
         );
 }
 
-/** Discord.js-familiar alias for {@link CreateStringSelect}. */
-export { CreateStringSelect as CreateStringSelectMenu };
-/** User select menu builder (Discord.js-familiar). */
-export class CreateUserSelectMenu extends CreateEntitySelect {
+/** User select menu builder. */
+export class CreateUserSelect extends CreateEntitySelect {
     public constructor() {
         super(ComponentEnum.UserSelect);
     }
 }
-/** Role select menu builder (Discord.js-familiar). */
-export class CreateRoleSelectMenu extends CreateEntitySelect {
+/** Role select menu builder. */
+export class CreateRoleSelect extends CreateEntitySelect {
     public constructor() {
         super(ComponentEnum.RoleSelect);
     }
 }
-/** Mentionable select menu builder (Discord.js-familiar). */
-export class CreateMentionableSelectMenu extends CreateEntitySelect {
+/** Mentionable select menu builder. */
+export class CreateMentionableSelect extends CreateEntitySelect {
     public constructor() {
         super(ComponentEnum.MentionableSelect);
     }
 }
-/** Channel select menu builder (Discord.js-familiar). */
-export class CreateChannelSelectMenu extends CreateEntitySelect {
+/** Channel select menu builder. */
+export class CreateChannelSelect extends CreateEntitySelect {
     public constructor() {
         super(ComponentEnum.ChannelSelect);
     }

@@ -13,8 +13,6 @@ export {
 } from "./permissions.js";
 export {
     ClientEvent,
-    /** Discord.js-familiar alias for {@link ClientEvent}. */
-    ClientEvent as Events,
     type ClientEventName,
     type ClientEvents,
     type ClientListener,
@@ -86,8 +84,6 @@ export {
 export {
     GatewayIntentBits,
     IntentBits,
-    Intents,
-    IntentsBitField,
     resolveGatewayIntents,
     type GatewayIntentResolvable,
 } from "@lunibee/types";
@@ -166,7 +162,7 @@ import type {
     APIGuildMembersChunk,
     APIMessagePollVoteEvent,
     ClientOptions,
-    ClientUser,
+    UserData,
 } from "@lunibee/types";
 import { ClientEvent, type ClientEvents } from "./events.js";
 import { Collector, type CollectorOptions } from "./collector.js";
@@ -349,7 +345,7 @@ export class Client
     public get gateway(): Gateway {
         return this.#gateway;
     }
-    public user?: ClientUser;
+    public user?: UserData;
     /**
      * Voice connections, one per guild: `await bot.voice.join({ guildId,
      * channelId })` resolves when audio can flow. Fed by this client's own
@@ -1627,16 +1623,10 @@ export class Client
                   carriesMessage ? this.options.allowedMentions : undefined,
               )
             : undefined;
-        if (upload && typeof upload === "object" && "files" in upload) {
-            const { body, files } = upload as { body: unknown; files: never[] };
-            return this.rest.post(callback, {
-                body: { ...json, data: body },
-                files,
-            });
-        }
         return this.rest.post(
             callback,
-            upload === undefined ? json : { ...json, data: upload },
+            upload === undefined ? json : { ...json, data: upload.body },
+            { files: upload?.files },
         );
     }
     public editInteractionReply(
@@ -1649,9 +1639,11 @@ export class Client
         const appId = applicationId ?? this.user?.id;
         if (!appId)
             return Promise.reject(new Error("Client is unauthenticated."));
+        const { body, files } = toRequest(data, this.options.allowedMentions);
         return this.rest.patch(
             Routes.interactionOriginalResponse(appId, token),
-            toRequest(data, this.options.allowedMentions),
+            body,
+            { files },
         );
     }
     public deleteInteractionReply(
@@ -1673,10 +1665,8 @@ export class Client
         const appId = applicationId ?? this.user?.id;
         if (!appId)
             return Promise.reject(new Error("Client is unauthenticated."));
-        return this.rest.post(
-            Routes.webhook(appId, token),
-            toRequest(data, this.options.allowedMentions),
-        );
+        const { body, files } = toRequest(data, this.options.allowedMentions);
+        return this.rest.post(Routes.webhook(appId, token), body, { files });
     }
     public interactionWebhookMessage(
         method: "GET" | "PATCH" | "DELETE",
@@ -1690,11 +1680,14 @@ export class Client
                 ? Routes.interactionOriginalResponse(applicationId, token)
                 : Routes.webhookMessage(applicationId, token, messageId);
         if (method === "GET") return this.rest.get(path);
-        if (method === "PATCH")
-            return this.rest.patch(
-                path,
-                data ? toRequest(data, this.options.allowedMentions) : data,
-            );
+        if (method === "PATCH") {
+            const request = data
+                ? toRequest(data, this.options.allowedMentions)
+                : undefined;
+            return this.rest.patch(path, request?.body, {
+                files: request?.files,
+            });
+        }
         return this.rest.delete(path);
     }
 

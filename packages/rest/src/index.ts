@@ -82,6 +82,37 @@ function assertSafePath(path: string): void {
     }
 }
 
+/** Keys of the `verb(path, { body, … })` form removed in 0.4.0. */
+const WRAPPER_KEYS = new Set([
+    "body",
+    "files",
+    "query",
+    "headers",
+    "reason",
+    "signal",
+    "auth",
+    "timeout",
+]);
+
+/**
+ * Recognizes a second argument that is the removed `verb(path, { body, … })`
+ * form: sending it would put the wrapper itself in the request body. No
+ * Discord payload has a top-level `body` or `files` field.
+ */
+function wrapperError(verb: string, body: unknown): TypeError | undefined {
+    if (typeof body !== "object" || body === null || Array.isArray(body))
+        return undefined;
+    const keys = Object.keys(body);
+    if (
+        (keys.includes("body") || keys.includes("files")) &&
+        keys.every((key) => WRAPPER_KEYS.has(key))
+    )
+        return new TypeError(
+            `rest.${verb}(path, { body, … }) was removed in 0.4.0: call rest.${verb}(path, body, options). Run \`lunibee migrate\` to find the calls.`,
+        );
+    return undefined;
+}
+
 /** A file attachment sent as part of a multipart REST request. */
 export interface RESTFileAttachment {
     name: string;
@@ -97,9 +128,8 @@ export interface RESTFileAttachment {
 /**
  * Options controlling an individual REST request.
  *
- * Lunibee's canonical call shape is positional (`post(path, body)`); these options
- * add the Discord.js-`@discordjs/rest`-familiar per-request knobs (`query`, `headers`,
- * `reason`, `auth`) additively without changing that positional default.
+ * The body is positional (`post(path, body, options)`); these options carry the
+ * per-request knobs (`query`, `headers`, `reason`, `auth`, `signal`, `maxQueueWait`).
  */
 export interface RESTRequestOptions {
     /** Abort signal used to cancel the request and any queued wait. */
@@ -121,65 +151,14 @@ export interface RESTRequestOptions {
 }
 
 /**
- * Discord.js-familiar request payload. Superset of {@link RESTRequestOptions} that also
- * carries the `body` and `files`, matching `@discordjs/rest`'s `RequestData`. It powers the
- * additive `method(path, { body })` overloads without breaking the positional signature.
+ * Request options plus `files` (which upgrade the request to multipart) and, for
+ * `get()` and `delete()` (which take no positional body), an optional `body`.
  */
 export interface RequestData extends RESTRequestOptions {
-    /** Request body. Encoded as JSON unless `files` are present (then multipart). */
+    /** Request body for `get()` and `delete()`; `request()`, `post()`, `put()` and `patch()` take theirs positionally. */
     body?: unknown;
     /** File attachments; presence upgrades the request to `multipart/form-data`. */
     files?: RESTFileAttachment[];
-}
-
-/**
- * The single-object form of {@link REST.request}, matching `@discordjs/rest`:
- * the route is `path` (or its Discord.js name, `fullRoute`).
- */
-export interface RequestOptionsObject extends RequestData {
-    /** HTTP method. */
-    method: string;
-    /** API path, starting with `/`. */
-    path?: string;
-    /** Alias of `path`, as `@discordjs/rest` names it. */
-    fullRoute?: string;
-}
-
-/** Keys recognised on a {@link RequestData} wrapper, used to disambiguate it from a raw body. */
-const REQUEST_DATA_KEYS = new Set([
-    "body",
-    "files",
-    "query",
-    "headers",
-    "reason",
-    "auth",
-    "signal",
-    "maxQueueWait",
-]);
-
-/**
- * Detects a Discord.js-style `RequestData` wrapper so verb helpers can accept both
- * `post(path, rawBody)` (Lunibee-canonical) and `post(path, { body })` (Discord.js-familiar).
- * A raw body whose keys are all option names (e.g. `{ reason: "x" }`) is read as a wrapper:
- * pass it as `{ body: { reason: "x" } }` to send it as a body.
- * Conservative by design: only a plain object whose every own key is a known `RequestData`
- * key counts — a raw Discord payload (which always carries entity keys like `content`/`name`)
- * never matches, so existing positional callers are unaffected.
- */
-function isRequestData(value: unknown): value is RequestData {
-    if (value === null || typeof value !== "object") return false;
-    if (Array.isArray(value)) return false;
-    if (typeof FormData !== "undefined" && value instanceof FormData)
-        return false;
-    if (
-        value instanceof Blob ||
-        value instanceof Uint8Array ||
-        value instanceof ArrayBuffer
-    )
-        return false;
-    const keys = Object.keys(value);
-    if (keys.length === 0) return false;
-    return keys.every((key) => REQUEST_DATA_KEYS.has(key));
 }
 
 // ─── REST Hooks ───────────────────────────────────────────────────────────────
@@ -509,42 +488,20 @@ export class REST {
      * @param method HTTP method.
      * @param path API path.
      * @param body Optional JSON body, FormData for file uploads, or undefined.
-     * @param options Request options: cancellation `signal` plus the Discord.js-familiar
-     *   `query`, `headers`, `reason`, `auth`, and `files` (which upgrade to multipart).
+     * @param options Request options: cancellation `signal`, `query`, `headers`,
+     *   `reason`, `auth`, and `files` (which upgrade to multipart).
      * @returns Decoded response body.
      * @throws {RESTError} If Discord or transport rejects the request.
      */
-    public request<T>(options: RequestOptionsObject): Promise<T>;
-    public request<T>(
+    public async request<T>(
         method: string,
         path: string,
         body?: unknown,
-        options?: RequestData,
-    ): Promise<T>;
-    public async request<T>(
-        methodOrOptions: string | RequestOptionsObject,
-        pathArg?: string,
-        bodyArg?: unknown,
-        optionsArg: RequestData = {},
+        options: RequestData = {},
     ): Promise<T> {
-        // Discord.js-familiar form: request({ method, path, body, ... }).
-        let method: string;
-        let path: string;
-        let body = bodyArg;
-        let options = optionsArg;
-        if (typeof methodOrOptions === "object" && methodOrOptions !== null) {
-            const { method: m, path: p, fullRoute, ...rest } = methodOrOptions;
-            method = m;
-            path = p ?? fullRoute ?? "";
-            body = rest.body;
-            options = rest;
-        } else {
-            method = methodOrOptions;
-            path = pathArg as string;
-        }
         if (typeof method !== "string" || !method.toUpperCase())
             throw new TypeError("REST method is required.");
-        if (!path.startsWith("/"))
+        if (typeof path !== "string" || !path.startsWith("/"))
             throw new TypeError("REST paths must start with '/'.");
         assertSafePath(path);
         const route = createRouteKey(method, path);
@@ -997,71 +954,39 @@ export class REST {
             return body;
         return body === undefined ? undefined : JSON.stringify(body);
     }
-    /**
-     * Normalizes a verb helper's second argument into `(body, options)`.
-     * Supports both `verb(path, rawBody, options?)` (Lunibee-canonical positional) and the
-     * Discord.js-familiar `verb(path, { body, query, headers, reason, files })` wrapper.
-     */
-    #dispatch<T>(
-        method: string,
-        path: string,
-        bodyOrOptions?: unknown,
-        options?: RequestData,
-    ): Promise<T> {
-        if (options === undefined && isRequestData(bodyOrOptions))
-            return this.request<T>(
-                method,
-                path,
-                bodyOrOptions.body,
-                bodyOrOptions,
-            );
-        return this.request<T>(method, path, bodyOrOptions, options);
-    }
     /** Sends a GET request. @param path API path. @param options Request options (`query`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */
     public get<T>(path: string, options?: RequestData): Promise<T> {
         return this.request<T>("GET", path, options?.body, options);
     }
-    /** Sends a POST request. Accepts a raw body (`post(path, body)`) or a Discord.js-familiar `post(path, { body })`. @param path API path. @param body Optional JSON body, or a `RequestData` wrapper. @param options Request options. @returns Decoded response. @throws {RESTError} When the request fails. */
-    public post<T>(path: string, options: RequestData): Promise<T>;
-    public post<T>(
-        path: string,
-        body?: unknown,
-        options?: RequestData,
-    ): Promise<T>;
+    /** Sends a POST request. @param path API path. @param body Optional JSON body. @param options Request options (`files`, `reason`, `query`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */
     public post<T>(
         path: string,
         body?: unknown,
         options?: RequestData,
     ): Promise<T> {
-        return this.#dispatch<T>("POST", path, body, options);
+        const removed = wrapperError("post", body);
+        if (removed) return Promise.reject(removed);
+        return this.request<T>("POST", path, body, options);
     }
-    /** Sends a PATCH request. Accepts a raw body (`patch(path, body)`) or a Discord.js-familiar `patch(path, { body })`. @param path API path. @param body Optional JSON body, or a `RequestData` wrapper. @param options Request options. @returns Decoded response. @throws {RESTError} When the request fails. */
-    public patch<T>(path: string, options: RequestData): Promise<T>;
-    public patch<T>(
-        path: string,
-        body?: unknown,
-        options?: RequestData,
-    ): Promise<T>;
+    /** Sends a PATCH request. @param path API path. @param body Optional JSON body. @param options Request options (`files`, `reason`, `query`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */
     public patch<T>(
         path: string,
         body?: unknown,
         options?: RequestData,
     ): Promise<T> {
-        return this.#dispatch<T>("PATCH", path, body, options);
+        const removed = wrapperError("patch", body);
+        if (removed) return Promise.reject(removed);
+        return this.request<T>("PATCH", path, body, options);
     }
-    /** Sends a PUT request. Accepts a raw body (`put(path, body)`) or a Discord.js-familiar `put(path, { body })`. @param path API path. @param body Optional JSON body, or a `RequestData` wrapper. @param options Request options. @returns Decoded response. @throws {RESTError} When the request fails. */
-    public put<T>(path: string, options: RequestData): Promise<T>;
-    public put<T>(
-        path: string,
-        body?: unknown,
-        options?: RequestData,
-    ): Promise<T>;
+    /** Sends a PUT request. @param path API path. @param body Optional JSON body. @param options Request options (`files`, `reason`, `query`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */
     public put<T>(
         path: string,
         body?: unknown,
         options?: RequestData,
     ): Promise<T> {
-        return this.#dispatch<T>("PUT", path, body, options);
+        const removed = wrapperError("put", body);
+        if (removed) return Promise.reject(removed);
+        return this.request<T>("PUT", path, body, options);
     }
     /** Sends a DELETE request. @param path API path. @param options Request options (`reason`, `headers`, `signal`, …). @returns Decoded response. @throws {RESTError} When the request fails. */
     public delete<T>(path: string, options?: RequestData): Promise<T> {
@@ -1216,10 +1141,3 @@ export {
     type WebhookClientOptions,
     type WebhookMessageOptions,
 } from "./webhook.js";
-
-/**
- * Discord.js-familiar alias for {@link RESTError}. `@discordjs/rest` throws `DiscordAPIError`
- * on a Discord-rejected request; Lunibee keeps `RESTError` as the canonical class and exports
- * this alias so Discord.js-shaped `catch (err) { if (err instanceof DiscordAPIError) … }` works.
- */
-export { RESTError as DiscordAPIError };

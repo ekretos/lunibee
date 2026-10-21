@@ -89,8 +89,6 @@ const all = await bus.broadcastRequest<number>("guildCount", null, {
 const total = all.reduce((sum, r) => sum + (r.result ?? 0), 0);
 ```
 
-`ShardingManager` is an alias of `ShardManager`.
-
 ## Events, buckets and the start limit (0.3.1)
 
 `ShardManager` re-emits what its shards do, each with the shard id first: `shardReady`, `shardDisconnect` (with `{ code, action }`), `shardResume`, `shardError` and `shardUnstable`; `ready` (no arguments) fires once every shard it owns is ready, and again after a shard recovers.

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
     REST,
     RESTError,
-    DiscordAPIError,
     type RESTFileAttachment,
 } from "../packages/rest/src/index.ts";
 import { fakeFetch } from "./helpers/fetch.ts";
@@ -45,12 +44,8 @@ function captureFetch(
     return calls;
 }
 
-describe("REST — DiscordAPIError alias", () => {
-    test("DiscordAPIError is the RESTError class (canonical + alias identity)", () => {
-        expect(DiscordAPIError).toBe(RESTError);
-    });
-
-    test("a rejected request throws an error that is instanceof DiscordAPIError", async () => {
+describe("REST — RESTError", () => {
+    test("a rejected request throws a RESTError", async () => {
         captureFetch(
             () =>
                 new Response(
@@ -62,9 +57,7 @@ describe("REST — DiscordAPIError alias", () => {
                 ),
         );
         const rest = new REST({ token: "t", retries: 0 });
-        await expect(rest.get("/users/@me")).rejects.toBeInstanceOf(
-            DiscordAPIError,
-        );
+        await expect(rest.get("/users/@me")).rejects.toBeInstanceOf(RESTError);
         try {
             await rest.get("/users/@me");
         } catch (error) {
@@ -75,40 +68,50 @@ describe("REST — DiscordAPIError alias", () => {
     });
 });
 
-describe("REST — Discord.js-familiar { body } overload (additive)", () => {
-    test("post(path, { body }) sends the wrapped body as JSON", async () => {
-        const calls = captureFetch();
-        const rest = new REST({ token: "t" });
-        await rest.post("/channels/1/messages", { body: { content: "hi" } });
-        expect(calls).toHaveLength(1);
-        expect(JSON.parse(calls[0]!.body as string)).toEqual({ content: "hi" });
-        expect(calls[0]!.headers["content-type"]).toBe("application/json");
-    });
-
-    test("positional raw body still works (Lunibee-canonical)", async () => {
+describe("REST — positional body", () => {
+    test("post(path, body) sends the body as JSON", async () => {
         const calls = captureFetch();
         const rest = new REST({ token: "t" });
         await rest.post("/channels/1/messages", { content: "hi" });
         expect(JSON.parse(calls[0]!.body as string)).toEqual({ content: "hi" });
+        expect(calls[0]!.headers["content-type"]).toBe("application/json");
     });
 
-    test("a raw body carrying a `content` key is never misread as options", async () => {
+    test("the removed { body } form is refused; other bodies are sent verbatim", async () => {
         const calls = captureFetch();
         const rest = new REST({ token: "t" });
-        // { content } is a raw Discord payload — must go through as the body verbatim.
-        await rest.patch("/channels/1/messages/2", { content: "edit" });
-        expect(JSON.parse(calls[0]!.body as string)).toEqual({
+        for (const call of [
+            () =>
+                rest.post("/channels/1/messages", { body: { content: "hi" } }),
+            () =>
+                rest.patch("/channels/1/messages/2", { body: {}, reason: "x" }),
+            () => rest.put("/x", { files: [] }),
+        ])
+            await expect(call()).rejects.toThrow(
+                /was removed in 0\.4\.0: call rest\.(post|patch|put)\(path, body, options\)/,
+            );
+        await rest.put("/guilds/1/members/2/roles/3", { reason: "x" });
+        await rest.patch("/channels/1/messages/2", {
             content: "edit",
+            body: "kept",
+        });
+        expect(calls).toHaveLength(2);
+        expect(JSON.parse(calls[0]!.body as string)).toEqual({ reason: "x" });
+        expect(calls[0]!.headers["x-audit-log-reason"]).toBeUndefined();
+        expect(JSON.parse(calls[1]!.body as string)).toEqual({
+            content: "edit",
+            body: "kept",
         });
     });
 
-    test("put(path, { body }) and delete(path, { reason }) honour the wrapper", async () => {
+    test("options go in the third argument", async () => {
         const calls = captureFetch();
         const rest = new REST({ token: "t" });
-        await rest.put("/guilds/1/members/2/roles/3", {
-            body: { access: true },
+        await rest.put("/guilds/1/members/2/roles/3", undefined, {
+            reason: "x",
         });
-        expect(JSON.parse(calls[0]!.body as string)).toEqual({ access: true });
+        expect(calls[0]!.body).toBeUndefined();
+        expect(calls[0]!.headers["x-audit-log-reason"]).toBe("x");
     });
 });
 

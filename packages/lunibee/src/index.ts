@@ -26,7 +26,6 @@ export type {
     ClientOptions,
     RESTOptions,
     UserData,
-    ClientUser,
     GatewayPayload,
     APIError,
     APIEmbedFooter,
@@ -104,8 +103,6 @@ export type {
     APIOnboardingOption,
     ChannelKind,
     ForumTagInput,
-    FollowUpOptions,
-    InteractionUpdateOptions,
     MessagePoll,
     UnknownChannelKind,
 } from "@lunibee/types";
@@ -114,8 +111,6 @@ export type {
 export {
     GatewayIntentBits,
     IntentBits,
-    Intents,
-    IntentsBitField,
     resolveGatewayIntents,
     MessageFlags,
     ChannelEnum,
