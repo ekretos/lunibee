@@ -1,7 +1,7 @@
 /**
  * Discord Gateway close codes.
  *
- * Discord.js-familiar names and numeric values, matching the Discord Gateway
+ * Familiar names and numeric values, matching the Discord Gateway
  * protocol. Exposed so consumers can branch on named codes instead of magic
  * numbers; {@link Gateway} uses them internally to decide resume/identify/stop.
  */

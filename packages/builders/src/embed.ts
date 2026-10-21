@@ -129,7 +129,7 @@ export class CreateEmbed {
         return this;
     }
     /** Adds embed fields. Accepts both the spread form `addFields(a, b)` and the
-     * single-array form `addFields([a, b])` for discord.js `RestOrArray` parity.
+     * single-array form `addFields([a, b])`.
      * @param fields Field payloads, spread or as a single array. @returns This builder. @throws {RangeError} If the 25-field limit is exceeded. */
     public addFields(...fields: EmbedField[] | [EmbedField[]]): this {
         const resolved = (

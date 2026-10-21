@@ -214,7 +214,7 @@ class EventEmitter<Events extends { [K in keyof Events]: unknown[] }> {
         this.#listeners[event]?.delete(listener);
         return this;
     }
-    /** Alias of {@link off}, provided for Node.js/Discord.js familiarity. */
+    /** Alias of {@link off}, provided for Node.js `EventEmitter` familiarity. */
     public removeListener<K extends keyof Events>(
         event: K,
         listener: Listener<Events[K]>,
@@ -356,7 +356,7 @@ export class Client
     public state: ClientState = "idle";
     /**
      * The bot token this client is authenticated with, or `null` once the
-     * client has been destroyed. Mirrors `Client#token` in Discord.js.
+     * client has been destroyed.
      */
     /** Replaces the bot token in text Lunibee prints (listener warnings). */
     protected override readonly redactSecrets = (text: string): string => {
@@ -815,7 +815,7 @@ export class Client
             }
             // A guild already in cache that arrives again (e.g. after an outage
             // or gateway resume) has become *available* rather than newly joined.
-            // Mirrors Discord.js' guildAvailable vs. guildCreate distinction.
+            // guildAvailable (a known guild comes back) vs. guildCreate (a new guild).
             const wasCached = this.guilds.has(payload.id);
             this.guilds.patch(payload);
             for (const role of payload.roles ?? [])
@@ -1534,7 +1534,7 @@ export class Client
     }
 
     /**
-     * Connects to the Gateway. Resolves with the token used, like discord.js;
+     * Connects to the Gateway. Resolves with the token used;
      * do not log the return value.
      */
     public async login(token?: string): Promise<string> {

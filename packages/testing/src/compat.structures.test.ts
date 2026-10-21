@@ -1,6 +1,6 @@
 /**
  * Structure hydration compatibility. Structures map raw Discord snake_case gateway/REST
- * payloads onto discord.js-familiar camelCase properties with discord.js nullability
+ * payloads onto camelCase properties with consistent nullability
  * semantics (e.g. legacy "0" discriminator → null, missing avatar → null).
  */
 import { describe, expect, test } from "bun:test";
@@ -30,7 +30,7 @@ describe("User hydration", () => {
         expect(u.globalName).toBeNull();
         expect(u.displayName).toBe("wumpus");
     });
-    test("legacy '0' discriminator normalizes to null (discord.js parity)", () => {
+    test("legacy '0' discriminator normalizes to null", () => {
         const u = new User({
             id: ID,
             username: "x",
@@ -51,7 +51,7 @@ describe("Message hydration", () => {
         channel_id: ID,
         author: { id: "999", username: "author" },
     };
-    test("core fields map with discord.js-familiar names", () => {
+    test("core fields map to camelCase names", () => {
         const m = new Message({
             ...base,
             content: "hello",
@@ -76,14 +76,14 @@ describe("Message hydration", () => {
         expect(m.timestamp).toBeInstanceOf(Date);
         expect(m.timestamp.toISOString()).toBe("2024-01-01T00:00:00.000Z");
     });
-    test("carries discord.js-style helper methods", () => {
+    test("carries helper methods", () => {
         const m = new Message(base as never);
         expect(typeof m.reply).toBe("function");
         expect(typeof m.react).toBe("function");
         expect(typeof m.pin).toBe("function");
     });
-    // discord.js exposes message.createdTimestamp (number) and message.createdAt (Date).
-    test("exposes discord.js createdTimestamp accessor", () => {
+    // Message exposes createdTimestamp (number) and createdAt (Date).
+    test("exposes the createdTimestamp accessor", () => {
         const m = new Message({
             ...base,
             timestamp: "2024-01-01T00:00:00.000Z",

@@ -42,8 +42,8 @@ console.log(replies.reduce((sum, reply) => sum + (reply.result ?? 0), 0));
   With `remote`, it is a coordinator for `ClusterHost` agents on other machines (authenticated WebSocket, fenced workers).
   Inside a worker, `ShardManager` owns only the cluster's shards and uses the parent for IDENTIFY.
 - **`ShardBus`**: `send`, `broadcast`, `on`/`off`, `onError`, and request/reply with
-  `respond`, `request` and `broadcastRequest`. This replaces discord.js's
-  `broadcastEval` without evaluating received code.
+  `respond`, `request` and `broadcastRequest`. Shards query each other without evaluating
+  received code.
 
 ## What's new in 0.2.0
 

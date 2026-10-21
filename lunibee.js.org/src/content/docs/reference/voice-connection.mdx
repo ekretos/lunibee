@@ -139,7 +139,7 @@ Out-of-range values throw a `RangeError`.
 
 | Export | Description |
 |---|---|
-| `createOpusCodec()` | `Promise<OpusCodec>` from `@discordjs/opus`, else `opusscript`: `encode(pcm)` (one 3,840-byte 20 ms frame), `decode(packet)`, `destroy()`, `library`. Throws a `VoiceError` when neither is installed. |
+| `createOpusCodec()` | `Promise<OpusCodec>` from `opusscript`: `encode(pcm)` (one 3,840-byte 20 ms frame), `decode(packet)`, `destroy()`, `library`. Throws a `VoiceError` when it is not installed. |
 | `OggOpusWriter` | Ogg/Opus muxer: `header()`, `write(packet)` (a page every 50 packets), `flush()`, `end()`. Each packet counts as 20 ms. |
 | `demuxOggOpus(chunks)` | An async generator of Opus packets from an Ogg/Opus byte stream; throws a `VoiceError` for anything that is not Ogg/Opus. |
 | `entersState(target, status, timeoutMs)` | Resolves when a connection or player reaches `status`, rejects with a `VoiceError` after `timeoutMs`. |

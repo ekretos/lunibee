@@ -5,7 +5,7 @@ description: BigInt-backed permission bitfield checker. Supports named permissio
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`PermissionSet` (with a `PermissionsBitField` subclass for Discord.js compatibility, which adds the static `Flags` and `All` constants) provides named permission checks against Discord's 64-bit permission bitfield. Sets are immutable.
+`PermissionSet` (with a `PermissionsBitField` subclass, which adds the static `Flags` and `All` constants) provides named permission checks against Discord's 64-bit permission bitfield. Sets are immutable.
 
 ## Import
 
@@ -13,14 +13,14 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 <TabItem label="TypeScript">
 ```ts
 import { PermissionSet, Permission } from "lunibee";
-// Discord.js-style alias:
+// Alias:
 import { PermissionsBitField } from "lunibee";
 ```
 </TabItem>
 <TabItem label="JavaScript">
 ```js
 import { PermissionSet, Permission } from "lunibee";
-// Discord.js-style alias:
+// Alias:
 import { PermissionsBitField } from "lunibee";
 ```
 </TabItem>
@@ -332,7 +332,7 @@ Permission names Discord has since renamed still resolve: `ManageEmojisAndSticke
 
 ## `PermissionFlagsBits`
 
-Discord's permission bits as `bigint`s, under Discord.js's name: `PermissionFlagsBits.BanMembers`, `PermissionFlagsBits.ManageMessages` and so on. It is the same object as `Permissions`, and every method on this page accepts its values.
+Discord's permission bits as `bigint`s: `PermissionFlagsBits.BanMembers`, `PermissionFlagsBits.ManageMessages` and so on. It is the same object as `Permissions`, and every method on this page accepts its values.
 
 ```ts
 member.permissions.has(PermissionFlagsBits.BanMembers);

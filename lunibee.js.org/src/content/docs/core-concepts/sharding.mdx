@@ -75,8 +75,8 @@ bus.onError((error, message) => console.error(message.type, error));
 ### Queries across shards
 
 `respond()` answers requests. `request()` asks one shard; `broadcastRequest()` asks every
-other shard and collects replies until `expected` arrive or the timeout passes. This
-covers discord.js's `broadcastEval` use cases without sending code to be evaluated.
+other shard and collects replies until `expected` arrive or the timeout passes. Shards
+query each other without sending code to be evaluated.
 
 ```ts
 bus.respond("guildCount", () => client.guilds.cache.size);

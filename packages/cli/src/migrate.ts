@@ -236,7 +236,7 @@ function isKey(code: string, at: number, length: number): boolean {
 /**
  * Finds APIs removed in 0.4.0 in one file. Old names are renamed only when
  * the file imports them from `lunibee` or `@lunibee/*` (an `import { X as Y }`
- * keeps its local name `Y`), so a discord.js `Events` in the same project is
+ * keeps its local name `Y`), so names imported from other packages are
  * never touched. A file without such an import is not checked at all.
  */
 export function scanSource(source: string): FileResult {

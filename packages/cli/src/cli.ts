@@ -73,7 +73,7 @@ const COMMANDS: Command[] = [
             "Find APIs removed in 0.4.0; --fix renames the old Lunibee names",
         flags: ["fix", "dry-run", "json"],
         details:
-            "Checks every TypeScript and JavaScript file under src/. --fix renames the removed names\n(Events → ClientEvent, CreateStringSelectMenu → CreateStringSelect, Status → GatewayState…)\nonly where the file imports them from lunibee or @lunibee/*, so discord.js names are never\ntouched; `import { X as Y }` keeps Y. Code it cannot rewrite (IntentsBitField, webhook\navatarURL/threadId/allowedMentions, rest.put(path, { body }), request({ method, path }), the\n0.3 voice API) is listed with its replacement; lines marked check: are guesses (a Client in\na cluster worker without gateway: { shardId, shardCount }). Exits 1 while anything is left.",
+            "Checks every TypeScript and JavaScript file under src/. --fix renames the removed names\n(Events → ClientEvent, CreateStringSelectMenu → CreateStringSelect, Status → GatewayState…)\nonly where the file imports them from lunibee or @lunibee/*, so names imported from other\npackages are never touched; `import { X as Y }` keeps Y. Code it cannot rewrite (IntentsBitField, webhook\navatarURL/threadId/allowedMentions, rest.put(path, { body }), request({ method, path }), the\n0.3 voice API) is listed with its replacement; lines marked check: are guesses (a Client in\na cluster worker without gateway: { shardId, shardCount }). Exits 1 while anything is left.",
         run: ({ io, args, root }) =>
             migrate(io, root, {
                 fix: flag(args, "fix"),

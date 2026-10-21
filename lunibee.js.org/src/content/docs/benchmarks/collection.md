@@ -1,16 +1,15 @@
 ---
 title: Collection benchmarks
-description: Lunibee's Collection against discord.js and a plain Map, and every Collection method.
+description: Lunibee's Collection against a plain Map, and every Collection method.
 ---
 
 Measured 2026-10-15 on Bun 1.4.2, Linux, a shared CPU. Absolute times move by about ±20% between runs and machines: compare ratios and orders of magnitude, not single digits.
 
-## Against discord.js
+## Against Map
 
 ```text
 set, 200000 new keys
   Map                                      150.0 ns/op    1.0x
-  discord.js Collection                    153.4 ns/op    1.0x
   Lunibee Collection                       155.7 ns/op    1.0x
   Lunibee, ttl                             601.6 ns/op    4.0x
   Lunibee, maxSize (evicting)              491.9 ns/op    3.3x
@@ -18,31 +17,25 @@ set, 200000 new keys
 
 get, 100000 hits
   Map                                       76.2 ns/op    1.3x
-  discord.js Collection                     69.0 ns/op    1.2x
   Lunibee Collection                        59.1 ns/op    1.0x
   Lunibee, ttl                             184.8 ns/op    3.1x
   Lunibee, maxSize (evicting)              116.9 ns/op    2.0x
   Lunibee, ttl + maxSize (evicting)        191.5 ns/op    3.2x
 
 filter, 1000 entries
-  discord.js Collection                  49590.6 ns/op    1.8x
   Lunibee Collection                     27924.5 ns/op    1.0x
 
 find (last match), 1000 entries
-  discord.js Collection                  10193.0 ns/op    1.0x
   Lunibee Collection                     10169.3 ns/op    1.0x
 
 random, 1000 entries
-  discord.js Collection                  10007.6 ns/op    6.9x
   Lunibee Collection                      1458.0 ns/op    1.0x
 
 at(500), 1000 entries
-  discord.js Collection                  10820.6 ns/op    8.1x
   Lunibee Collection                      1332.4 ns/op    1.0x
 
 empty instance (shallow bytes, bun:jsc)
   Map                                         32 B
-  discord.js Collection                       32 B
   Lunibee Collection                          35 B
 ```
 

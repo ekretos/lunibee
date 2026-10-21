@@ -12,7 +12,7 @@ bunx @lunibee/cli migrate          # lists what needs changing
 bunx @lunibee/cli migrate --fix    # renames the removed aliases, then lists the rest
 ```
 
-It renames the removed discord.js-style names (`Events` → `ClientEvent`, `ShardingManager` → `ShardManager`, `DiscordAPIError` → `RESTError`, …) in files that import them from Lunibee. It lists, with file and line, what needs a hand change:
+It renames the removed compatibility names (`Events` → `ClientEvent`, `ShardingManager` → `ShardManager`, `DiscordAPIError` → `RESTError`, …) in files that import them from Lunibee. It lists, with file and line, what needs a hand change:
 - `IntentsBitField`: use an array of `GatewayIntentBits`.
 - REST calls in the removed `rest.post(path, { body })` / `rest.request({ method, path })` forms: use `rest.post(path, body, options)` and `rest.request(method, path, body, options)`.
 - WebhookClient `avatarURL` / `threadId` / `allowedMentions`: use `avatar_url` / `thread_id` / `allowed_mentions`.

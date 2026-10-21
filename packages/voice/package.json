@@ -13,17 +13,13 @@
   },
   "peerDependencies": {
     "@snazzah/davey": ">=0.1.9",
-    "opusscript": ">=0.1.1",
-    "@discordjs/opus": ">=0.10.0"
+    "opusscript": ">=0.1.1"
   },
   "peerDependenciesMeta": {
     "@snazzah/davey": {
       "optional": true
     },
     "opusscript": {
-      "optional": true
-    },
-    "@discordjs/opus": {
       "optional": true
     }
   }

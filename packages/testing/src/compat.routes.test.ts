@@ -1,6 +1,6 @@
 /**
  * REST route wire-compatibility. Route *names* follow Lunibee conventions and are
- * intentionally allowed to differ from discord.js/discord-api-types, but the *paths*
+ * intentionally allowed to differ from other libraries, but the *paths*
  * they produce are sent to Discord's REST API and MUST match Discord's documented
  * endpoints exactly (leading slash, snowflake segments, sub-resource spelling).
  */

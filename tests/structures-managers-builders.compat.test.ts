@@ -1,7 +1,7 @@
 /**
  * Compatibility payload + type tests for Structures, Managers & Builders (T5).
  *
- * These lock down the JSON payload shapes Lunibee emits and the Discord.js-familiar
+ * These lock down the JSON payload shapes Lunibee emits and its public
  * surface (properties, nullability, serialization) so regressions surface early.
  * The `satisfies`/typed-binding assertions double as compile-time (type) tests:
  * they only pass `tsc` if the public types stay compatible.

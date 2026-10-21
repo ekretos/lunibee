@@ -642,16 +642,3 @@ const rest = new REST({
 ```
 
 `@lunibee/testing` also has `MockREST`, which records each call and answers from a path-to-response map.
-
-## Compatibility with `@discordjs/rest`
-
-| `@discordjs/rest` | Lunibee |
-|---|---|
-| `new REST().setToken(t)` | `new REST({ token })` or `setToken(t)` |
-| `rest.post(route, { body, reason })` | `rest.post(route, body, { reason })` |
-| `rest.request({ method, fullRoute, body })` | `rest.request(method, path, body?, options?)` |
-| `query`, `headers`, `reason`, `auth: false`, `files` | the same, in the options argument |
-| `DiscordAPIError` | `RESTError` |
-| `HTTPError` | `RESTError` with `status: 0` and kind `network` or `timeout` |
-
-Details are in `packages/rest/COMPATIBILITY.md`.

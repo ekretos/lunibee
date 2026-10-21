@@ -10,7 +10,7 @@ Use `BENCH_ITERATIONS` to change the sample count, for example `BENCH_ITERATIONS
 
 The harness reports deterministic `ns/op` measurements for representative collection operations and builder serialization. It is intentionally kept outside `packages/` so benchmark code never becomes part of the runtime library.
 
-Compare Lunibee's `Collection` with discord.js's (`@discordjs/collection`) and a plain `Map`:
+Compare Lunibee's `Collection` (plain, `ttl`, `maxSize`) with a plain `Map`:
 
 ```sh
 bun benchmarks/collection.ts

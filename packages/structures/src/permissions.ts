@@ -118,10 +118,10 @@ export const Permissions = {
 
 /**
  * Permission flag bits with **bigint** values matching Discord's permission bit
- * positions. Mirrors discord.js's `PermissionFlagsBits`, so bitwise composition
+ * positions, so bitwise composition
  * (`Flags.A | Flags.B`) OR-s the bits instead of concatenating strings.
  *
- * The same object as {@link Permissions}, under the discord.js name. It is a
+ * The same object as {@link Permissions}, under another name. It is a
  * `const` object rather than a TS `enum` because enums cannot hold bigint
  * members; the same-named union type below preserves usage as a type.
  */

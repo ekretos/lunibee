@@ -8,14 +8,14 @@ import {
 } from "../packages/core/src/index.ts";
 
 /**
- * Discord.js compatibility surface for the Lunibee Client.
+ * Public surface of the Lunibee Client.
  *
- * These tests pin the client-facing API that Discord.js developers expect —
+ * These tests pin the client-facing API —
  * event names, the `token` getter, Node-style emitter aliases, the Collector
  * primitive, and the interaction acknowledgement methods — while preserving
  * Lunibee's own naming and architecture (no renames).
  */
-describe("Client — Discord.js-familiar event names", () => {
+describe("Client — event names", () => {
     // Compile-time: every name below must be a valid ClientEvents key, and the
     // ClientEvent enum must carry the same string value.
     const familiarEvents: Record<string, ClientEventName> = {
@@ -34,7 +34,7 @@ describe("Client — Discord.js-familiar event names", () => {
         guildUnavailable: "guildUnavailable",
     };
 
-    test("core Discord.js event names exist in the ClientEvent enum", () => {
+    test("core event names exist in the ClientEvent enum", () => {
         const enumValues = new Set<string>(Object.values(ClientEvent));
         for (const name of [
             "ready",
@@ -104,7 +104,7 @@ describe("Client — guildCreate vs. guildAvailable", () => {
     });
 });
 
-describe("Client — Discord.js-familiar accessors & emitter aliases", () => {
+describe("Client — accessors & emitter aliases", () => {
     test("exposes client.token and nulls it after destroy", () => {
         const client = new Client({ token: "secret-token", intents: [1] });
         expect(client.token).toBe("secret-token");
@@ -127,7 +127,7 @@ describe("Client — Discord.js-familiar accessors & emitter aliases", () => {
     });
 });
 
-describe("Collector — Discord.js-familiar collection primitive", () => {
+describe("Collector — collection primitive", () => {
     test("is exported from the public API and collects up to max", async () => {
         const collector = new Collector<string, number>({ max: 2 });
         const ended: unknown[] = [];
@@ -156,7 +156,7 @@ describe("Collector — Discord.js-familiar collection primitive", () => {
     });
 });
 
-describe("Interaction — Discord.js acknowledgement methods", () => {
+describe("Interaction — acknowledgement methods", () => {
     test("interactionCreate yields an interaction exposing reply/defer/etc.", () => {
         const client = new Client({ token: "test-token", intents: [1] });
         let interaction: ClientEvents["interactionCreate"][0] | undefined;

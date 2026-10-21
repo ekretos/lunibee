@@ -300,7 +300,7 @@ export class AudioPlayer extends Emitter<AudioPlayerEvents> {
     }
 }
 
-/** Creates an {@link AudioPlayer}. Mirrors `@discordjs/voice`. */
+/** Creates an {@link AudioPlayer}. */
 export function createAudioPlayer(options?: AudioPlayerOptions): AudioPlayer {
     return new AudioPlayer(options);
 }

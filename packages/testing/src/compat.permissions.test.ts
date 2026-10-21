@@ -1,7 +1,6 @@
 /**
- * PermissionsBitField compatibility. The class is documented as "Discord.js-compatible"
- * and exposes a static `Flags` — so it must behave like discord.js's PermissionsBitField
- * for the common patterns (has/any/add/remove, Flags.* resolution, toArray).
+ * PermissionsBitField behaviour. The class exposes a static `Flags`, and must
+ * behave as documented for the common patterns (has/any/add/remove, Flags.* resolution, toArray).
  */
 import { describe, expect, test } from "bun:test";
 import {
@@ -13,7 +12,7 @@ import {
 import * as structures from "@lunibee/structures";
 
 describe("PermissionsBitField — core behavior", () => {
-    test("has() resolves single Flags value like discord.js", () => {
+    test("has() resolves a single Flags value", () => {
         const perms = new PermissionsBitField(
             Permissions.Administrator | Permissions.BanMembers,
         );
@@ -45,7 +44,7 @@ describe("PermissionsBitField — core behavior", () => {
         expect(arr).toContain("administrator");
         expect(arr).toContain("banmembers");
     });
-    test("static Flags is exposed (discord.js parity)", () => {
+    test("static Flags is exposed", () => {
         expect(PermissionsBitField.Flags).toBeDefined();
         expect(PermissionsBitField.Flags.Administrator).toBeDefined();
     });
@@ -54,20 +53,18 @@ describe("PermissionsBitField — core behavior", () => {
     });
 });
 
-describe("PermissionsBitField — discord.js divergences", () => {
-    // discord.js PermissionsBitField.Flags.* are BIGINT values (8n), enabling
-    // `Flags.A | Flags.B`; Lunibee matches.
+describe("PermissionsBitField — bigint flags and exports", () => {
+    // Flags.* are BIGINT values (8n), enabling `Flags.A | Flags.B`.
     test("Flags values are bigints supporting bitwise OR", () => {
         expect(typeof PermissionFlagsBits.Administrator).toBe("bigint");
         const combined =
             (PermissionFlagsBits.Administrator as unknown as bigint) |
             (PermissionFlagsBits.ManageGuild as unknown as bigint);
-        // Administrator(8) | ManageGuild(32) === 40n in discord.js.
+        // Administrator(8) | ManageGuild(32) === 40n.
         expect(combined).toBe(40n);
     });
 
-    // discord.js re-exports PermissionsBitField from its top-level entry; importers of
-    // @lunibee/structures must be able to reach it too.
+    // Importers of @lunibee/structures must be able to reach PermissionsBitField.
     test("@lunibee/structures re-exports PermissionsBitField", () => {
         expect(
             (structures as Record<string, unknown>).PermissionsBitField,

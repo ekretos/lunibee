@@ -65,7 +65,7 @@ export interface VoiceAdapter {
     destroy(): void;
 }
 
-/** Builds an adapter for a guild. `@discordjs/voice`'s adapter shape. */
+/** Builds an adapter for a guild. */
 export type VoiceAdapterCreator = (
     methods: VoiceAdapterMethods,
 ) => VoiceAdapter;

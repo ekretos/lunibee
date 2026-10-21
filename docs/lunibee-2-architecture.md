@@ -1,6 +1,6 @@
 # Lunibee 2.0 — architecture direction
 
-_Discord API concepts underneath, Lunibee architecture on top. Not a discord.js clone._
+_Discord API concepts underneath, Lunibee architecture on top._
 
 ## The governing rule
 

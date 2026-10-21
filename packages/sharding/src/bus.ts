@@ -179,8 +179,8 @@ export class ShardBus {
     }
     /**
      * Registers a handler that answers requests of `type`. Its return value (or
-     * thrown error) is sent back to the requesting shard. Discord.js-familiar
-     * replacement for `broadcastEval` that never evaluates received code.
+     * thrown error) is sent back to the requesting shard. Received code is
+     * never evaluated.
      * @returns This bus.
      */
     public respond<T, R>(

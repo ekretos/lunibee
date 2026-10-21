@@ -5,7 +5,7 @@ then build in the order at the end.
 
 ## Why
 
-Today a bot reads like discord.js: `client.guilds.cache.get(id)`,
+Today a bot reads like this: `client.guilds.cache.get(id)`,
 `guild.members.fetch(id)`, `new SlashCommandBuilder()`, `interaction.options.getUser("user")`.
 Lunibee 0.3 keeps the same engine (managers, caches, REST) but changes how you reach it:
 

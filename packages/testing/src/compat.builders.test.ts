@@ -1,5 +1,5 @@
 /**
- * Builder → Discord API payload compatibility. Builders are Discord.js-familiar
+ * Builder → Discord API payload compatibility. Builders
  * (CreateEmbed, CreateButton, CreateActionRow, CreateSlashCommand, ...); their
  * toJSON() output is sent to Discord verbatim, so the payload shape (snake_case keys,
  * numeric type/style, nesting) must match the Discord REST contract.
@@ -48,9 +48,8 @@ describe("CreateEmbed → APIEmbed payload", () => {
     test("rejects out-of-range color like Discord", () => {
         expect(() => new CreateEmbed().setColor(0x1000000)).toThrow(RangeError);
     });
-    // discord.js CreateEmbed.addFields accepts BOTH spread and a single array
-    // (RestOrArray); Lunibee matches.
-    test("addFields accepts an array argument (discord.js RestOrArray)", () => {
+    // CreateEmbed.addFields accepts BOTH spread and a single array.
+    test("addFields accepts an array argument", () => {
         const embed = new CreateEmbed().addFields([
             { name: "f1", value: "v1" },
             { name: "f2", value: "v2" },

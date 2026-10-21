@@ -46,7 +46,7 @@ Outcome: new `tests/coverage.phase3.test.ts` and `tests/sharding.cluster.test.ts
 `Emoji` with `id: null` (unicode) threw; `generateInvite` sent `scopes=` instead of
 Discord's `scope=`; `fetchInvite`/`fetchGuildTemplate` did not encode the code.
 
-## Phase 4 — Compatibility gaps (`docs/compatibility/remaining-gaps.md`) — done
+## Phase 4 — Compatibility gaps — done
 
 Re-verify the list (several items appear done: `DiscordAPIError`, `guildAvailable`,
 `createdTimestamp`), mark completed items, then implement remaining low-risk additive
@@ -68,8 +68,7 @@ event payloads, channel subclasses) need a design proposal first.
 1 → 2 (BUS-001, REST-003) → 3 → 4 → 2 (WS-004) → 5. Each step: small PR-sized change
 on `dev`, `bun run ci` green before push.
 
-Phase 4 outcome: all additive aliases/helpers above landed (see the Status block in
-`remaining-gaps.md`), tested from the top-level `lunibee` barrel in
+Phase 4 outcome: all additive aliases/helpers above landed, tested from the top-level `lunibee` barrel in
 `tests/compat.phase4.test.ts`; the rest was finished in the completion pass below.
 
 Phase 5 outcome: split `types/src/index.ts` (→ `gateway.ts`, `gateway-events.ts`),
@@ -90,6 +89,6 @@ summary. API reference generation was done in the completion pass below.
 - Generated API reference: `starlight-typedoc` (already a docs dependency) now builds
   `/api/` from TSDoc alongside the hand-written pages.
 - `audit:api` wired into `bun run ci` and CI (its temp tsconfig resolved no inputs before).
-- Wrapped event payloads and `broadcastEval` are recorded as deliberate divergences in
-  `known-incompatibilities.md`. No plan items remain open.
+- Wrapped event payloads and code evaluation across shards are deliberately not
+  provided. No plan items remain open.
 

@@ -31,7 +31,7 @@ function withQuery(path: string, params: Record<string, unknown>): string {
     return suffix ? `${path}?${suffix}` : path;
 }
 
-/** Manages a guild's bans, cached by user ID. Discord.js-familiar. */
+/** Manages a guild's bans, cached by user ID. */
 export class GuildBanManager extends Manager<string, APIBan> {
     readonly #rest: REST;
     public readonly guildId: string;
@@ -127,7 +127,7 @@ export type GuildScheduledEventOptions = Partial<
         reason?: string;
     };
 
-/** Manages a guild's scheduled events, cached by event ID. Discord.js-familiar. */
+/** Manages a guild's scheduled events, cached by event ID. */
 export class GuildScheduledEventManager extends Manager<
     string,
     APIGuildScheduledEvent
@@ -245,7 +245,7 @@ export interface StageInstanceCreateOptions {
     guildScheduledEventId?: string;
 }
 
-/** Manages stage instances, cached by stage channel ID. Discord.js-familiar. */
+/** Manages stage instances, cached by stage channel ID. */
 export class StageInstanceManager extends Manager<string, APIStageInstance> {
     readonly #rest: REST;
 
@@ -334,7 +334,7 @@ export interface PermissionOverwriteUpdate {
     inherit?: bigint;
 }
 
-/** Manages a channel's permission overwrites. Discord.js-familiar. */
+/** Manages a channel's permission overwrites. */
 export class PermissionOverwriteManager {
     readonly #rest: REST;
     readonly #current: () => readonly APIOverwrite[] | undefined;

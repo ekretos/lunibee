@@ -2,7 +2,7 @@ import { FRAME_SAMPLES, VoiceError } from "./protocol.js";
 
 /** One 48 kHz stereo Opus encoder and decoder. Call `destroy()` when done. */
 export interface OpusCodec {
-    /** The library behind it: `"@discordjs/opus"` (native) or `"opusscript"` (WebAssembly). */
+    /** The library behind it: always `"opusscript"` (libopus compiled to WebAssembly). */
     readonly library: string;
     /** Encodes one 20 ms frame of s16le PCM (3,840 bytes). */
     encode(pcm: Uint8Array): Uint8Array;
@@ -11,34 +11,8 @@ export interface OpusCodec {
     destroy(): void;
 }
 
-type CodecFactory = () => Promise<OpusCodec>;
-
-/** Native `@discordjs/opus`: about 1.2x faster, but its prebuilt binary must match the runtime. */
-const native: CodecFactory = async () => {
-    // Not a declared dependency: a variable keeps type checking and bundlers from requiring it.
-    const name = "@discordjs/opus";
-    const mod = (await import(name)) as {
-        default?: {
-            OpusEncoder: new (rate: number, channels: number) => NativeEncoder;
-        };
-        OpusEncoder?: new (rate: number, channels: number) => NativeEncoder;
-    };
-    const Encoder = mod.OpusEncoder ?? mod.default!.OpusEncoder;
-    const codec = new Encoder(48_000, 2);
-    return {
-        library: "@discordjs/opus",
-        encode: (pcm) => codec.encode(Buffer.from(pcm)),
-        decode: (packet) => codec.decode(Buffer.from(packet)),
-        destroy: () => undefined,
-    };
-};
-interface NativeEncoder {
-    encode(pcm: Buffer): Buffer;
-    decode(packet: Buffer): Buffer;
-}
-
 /** `opusscript`: libopus compiled to WebAssembly; works on every runtime. */
-const wasm: CodecFactory = async () => {
+const wasm = async (): Promise<OpusCodec> => {
     const name = "opusscript";
     const mod = (await import(name)) as unknown as {
         default: ScriptConstructor;
@@ -70,25 +44,18 @@ interface ScriptConstructor {
     Application: { AUDIO: number };
 }
 
-let preferred: CodecFactory | undefined;
-
 /**
- * Creates an Opus codec from the first library that loads: `@discordjs/opus`,
- * then `opusscript`. Both are optional peer dependencies; playing Ogg/Opus
- * files, or anything through FFmpeg without `inlineVolume`, needs neither.
- * @throws {VoiceError} If neither is installed.
+ * Creates an Opus codec with `opusscript`, an optional peer dependency.
+ * Playing Ogg/Opus files, or anything through FFmpeg without `inlineVolume`,
+ * does not need it.
+ * @throws {VoiceError} If `opusscript` is not installed.
  */
 export async function createOpusCodec(): Promise<OpusCodec> {
-    if (preferred) return preferred();
-    for (const factory of [native, wasm])
-        try {
-            const codec = await factory();
-            preferred = factory;
-            return codec;
-        } catch {
-            // Not installed, or a native binary for another runtime.
-        }
-    throw new VoiceError(
-        "Encoding or decoding Opus needs an Opus library: install opusscript (or @discordjs/opus).",
-    );
+    try {
+        return await wasm();
+    } catch {
+        throw new VoiceError(
+            "Encoding or decoding Opus needs an Opus library: install opusscript.",
+        );
+    }
 }

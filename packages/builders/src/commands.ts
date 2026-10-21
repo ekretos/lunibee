@@ -557,7 +557,7 @@ function validateNumberRange(
 // ─── Context Menu Builders ────────────────────────────────────────────────────
 
 /** Builder for application commands that appear in right-click context menus.
- * Discord.js-familiar: `new CreateContextMenuCommand().setName("x").setType(2)`. */
+ * Example: `new CreateContextMenuCommand().setName("x").setType(2)`. */
 export class CreateContextMenuCommand {
     protected readonly data: Record<string, unknown>;
     public constructor(type: 2 | 3 = 2) {

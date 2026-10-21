@@ -1,6 +1,6 @@
 # @lunibee/testing
 
-> Test helpers for Lunibee apps, and Lunibee's own discord.js compatibility suite.
+> Test helpers for Lunibee apps, and Lunibee's own API contract suite.
 
 ```bash
 bun add -d @lunibee/testing
@@ -32,5 +32,5 @@ test("waits for async work", async () => {
 | `deferred<T>()` | `{ promise, resolve, reject }` for controlling async flow in tests. |
 | `waitFor(predicate, timeout?, interval?)` | Polls until `predicate()` is true or throws after `timeout` ms. |
 
-The `src/compat.*.test.ts` files check Lunibee's discord.js-familiar APIs; they run in
+The `src/compat.*.test.ts` files check Lunibee's public API contracts; they run in
 the repository's `ci:test`.

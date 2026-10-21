@@ -1,5 +1,5 @@
 /**
- * Collection compatibility. Lunibee's Collection is the discord.js Collection analogue:
+ * Collection compatibility. Lunibee's Collection is
  * a Map subclass with first()/last()/find()/filter()/map()/reduce()/at() helpers.
  * Return-type contracts matter: filter() must return a Collection, map() an array.
  */
@@ -15,7 +15,7 @@ function sample(): Collection<string, number> {
     return c;
 }
 
-describe("Collection is a Map subclass (discord.js parity)", () => {
+describe("Collection is a Map subclass", () => {
     test("extends Map and supports Map operations", () => {
         const c = sample();
         expect(c).toBeInstanceOf(Map);
@@ -46,7 +46,7 @@ describe("Collection accessors", () => {
     });
 });
 
-describe("Collection iteration helpers preserve discord.js return types", () => {
+describe("Collection iteration helpers keep their return types", () => {
     test("find returns a single value or undefined", () => {
         const c = sample();
         expect(c.find((v) => v > 1)).toBe(2);

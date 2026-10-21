@@ -111,7 +111,6 @@ export {
 
 /**
  * Resolves once `target` reaches `status`, or rejects after `timeoutMs`.
- * Mirrors `@discordjs/voice`'s `entersState`.
  * @throws {VoiceError} If the status is not reached in time.
  */
 export function entersState<T extends VoiceConnection | AudioPlayer>(

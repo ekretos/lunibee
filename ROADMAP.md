@@ -47,9 +47,7 @@ Done and covered by tests (see the changelog and the audit docs):
 - 0.2.1: `message.member`, member actions, merge-style overwrites, file
   uploads, component/modal collectors, prefix-argument parsing, builder and
   typing fixes.
-- The reliability backlog and the
-  discord.js compatibility gaps (`docs/compatibility/remaining-gaps.md`) are
-  closed, apart from the decided divergences.
+- The reliability backlog is closed.
 
 ## Gaps between 0.2.1 and 1.0
 

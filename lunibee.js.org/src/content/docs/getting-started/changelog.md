@@ -48,7 +48,7 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
 
 Old compatibility layers are gone. `lunibee migrate --fix` renames what it can and lists the rest ([Upgrading](/getting-started/upgrading/#033--040)).
 
-- **discord.js-style aliases** (old → use):
+- **Compatibility aliases** (old → use):
   - `Events` → `ClientEvent`
   - `ShardingManager` → `ShardManager`
   - `DiscordAPIError` → `RESTError`
@@ -80,7 +80,7 @@ Old compatibility layers are gone. `lunibee migrate --fix` renames what it can a
 - **Audio:**
   - `createAudioResource()` passes Ogg/Opus through without re-encoding. It handles raw PCM, Opus packets, and anything FFmpeg reads; FFmpeg is fed on stdin and killed when the resource ends.
   - `inlineVolume` is optional.
-  - `createOpusCodec()` uses `@discordjs/opus` when it loads, else `opusscript`; both are optional peers.
+  - `createOpusCodec()` uses `opusscript`, an optional peer.
 - **`AudioPlayer`:**
   - a 20 ms clock that corrects its drift, and no timer while idle or paused;
   - five silence frames on stop and pause;
@@ -152,7 +152,7 @@ Old compatibility layers are gone. `lunibee migrate --fix` renames what it can a
 - `setSpeaking` sends the negotiated SSRC instead of `0`.
 - A paused player no longer polls every 25 ms.
 - The `assertUsable` indirection is removed.
-- The optional peers (`@snazzah/davey`, `opusscript`, `@discordjs/opus`) are loaded at run time, so a bundle of an app that uses `lunibee` does not inline their native or WebAssembly binaries.
+- The optional peers (`@snazzah/davey`, `opusscript`) are loaded at run time, so a bundle of an app that uses `lunibee` does not inline their native or WebAssembly binaries.
 
 ### 📚 Documentation
 

@@ -695,8 +695,8 @@ export class Gateway {
         } else if (event === "RESUMED") {
             // A successful RESUME ends the reconnect cycle just like READY:
             // reset the backoff counter so a later disconnect starts from the
-            // base delay, mark the connection READY, and surface a Discord.js-
-            // familiar `resumed` event.
+            // base delay, mark the connection READY, and surface a
+            // `resumed` event.
             this.#reconnect.reset();
             this.#setState(GatewayState.Ready);
             this.#emit("resumed", data);

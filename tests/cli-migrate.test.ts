@@ -67,12 +67,12 @@ describe("scanSource: renames", () => {
     });
 
     test("only in files that import the name from lunibee or @lunibee/*", () => {
-        const discord =
-            'import { Events, Status } from "discord.js";\nclient.on(Events.MessageCreate, f);\nStatus.Ready;\n';
-        expect(scanSource(discord)).toEqual({
+        const other =
+            'import { Events, Status } from "some-other-lib";\nclient.on(Events.MessageCreate, f);\nStatus.Ready;\n';
+        expect(scanSource(other)).toEqual({
             fixable: [],
             manual: [],
-            source: discord,
+            source: other,
         });
         // A Lunibee import does not make other packages' names Lunibee's.
         const mixed =
@@ -167,7 +167,7 @@ describe("scanSource: reported for a hand change", () => {
         ).toEqual([[2, "lb.IntentsBitField"]]);
         expect(
             found(
-                'import { IntentsBitField } from "discord.js";\nnew IntentsBitField();\n',
+                'import { IntentsBitField } from "some-other-lib";\nnew IntentsBitField();\n',
             ),
         ).toEqual([]);
     });

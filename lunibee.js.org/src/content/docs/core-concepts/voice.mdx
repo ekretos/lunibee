@@ -18,7 +18,7 @@ bun add lunibee @snazzah/davey opusscript
 | Package | Needed for |
 |---|---|
 | `@snazzah/davey` | **Required in voice and stage-less channels.** Since 1 March 2026 Discord only lets clients that speak DAVE (end-to-end encrypted voice) into calls. Without it the voice server closes with `4017`. |
-| `opusscript` *or* `@discordjs/opus` | Encoding PCM, and `inlineVolume`. Not needed to play Ogg/Opus files, or anything FFmpeg converts. `@discordjs/opus` is native and about 1.2× faster under Node, but its prebuilt binary does not load under Bun; `opusscript` (WebAssembly) works everywhere. |
+| `opusscript` | Encoding PCM, and `inlineVolume`. Not needed to play Ogg/Opus files, or anything FFmpeg converts. libopus compiled to WebAssembly, so it runs under Bun. |
 | `ffmpeg` on the `PATH` | Any format other than Ogg/Opus (MP3, WAV, AAC, URLs…). |
 
 `generateDependencyReport()` tells you what this runtime can load. Your bot also needs the `GuildVoiceStates` intent.

@@ -55,7 +55,7 @@ player.on("finish", () => connection.destroy());
 - `AudioPlayer` / `AudioStream`: `play`, `pause`, `resume`, `stop`; override `onChunk`.
   Its `stateChange` passes `(from, to)`.
 - `VoiceReceiver`: `mapSsrc`, `subscribe(userId)`, `onPacket`.
-- `@discordjs/voice`-style helpers: `joinVoiceChannel`, `getVoiceConnection`,
+- Helpers: `joinVoiceChannel`, `getVoiceConnection`,
   `createAudioPlayer`, `createAudioResource`, `entersState`, `VoiceConnectionStatus`.
 
 ## What's new in 0.2.0

@@ -1,6 +1,6 @@
 # FIX.md — Make Lunibee humane to write
 
-Found by reading how ZedBot 0.2.0 (a discord.js → Lunibee port) uses Lunibee.
+Found by reading how ZedBot 0.2.0 (a port to Lunibee) uses Lunibee.
 Goal: code written with Lunibee reads like intent, not like plumbing.
 Scope: consistency, typing, errors and docs only. **No new concepts.**
 

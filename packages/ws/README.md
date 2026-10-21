@@ -3,7 +3,7 @@
 > Discord Gateway (WebSocket) connection manager for the lunibee ecosystem.
 
 Lunibee uses a single-connection `Gateway` (sharding lives in `@lunibee/sharding`). It
-exposes a discord.js-*familiar* surface (opcodes, close codes, lifecycle) while keeping
+exposes a familiar surface (opcodes, close codes, lifecycle) while keeping
 Lunibee's canonical names.
 
 ```bash
@@ -40,7 +40,7 @@ Every dispatch is also emitted under its Discord name (`READY`, `MESSAGE_CREATE`
 | `GatewayOpcodes` | const | Discord opcode names → values. |
 | `GatewayCloseCodes` | const | Discord close-code names → values (`AuthenticationFailed = 4004`, `InvalidSeq = 4007`, …). |
 | `GatewayState` | enum | Lunibee lifecycle states. |
-| `Status` | alias | discord.js-familiar alias of `GatewayState`. Values stay Lunibee strings. |
+| `Status` | alias | Alias of `GatewayState`. Values stay Lunibee strings. |
 | `GatewayError` | class | Thrown/emitted on gateway failures. |
 | `GatewayOptions` | interface | Connection config (`compress`, `shardId`/`shardCount`, reconnect tuning, `createSocket`). |
 

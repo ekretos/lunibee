@@ -11,7 +11,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 - asks one shard a question and waits for its answer (`request` / `respond`);
 - asks every shard and collects the answers (`broadcastRequest`).
 
-It never evaluates code it receives: a request names a handler type, and only handlers you registered with `respond()` answer. It is the replacement for Discord.js's `broadcastEval`.
+It never evaluates code it receives: a request names a handler type, and only handlers you registered with `respond()` answer.
 
 The transport is chosen for you: a `BroadcastChannel` inside one process, IPC inside a worker forked by [`ClusterManager`](/reference/cluster-manager/), relayed by the parent to the other clusters. See [Sharding](/core-concepts/sharding/) for the overall picture and [ShardManager](/reference/shard-manager/) for running the shards.
 

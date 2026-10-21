@@ -1,11 +1,9 @@
 /**
  * Collection micro-benchmark: `bun benchmarks/collection.ts`.
- * Compares a plain Map, discord.js's Collection (@discordjs/collection) and
- * Lunibee's Collection in its modes. Each figure is the best of several
+ * Compares a plain Map and Lunibee's Collection in its modes. Each figure is the best of several
  * interleaved runs, with a garbage collection before each.
  */
 import { estimateShallowMemoryUsageOf } from "bun:jsc";
-import { Collection as DiscordJS } from "@discordjs/collection";
 import { Collection } from "../packages/collection/src/index.ts";
 
 const N = 200_000;
@@ -51,7 +49,6 @@ function report(group: string, rows: [string, number][]): void {
 type Store = Map<string, number>;
 const makers: [string, () => Store][] = [
     ["Map", () => new Map()],
-    ["discord.js Collection", () => new DiscordJS<string, number>()],
     ["Lunibee Collection", () => new Collection<string, number>()],
     ["Lunibee, ttl", () => new Collection<string, number>(null, { ttl: 60_000 })],
     [
@@ -104,14 +101,13 @@ report(
 );
 
 const scans: [string, () => Store][] = [
-    ["discord.js Collection", () => filled(() => new DiscordJS(), SMALL)],
     ["Lunibee Collection", () => filled(() => new Collection(), SMALL)],
 ];
 const scanOps: [string, (store: never) => unknown][] = [
-    ["filter", (c: DiscordJS<string, number>) => c.filter((v) => v % 2 === 0)],
-    ["find (last match)", (c: DiscordJS<string, number>) => c.find((v) => v === SMALL - 1)],
-    ["random", (c: DiscordJS<string, number>) => c.random()],
-    ["at(500)", (c: DiscordJS<string, number>) => c.at(500)],
+    ["filter", (c: Collection<string, number>) => c.filter((v) => v % 2 === 0)],
+    ["find (last match)", (c: Collection<string, number>) => c.find((v) => v === SMALL - 1)],
+    ["random", (c: Collection<string, number>) => c.random()],
+    ["at(500)", (c: Collection<string, number>) => c.at(500)],
 ];
 const scanStores = scans.map(([name, make]) => [name, make()] as const);
 for (const [op, run] of scanOps)
@@ -131,7 +127,6 @@ for (const [op, run] of scanOps)
 console.log("\nempty instance (shallow bytes, bun:jsc)");
 for (const [name, make] of [
     ["Map", () => new Map()],
-    ["discord.js Collection", () => new DiscordJS()],
     ["Lunibee Collection", () => new Collection()],
 ] as const)
     console.log(

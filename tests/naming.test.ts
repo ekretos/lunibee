@@ -64,7 +64,7 @@ test("new names are exported and the removed names are gone", () => {
     }
 });
 
-// 0.4.0 removed the discord.js-style compatibility aliases.
+// 0.4.0 removed the compatibility aliases.
 const removedIn040: Record<string, string> = {
     Events: "ClientEvent",
     CreateStringSelectMenu: "CreateStringSelect",
@@ -81,7 +81,7 @@ const removedIn040: Record<string, string> = {
     IntentsBitField: "GatewayIntentBits",
 };
 
-test("the discord.js-style aliases removed in 0.4.0 are gone", () => {
+test("the compatibility aliases removed in 0.4.0 are gone", () => {
     const exports = lunibee as unknown as Record<string, unknown>;
     for (const [old, current] of Object.entries(removedIn040)) {
         expect(exports[current]).toBeDefined();

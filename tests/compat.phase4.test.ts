@@ -117,7 +117,7 @@ describe("interaction guards and getFocused", () => {
     });
 });
 
-describe("@discordjs/voice-style helpers", () => {
+describe("voice helpers", () => {
     const adapter = () => {
         const sent: unknown[] = [];
         return {

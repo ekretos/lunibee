@@ -15,7 +15,7 @@ export interface ComponentCollectorOptions extends CollectorOptions<ComponentInt
 }
 import type { ResourceContext } from "./base.js";
 
-/** discord.js user-authored (non-system) message types: Default, Reply,
+/** User-authored (non-system) message types: Default, Reply,
  * ChatInputCommand and ContextMenuCommand. Any other type is a system message. */
 const NON_SYSTEM_MESSAGE_TYPES = new Set([0, 19, 20, 23]);
 
@@ -131,13 +131,13 @@ export class Message extends BaseStructure {
         return (this.flags & 4) !== 0;
     }
 
-    /** Unix timestamp (ms) at which the message was created — discord.js parity.
+    /** Unix timestamp (ms) at which the message was created.
      * Derived from the message `timestamp`, which itself falls back to the id snowflake. */
     public override get createdTimestamp(): number {
         return this.timestamp.getTime();
     }
 
-    /** Date at which the message was created — discord.js parity. Overrides the
+    /** Date at which the message was created. Overrides the
      * snowflake-only `BaseStructure.createdAt` to honour the message `timestamp`. */
     public override get createdAt(): Date {
         return this.timestamp;
@@ -287,8 +287,8 @@ export class Message extends BaseStructure {
         return this.pinned;
     }
 
-    /** Whether this is a system-generated message (join, boost, etc). Mirrors
-     * discord.js: a message is "system" unless its type is one of the user-authored
+    /** Whether this is a system-generated message (join, boost, etc).
+     * A message is "system" unless its type is one of the user-authored
      * types — Default (0), Reply (19), ChatInputCommand (20) or ContextMenuCommand (23). */
     public get isSystemMessage(): boolean {
         return !NON_SYSTEM_MESSAGE_TYPES.has(this.type);

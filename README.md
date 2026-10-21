@@ -160,7 +160,7 @@ Available lifecycle methods include `reply()`, `deferReply()`, `editReply()`, `d
 
 ## Builders
 
-Lunibee provides strict builders for Discord payloads (Discord.js V2 compatible), including:
+Lunibee provides strict builders for Discord payloads (Components V2 included), including:
 
 - `CreateActionRow`
 - `CreateButton`

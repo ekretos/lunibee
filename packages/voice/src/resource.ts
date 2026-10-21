@@ -372,8 +372,8 @@ function spawnFFmpeg(
  * `ReadableStream` or an async iterable.
  *
  * Ogg/Opus input is played as it is (passthrough). PCM input, and anything
- * with `inlineVolume`, is encoded with an Opus library (`opusscript` or
- * `@discordjs/opus`). Other formats go through FFmpeg, which is killed when
+ * with `inlineVolume`, is encoded with Opus (`opusscript`, an optional
+ * peer). Other formats go through FFmpeg, which is killed when
  * the resource ends or is destroyed.
  */
 export function createAudioResource<T = unknown>(
