@@ -19,6 +19,11 @@ import {
 } from "../packages/cli/src/maintainer.ts";
 import { CliError, type IO } from "../packages/cli/src/io.ts";
 import { initFiles } from "../packages/cli/src/init.ts";
+import {
+    APP,
+    PRELOAD,
+    fakeDiscord,
+} from "../tests/helpers/fake-discord-bot.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const io: IO = {
@@ -192,6 +197,45 @@ console.log("imports ok");
             "The init project built no dist/commands/info/ping.js.",
         );
     console.log("• a `lunibee init` project installs, type-checks and builds");
+
+    // …and the compiled bot starts: registers its commands and logs in (fake Discord).
+    const discord = fakeDiscord();
+    await writeFile(join(bot, "preload.js"), PRELOAD);
+    const token = "MTAw.smoke-install.fake-token";
+    const child = Bun.spawn(
+        ["bun", "--preload", "./preload.js", "dist/index.js"],
+        {
+            cwd: bot,
+            env: {
+                PATH: process.env.PATH!,
+                FAKE_DISCORD: discord.url,
+                DISCORD_TOKEN: token,
+                CLIENT_ID: APP,
+                NODE_ENV: "production",
+                NO_COLOR: "1",
+            },
+            stdout: "pipe",
+            stderr: "pipe",
+        },
+    );
+    await Promise.race([discord.identified, Bun.sleep(10_000)]);
+    await Bun.sleep(200);
+    child.kill("SIGTERM");
+    const code = await child.exited;
+    const log =
+        (await new Response(child.stdout).text()) +
+        (await new Response(child.stderr).text());
+    discord.stop();
+    if (
+        !log.includes("Online as") ||
+        discord.puts.length !== 1 ||
+        log.includes(token) ||
+        code !== 0
+    )
+        throw new CliError(`The init project did not start cleanly:\n${log}`);
+    console.log(
+        "• the compiled bot registers its commands, logs in and shuts down on SIGTERM",
+    );
     console.log("\n✅ Smoke test passed.");
 } catch (error) {
     console.error(

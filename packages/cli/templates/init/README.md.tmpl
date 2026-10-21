@@ -8,7 +8,9 @@ there is no separate deploy step.
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) 1.4 or newer
+- [Bun](https://bun.sh) 1.4 or newer. Lunibee runs on Bun: the scripts, development
+  and the compiled bot (`bun dist/index.js`) all use it. npm or pnpm can install the
+  dependencies, but not run the bot.
 - A Discord application with a bot user
 
 ## Installation
@@ -69,7 +71,14 @@ On every start, `src/services/register.ts` sends every command found under
 - without it, globally, for every server the bot is in.
 
 If Discord refuses the commands, the bot stops with the reason instead of running
-with outdated commands.
+with outdated commands. Network errors and rate limits are retried first. Sending the
+whole set on each start is deliberate: it replaces what Discord has, so a renamed or
+deleted command never lingers. In development, `bun run dev` restarts on every change
+and registers the new set.
+
+`lunibee check` loads every command and event the way startup does (without logging
+in) and reports invalid modules and duplicate names, and `.env` keys missing from
+`.env.example`.
 
 ## Adding a command
 

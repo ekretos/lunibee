@@ -103,6 +103,91 @@ export interface Finding {
     hint?: string;
 }
 
+/** Run in the project: loads its commands and events the way startup does, without logging in. */
+const LOAD_SCRIPT = `
+const { discoverCommands } = await import("./src/handlers/commands.ts");
+const { discoverEvents } = await import("./src/handlers/events.ts");
+const result = {};
+try { result.commands = [...(await discoverCommands("src/commands")).values()].map((c) => c.data.toJSON().name); }
+catch (error) { result.commandError = String(error?.message ?? error); }
+try { result.events = (await discoverEvents("src/events")).map(({ event }) => event.name); }
+catch (error) { result.eventError = String(error?.message ?? error); }
+console.log(JSON.stringify(result));
+`;
+
+/**
+ * For a \`lunibee init\` project: imports every command and event module and
+ * reports what fails validation (a missing export, a duplicate name…).
+ */
+async function loadModules(root: string): Promise<Finding[]> {
+    if (!(await exists(join(root, "node_modules", "lunibee"))))
+        return [
+            {
+                level: "warn",
+                message:
+                    "Commands and events not loaded: dependencies are not installed",
+                hint: "Run `bun install`, then `lunibee check` again.",
+            },
+        ];
+    const child = Bun.spawn(["bun", "-e", LOAD_SCRIPT], {
+        cwd: root,
+        stdout: "pipe",
+        stderr: "pipe",
+        // Discovery needs no settings; never hand the token to module code here.
+        env: { PATH: process.env.PATH ?? "", NODE_ENV: "test" },
+    });
+    const timer = setTimeout(() => child.kill(), 20_000);
+    const [stdout, stderr] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+    ]);
+    clearTimeout(timer);
+    let result: {
+        commands?: string[];
+        events?: string[];
+        commandError?: string;
+        eventError?: string;
+    };
+    try {
+        result = JSON.parse(stdout.trim().split("\n").at(-1) ?? "");
+    } catch {
+        return [
+            {
+                level: "error",
+                message: "Could not load the commands and events",
+                hint:
+                    (stderr || stdout)
+                        .trim()
+                        .split("\n")
+                        .slice(0, 3)
+                        .join(" ") || undefined,
+            },
+        ];
+    }
+    const findings: Finding[] = [];
+    findings.push(
+        result.commandError
+            ? { level: "error", message: result.commandError }
+            : {
+                  level: "ok",
+                  message: `${result.commands!.length} command(s) load: ${
+                      [...result.commands!]
+                          .sort()
+                          .map((n) => `/${n}`)
+                          .join(", ") || "none"
+                  }`,
+              },
+        result.eventError
+            ? { level: "error", message: result.eventError }
+            : {
+                  level: "ok",
+                  message: `${result.events!.length} event handler(s) load: ${[...new Set(result.events)].join(", ") || "none"}`,
+              },
+    );
+    return findings;
+}
+
 const TOKEN_KEY = /^\s*(?:export\s+)?(DISCORD_TOKEN|BOT_TOKEN|TOKEN)\s*=\s*\S/m;
 
 /** Whether .gitignore has a rule that ignores `.env`. */
@@ -160,11 +245,7 @@ async function projectFindings(
     const runtimeDiscovery =
         (await exists(join(root, "src", "handlers", "events.ts"))) &&
         !(await exists(join(root, "src", "handlers", "event.ts")));
-    if (runtimeDiscovery)
-        findings.push({
-            level: "ok",
-            message: "src/handlers/events.ts finds events at runtime",
-        });
+    if (runtimeDiscovery) findings.push(...(await loadModules(root)));
     else if (await exists(join(root, "src", "events"))) {
         const state = await binderState(root);
         for (const folder of state.discovery.unknownFolders)
@@ -199,6 +280,26 @@ async function projectFindings(
                 level: "warn",
                 message: ".env has no DISCORD_TOKEN (or TOKEN) entry",
             });
+        const example = Bun.file(join(root, ".env.example"));
+        if (await example.exists()) {
+            const keys = (text: string) =>
+                new Set(
+                    [
+                        ...text.matchAll(
+                            /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/gm,
+                        ),
+                    ].map((m) => m[1]!),
+                );
+            const have = keys(await envFile.text());
+            const missing = [...keys(await example.text())].filter(
+                (key) => !have.has(key),
+            );
+            if (missing.length)
+                findings.push({
+                    level: "warn",
+                    message: `.env is missing ${missing.join(", ")} from .env.example`,
+                });
+        }
         const gitignore = Bun.file(join(root, ".gitignore"));
         if (!(await gitignore.exists()) || !ignoresEnv(await gitignore.text()))
             findings.push({

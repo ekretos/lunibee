@@ -19,9 +19,27 @@ function invalid(value: unknown): string | null {
 }
 
 /**
- * Loads every event under `directory` (any folder layout) and binds it to the
- * client: `once: true` events run for the first occurrence only. A failing
- * handler is logged and does not stop the others.
+ * Loads and validates every event module under `directory` (any folder layout).
+ * @throws {Error} For an invalid module.
+ */
+export async function discoverEvents(
+    directory = join(SRC, "events"),
+): Promise<{ event: Event; file: string }[]> {
+    const events: { event: Event; file: string }[] = [];
+    for (const file of await findModules(directory)) {
+        const shown = relative(SRC, file);
+        const event = await importDefault(file);
+        const problem = invalid(event);
+        if (problem) throw new Error(`Invalid event ${shown}: ${problem}.`);
+        events.push({ event: event as Event, file: shown });
+    }
+    return events;
+}
+
+/**
+ * Binds every event under `directory` to the client: `once: true` events run
+ * for the first occurrence only. A failing handler is logged and does not stop
+ * the others.
  * @returns How many events were bound.
  * @throws {Error} For an invalid module, or when the client was already bound.
  */
@@ -31,14 +49,7 @@ export async function loadEvents(
 ): Promise<number> {
     const { client } = context;
     if (bound.has(client)) throw new Error("Events are already registered on this client.");
-    const events: { event: Event; file: string }[] = [];
-    for (const file of await findModules(directory)) {
-        const shown = relative(SRC, file);
-        const event = await importDefault(file);
-        const problem = invalid(event);
-        if (problem) throw new Error(`Invalid event ${shown}: ${problem}.`);
-        events.push({ event: event as Event, file: shown });
-    }
+    const events = await discoverEvents(directory);
     bound.add(client);
     for (const { event, file } of events) {
         const listener = (...args: ClientEvents[EventName]) => {

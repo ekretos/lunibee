@@ -1,4 +1,12 @@
-import { mkdir, readdir, stat as statPath, writeFile } from "node:fs/promises";
+import {
+    mkdir,
+    mkdtemp,
+    readdir,
+    rename,
+    rm,
+    stat as statPath,
+    writeFile,
+} from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import config from "../templates/init/config.ts.tmpl" with { type: "text" };
 import env from "../templates/init/env.example.tmpl" with { type: "text" };
@@ -96,6 +104,36 @@ export function projectName(target: string): string {
     return name;
 }
 
+/**
+ * Writes every file to a staging folder next to `directory` first, so a failed
+ * write (full disk, permissions) leaves nothing behind. A new project is then
+ * moved into place in one rename; into an existing folder, file by file.
+ */
+async function writeStaged(
+    directory: string,
+    files: Record<string, string>,
+    existed: boolean,
+): Promise<void> {
+    await mkdir(dirname(directory), { recursive: true });
+    const staging = await mkdtemp(join(dirname(directory), ".lunibee-init-"));
+    try {
+        for (const [path, source] of Object.entries(files)) {
+            await mkdir(dirname(join(staging, path)), { recursive: true });
+            await writeFile(join(staging, path), source);
+        }
+        if (!existed) {
+            await rename(staging, directory);
+            return;
+        }
+        for (const path of Object.keys(files)) {
+            await mkdir(dirname(join(directory, path)), { recursive: true });
+            await rename(join(staging, path), join(directory, path));
+        }
+    } finally {
+        await rm(staging, { recursive: true, force: true });
+    }
+}
+
 /** `lunibee init [directory]`: writes a new project into `directory`. */
 export async function initProject(
     io: IO,
@@ -153,20 +191,15 @@ export async function initProject(
             ),
         );
 
-    for (const [path, source] of Object.entries(files)) {
-        if (options.dryRun) {
-            io.out(`• would create ${path}`);
-            continue;
-        }
-        const file = join(directory, path);
-        await mkdir(dirname(file), { recursive: true });
-        await writeFile(file, source);
+    if (options.dryRun) {
+        for (const path of Object.keys(files)) io.out(`• would create ${path}`);
+        return 0;
+    }
+    await writeStaged(directory, files, stat !== null);
+    for (const path of Object.keys(files))
         io.out(
             `${paint(io, "green", "✓")} ${existing.includes(path) ? "overwrote" : "created"} ${path}`,
         );
-    }
-    if (options.dryRun) return 0;
-
     const shown = relative(start, directory) || ".";
     if (options.install) {
         io.out(`\nInstalling dependencies…`);

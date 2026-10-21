@@ -7,17 +7,23 @@ import {
     expect,
     test,
 } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+    mkdir,
+    mkdtemp,
+    readdir,
+    readFile,
+    rm,
+    writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ServerWebSocket } from "bun";
 import { main } from "../packages/cli/src/cli.ts";
 import { initFiles } from "../packages/cli/src/init.ts";
 import type { IO } from "../packages/cli/src/io.ts";
+import { APP, PRELOAD, fakeDiscord } from "./helpers/fake-discord-bot.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const TOKEN = "MTAwMDAwMDAwMDAwMDAwMDAx.fake-token.for-tests-only";
-const APP = "100000000000000002";
 const GUILD = "100000000000000003";
 
 let dir: string;
@@ -172,11 +178,20 @@ describe("lunibee init", () => {
         out = [];
         expect(await cli(`check --cwd my-bot`)).toBe(0);
         const report = out.join("\n");
-        expect(report).toContain(
-            "src/handlers/events.ts finds events at runtime",
-        );
+        expect(report).toContain("dependencies are not installed");
         expect(report).not.toContain("is not a client event");
         expect(report).not.toContain("out of date");
+    });
+
+    test("writes through a staging folder and leaves nothing behind on failure", async () => {
+        expect(await cli("init staged")).toBe(0);
+        expect(
+            (await readdir(dir)).filter((f) => f.startsWith(".lunibee-init-")),
+        ).toEqual([]);
+        await writeFile(join(dir, "blocker"), "x");
+        expect(await cli("init blocker/inner")).toBe(1);
+        expect(await readFile(join(dir, "blocker"), "utf8")).toBe("x");
+        expect((await readdir(dir)).sort()).toEqual(["blocker", "staged"]);
     });
 
     test("a folder with unrelated files is fine", async () => {
@@ -186,143 +201,6 @@ describe("lunibee init", () => {
         expect(out.join("\n")).toContain("left alone");
     });
 });
-
-/** A Discord stand-in: REST under /api/v10 and a Gateway at /gateway. */
-function fakeDiscord(options: { registerStatus?: number } = {}) {
-    const puts: { path: string; body: unknown }[] = [];
-    const callbacks: unknown[] = [];
-    const edits: unknown[] = [];
-    let socket: ServerWebSocket<unknown> | undefined;
-    let ready!: () => void;
-    const identified = new Promise<void>((resolve) => (ready = resolve));
-    let sequence = 0;
-    const server = Bun.serve({
-        port: 0,
-        hostname: "127.0.0.1",
-        async fetch(request, srv) {
-            const url = new URL(request.url);
-            if (url.pathname === "/gateway") {
-                if (srv.upgrade(request)) return;
-                return new Response("upgrade required", { status: 426 });
-            }
-            if (url.pathname.endsWith("/gateway/bot"))
-                return Response.json({
-                    url: "wss://gateway.discord.gg",
-                    shards: 1,
-                    session_start_limit: {
-                        total: 1000,
-                        remaining: 1000,
-                        reset_after: 0,
-                        max_concurrency: 1,
-                    },
-                });
-            if (
-                request.method === "PUT" &&
-                url.pathname.endsWith("/commands")
-            ) {
-                const body = await request.json();
-                puts.push({ path: url.pathname, body });
-                if (options.registerStatus)
-                    return Response.json(
-                        { message: "401: Unauthorized", code: 0 },
-                        { status: options.registerStatus },
-                    );
-                return Response.json(body);
-            }
-            if (
-                request.method === "POST" &&
-                url.pathname.endsWith("/callback")
-            ) {
-                callbacks.push(await request.json());
-                return new Response(null, { status: 204 });
-            }
-            if (
-                request.method === "PATCH" &&
-                url.pathname.includes("/messages/@original")
-            ) {
-                edits.push(await request.json());
-                return Response.json({
-                    id: "1",
-                    channel_id: "1",
-                    content: "",
-                    author: { id: "1", username: "x" },
-                });
-            }
-            return Response.json(
-                { message: "Unknown", code: 0 },
-                { status: 404 },
-            );
-        },
-        websocket: {
-            open(ws) {
-                socket = ws;
-                ws.send(
-                    JSON.stringify({
-                        op: 10,
-                        d: { heartbeat_interval: 45000 },
-                    }),
-                );
-            },
-            message(ws, raw) {
-                const frame = JSON.parse(String(raw)) as { op: number };
-                if (frame.op === 1) ws.send(JSON.stringify({ op: 11 }));
-                if (frame.op === 2) {
-                    ws.send(
-                        JSON.stringify({
-                            op: 0,
-                            t: "READY",
-                            s: ++sequence,
-                            d: {
-                                v: 10,
-                                user: {
-                                    id: "100000000000000001",
-                                    username: "testbot",
-                                    discriminator: "0",
-                                    bot: true,
-                                },
-                                guilds: [],
-                                session_id: "session",
-                                resume_gateway_url: `ws://127.0.0.1:${server.port}/gateway`,
-                                application: { id: APP, flags: 0 },
-                            },
-                        }),
-                    );
-                    ready();
-                }
-            },
-        },
-    });
-    return {
-        url: `http://127.0.0.1:${server.port}`,
-        puts,
-        callbacks,
-        edits,
-        identified,
-        dispatch(t: string, d: unknown) {
-            socket?.send(JSON.stringify({ op: 0, t, s: ++sequence, d }));
-        },
-        stop: () => server.stop(true),
-    };
-}
-
-/** Redirects discord.com and the Gateway to the fake, below Lunibee. */
-const PRELOAD = `
-const base = new URL(process.env.FAKE_DISCORD);
-const realFetch = globalThis.fetch;
-globalThis.fetch = (input, init) => {
-    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
-    if (url.hostname === "discord.com") { url.protocol = base.protocol; url.host = base.host; }
-    return realFetch(url, init);
-};
-const RealWebSocket = globalThis.WebSocket;
-globalThis.WebSocket = class extends RealWebSocket {
-    constructor(url, protocols) {
-        const target = new URL(String(url));
-        if (target.hostname.endsWith("discord.gg")) { target.protocol = "ws:"; target.host = base.host; target.pathname = "/gateway"; }
-        super(target, protocols);
-    }
-};
-`;
 
 describe("the generated project", () => {
     let project: string;
@@ -433,6 +311,24 @@ describe("the generated project", () => {
         }
     }, 20_000);
 
+    test("lunibee check loads the commands and events and reports invalid ones", async () => {
+        const local = { cwd: project };
+        expect(await cli("check", local)).toBe(0);
+        expect(out.join("\n")).toContain("2 command(s) load: /ping, /roll");
+        expect(out.join("\n")).toContain("2 event handler(s) load");
+        const broken = join(project, "src/events/broken.ts");
+        await writeFile(broken, "export default { name: 'ready' };\n");
+        out = [];
+        try {
+            expect(await cli("check", local)).toBe(1);
+            expect(out.join("\n")).toContain(
+                "Invalid event events/broken.ts: execute is not a function.",
+            );
+        } finally {
+            await rm(broken);
+        }
+    }, 30_000);
+
     test("registers globally without GUILD_ID", async () => {
         const discord = fakeDiscord();
         const child = await run(
@@ -447,6 +343,19 @@ describe("the generated project", () => {
             `/api/v10/applications/${APP}/commands`,
         ]);
     }, 20_000);
+
+    test("a transient registration failure is retried, then startup continues", async () => {
+        const discord = fakeDiscord({ failRegistrations: 1 });
+        const child = await run(
+            { DISCORD_TOKEN: TOKEN, CLIENT_ID: APP, GUILD_ID: GUILD },
+            discord,
+        );
+        await Promise.race([discord.identified, Bun.sleep(15_000)]);
+        child.kill();
+        await child.exited;
+        discord.stop();
+        expect(discord.puts).toHaveLength(2);
+    }, 30_000);
 
     test("a refused registration stops startup before login", async () => {
         const discord = fakeDiscord({ registerStatus: 401 });
