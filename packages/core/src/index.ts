@@ -123,6 +123,13 @@ import {
 } from "@lunibee/structures";
 import { Gateway } from "@lunibee/ws";
 import { VoiceManager } from "@lunibee/voice";
+import {
+    ClusterWorker,
+    connectInQueue,
+    readClusterContext,
+    type ClusterContext,
+    type IdentifySlotGate,
+} from "@lunibee/sharding";
 import type {
     APIEntitlement,
     APISoundboardSound,
@@ -440,6 +447,10 @@ export class Client
         return this.#gateway.requestGuildMembers(data);
     }
     readonly #gateway: Gateway;
+    /** Set when this process is a `ClusterManager` worker. */
+    readonly #cluster: ClusterContext | null;
+    /** The parent's IDENTIFY queue, when it coordinates this cluster's IDENTIFYs. */
+    readonly #identifyGate?: IdentifySlotGate;
     /** Which resources Gateway events are allowed to cache. */
     readonly #collectors = new Set<{ stop(reason?: string): void }>();
     readonly #cache: Required<
@@ -498,12 +509,30 @@ export class Client
         this.application = { commands: placeholderAppCommands };
         this.#resourceContext = this.#createResourceContext();
         this.guilds.attachContext(this.#resourceContext);
+        this.#cluster = readClusterContext();
+        const shardId = options.gateway?.shardId;
+        // In a coordinated cluster, every IDENTIFY of this shard (the first in
+        // login(), and re-IDENTIFYs after a lost session) waits for the
+        // parent's queue, so all clusters together respect Discord's limits.
+        const gate =
+            this.#cluster?.coordinatedIdentify && shardId !== undefined
+                ? ClusterWorker.current()?.identifyGate
+                : undefined;
+        this.#identifyGate = gate;
         this.#gateway = new Gateway({
             token: options.token,
             intents: options.intents,
             ...(options.compress === undefined
                 ? {}
                 : { compress: options.compress }),
+            ...(gate
+                ? {
+                      identifyGate: {
+                          acquire: () => gate.acquire(shardId!),
+                          release: () => gate.release(shardId!),
+                      },
+                  }
+                : {}),
             ...options.gateway,
         });
 
@@ -1522,9 +1551,41 @@ export class Client
         const usedToken = this.options.token;
         if (!usedToken?.trim())
             throw new TypeError("A bot token is required to log in.");
+        const shardId = this.#assertClusterShard();
         this.state = "connecting";
-        await this.#gateway.connect();
+        if (this.#identifyGate && shardId !== undefined)
+            await connectInQueue(this.#gateway, shardId, this.#identifyGate, {
+                waitForReady: this.#cluster?.startup === "sequential",
+            });
+        else await this.#gateway.connect();
         return usedToken;
+    }
+
+    /**
+     * Inside a cluster worker a Client must run one of that cluster's shards,
+     * with the deployment's total shard count: otherwise it would IDENTIFY
+     * outside the cluster's assignment (every cluster as shard 0, or unsharded).
+     * @returns The shard ID, or `undefined` outside a cluster.
+     * @throws {Error} When the shard is missing or not this cluster's.
+     */
+    #assertClusterShard(): number | undefined {
+        const cluster = this.#cluster;
+        if (!cluster) return undefined;
+        const { shardId, shardCount } = this.options.gateway ?? {};
+        const fix = `new Client({ …, gateway: { shardId, shardCount: ${cluster.shardCount} } }) with shardId one of ${cluster.shardIds.join(", ")}, or a ShardManager to run them all`;
+        if (shardId === undefined)
+            throw new Error(
+                `This process is cluster ${cluster.clusterId}'s worker: use ${fix}.`,
+            );
+        if (!cluster.shardIds.includes(shardId))
+            throw new Error(
+                `Shard ${shardId} belongs to another cluster; cluster ${cluster.clusterId} runs ${cluster.shardIds.join(", ")}. Use ${fix}.`,
+            );
+        if (shardCount !== cluster.shardCount)
+            throw new Error(
+                `gateway.shardCount must be the deployment's ${cluster.shardCount} shards (got ${String(shardCount)}).`,
+            );
+        return shardId;
     }
 
     /**

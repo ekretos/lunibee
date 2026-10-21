@@ -19,6 +19,13 @@ function setup(options: Partial<ClusterManagerOptions> = {}) {
         script: "w.js",
         shardCount: 4,
         clusterCount: 2,
+        // Allocation is contiguous; this order keeps the [0,2] [1,3] layout
+        // the routing, health and recovery tests below are written against.
+        ...(options.shardCount === undefined &&
+        options.shardsPerCluster === undefined &&
+        options.clusterCount === undefined
+            ? { shardIds: [0, 2, 1, 3] }
+            : {}),
         spawnInterval: 0,
         restartDelay: 5,
         fork: forked.fork,
@@ -39,21 +46,22 @@ describe("allocation and the worker contract", () => {
     test("every shard is owned by exactly one cluster", async () => {
         const { manager, children } = setup({ shardCount: 7, clusterCount: 3 });
         await manager.spawn();
+        // Contiguous blocks; the remainder goes to the first clusters.
         expect(children.map((c) => c.env.SHARD_LIST)).toEqual([
-            "0,3,6",
-            "1,4",
-            "2,5",
+            "0,1,2",
+            "3,4",
+            "5,6",
         ]);
         const all = children.flatMap((c) => c.shards).sort((a, b) => a - b);
         expect(all).toEqual([0, 1, 2, 3, 4, 5, 6]);
         expect([...manager.assignments()].sort((a, b) => a[0] - b[0])).toEqual([
             [0, 0],
-            [1, 1],
-            [2, 2],
-            [3, 0],
+            [1, 0],
+            [2, 0],
+            [3, 1],
             [4, 1],
             [5, 2],
-            [6, 0],
+            [6, 2],
         ]);
         expect(manager.clusterForShard(4)?.id).toBe(1);
         expect(manager.clusterForShard(99)).toBeUndefined();
@@ -77,9 +85,9 @@ describe("allocation and the worker contract", () => {
         });
         await a.manager.spawn();
         expect(a.children.map((c) => c.env.SHARD_LIST)).toEqual([
-            "0,3",
-            "1,4",
-            "2",
+            "0,1",
+            "2,3",
+            "4",
         ]);
 
         const b = setup({ shardCount: 3, clusterCount: 3 });
@@ -104,7 +112,7 @@ describe("allocation and the worker contract", () => {
             shardIds: [4, 5, 6, 7],
         });
         await manager.spawn();
-        expect(children.map((c) => c.env.SHARD_LIST)).toEqual(["4,6", "5,7"]);
+        expect(children.map((c) => c.env.SHARD_LIST)).toEqual(["4,5", "6,7"]);
         expect(children.every((c) => c.env.SHARD_COUNT === "8")).toBe(true);
         expect(manager.shardCount).toBe(8);
         expect(manager.clusterForShard(0)).toBeUndefined();
@@ -386,7 +394,7 @@ describe("lifecycle", () => {
     });
 
     test("respawn replaces the fleet with a new shard count", async () => {
-        const { manager, children } = setup();
+        const { manager, children } = setup({ clusterCount: 2 });
         await manager.spawn();
         await manager.respawn(6);
         expect(manager.shardCount).toBe(6);
@@ -652,11 +660,12 @@ describe("IDENTIFY coordination across clusters", () => {
         try {
             await manager.spawn();
             identify(children[0]!, 1, 0);
-            identify(children[1]!, 1, 1);
+            // Shard 3 is on another rate-limit key (3 % 2): it waits for the budget, not the key.
+            identify(children[1]!, 1, 3);
             await tick();
             expect(grants(children[0]!)).toEqual([1]);
             expect(grants(children[1]!)).toEqual([]);
-            expect(waits).toEqual([1]);
+            expect(waits).toEqual([3]);
             await tick(90);
             expect(grants(children[1]!)).toEqual([1]);
         } finally {
@@ -684,7 +693,11 @@ describe("routing and requests", () => {
     ) => ({ source, target, type: "ping", data: 1, id: "m", ...extra });
 
     test("a shard-targeted message reaches only the owning cluster", async () => {
-        const { manager, children } = setup({ shardCount: 6, clusterCount: 3 });
+        const { manager, children } = setup({
+            shardCount: 6,
+            clusterCount: 3,
+            shardIds: [0, 3, 1, 4, 2, 5],
+        });
         await manager.spawn();
         children[0]!.bus(message(0, 4)); // shard 4 lives on cluster 1
         await tick();
@@ -694,7 +707,11 @@ describe("routing and requests", () => {
     });
 
     test("a broadcast reaches every other cluster, not the sender", async () => {
-        const { manager, children } = setup({ shardCount: 6, clusterCount: 3 });
+        const { manager, children } = setup({
+            shardCount: 6,
+            clusterCount: 3,
+            shardIds: [0, 3, 1, 4, 2, 5],
+        });
         await manager.spawn();
         children[1]!.bus(message(1, null));
         await tick();
@@ -719,7 +736,11 @@ describe("routing and requests", () => {
     });
 
     test("request() reaches the right cluster and returns the handler's result", async () => {
-        const { manager, children } = setup({ shardCount: 6, clusterCount: 3 });
+        const { manager, children } = setup({
+            shardCount: 6,
+            clusterCount: 3,
+            shardIds: [0, 3, 1, 4, 2, 5],
+        });
         await manager.spawn();
         const result = await manager.request<{ shard: number; echo: number }>(
             4,
@@ -797,6 +818,7 @@ describe("routing and requests", () => {
         const { manager, children, onFork } = setup({
             shardCount: 6,
             clusterCount: 3,
+            shardIds: [0, 3, 1, 4, 2, 5],
             restartOnExit: false,
         });
         onFork((c) => {
@@ -945,6 +967,8 @@ describe("recovery by reassignment", () => {
         const { manager, children } = setup({
             shardCount: 5,
             clusterCount: 3,
+            // The interleaved order keeps the uneven 0,3 / 1,4 / 2 split this test is about.
+            shardIds: [0, 3, 1, 4, 2],
             restartOnExit: true,
             supervisor: { maxRestarts: 0 },
             reassignOnGiveUp: true,

@@ -53,9 +53,14 @@ export type {
     ClusterInfo,
     BroadcastResult,
     RequestOptions,
+    ClusterPlanInfo,
 } from "./cluster.js";
 export {
     allocateShards,
+    planClusters,
+    type ClusterPlan,
+    type ClusterPlanOptions,
+    type ClusterCountSource,
     assertCompleteAllocation,
     isClusterWorker,
     readClusterContext,
@@ -87,6 +92,7 @@ export {
     IDENTIFY_INTERVAL,
     type IdentifyBudget,
     type IdentifyCoordinatorOptions,
+    type IdentifyEvent,
 } from "./identify.js";
 export { RequestTracker } from "./requests.js";
 export type {
@@ -135,6 +141,66 @@ function handshakeSent(gateway: Gateway, timeout: number): Promise<void> {
     });
 }
 
+/** Resolves once the shard is READY (or resumed), or after `timeout` ms. */
+function shardReady(gateway: Gateway, timeout: number): Promise<boolean> {
+    if (gateway.state === GatewayState.Dispatch) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        const done = (ready: boolean): void => {
+            clearTimeout(timer);
+            gateway.off("ready", onReady);
+            gateway.off("resumed", onReady);
+            resolve(ready);
+        };
+        const onReady = (): void => done(true);
+        const timer = setTimeout(() => done(false), timeout);
+        gateway.on("ready", onReady);
+        gateway.on("resumed", onReady);
+    });
+}
+
+/** How long sequential startup waits for a shard's READY before moving on. */
+export const SEQUENTIAL_READY_TIMEOUT = 60_000;
+
+/** An IDENTIFY slot source: a cluster worker's `identifyGate`. */
+export interface IdentifySlotGate {
+    acquire(shardId: number): Promise<void>;
+    release(shardId: number): void;
+}
+
+/**
+ * Connects one shard inside the IDENTIFY queue: takes a slot, connects, and
+ * gives the slot back once the IDENTIFY is sent, or, with `waitForReady`
+ * (sequential startup), once the shard is READY. The slot is always released,
+ * also when connecting fails.
+ * @returns Whether the shard became READY in time (`true` without `waitForReady`).
+ */
+export async function connectInQueue(
+    gateway: Gateway,
+    shardId: number,
+    gate: IdentifySlotGate,
+    options: {
+        handshakeTimeout?: number;
+        waitForReady?: boolean;
+        readyTimeout?: number;
+        /** Checked after the slot is granted: true skips connecting (a stale start). */
+        cancelled?: () => boolean;
+    } = {},
+): Promise<boolean> {
+    await gate.acquire(shardId);
+    try {
+        if (options.cancelled?.()) return false;
+        await gateway.connect();
+        await handshakeSent(gateway, options.handshakeTimeout ?? 15_000);
+        if (!options.waitForReady) return true;
+        return await shardReady(
+            gateway,
+            options.readyTimeout ?? SEQUENTIAL_READY_TIMEOUT,
+        );
+    } finally {
+        gate.release(shardId);
+    }
+}
+
 /** Configuration for a sharded Gateway client. */
 export interface ShardManagerOptions {
     /** Bot token. */
@@ -144,11 +210,12 @@ export interface ShardManagerOptions {
     /** Number of shards. Use `"auto"` to request Discord's recommended count. */
     shardCount?: number | "auto";
     /**
-     * With `shardCount: "auto"`, size the deployment by guilds instead of
-     * Discord's recommendation: `ceil(guilds / guildsPerShard)` shards, at
-     * least one. 1 to 2500 (Discord's limit); Discord recommends about 1000.
-     * Guilds are assigned to shards by their ID, so this sets the average,
-     * not an exact split.
+     * A sizing hint for `shardCount: "auto"`: run at least
+     * `ceil(guildCount / guildsPerShard)` shards, and never fewer than Discord
+     * recommends. 1 to 2500 (Discord's limit); Discord recommends about 1000.
+     * It only picks the shard count: Discord puts each guild on shard
+     * `(guild_id >> 22) % shardCount`, so shards get about this many guilds,
+     * not exactly, and ownership never follows from it.
      */
     guildsPerShard?: number;
     /** The bot's guild count for `guildsPerShard`, instead of asking Discord for it. */
@@ -169,6 +236,13 @@ export interface ShardManagerOptions {
      * How long a startup round waits for its shards to send IDENTIFY/RESUME
      * before the next round's `spawnDelay` starts. Defaults to 15000 ms.
      */ handshakeTimeout?: number;
+    /**
+     * `"safe"` (default): start shards as fast as Discord's IDENTIFY limits
+     * allow. `"sequential"`: one shard at a time, each waiting for the previous
+     * one's READY (up to 60 s) and then `spawnDelay`. In a cluster worker this
+     * follows the `ClusterManager`'s `startup` option.
+     */
+    startup?: "safe" | "sequential";
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */
     autoScaleInterval?: number;
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */
@@ -261,6 +335,7 @@ export class ShardManager {
     readonly #auto: boolean;
     /** The shard count when it is not "auto" (from the options or the cluster context). */
     readonly #fixedCount: number;
+    readonly #startup: "safe" | "sequential";
     #autoScaleTimer?: ReturnType<typeof setInterval>;
     /** The shard count of the current shard set; kept while a reshard has no shards so `getShardIdForGuild` stays right. */
     #total: number;
@@ -366,6 +441,13 @@ export class ShardManager {
             throw new RangeError(
                 "handshakeTimeout must be a non-negative number of milliseconds.",
             );
+        if (
+            options.startup !== undefined &&
+            options.startup !== "safe" &&
+            options.startup !== "sequential"
+        )
+            throw new RangeError('startup must be "safe" or "sequential".');
+        this.#startup = options.startup ?? context?.startup ?? "safe";
         this.#total = count;
         this.#fixedCount = count;
         this.#auto = options.shardCount === "auto";
@@ -471,20 +553,25 @@ export class ShardManager {
         const stale = (): boolean => generation !== this.#generation;
         const gateways = new Map(ids.map((id) => [id, this.shards.get(id)!]));
         const gate = this.#gate;
+        const sequential = this.#startup === "sequential";
         if (gate) {
-            const timeout = this.#options.handshakeTimeout ?? 15_000;
             const results = await Promise.allSettled(
                 ids.map(async (id) => {
                     const gateway = gateways.get(id)!;
                     this.#setStatus(id, "connecting");
-                    await gate.acquire(id);
-                    try {
-                        if (stale()) return;
-                        await gateway.connect();
-                        await handshakeSent(gateway, timeout);
-                    } finally {
-                        gate.release(id);
-                    }
+                    const ready = await connectInQueue(gateway, id, gate, {
+                        handshakeTimeout: this.#options.handshakeTimeout,
+                        waitForReady: sequential,
+                        cancelled: stale,
+                    });
+                    if (!ready && sequential && !stale())
+                        this.#emit(
+                            "shardError",
+                            id,
+                            new Error(
+                                `Shard ${id} was not READY within ${SEQUENTIAL_READY_TIMEOUT / 1000}s; the next shard starts.`,
+                            ),
+                        );
                 }),
             );
             if (stale()) return;
@@ -509,10 +596,12 @@ export class ShardManager {
         // IDENTIFY rate-limit keys, so each round of consecutive IDs may start
         // together; rounds are spaced by spawnDelay. An override may lower the
         // concurrency but never exceed what Discord reported.
-        const concurrency = Math.min(
-            this.#options.maxConcurrency ?? limit?.maxConcurrency ?? 1,
-            limit?.maxConcurrency ?? Infinity,
-        );
+        const concurrency = sequential
+            ? 1
+            : Math.min(
+                  this.#options.maxConcurrency ?? limit?.maxConcurrency ?? 1,
+                  limit?.maxConcurrency ?? Infinity,
+              );
         // Discord's IDENTIFY rate-limit key is `shard_id % max_concurrency`: one
         // IDENTIFY per key per 5 seconds. Each round starts the next shard of
         // every bucket, so a round never puts two shards on one key.
@@ -554,6 +643,22 @@ export class ShardManager {
                     cause: (results[failed] as PromiseRejectedResult).reason,
                 });
             }
+            if (sequential && index + 1 < rounds)
+                for (const id of round)
+                    if (
+                        !(await shardReady(
+                            gateways.get(id)!,
+                            SEQUENTIAL_READY_TIMEOUT,
+                        )) &&
+                        !stale()
+                    )
+                        this.#emit(
+                            "shardError",
+                            id,
+                            new Error(
+                                `Shard ${id} was not READY within ${SEQUENTIAL_READY_TIMEOUT / 1000}s; the next shard starts.`,
+                            ),
+                        );
             if (
                 index + 1 < rounds &&
                 this.#options.spawnDelay &&

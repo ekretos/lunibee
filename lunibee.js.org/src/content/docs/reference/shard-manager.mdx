@@ -79,12 +79,13 @@ new ShardManager(options: ShardManagerOptions)
 | `token` | `string` | — | Bot token. Required. |
 | `intents` | `GatewayIntentResolvable` | — | Required. An array of `GatewayIntentBits`, used by every shard. |
 | `shardCount` | `number \| "auto"` | `1` | Total shards in the deployment. `"auto"` asks Discord when `connect()` runs. Inside a cluster worker it defaults to the cluster's count. See [Shard count](#shard-count). |
-| `guildsPerShard` | `number` | — | With `shardCount: "auto"` only: size the deployment as `ceil(guilds / guildsPerShard)` shards (at least one) instead of Discord's recommendation. An integer from 1 to 2500. |
+| `guildsPerShard` | `number` | — | With `shardCount: "auto"` only, a sizing hint: at least `ceil(guilds / guildsPerShard)` shards, and never fewer than Discord recommends. An integer from 1 to 2500. It never decides which shard owns a guild. |
 | `guildCount` | `number` | asked from Discord | The guild count for `guildsPerShard`, so no extra request is made. A non-negative integer. |
 | `shardIds` | `number[]` | every shard, or the cluster's own list | The shards this manager runs, out of `shardCount`. Unique integers in `[0, shardCount)`. |
 | `reconnect` | `boolean` | `true` | Passed to every `Gateway`: reconnect automatically after a close that is not fatal. |
 | `spawnDelay` | `number` | `5000` | Milliseconds between startup rounds when pacing locally. `0` drops the handshake wait and the delay, so each round starts as soon as the previous round's sockets are open. See [IDENTIFY pacing](#identify-pacing). |
 | `maxConcurrency` | `number` | Discord's `max_concurrency` if known, else `1` | Shards per startup round when pacing locally. Capped at Discord's value when it is known. |
+| `startup` *(0.4.0)* | `"safe" \| "sequential"` | `"safe"`, or the cluster's | `"sequential"` starts one shard at a time: each waits for the previous one's READY (up to 60 s; a `shardError` says when it timed out) and then `spawnDelay`. In a cluster worker it follows `ClusterManager`'s `startup`, and the slot from the parent is held until READY. |
 | `handshakeTimeout` | `number` | `15000` | How long a startup round waits for its shards to send IDENTIFY or RESUME before the next `spawnDelay` starts, in ms. With an IDENTIFY gate, how long a shard holds its slot waiting for the handshake. |
 | `autoScaleInterval` | `number` | — | With `shardCount: "auto"`: re-check the shard count this often, in ms, and reshard when it changes. An integer of at least `1000`. With a fixed count no timer is started. |
 | `onAutoScaleError` | `(error: unknown) => void` | — | Called when a background auto-scale check fails. |
@@ -155,7 +156,7 @@ Does nothing unless the manager was created with `shardCount: "auto"`. Otherwise
 
 ### `fetchRecommendedShardCount()`
 
-Resolves the shard count `"auto"` would use: Discord's recommendation from `/gateway/bot`, or with `guildsPerShard`, `shardsForGuilds(guildCount ?? fetchGuildCount(token), guildsPerShard)`. Throws if a request fails or Discord's answer is unusable.
+Resolves the shard count `"auto"` would use: Discord's recommendation from `/gateway/bot`, or with `guildsPerShard`, the larger of that and `shardsForGuilds(guildCount ?? fetchGuildCount(token), guildsPerShard)`. Throws if a request fails or Discord's answer is unusable.
 
 ```ts
 const count = await manager.fetchRecommendedShardCount();
@@ -242,7 +243,7 @@ Inside a cluster worker, `ready` also tells the parent that the cluster is ready
 | a number | That many shards. |
 | omitted | `1`, or the cluster's count inside a worker. |
 | `"auto"` | Discord's recommendation from `GET /gateway/bot`, read by the first `connect()`. |
-| `"auto"` with `guildsPerShard` | `ceil(guilds / guildsPerShard)`, at least 1, where `guilds` is `guildCount` or `approximate_guild_count` from `GET /applications/@me`. |
+| `"auto"` with `guildsPerShard` | `max(recommended, ceil(guilds / guildsPerShard))`, where `guilds` is `guildCount` or `approximate_guild_count` from `GET /applications/@me`. A stale or low guild count can only add shards, never drop below Discord's recommendation (0.4.0). |
 
 Discord assigns guilds to shards by their ID, so `guildsPerShard` sets the average per shard, not an exact split. Discord's hard limit is 2,500 guilds per shard and it recommends about 1,000.
 

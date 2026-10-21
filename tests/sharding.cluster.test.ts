@@ -86,9 +86,9 @@ describe("ClusterManager (mocked fork)", () => {
         await manager.spawn();
         await manager.spawn(); // idempotent
         expect(children.map((c) => c.env.SHARD_LIST)).toEqual([
-            "0,3",
-            "1,4",
-            "2",
+            "0,1",
+            "2,3",
+            "4",
         ]);
         expect(children.every((c) => c.env.SHARD_COUNT === "5")).toBe(true);
         expect(manager.shardCount).toBe(5);

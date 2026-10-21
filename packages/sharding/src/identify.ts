@@ -28,11 +28,25 @@ export interface IdentifyCoordinatorOptions {
     cancel?: (handle: unknown) => void;
     /** Called when a request has to wait for the budget to reset. */
     onBudgetWait?: (info: { shardId: number; waitMs: number }) => void;
+    /** Called for every queue change, for logs and metrics. */
+    onEvent?: (event: IdentifyEvent) => void;
+}
+
+/** One change in the IDENTIFY queue. `bucket` is the rate-limit key, `shardId % maxConcurrency`. */
+export interface IdentifyEvent {
+    type: "queued" | "granted" | "released" | "expired" | "dropped";
+    /** The cluster that asked. */
+    owner: number;
+    shardId: number;
+    bucket: number;
+    /** `granted`: how long the request waited. */
+    waitedMs?: number;
 }
 
 interface Waiter {
     owner: number;
     shardId: number;
+    since: number;
     grant: () => void;
     fail: (error: Error) => void;
 }
@@ -60,6 +74,7 @@ export class IdentifyCoordinator {
     readonly #schedule: (callback: () => void, ms: number) => unknown;
     readonly #cancel: (handle: unknown) => void;
     readonly #onBudgetWait?: IdentifyCoordinatorOptions["onBudgetWait"];
+    readonly #onEvent?: IdentifyCoordinatorOptions["onEvent"];
     readonly #keys = new Map<number, Key>();
     #remaining: number | undefined;
     #total: number | undefined;
@@ -94,6 +109,7 @@ export class IdentifyCoordinator {
             options.cancel ??
             ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
         this.#onBudgetWait = options.onBudgetWait;
+        this.#onEvent = options.onEvent;
         if (options.budget) {
             this.#total = options.budget.total;
             this.#remaining = options.budget.remaining;
@@ -135,7 +151,8 @@ export class IdentifyCoordinator {
         let key = this.#keys.get(index);
         if (!key) this.#keys.set(index, (key = { queue: [], nextAt: 0 }));
         return new Promise<void>((grant, fail) => {
-            key.queue.push({ owner, shardId, grant, fail });
+            key.queue.push({ owner, shardId, grant, fail, since: this.#now() });
+            this.#report({ type: "queued", owner, shardId, bucket: index });
             this.pump();
         });
     }
@@ -152,7 +169,21 @@ export class IdentifyCoordinator {
         )
             return;
         this.#free(key);
+        this.#report({
+            type: "released",
+            owner,
+            shardId,
+            bucket: shardId % this.maxConcurrency,
+        });
         this.pump();
+    }
+
+    #report(event: IdentifyEvent): void {
+        try {
+            this.#onEvent?.(event);
+        } catch {
+            // A faulty listener must not break the queue.
+        }
     }
 
     /** A cluster is gone: forget its waiting requests and free the slots it held. */
@@ -160,8 +191,15 @@ export class IdentifyCoordinator {
         for (const key of this.#keys.values()) {
             const keep: Waiter[] = [];
             for (const waiter of key.queue)
-                if (waiter.owner === owner) waiter.fail(new Error(reason));
-                else keep.push(waiter);
+                if (waiter.owner === owner) {
+                    waiter.fail(new Error(reason));
+                    this.#report({
+                        type: "dropped",
+                        owner,
+                        shardId: waiter.shardId,
+                        bucket: waiter.shardId % this.maxConcurrency,
+                    });
+                } else keep.push(waiter);
             key.queue = keep;
             if (key.holder?.owner === owner) this.#free(key);
         }
@@ -213,6 +251,12 @@ export class IdentifyCoordinator {
             if (this.#remaining !== undefined) this.#remaining--;
             const timer = this.#schedule(() => {
                 if (key.holder?.timer === timer) {
+                    this.#report({
+                        type: "expired",
+                        owner: waiter.owner,
+                        shardId: waiter.shardId,
+                        bucket: waiter.shardId % this.maxConcurrency,
+                    });
                     this.#free(key);
                     this.pump();
                 }
@@ -223,6 +267,13 @@ export class IdentifyCoordinator {
                 timer,
             };
             waiter.grant();
+            this.#report({
+                type: "granted",
+                owner: waiter.owner,
+                shardId: waiter.shardId,
+                bucket: waiter.shardId % this.maxConcurrency,
+                waitedMs: now - waiter.since,
+            });
         }
         this.#arm(next);
     }

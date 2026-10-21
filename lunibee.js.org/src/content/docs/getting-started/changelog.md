@@ -19,6 +19,15 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
 
 ### ⚠️ Changed (reliability audit)
 
+- **Clusters split shards in contiguous blocks** (they were dealt round-robin):
+  - 10 shards over 3 clusters are `[0-3] [4-6] [7-9]`;
+  - `shardsPerCluster: 4` gives `[0-3] [4-7] [8-9]` (it gave 4/3/3 before);
+  - `allocateShards()` returns the same blocks.
+
+  Code that assumed shard `i` runs in cluster `i % clusterCount` must use `clusterForShard()` or `assignments()`.
+- **A `Client` inside a cluster worker must run one of that cluster's shards:** `gateway: { shardId, shardCount }`, with `shardCount` the deployment's total. Without them, `login()` throws instead of IDENTIFYing outside the cluster's assignment. In a coordinated cluster its IDENTIFYs (the first, and after a lost session) now wait for the parent's queue like `ShardManager`'s.
+- **`guildsPerShard` never gives fewer shards than Discord recommends.**
+
 - **Interactions:**
   - `followUp()` throws before the interaction is acknowledged.
   - `update()` and `deferUpdate()` reject on interactions that are not components, or modals opened from one.
@@ -53,6 +62,10 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
   - decrypts incoming RTP (transport and DAVE) and maps SSRC to user from op 5;
   - per-user streams end after silence; buffers are bounded (`highWaterMark`) and released on unsubscribe.
 - `entersState()` and `generateDependencyReport()`.
+- **Sharding startup and observability:**
+  - `startup: "sequential"` (`ClusterManager` and `ShardManager`) starts one shard at a time across all clusters, each holding its IDENTIFY slot until READY.
+  - New `ClusterManager` events: `plan` (total shards, cluster count and where it came from, each cluster's shards), `identify` (the IDENTIFY queue, with buckets and waits) and `shutdown`.
+  - New exports: `planClusters()`, the allocation `spawn()` uses, as a pure function; and `connectInQueue()`.
 - **Recording:** `receiver.record(userId)` gives an Ogg/Opus stream of a user, not re-encoded, with silence kept so recordings line up. `OggOpusWriter` is the muxer it uses.
 - **Effects and a live voice changer:**
   - `effects` on `createAudioResource()`: `pitchShift()`, `robot()`, `echo()`, `gain()`, or your own; they can be changed while playing.
@@ -68,6 +81,10 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
   Existing files are never overwritten without `--force`, which asks first. `--install` runs `bun install`. `lunibee check` accepts the layout.
 
 ### 🐛 Fixed
+- **Sharding:**
+  - A cluster whose process cannot be forked no longer stops the clusters after it: `spawn()` used to reject after the first cluster. It is reported with its shards and retried by the restart policy.
+  - Shutdown is bounded even when a killed process never reports its exit.
+  - The worker contract rejects an empty `SHARD_LIST` and a `CLUSTER_ID` outside `CLUSTER_COUNT`.
 - **Reliability audit.** These fixes came from an audit of every area, with a reproduction for each finding, now kept as regression tests:
   - `rest.hardening`
   - `voice.hardening`

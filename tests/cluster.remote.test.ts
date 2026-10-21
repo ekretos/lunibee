@@ -468,8 +468,8 @@ describe("clusters on hosts", () => {
             "3",
         ]);
         expect(agents.get("a")!.children.map((c) => c.env.SHARD_LIST)).toEqual([
-            "0,4",
-            "2,6",
+            "0,1",
+            "4,5",
         ]);
         expect([...manager.clusters.values()].map((c) => c.host)).toEqual([
             "a",
@@ -608,7 +608,7 @@ describe("clusters on hosts", () => {
         const a = await until(() => agents.get("a")!.children[0]);
         const b = await until(() => agents.get("b")!.children[0]);
         a.control({ kind: "identify", id: 1, shardId: 0 });
-        b.control({ kind: "identify", id: 1, shardId: 1 });
+        b.control({ kind: "identify", id: 1, shardId: 2 });
         await until(() => a.controlFrames("identify-grant").length === 1);
         expect(b.controlFrames("identify-grant")).toHaveLength(0);
         const first =

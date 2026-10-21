@@ -112,7 +112,8 @@ const manager = new ClusterManager({
     shardCount: SHARDS,
     clusterCount: 2,
     maxConcurrency: 1,
-    identify: { coordinate: false },
+    // Every Client in every cluster takes its IDENTIFY slot from this parent.
+    identify: { interval: 300 },
     spawnInterval: 0,
     waitForReady: true,
     startTimeout: 30_000,
@@ -132,6 +133,12 @@ check(
         .sort()
         .join() === "0,1,2,3" && identifies.every((i) => i.shard[1] === SHARDS),
     "every shard identified once with the right [id, count]",
+);
+const at = identifies.map((i) => i.at).sort((a, b) => a - b);
+const gaps = at.slice(1).map((t, i) => t - at[i]!);
+check(
+    gaps.every((gap) => gap >= 250),
+    `IDENTIFYs one at a time across both processes (gaps ${gaps.join(", ")} ms)`,
 );
 const pids = new Set([...manager.clusters.values()].map((c) => c.process.pid));
 check(pids.size === 2, "the shards run in two processes");

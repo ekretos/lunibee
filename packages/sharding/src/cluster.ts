@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import {
     assertGuildsPerShard,
     fetchGatewayBot,
@@ -8,8 +9,8 @@ import { fork, type ChildProcess } from "node:child_process";
 import { cpus } from "node:os";
 import { REPLY_TYPE, type ReplyPayload, type ShardReply } from "./bus.js";
 import {
-    allocateShards,
-    assertCompleteAllocation,
+    planClusters,
+    type ClusterCountSource,
     isClusterWorker,
     validateShardIds,
     WORKER_MARKER,
@@ -22,7 +23,11 @@ import type {
     WorkerMetrics,
     WorkerReport,
 } from "./health.js";
-import { IdentifyCoordinator, type IdentifyBudget } from "./identify.js";
+import {
+    IdentifyCoordinator,
+    type IdentifyBudget,
+    type IdentifyEvent,
+} from "./identify.js";
 import type { LeaderLock } from "./leader.js";
 import {
     CLUSTER_FRAME,
@@ -37,6 +42,32 @@ import { RequestTracker } from "./requests.js";
 import { ShardSupervisor, type SupervisorOptions } from "./supervisor.js";
 import { BUS_FRAME, PEER_DOWN_FRAME } from "./transport.js";
 
+/** Stands in for a cluster process that could not be forked: already exited, kill() a no-op. */
+function notStarted(): ChildProcess {
+    return Object.assign(new EventEmitter(), {
+        exitCode: 1,
+        signalCode: null,
+        connected: false,
+        pid: undefined,
+        kill: () => false,
+    }) as unknown as ChildProcess;
+}
+
+/** What the `plan` event reports. */
+export interface ClusterPlanInfo {
+    /** The deployment's shard count (Discord's `num_shards`), the same in every worker. */
+    totalShards: number;
+    clusterCount: number;
+    /** `"clusterCount"`, `"shardsPerCluster"` or `"default"` (the number of CPUs). */
+    clusterCountSource: ClusterCountSource;
+    /** The count asked for; larger than `clusterCount` when there were more clusters than shards. */
+    requestedClusterCount: number;
+    clusters: { id: number; shards: number[] }[];
+    maxConcurrency: number;
+    startup: "safe" | "sequential";
+    identifyCoordinated: boolean;
+}
+
 /** Configuration for managing multiple shard clusters. */
 export interface ClusterManagerOptions {
     /** Discord bot token. */
@@ -46,11 +77,12 @@ export interface ClusterManagerOptions {
     /** Total number of shards. Use "auto" to request Discord's recommended count. */
     shardCount?: number | "auto";
     /**
-     * With `shardCount: "auto"`, size the deployment by guilds instead of
-     * Discord's recommendation: `ceil(guilds / guildsPerShard)` shards, at
-     * least one. 1 to 2500 (Discord's limit); Discord recommends about 1000.
-     * Guilds are assigned to shards by their ID, so this sets the average,
-     * not an exact split.
+     * A sizing hint for `shardCount: "auto"`: run at least
+     * `ceil(guildCount / guildsPerShard)` shards, and never fewer than Discord
+     * recommends. 1 to 2500 (Discord's limit); Discord recommends about 1000.
+     * It only picks the shard count: Discord puts each guild on shard
+     * `(guild_id >> 22) % shardCount`, so shards get about this many guilds,
+     * not exactly, and ownership never follows from it.
      */
     guildsPerShard?: number;
     /** The bot's guild count for `guildsPerShard`, instead of asking Discord for it. */
@@ -72,6 +104,17 @@ export interface ClusterManagerOptions {
     maxConcurrency?: number;
     /** Ask `/gateway/bot` for `max_concurrency` and the session budget even with a fixed `shardCount`. */
     fetchLimits?: boolean;
+    /**
+     * How shards start across the whole deployment.
+     * - `"safe"` (default): as fast as Discord allows. One IDENTIFY per
+     *   rate-limit key (`shard_id % max_concurrency`) every `identify.interval`,
+     *   keys in parallel; a slot is freed as soon as the IDENTIFY is sent.
+     * - `"sequential"`: one shard at a time across all clusters, in the order
+     *   they ask (cluster by cluster, as they spawn). Each slot is held until that shard is READY (or
+     *   `identify.holdTimeout` passes), then the next shard waits the interval.
+     *   Slow, for debugging and small bots. Needs IDENTIFY coordination.
+     */
+    startup?: "safe" | "sequential";
     /** IDENTIFY coordination across clusters. On by default. */
     identify?: {
         /** Set `false` to let every cluster pace its own IDENTIFYs. */
@@ -236,6 +279,12 @@ export interface ClusterManagerEvents {
     leaderLost: [reason: string];
     /** An IDENTIFY is waiting for the session-start budget to reset. */
     identifyWait: [info: { shardId: number; waitMs: number }];
+    /** The allocation of a start: total shards, the cluster count and where it came from, each cluster's shards. */
+    plan: [plan: ClusterPlanInfo];
+    /** The IDENTIFY queue: a shard asked for a slot, got it, or gave it back. */
+    identify: [event: IdentifyEvent];
+    /** `shutdownAll()` finished: every cluster process has exited (or was killed after the timeout). */
+    shutdown: [info: { clusters: number; durationMs: number }];
     /** Something went wrong that did not stop the deployment (a bad frame, a failed recovery). */
     error: [error: Error];
 }
@@ -390,6 +439,19 @@ export class ClusterManager {
         ] as const)
             if (value !== undefined && !(value >= 0))
                 throw new RangeError(`${name} cannot be negative.`);
+        if (
+            options.startup !== undefined &&
+            options.startup !== "safe" &&
+            options.startup !== "sequential"
+        )
+            throw new RangeError('startup must be "safe" or "sequential".');
+        if (
+            options.startup === "sequential" &&
+            options.identify?.coordinate === false
+        )
+            throw new RangeError(
+                'startup: "sequential" needs IDENTIFY coordination; remove identify.coordinate: false.',
+            );
         if (options.guildsPerShard !== undefined) {
             assertGuildsPerShard(options.guildsPerShard);
             if (typeof options.shardCount === "number")
@@ -568,13 +630,13 @@ export class ClusterManager {
             this.#options.shardIds ??
             Array.from({ length: count }, (_, i) => i);
         validateShardIds(ids, count);
-        const clusterCount =
-            this.#options.clusterCount ??
-            (this.#options.shardsPerCluster
-                ? Math.ceil(ids.length / this.#options.shardsPerCluster)
-                : cpus().length);
-        const chunks = allocateShards(ids, clusterCount);
-        assertCompleteAllocation(chunks, ids);
+        const plan = planClusters({
+            shardIds: ids,
+            clusterCount: this.#options.clusterCount,
+            shardsPerCluster: this.#options.shardsPerCluster,
+            defaultClusterCount: Math.max(1, cpus().length),
+        });
+        const chunks = plan.clusters;
 
         const placement = await this.#placeHosts().catch((error: unknown) => {
             // A shutdown that interrupts the wait is not a failure of the start.
@@ -592,7 +654,12 @@ export class ClusterManager {
             identify?.coordinate === false
                 ? undefined
                 : new IdentifyCoordinator({
-                      maxConcurrency,
+                      // Sequential: every shard shares one key, so one starts at a time.
+                      maxConcurrency:
+                          this.#options.startup === "sequential"
+                              ? 1
+                              : maxConcurrency,
+                      onEvent: (event) => this.#emit("identify", event),
                       interval: identify?.interval,
                       holdTimeout: identify?.holdTimeout,
                       budget,
@@ -604,17 +671,28 @@ export class ClusterManager {
                       },
                   });
 
-        const active = chunks
-            .map((shards, id) => ({ id, shards }))
-            .filter((chunk) => chunk.shards.length > 0);
+        const active = chunks.map((shards, id) => ({ id, shards }));
         this.#clusterCount = active.length;
+        this.#emit("plan", {
+            totalShards: count,
+            clusterCount: active.length,
+            clusterCountSource: plan.source,
+            requestedClusterCount: plan.requested,
+            clusters: active.map((chunk) => ({
+                id: chunk.id,
+                shards: chunk.shards,
+            })),
+            maxConcurrency,
+            startup: this.#options.startup ?? "safe",
+            identifyCoordinated: this.#coordinator !== undefined,
+        });
         this.#hostOf.clear();
         for (const chunk of active)
             this.#hostOf.set(chunk.id, placement[chunk.id % placement.length]!);
         for (const [index, chunk] of active.entries()) {
             if (stale()) return;
             for (const shard of chunk.shards) this.#owner.set(shard, chunk.id);
-            this.#launch(chunk.id, chunk.shards);
+            this.#launchOrRecover(chunk.id, chunk.shards);
             // Spread the CPU cost of starting processes. IDENTIFY pacing is
             // the coordinator's job and does not depend on this.
             const gap = this.#options.spawnInterval ?? 500;
@@ -821,6 +899,10 @@ export class ClusterManager {
             LUNIBEE_SHARD_BUS: "ipc",
             [WORKER_MARKER]: "1",
             LUNIBEE_IDENTIFY: this.#coordinator ? "coordinated" : "local",
+            // Only when set: hosts older than this option reject unknown keys.
+            ...(this.#options.startup === "sequential"
+                ? { LUNIBEE_STARTUP: "sequential" }
+                : {}),
         };
         const host = this.#hostOf.get(id) ?? "local";
         const env: Record<string, string | undefined> = {
@@ -924,6 +1006,46 @@ export class ClusterManager {
             return;
         }
         this.#announceDown(info.id, info.shards);
+        this.#recover(info);
+    }
+
+    /**
+     * Forks a cluster; a fork that throws (EAGAIN, EMFILE, a bad script path
+     * for a custom `fork`) is a failed start of that cluster only. It goes
+     * through the restart policy like a crash, and the clusters after it are
+     * still started.
+     */
+    #launchOrRecover(id: number, shards: number[]): void {
+        try {
+            this.#launch(id, shards);
+        } catch (error) {
+            const known = this.#infos.get(id);
+            if (known) known.process = notStarted();
+            const info: ClusterInfo = this.#infos.get(id) ?? {
+                id,
+                host: this.#hostOf.get(id) ?? "local",
+                process: notStarted(),
+                shards,
+                state: "starting",
+                restarts: 0,
+                startedAt: Date.now(),
+            };
+            this.#infos.set(id, info);
+            this.clusters.delete(id);
+            this.#allReady = false;
+            this.#emit(
+                "error",
+                new Error(
+                    `Cluster ${id} (shards ${shards.join(",")}) could not be spawned: ${error instanceof Error ? error.message : String(error)}`,
+                    { cause: error },
+                ),
+            );
+            this.#recover(info);
+        }
+    }
+
+    /** Applies the restart policy to a cluster that exited or failed to start. */
+    #recover(info: ClusterInfo): void {
         if (this.#options.restartOnExit === false) {
             info.state = "failed";
             this.#rejectReady(info, "restartOnExit is false");
@@ -966,7 +1088,7 @@ export class ClusterManager {
             const wait = this.#relocate(info);
             if (wait > 0)
                 this.#fencing.set(info.id, this.#restartLater(info, wait));
-            else this.#launch(info.id, info.shards);
+            else this.#launchOrRecover(info.id, info.shards);
         }, delay);
         // Do not hold the event loop open purely for a pending restart.
         (timer as { unref?: () => void }).unref?.();
@@ -984,7 +1106,7 @@ export class ClusterManager {
             this.#restartTimers.delete(timer);
             this.#fencing.delete(id);
             if (!this.#stopping && info.state === "restarting")
-                this.#launch(info.id, info.shards);
+                this.#launchOrRecover(info.id, info.shards);
         }
     }
 
@@ -1694,11 +1816,15 @@ export class ClusterManager {
         this.#halt();
         // A spawn that is still forking sees `#stopping` and stops on its own.
         await this.#startPromise?.catch(() => undefined);
+        const started = Date.now();
+        const live = [...this.clusters.values()];
         await Promise.all(
-            [...this.clusters.values()].map((cluster) =>
-                this.#shutdownCluster(cluster, timeoutMs),
-            ),
+            live.map((cluster) => this.#shutdownCluster(cluster, timeoutMs)),
         );
+        this.#emit("shutdown", {
+            clusters: live.length,
+            durationMs: Date.now() - started,
+        });
         for (const cluster of this.#infos.values()) cluster.state = "stopped";
         this.clusters.clear();
         this.#startPromise = undefined;
@@ -1758,6 +1884,9 @@ export class ClusterManager {
                 } catch {
                     // Ignore force-kill errors.
                 }
+                // A process whose exit is never reported (a remote host that
+                // lost the kill frame) must not hang the shutdown.
+                timer = setTimeout(finish, Math.max(timeoutMs, 1000));
             }, timeoutMs);
         });
     }

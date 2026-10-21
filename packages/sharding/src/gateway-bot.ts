@@ -114,7 +114,8 @@ export async function fetchGuildCount(token: string): Promise<number> {
 /**
  * The shard count to use for `"auto"`: Discord's recommendation, or, with
  * `guildsPerShard`, enough shards for the bot's guild count (`guildCount`, or
- * what Discord reports).
+ * what Discord reports), but never fewer than the recommendation: a stale or
+ * low guild count must not leave shards over Discord's 2,500-guild limit.
  */
 export async function resolveShardCount(
     token: string,
@@ -122,8 +123,11 @@ export async function resolveShardCount(
     options: { guildsPerShard?: number; guildCount?: number },
 ): Promise<number> {
     if (options.guildsPerShard === undefined) return info.shards;
-    return shardsForGuilds(
-        options.guildCount ?? (await fetchGuildCount(token)),
-        options.guildsPerShard,
+    return Math.max(
+        info.shards,
+        shardsForGuilds(
+            options.guildCount ?? (await fetchGuildCount(token)),
+            options.guildsPerShard,
+        ),
     );
 }

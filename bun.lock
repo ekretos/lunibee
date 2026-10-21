@@ -58,6 +58,7 @@
         "@lunibee/collection": "workspace:*",
         "@lunibee/managers": "workspace:*",
         "@lunibee/rest": "workspace:*",
+        "@lunibee/sharding": "workspace:*",
         "@lunibee/structures": "workspace:*",
         "@lunibee/types": "workspace:*",
         "@lunibee/utils": "workspace:*",

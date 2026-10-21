@@ -7,7 +7,7 @@ description: Every type the lunibee package exports, grouped by package, with a 
 
 Every interface and type alias that `lunibee` exports, with what it is for. Each name links to its full definition in the generated API reference. The classes and functions that use these types are described on the other reference pages.
 
-372 types in 12 packages.
+375 types in 12 packages.
 
 ## `@lunibee/builders`
 
@@ -374,16 +374,19 @@ Every interface and type alias that `lunibee` exports, with what it is for. Each
 
 | Type | Kind | Description |
 |---|---|---|
+| [`AudioEffect`](/api/interfaces/audioeffect/) | interface | A PCM effect: changes one 20 ms frame of 48 kHz stereo interleaved samples in place. |
 | [`AudioPlayerEvents`](/api/interfaces/audioplayerevents/) | interface | What AudioPlayer emits. |
 | [`AudioPlayerOptions`](/api/interfaces/audioplayeroptions/) | interface | Options for AudioPlayer. |
 | [`AudioResourceOptions`](/api/interfaces/audioresourceoptions/) | interface | Options for createAudioResource. |
 | [`AudioSink`](/api/interfaces/audiosink/) | interface | A destination for a player's frames: a voice connection. |
 | [`DaveSessionHooks`](/api/interfaces/davesessionhooks/) | interface | What a DaveSession asks its connection to send. |
 | [`DisconnectReason`](/api/interfaces/disconnectreason/) | interface | Why a connection is disconnected. |
+| [`EchoOptions`](/api/interfaces/echooptions/) | interface | Options for echo. |
 | [`JoinVoiceChannelOptions`](/api/interfaces/joinvoicechanneloptions/) | interface | Options for joinVoiceChannel. |
 | [`OpusCodec`](/api/interfaces/opuscodec/) | interface | One 48 kHz stereo Opus encoder and decoder. |
 | [`PlayerSubscription`](/api/interfaces/playersubscription/) | interface | A player subscribed to a connection. |
 | [`ReceiveOptions`](/api/interfaces/receiveoptions/) | interface | Options for VoiceReceiver.subscribe. |
+| [`RecordOptions`](/api/interfaces/recordoptions/) | interface | Options for VoiceReceiver.record. |
 | [`RtpHeader`](/api/interfaces/rtpheader/) | interface | A parsed RTP packet header. |
 | [`UdpSocketLike`](/api/interfaces/udpsocketlike/) | interface | The parts of a UDP socket VoiceUdp uses; `Bun.udpSocket` provides them. |
 | [`VoiceAdapter`](/api/interfaces/voiceadapter/) | interface | How a connection reaches the main Gateway: send op 4, and be told about voice events. |

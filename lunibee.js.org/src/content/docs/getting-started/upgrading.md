@@ -28,6 +28,7 @@ Only `@lunibee/voice` changed. The 0.3 API carried no audio, so most code built 
   - Do not call `editReply()` after `showModal()`.
 - **Sharding restart limits:** `maxRestarts` now trips for a cluster that keeps crashing with backoff in between. If you raised `window` to work around that, you can lower it again.
 - **Gateway:** if you reconnect yourself from a `close` handler, `connect()` now waits for the scheduled backoff.
+- **Clusters:** shards are split in contiguous blocks (`[0,1] [2,3]`, not `[0,2] [1,3]`). Look up a shard's cluster with `clusterForShard(id)` instead of computing `id % clusterCount`. A `Client` in a worker needs `gateway: { shardId, shardCount }` with one of `ClusterWorker.current()!.context.shardIds`, or use `ShardManager`.
 
 ## 0.3.2 → 0.3.3
 

@@ -53,8 +53,8 @@ describe("ClusterManager over real forked processes", () => {
             .sort((a: number[], b: number[]) => a[0]! - b[0]!);
         expect(answers).toEqual([
             [0, 0],
-            [1, 1],
-            [2, 0],
+            [1, 0],
+            [2, 1],
             [3, 1],
         ]);
         expect(results.one.result ?? results.one).toMatchObject({
@@ -71,8 +71,8 @@ describe("ClusterManager over real forked processes", () => {
             ),
         ).toEqual([
             [0, 0],
-            [1, 1],
-            [2, 0],
+            [1, 0],
+            [2, 1],
             [3, 1],
         ]);
         expect(results.alive).toEqual([]);
@@ -184,8 +184,8 @@ describe("ClusterManager with threadFork", () => {
             expect(gap).toBeGreaterThanOrEqual(80);
         expect(results.broadcast).toEqual([
             [0, 0],
-            [1, 1],
-            [2, 0],
+            [1, 0],
+            [2, 1],
             [3, 1],
         ]);
         // Threads share the manager's process.

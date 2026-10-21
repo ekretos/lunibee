@@ -101,8 +101,8 @@ describe("ClusterManager guildsPerShard", () => {
         expect(manager.shardCount).toBe(6);
         expect(children).toHaveLength(2);
         expect(children.map((c) => c.env.SHARD_LIST)).toEqual([
-            "0,2,4",
-            "1,3,5",
+            "0,1,2",
+            "3,4,5",
         ]);
         expect(calls.every((c) => !c.endsWith("/applications/@me"))).toBe(true);
         await manager.shutdownAll();

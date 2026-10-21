@@ -348,11 +348,11 @@ describe("RequestTracker", () => {
 });
 
 describe("shard allocation and the worker contract", () => {
-    test("allocates deterministically, round-robin", () => {
+    test("allocates deterministically, in contiguous blocks", () => {
         expect(allocateShards([0, 1, 2, 3, 4], 3)).toEqual([
-            [0, 3],
-            [1, 4],
-            [2],
+            [0, 1],
+            [2, 3],
+            [4],
         ]);
         expect(allocateShards([0, 1, 2, 3, 4], 3)).toEqual(
             allocateShards([0, 1, 2, 3, 4], 3),
@@ -360,8 +360,8 @@ describe("shard allocation and the worker contract", () => {
         expect(allocateShards([0, 1, 2], 3)).toEqual([[0], [1], [2]]);
         expect(allocateShards([0, 1], 4)).toEqual([[0], [1], [], []]);
         expect(allocateShards([4, 5, 6, 7], 2)).toEqual([
-            [4, 6],
-            [5, 7],
+            [4, 5],
+            [6, 7],
         ]);
         expect(() => allocateShards([0], 0)).toThrow(RangeError);
     });
@@ -405,6 +405,7 @@ describe("shard allocation and the worker contract", () => {
             shardCount: 6,
             shardIds: [1, 4],
             coordinatedIdentify: true,
+            startup: "safe",
         });
         expect(
             readClusterContext({

@@ -145,11 +145,11 @@ The constructor validates the options and throws; it does not fork or call Disco
 | `token` | `string` | — | Bot token. Required; an empty one throws a `TypeError`. |
 | `script` | `string` | — | Worker script, forked once per cluster on this machine. Required (also with `remote`, where it is used only for clusters on this machine); an empty one throws a `TypeError`. |
 | `shardCount` | `number \| "auto"` | unset | Total shards. `"auto"` asks `/gateway/bot`. When unset, `spawn()` also asks Discord, but `autoScaleInterval` only acts with an explicit `"auto"`. |
-| `guildsPerShard` | `number` | unset | With `"auto"`, size by guilds instead of Discord's recommendation: `ceil(guilds / guildsPerShard)` shards, at least one. Integer from 1 to 2500 (Discord's limit); Discord recommends about 1000. Throws with a numeric `shardCount`. |
+| `guildsPerShard` | `number` | unset | A sizing hint for `"auto"`: at least `ceil(guilds / guildsPerShard)` shards, and never fewer than Discord recommends. Integer from 1 to 2500 (Discord's limit); Discord recommends about 1000. It only picks the shard count: Discord puts each guild on shard `(guild_id >> 22) % shardCount`, so a shard gets about that many guilds, not exactly. Throws with a numeric `shardCount`. |
 | `guildCount` | `number` | asked from Discord | The guild count for `guildsPerShard`, instead of reading `approximate_guild_count` from `/applications/@me`. |
 | `shardIds` | `number[]` | every shard | The shards this deployment runs, out of `shardCount`. Must be unique integers in `[0, shardCount)`; checked in the constructor when `shardCount` is a number, otherwise in `spawn()`. |
-| `clusterCount` | `number` | logical CPUs (`os.cpus().length`) | Clusters to split the shards across. Positive integer. Clusters that would get no shard are not forked. |
-| `shardsPerCluster` | `number` | unset | Shards per cluster; the cluster count is `ceil(shards / shardsPerCluster)`. Positive integer. Setting it together with `clusterCount` throws a `RangeError`. |
+| `clusterCount` | `number` | logical CPUs (`os.cpus().length`) | Clusters to split the shards across, in contiguous blocks: 10 shards over 3 clusters are `[0-3] [4-6] [7-9]`. Positive integer. More clusters than shards gives one shard per cluster (the `plan` event reports the count asked for). On a one-CPU machine the default is one cluster: set `clusterCount` or `shardsPerCluster` to be sure. |
+| `shardsPerCluster` | `number` | unset | Shards per cluster; the cluster count is `ceil(shards / shardsPerCluster)` and the last cluster may have fewer: 10 shards at 4 per cluster are `[0-3] [4-7] [8-9]`. Positive integer. Setting it together with `clusterCount` throws a `RangeError`. |
 
 ### IDENTIFY
 
@@ -157,6 +157,7 @@ The constructor validates the options and throws; it does not fork or call Disco
 |---|---|---|---|
 | `maxConcurrency` | `number` | Discord's value when fetched, else `1` | Discord's `max_concurrency`: how many IDENTIFY rate-limit keys there are. Positive integer. When `/gateway/bot` was read, this can only lower Discord's value. |
 | `fetchLimits` | `boolean` | `false` | Read `max_concurrency` and the session-start budget from `/gateway/bot` even with a numeric `shardCount`. A failed request is reported as an `error` event and the start continues without them. |
+| `startup` *(0.4.0)* | `"safe" \| "sequential"` | `"safe"` | `"safe"`: shards start as fast as the IDENTIFY rules allow, different rate-limit keys in parallel. `"sequential"`: one shard at a time across all clusters; each holds its slot until it is READY (or `identify.holdTimeout`), then the next waits `identify.interval`. Slow, for debugging and small bots. Needs `identify.coordinate`. |
 | `identify.coordinate` | `boolean` | `true` | Hand out IDENTIFY slots from the parent for every cluster. `false` lets each cluster pace its own IDENTIFYs (`LUNIBEE_IDENTIFY=local`). |
 | `identify.interval` | `number` | `5000` | Milliseconds between two IDENTIFYs on one key. |
 | `identify.holdTimeout` | `number` | `60000` | A granted slot that a worker never gives back is released after this many ms. |
@@ -422,10 +423,13 @@ A `startTimeout` that passes while `starting` kills the process; its exit is han
 | `clusterMoved` *(0.3.2)* | `cluster`, `{ from: string; to: string }` | A lost host's cluster is restarting on another place (`remote.moveClusters`). |
 | `leaderAcquired` *(0.3.2)* | — | This coordinator took the `leader` lock. |
 | `leaderLost` *(0.3.2)* | `reason: string` | This coordinator lost the lock, killed its clusters and is a standby again. |
+| `plan` *(0.4.0)* | `ClusterPlanInfo` | Each start: `totalShards`, `clusterCount`, `clusterCountSource` (`"clusterCount"`, `"shardsPerCluster"` or `"default"`), `requestedClusterCount`, `clusters` (`{ id, shards }`), `maxConcurrency`, `startup`, `identifyCoordinated`. Before any process is forked. |
+| `identify` *(0.4.0)* | `IdentifyEvent` | The IDENTIFY queue: `{ type, owner, shardId, bucket, waitedMs? }`, `type` one of `"queued"`, `"granted"`, `"released"`, `"expired"` (a slot not given back in `holdTimeout`), `"dropped"` (its cluster exited). `bucket` is `shardId % maxConcurrency`. |
+| `shutdown` *(0.4.0)* | `{ clusters: number; durationMs: number }` | `shutdownAll()` finished: every worker exited, or was killed after the timeout. |
 | `identifyWait` | `{ shardId: number; waitMs: number }` | An IDENTIFY waits for the session-start budget to reset. Repeated waits for the same shard and second are not re-emitted. |
 | `error` | `error: Error` | Something went wrong that did not stop the deployment. See below. |
 
-`error` is emitted for: a malformed control frame from a worker; a `ready` report naming shards the cluster does not own; an oversized shard-bus message or health report; an asynchronous IPC send failure of a worker process; a failed `fetchLimits` request; a [reassignment](#reassignment) that found no target or was refused; and, with `remote`, a host that could not start a worker. With no `error` listener these are dropped.
+`error` is emitted for: a cluster whose process could not be forked (the message names the cluster and its shards; it goes through the restart policy like a crash, and the clusters after it still start); a malformed control frame from a worker; a `ready` report naming shards the cluster does not own; an oversized shard-bus message or health report; an asynchronous IPC send failure of a worker process; a failed `fetchLimits` request; a [reassignment](#reassignment) that found no target or was refused; and, with `remote`, a host that could not start a worker. With no `error` listener these are dropped.
 
 ## Readiness
 
@@ -437,7 +441,7 @@ When every cluster in the deployment is `ready`, `ready()` waiters resolve and t
 
 Discord allows one IDENTIFY per rate-limit key (`shard_id % max_concurrency`) every five seconds, for the whole bot, and a daily session-start budget. With `identify.coordinate` on (the default), the parent holds both rules for every cluster, local or remote:
 
-1. Before a worker connects a shard, it asks the parent for a slot (`ClusterWorker.identifyGate.acquire(shardId)`). `ShardManager` does this for you.
+1. Before a worker connects a shard, it asks the parent for a slot (`ClusterWorker.identifyGate.acquire(shardId)`). `ShardManager` does this for you, and so does a `Client` created with `gateway: { shardId, shardCount }` inside a worker (0.4.0); its re-IDENTIFYs after a lost session ask too.
 2. The parent grants one slot per key at a time, at least `identify.interval` apart, in request order.
 3. Once the IDENTIFY went out, the worker gives the slot back (`release(shardId)`) and the key rests for one interval. A slot not given back within `identify.holdTimeout` is released for the worker.
 
@@ -625,6 +629,7 @@ Process per shard: `shardsPerCluster: 1` gives every shard its own process (or t
 | `SHARD_LIST` | Comma-separated shard IDs this cluster owns. |
 | `LUNIBEE_SHARD_BUS` | `ipc`: `ShardBus` uses the IPC channel instead of a `BroadcastChannel`. |
 | `LUNIBEE_IDENTIFY` | `coordinated` when the parent hands out IDENTIFY slots, otherwise `local`. |
+| `LUNIBEE_STARTUP` *(0.4.0)* | `sequential` with `startup: "sequential"`; unset otherwise. |
 
 These seven are the only variables a coordinator can set in a worker on another host.
 
@@ -644,6 +649,7 @@ isClusterWorker(env = process.env): boolean
 | `shardCount` | `number` | `SHARD_COUNT` |
 | `shardIds` | `number[]` | `SHARD_LIST` |
 | `coordinatedIdentify` | `boolean` | `LUNIBEE_IDENTIFY === "coordinated"` |
+| `startup` | `"safe" \| "sequential"` | `LUNIBEE_STARTUP` (default `"safe"`) |
 
 ### `ClusterWorker`
 
@@ -730,10 +736,23 @@ The pure functions the manager uses, exported for custom orchestrators and tests
 allocateShards(shardIds: readonly number[], clusterCount: number): number[][]
 ```
 
-Splits shard IDs round-robin: the *i*-th ID goes to cluster `i % clusterCount`. The same input always gives the same output. Some lists are empty when there are more clusters than shards. Throws a `RangeError` unless `clusterCount` is a positive integer.
+Splits shard IDs into contiguous blocks, in order; when they do not divide evenly the first clusters get one more. The same input always gives the same output. Lists at the end are empty when there are more clusters than shards. Throws a `RangeError` unless `clusterCount` is a positive integer. Before 0.4.0 the split was round-robin.
 
 ```ts
-allocateShards([0, 1, 2, 3, 4, 5], 4); // [[0, 4], [1, 5], [2], [3]]
+allocateShards([0, 1, 2, 3, 4, 5], 4); // [[0, 1], [2, 3], [4], [5]]
+```
+
+### `planClusters(options)` *(0.4.0)*
+
+```ts
+planClusters({ shardIds, clusterCount?, shardsPerCluster?, defaultClusterCount }): ClusterPlan
+```
+
+What `spawn()` does with the options, without starting anything: `clusterCount` splits the shards with `allocateShards`, `shardsPerCluster` fills clusters of that size (the last may be partial), and neither uses `defaultClusterCount`. Never more clusters than shards, and no cluster is empty. Returns `{ clusters, source, requested }`. Throws a `RangeError` for both options at once, a count that is not a positive integer, or no shards.
+
+```ts
+planClusters({ shardIds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], shardsPerCluster: 4, defaultClusterCount: 1 }).clusters;
+// [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9]]
 ```
 
 ### `assertCompleteAllocation(chunks, expected)`
