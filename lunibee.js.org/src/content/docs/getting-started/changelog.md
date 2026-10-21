@@ -59,6 +59,13 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
   - `live: true` plays a user's voice back through effects without failing on their silence and keeps the delay low.
   - Video and Go Live stay unsupported: Discord does not allow them for bot accounts.
 - `examples/music`: `/play`, `/skip`, `/queue`, `/stop` and `/leave`.
+- **`lunibee init [directory]`**: creates a bot project in TypeScript with:
+  - validated configuration from the root `.env`;
+  - commands and events found recursively at runtime;
+  - commands registered with Discord on every start, in `GUILD_ID`'s server or globally, with startup stopping when Discord refuses them;
+  - `/ping`, a logger that redacts the token, a README and `tsconfig.json`.
+
+  Existing files are never overwritten without `--force`, which asks first. `--install` runs `bun install`. `lunibee check` accepts the layout.
 
 ### 🐛 Fixed
 - **Reliability audit.** These fixes came from an audit of every area, with a reproduction for each finding, now kept as regression tests:

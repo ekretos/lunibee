@@ -1,0 +1,79 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+/** The application's settings, read once from the environment at startup. */
+export interface Config {
+    /** Bot token. Never log it. */
+    readonly token: string;
+    /** Application ID, used to register commands. */
+    readonly clientId: string;
+    /** Register commands in this server only (instant updates while developing). */
+    readonly guildId: string | null;
+    readonly environment: "development" | "production" | "test";
+    /** Request the privileged Message Content intent. */
+    readonly messageContent: boolean;
+}
+
+/** A missing or invalid setting; the message lists every problem. */
+export class ConfigError extends Error {
+    public constructor(problems: readonly string[]) {
+        super(
+            `Invalid configuration:\n${problems.map((problem) => `  - ${problem}`).join("\n")}\nCopy .env.example to .env and fill it in.`,
+        );
+        this.name = "ConfigError";
+    }
+}
+
+const SNOWFLAKE = /^\d{17,20}$/;
+const ENVIRONMENTS = ["development", "production", "test"] as const;
+
+/** The project root: one level above src/ (or dist/ once compiled). */
+const ROOT = join(import.meta.dir, "..");
+
+/** Reads the root .env file into `env` without replacing variables that are already set. */
+function loadEnvFile(path: string, env: Record<string, string | undefined>): void {
+    if (!existsSync(path)) return;
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+        const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+        if (!match || line.trimStart().startsWith("#")) continue;
+        const [, key, raw] = match as unknown as [string, string, string];
+        const quoted = /^(["'])(.*)\1$/.exec(raw);
+        const value = quoted ? quoted[2]! : raw.replace(/\s+#.*$/, "");
+        if (env[key] === undefined) env[key] = value;
+    }
+}
+
+/**
+ * Loads and validates the configuration from the environment and the root
+ * `.env` file. @throws {ConfigError} With every problem found.
+ */
+export function loadConfig(
+    env: Record<string, string | undefined> = process.env,
+    envFile: string | null = join(ROOT, ".env"),
+): Config {
+    if (envFile) loadEnvFile(envFile, env);
+    const problems: string[] = [];
+    const token = env.DISCORD_TOKEN?.trim() ?? "";
+    if (!token || token === "your_bot_token_here")
+        problems.push("DISCORD_TOKEN is required (Developer Portal → your application → Bot → Reset Token).");
+    const clientId = env.CLIENT_ID?.trim() ?? "";
+    if (!SNOWFLAKE.test(clientId))
+        problems.push("CLIENT_ID must be your application ID (Developer Portal → General Information).");
+    const guildId = env.GUILD_ID?.trim() || null;
+    if (guildId !== null && !SNOWFLAKE.test(guildId))
+        problems.push("GUILD_ID must be a server ID, or empty to register commands globally.");
+    const environment = (env.NODE_ENV?.trim() || "development") as Config["environment"];
+    if (!ENVIRONMENTS.includes(environment))
+        problems.push(`NODE_ENV must be one of ${ENVIRONMENTS.join(", ")}.`);
+    const messageContent = (env.MESSAGE_CONTENT?.trim() || "false").toLowerCase();
+    if (messageContent !== "true" && messageContent !== "false")
+        problems.push("MESSAGE_CONTENT must be true or false.");
+    if (problems.length) throw new ConfigError(problems);
+    return Object.freeze({
+        token,
+        clientId,
+        guildId,
+        environment,
+        messageContent: messageContent === "true",
+    });
+}

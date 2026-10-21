@@ -1,9 +1,9 @@
 ---
 title: "@lunibee/cli"
-description: The lunibee command — scaffold handlers, commands and components, migrate handlers, and check a project.
+description: The lunibee command — create a bot project, scaffold handlers, commands and components, migrate handlers, and check a project.
 ---
 
-The `lunibee` command scaffolds handlers, commands and components, migrates handlers
+The `lunibee` command creates bot projects (`lunibee init`), scaffolds handlers, commands and components, migrates handlers
 between versions, and checks a project for common mistakes.
 
 ```bash
@@ -11,10 +11,26 @@ bun add -d @lunibee/cli
 bunx lunibee help
 ```
 
+## A new project
+
+```bash
+bunx @lunibee/cli init my-bot
+cd my-bot && bun install
+cp .env.example .env   # DISCORD_TOKEN, CLIENT_ID, and GUILD_ID while developing
+bun run dev
+```
+
+The project registers its commands on every start (no deploy script) and finds commands and
+events by walking `src/commands` and `src/events`, so adding a file is enough. Its README
+covers setup, adding commands and events, and troubleshooting. `create handler`,
+`create command` and the `sync` commands generate binder files for the other layout; an
+`init` project does not need them.
+
 ## Commands
 
 | Command | What it does |
 |---|---|
+| `lunibee init [directory]` | Create a new bot project: `src/index.ts` (startup), `config.ts` (validated `.env`), commands and events found recursively at runtime under `src/commands` and `src/events`, `services/register.ts` (registers the commands with Discord on every start: in `GUILD_ID`'s server, or globally), `/ping`, logger, README, `.env.example`, `tsconfig.json`. The folder name is the package name. Existing files are never overwritten without `--force`, which asks first (`--yes` confirms without a prompt). `--install` runs `bun install`; `--dry-run`. |
 | `lunibee create handler [event…] [name]` | Create `src/events/<event>/<name>.ts` and regenerate `src/handlers/event.ts`, which exports `registerEvents(client)`. Events may be values (`messageCreate`), member names (`MessageCreate`), any case, or comma-separated; without one, pick from a list (terminal only). Options: `--name`, `--force`, `--dry-run`. |
 | `lunibee handler [--fix]` | Find handlers not in the current format. `--fix` adds a first `_client: Client` parameter (plus the `lunibee` import; `.js` files get `_client` only), renames event folders whose case is wrong (`messagecreate/` → `messageCreate/`), then regenerates `src/handlers/event.ts`. Handlers already taking the client (a first parameter named `client`/`bot` or typed as a `Client`) and parameterless ones are left alone; shapes it cannot rewrite are listed. Without `--fix` it only reports (exit 1 when something needs fixing). `--dry-run`, `--json`; `handlers` works too. |
 | `lunibee migrate [--fix]` | Find APIs removed in 0.3.1 under `src/`. `--fix` renames the pre-0.2.2 names (`ButtonBuilder` → `CreateButton`, `ChannelType` → `ChannelEnum`…) only in files that import them from `lunibee` or `@lunibee/*`, so discord.js names are never touched, and `Routes.channelPin` → `Routes.channelMessagesPin`. Calls it cannot prove are Lunibee's (`deleteRole`, `sendMessage`, `bulkDelete`, `setDMPermission`, `Routes.channelPins`, `withExpiration`…) are listed with their replacement. Exit 1 while anything is left. `--dry-run`, `--json`. |

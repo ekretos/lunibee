@@ -1,0 +1,31 @@
+import { Routes, type Client } from "lunibee";
+import type { Config } from "../config.js";
+import type { CommandRegistry } from "../types/index.js";
+import { logger } from "../utils/logger.js";
+
+export interface RegisterOptions {
+    readonly client: Client;
+    readonly config: Config;
+    readonly commands: CommandRegistry;
+}
+
+/**
+ * Publishes the discovered commands to Discord, replacing what was there.
+ * With `GUILD_ID` they go to that server only (updated at once, for
+ * development); without it they are global.
+ * @throws {Error} When Discord refuses them; startup stops instead of running
+ *   with stale commands.
+ */
+export async function registerCommands({ client, config, commands }: RegisterOptions): Promise<void> {
+    const body = commands.toJSON();
+    const scope = config.guildId ? `server ${config.guildId}` : "all servers (global)";
+    const route = config.guildId
+        ? Routes.guildApplicationCommands(config.clientId, config.guildId)
+        : Routes.applicationCommands(config.clientId);
+    try {
+        await client.rest.put(route, { body });
+    } catch (error) {
+        throw new Error(`Could not register ${body.length} command(s) for ${scope}.`, { cause: error });
+    }
+    logger.success(`Registered ${body.length} command(s) for ${scope}.`);
+}

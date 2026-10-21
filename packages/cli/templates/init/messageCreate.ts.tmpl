@@ -1,0 +1,14 @@
+import { defineEvent } from "../../types/index.js";
+
+/**
+ * Called for every message the bot can see. Reading `message.content` in
+ * servers needs the privileged Message Content intent: set MESSAGE_CONTENT=true
+ * in .env and enable it in the Developer Portal (Bot → Privileged Gateway Intents).
+ */
+export default defineEvent({
+    name: "messageCreate",
+    async execute(_context, message) {
+        if (message.author.bot) return;
+        // Handle messages here.
+    },
+});

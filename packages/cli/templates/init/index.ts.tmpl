@@ -1,0 +1,55 @@
+import { Client, GatewayIntentBits } from "lunibee";
+import { loadConfig } from "./config.js";
+import { loadCommands } from "./handlers/commands.js";
+import { loadEvents } from "./handlers/events.js";
+import { registerCommands } from "./services/register.js";
+import { logger, protect } from "./utils/logger.js";
+
+/** The running client, so a failed start or a signal can close it. */
+let client: Client | undefined;
+
+async function start(): Promise<void> {
+    // 1. Configuration
+    const config = loadConfig();
+    protect(config.token);
+    logger.info(`Starting in ${config.environment} mode.`);
+
+    // 2. Client and command registry
+    const intents = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages];
+    if (config.messageContent) intents.push(GatewayIntentBits.MessageContent);
+    const bot = new Client({ token: config.token, intents });
+    client = bot;
+
+    // 3. Commands under src/commands
+    const commands = await loadCommands();
+    logger.info(`Loaded ${commands.size} command(s).`);
+
+    // 4. Register them with Discord before going online
+    await registerCommands({ client: bot, config, commands });
+
+    // 5. Events under src/events
+    const events = await loadEvents({ client: bot, commands });
+    logger.info(`Loaded ${events} event handler(s).`);
+
+    // 6–7. Log in; report once the connection is ready
+    bot.once("ready", () => {
+        logger.success(`Online as ${bot.user?.username ?? "the bot"} in ${bot.guilds.size} server(s).`);
+    });
+    bot.on("error", (error) => logger.error("Client error.", error));
+    await bot.login();
+}
+
+try {
+    await start();
+} catch (error) {
+    logger.error("Startup failed.", error);
+    client?.destroy();
+    process.exit(1);
+}
+
+for (const signal of ["SIGINT", "SIGTERM"] as const)
+    process.once(signal, () => {
+        logger.info("Shutting down.");
+        client?.destroy();
+        process.exit(0);
+    });

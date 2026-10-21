@@ -1,0 +1,114 @@
+import { readdir } from "node:fs/promises";
+import { join, relative } from "node:path";
+import { pathToFileURL } from "node:url";
+import type { Command, CommandRegistry } from "../types/index.js";
+
+/** Source files while developing (`bun src/index.ts`), compiled files in production (`bun dist/index.js`). */
+const EXTENSION = import.meta.path.endsWith(".ts") ? ".ts" : ".js";
+const SRC = join(import.meta.dir, "..");
+
+/**
+ * Every module file under `directory`, recursively and in a stable order.
+ * Skips declaration files, tests and files or folders starting with `_`.
+ */
+export async function findModules(directory: string): Promise<string[]> {
+    let entries: string[];
+    try {
+        entries = await readdir(directory, { recursive: true });
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+        throw error;
+    }
+    return entries
+        .filter((entry) => {
+            if (!entry.endsWith(EXTENSION) || entry.endsWith(".d.ts")) return false;
+            if (/\.(test|spec)\.[jt]s$/.test(entry)) return false;
+            return !entry.split(/[\\/]/).some((part) => part.startsWith("_"));
+        })
+        .sort()
+        .map((entry) => join(directory, entry));
+}
+
+/** Imports a module file and returns its default export. */
+export async function importDefault(file: string): Promise<unknown> {
+    const module = (await import(pathToFileURL(file).href)) as { default?: unknown };
+    return module.default;
+}
+
+class Registry implements CommandRegistry {
+    readonly #commands = new Map<string, Command>();
+    readonly #files = new Map<string, string>();
+
+    public add(command: Command, file: string): void {
+        const name = command.data.toJSON().name as string;
+        const existing = this.#files.get(name);
+        if (existing)
+            throw new Error(`Two commands are named "${name}": ${existing} and ${file}.`);
+        this.#commands.set(name, command);
+        this.#files.set(name, file);
+    }
+
+    public get(name: string): Command | undefined {
+        return this.#commands.get(name);
+    }
+
+    public has(name: string): boolean {
+        return this.#commands.has(name);
+    }
+
+    public get size(): number {
+        return this.#commands.size;
+    }
+
+    public values(): IterableIterator<Command> {
+        return this.#commands.values();
+    }
+
+    public toJSON(): Record<string, unknown>[] {
+        return [...this.#commands.values()].map((command) => command.data.toJSON());
+    }
+}
+
+/** Why `value` is not a {@link Command}, or null when it is one. */
+function invalid(value: unknown): string | null {
+    if (typeof value !== "object" || value === null)
+        return "it has no default export (export default defineCommand({ … }))";
+    const command = value as Partial<Command>;
+    if (typeof command.execute !== "function") return "execute is not a function";
+    if (typeof command.data?.toJSON !== "function")
+        return "data is not a command definition (new CreateSlashCommand())";
+    let json: Record<string, unknown>;
+    try {
+        json = command.data.toJSON();
+    } catch (error) {
+        return `its definition is incomplete: ${(error as Error).message}`;
+    }
+    if (typeof json.name !== "string" || !json.name) return "the command has no name";
+    if (typeof json.description !== "string" || !json.description)
+        return "the command has no description";
+    return null;
+}
+
+/**
+ * Loads every command under `directory` (folders are categories) into a new
+ * registry. @throws {Error} For an invalid module or a duplicate name.
+ */
+export async function discoverCommands(directory: string): Promise<CommandRegistry> {
+    const registry = new Registry();
+    for (const file of await findModules(directory)) {
+        const shown = relative(SRC, file);
+        const command = await importDefault(file);
+        const problem = invalid(command);
+        if (problem) throw new Error(`Invalid command ${shown}: ${problem}.`);
+        registry.add(command as Command, shown);
+    }
+    return registry;
+}
+
+let loaded: Promise<CommandRegistry> | undefined;
+
+/** The commands under src/commands. Loaded once; later calls return the same registry. */
+export function loadCommands(): Promise<CommandRegistry> {
+    loaded ??= discoverCommands(join(SRC, "commands"));
+    return loaded;
+}

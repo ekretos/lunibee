@@ -1,0 +1,50 @@
+import type { Client, ClientEvents, CommandInteraction, CreateSlashCommand } from "lunibee";
+
+/** What a command's `execute` receives. */
+export interface CommandContext {
+    readonly client: Client;
+    readonly interaction: CommandInteraction;
+}
+
+/** A slash command module: the default export of a file under src/commands. */
+export interface Command {
+    /** The command definition sent to Discord; its name routes interactions here. */
+    readonly data: CreateSlashCommand;
+    execute(context: CommandContext): Promise<void>;
+}
+
+/** Every loaded command, by name. */
+export interface CommandRegistry {
+    get(name: string): Command | undefined;
+    has(name: string): boolean;
+    readonly size: number;
+    values(): IterableIterator<Command>;
+    /** The definitions to register with Discord. */
+    toJSON(): Record<string, unknown>[];
+}
+
+/** What an event's `execute` receives before the event's own arguments. */
+export interface EventContext {
+    readonly client: Client;
+    readonly commands: CommandRegistry;
+}
+
+export type EventName = keyof ClientEvents;
+
+/** An event module: the default export of a file under src/events. */
+export interface Event<K extends EventName = EventName> {
+    readonly name: K;
+    /** Run only for the first occurrence. Default false. */
+    readonly once?: boolean;
+    execute(context: EventContext, ...args: ClientEvents[K]): void | Promise<void>;
+}
+
+/** Defines a command with its types checked. */
+export function defineCommand(command: Command): Command {
+    return command;
+}
+
+/** Defines an event; `name` types the event's arguments. */
+export function defineEvent<K extends EventName>(event: Event<K>): Event<K> {
+    return event;
+}

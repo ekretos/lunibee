@@ -155,7 +155,17 @@ async function projectFindings(
                       message: `${dir} (not created yet)`,
                   },
         );
-    if (await exists(join(root, "src", "events"))) {
+    // A `lunibee init` project finds its events at runtime (src/handlers/events.ts),
+    // in any folder layout, so there is no generated binder to check.
+    const runtimeDiscovery =
+        (await exists(join(root, "src", "handlers", "events.ts"))) &&
+        !(await exists(join(root, "src", "handlers", "event.ts")));
+    if (runtimeDiscovery)
+        findings.push({
+            level: "ok",
+            message: "src/handlers/events.ts finds events at runtime",
+        });
+    else if (await exists(join(root, "src", "events"))) {
         const state = await binderState(root);
         for (const folder of state.discovery.unknownFolders)
             findings.push({

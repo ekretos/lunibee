@@ -1,0 +1,42 @@
+type Level = "info" | "success" | "warn" | "error";
+
+const COLORS: Record<Level, number> = { info: 36, success: 32, warn: 33, error: 31 };
+const LABELS: Record<Level, string> = { info: "info", success: "ready", warn: "warn", error: "error" };
+const color = Boolean(process.stdout.isTTY) && !process.env.NO_COLOR;
+const secrets = new Set<string>();
+
+/** Never print `value` (a token, a key): it is replaced by `[redacted]` in every log line. */
+export function protect(value: string): void {
+    if (value.length >= 8) secrets.add(value);
+}
+
+function redact(text: string): string {
+    let result = text;
+    for (const secret of secrets) result = result.split(secret).join("[redacted]");
+    return result;
+}
+
+function describe(error: unknown): string {
+    if (error instanceof Error) {
+        const cause = error.cause === undefined ? "" : `\n  caused by: ${describe(error.cause)}`;
+        const detail = process.env.NODE_ENV === "production" ? error.message : (error.stack ?? error.message);
+        return `${detail}${cause}`;
+    }
+    return String(error);
+}
+
+function write(level: Level, message: string, error?: unknown): void {
+    const time = new Date().toISOString();
+    const label = color ? `\x1b[${COLORS[level]}m${LABELS[level].padEnd(5)}\x1b[0m` : LABELS[level].padEnd(5);
+    const line = redact(`${time} ${label} ${message}${error === undefined ? "" : `\n${describe(error)}`}`);
+    if (level === "error" || level === "warn") console.error(line);
+    else console.log(line);
+}
+
+/** The application's logger. Messages pass through {@link protect}'s redaction. */
+export const logger = {
+    info: (message: string) => write("info", message),
+    success: (message: string) => write("success", message),
+    warn: (message: string, error?: unknown) => write("warn", message, error),
+    error: (message: string, error?: unknown) => write("error", message, error),
+};

@@ -1,0 +1,143 @@
+# {{name}}
+
+A Lunibee bot, written in TypeScript. Created with `lunibee init`.
+
+Commands and events are found automatically: add a file under `src/commands` or
+`src/events` and restart. Commands are registered with Discord on every start, so
+there is no separate deploy step.
+
+## Prerequisites
+
+- [Bun](https://bun.sh) 1.4 or newer
+- A Discord application with a bot user
+
+## Installation
+
+```sh
+bun install
+```
+
+## Environment
+
+Copy `.env.example` to `.env` and fill it in. `.env` is ignored by git.
+
+| Variable | Required | Description |
+|---|---|---|
+| `DISCORD_TOKEN` | yes | The bot's token. |
+| `CLIENT_ID` | yes | The application ID, used to register commands. |
+| `GUILD_ID` | no | A server ID: commands are registered there only and update at once. Leave empty for global commands. |
+| `NODE_ENV` | no | `development` (default), `production` or `test`. |
+| `MESSAGE_CONTENT` | no | `true` to read message text in servers. Off by default. |
+
+The configuration is checked at startup (`src/config.ts`); a missing or invalid
+value stops the bot with a message saying what to fix. The token is never logged.
+
+## Setting up the application
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications) and create an application.
+2. **General Information:** copy the *Application ID* into `CLIENT_ID`.
+3. **Bot:** *Reset Token* and copy it into `DISCORD_TOKEN`.
+4. **OAuth2 → URL Generator:** tick `bot` and `applications.commands`, pick the
+   permissions the bot needs (for `/ping`, *Send Messages*), and open the URL to
+   add the bot to your server.
+5. To develop against one server, turn on *Developer Mode* in Discord's settings,
+   right-click the server, *Copy Server ID*, and put it in `GUILD_ID`.
+
+## Development
+
+```sh
+bun run dev
+```
+
+Runs `src/index.ts` and restarts when a file changes.
+
+## Production
+
+```sh
+bun run build   # compiles src/ to dist/
+bun run start   # runs dist/index.js
+```
+
+`bun run typecheck` checks the types without writing files.
+
+## Command registration
+
+On every start, `src/services/register.ts` sends every command found under
+`src/commands` to Discord, replacing the previous set:
+
+- with `GUILD_ID`, to that server only (changes appear at once);
+- without it, globally, for every server the bot is in.
+
+If Discord refuses the commands, the bot stops with the reason instead of running
+with outdated commands.
+
+## Adding a command
+
+Create a file anywhere under `src/commands` (folders are categories), for example
+`src/commands/fun/roll.ts`:
+
+```ts
+import { CreateSlashCommand } from "lunibee";
+import { defineCommand } from "../../types/index.js";
+
+export default defineCommand({
+    data: new CreateSlashCommand().setName("roll").setDescription("Rolls a die."),
+    async execute({ interaction }) {
+        await interaction.reply(`You rolled ${1 + Math.floor(Math.random() * 6)}.`);
+    },
+});
+```
+
+Restart the bot: it is loaded and registered. Names must be unique; two commands
+with the same name stop the startup. Files and folders starting with `_` are skipped.
+
+## Adding an event
+
+Create a file anywhere under `src/events`, for example `src/events/guild/guildCreate.ts`:
+
+```ts
+import { defineEvent } from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
+
+export default defineEvent({
+    name: "guildCreate",
+    async execute({ client }, guild) {
+        logger.info(`Joined ${guild.name}.`);
+    },
+});
+```
+
+`name` is the event; its arguments are typed from it. Add `once: true` to run only
+the first time. A handler that throws is logged and the bot keeps running.
+
+## Project layout
+
+```
+src/
+├── index.ts          startup: config → commands → registration → events → login
+├── config.ts         typed, validated settings from .env
+├── commands/         slash commands, found recursively
+├── events/           event handlers, found recursively
+├── handlers/         command and event discovery
+├── services/         command registration
+├── types/            shared types and defineCommand / defineEvent
+└── utils/logger.ts   logging (secrets are redacted)
+```
+
+## Troubleshooting
+
+- **"Invalid configuration"**: a variable in `.env` is missing or malformed; the
+  message names it. Check that `.env` is in the project root.
+- **"Could not register … command(s)"**: `CLIENT_ID` does not belong to the token's
+  application, the bot was not added with the `applications.commands` scope, or
+  `GUILD_ID` is a server the bot is not in.
+- **Commands do not appear**: global commands can take a while to show up in
+  Discord's client; set `GUILD_ID` while developing.
+- **Login fails with an authentication error**: the token is wrong or was reset;
+  copy a new one into `DISCORD_TOKEN`.
+- **Message text is empty**: set `MESSAGE_CONTENT=true` and enable the *Message
+  Content* intent in the Developer Portal.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

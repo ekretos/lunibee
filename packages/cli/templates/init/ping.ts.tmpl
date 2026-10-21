@@ -1,0 +1,17 @@
+import { CreateSlashCommand } from "lunibee";
+import { defineCommand } from "../../types/index.js";
+
+/** Discord's epoch, for the time an interaction was created. */
+const DISCORD_EPOCH = 1_420_070_400_000n;
+
+/** /ping: the Gateway heartbeat latency and how long this reply took. */
+export default defineCommand({
+    data: new CreateSlashCommand().setName("ping").setDescription("Shows the bot's latency."),
+    async execute({ client, interaction }) {
+        const created = Number((BigInt(interaction.id) >> 22n) + DISCORD_EPOCH);
+        await interaction.reply("Pinging…");
+        const response = Date.now() - created;
+        const gateway = client.ping >= 0 ? `${Math.round(client.ping)} ms` : "not measured yet";
+        await interaction.editReply({ content: `Pong! Gateway: ${gateway} · Response: ${response} ms` });
+    },
+});

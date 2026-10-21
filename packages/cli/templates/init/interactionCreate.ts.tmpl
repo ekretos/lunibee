@@ -1,0 +1,31 @@
+import { defineEvent } from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
+
+const FAILED = "Something went wrong while running this command.";
+
+/** Runs the slash command an interaction names. */
+export default defineEvent({
+    name: "interactionCreate",
+    async execute({ client, commands }, interaction) {
+        if (!interaction.isChatInputCommand()) return;
+        const command = commands.get(interaction.commandName);
+        if (!command) {
+            logger.warn(`Received /${interaction.commandName}, which is not loaded.`);
+            await interaction.reply({ content: "This command is not available.", ephemeral: true });
+            return;
+        }
+        try {
+            await command.execute({ client, interaction });
+        } catch (error) {
+            logger.error(`/${interaction.commandName} failed.`, error);
+            try {
+                // Answer once: follow up when the command already replied or deferred.
+                if (interaction.replied || interaction.deferred)
+                    await interaction.followUp({ content: FAILED, ephemeral: true });
+                else await interaction.reply({ content: FAILED, ephemeral: true });
+            } catch (reportError) {
+                logger.error("Could not tell the user that the command failed.", reportError);
+            }
+        }
+    },
+});

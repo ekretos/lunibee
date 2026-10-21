@@ -1,0 +1,57 @@
+import { join, relative } from "node:path";
+import type { Client, ClientEvents } from "lunibee";
+import type { Event, EventContext, EventName } from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import { findModules, importDefault } from "./commands.js";
+
+const SRC = join(import.meta.dir, "..");
+const bound = new WeakSet<Client>();
+
+/** Why `value` is not an {@link Event}, or null when it is one. */
+function invalid(value: unknown): string | null {
+    if (typeof value !== "object" || value === null)
+        return "it has no default export (export default defineEvent({ … }))";
+    const event = value as Partial<Event>;
+    if (typeof event.name !== "string" || !event.name) return "name is missing";
+    if (typeof event.execute !== "function") return "execute is not a function";
+    if (event.once !== undefined && typeof event.once !== "boolean") return "once must be true or false";
+    return null;
+}
+
+/**
+ * Loads every event under `directory` (any folder layout) and binds it to the
+ * client: `once: true` events run for the first occurrence only. A failing
+ * handler is logged and does not stop the others.
+ * @returns How many events were bound.
+ * @throws {Error} For an invalid module, or when the client was already bound.
+ */
+export async function loadEvents(
+    context: EventContext,
+    directory = join(SRC, "events"),
+): Promise<number> {
+    const { client } = context;
+    if (bound.has(client)) throw new Error("Events are already registered on this client.");
+    const events: { event: Event; file: string }[] = [];
+    for (const file of await findModules(directory)) {
+        const shown = relative(SRC, file);
+        const event = await importDefault(file);
+        const problem = invalid(event);
+        if (problem) throw new Error(`Invalid event ${shown}: ${problem}.`);
+        events.push({ event: event as Event, file: shown });
+    }
+    bound.add(client);
+    for (const { event, file } of events) {
+        const listener = (...args: ClientEvents[EventName]) => {
+            void (async () => {
+                try {
+                    await event.execute(context, ...args);
+                } catch (error) {
+                    logger.error(`The ${event.name} handler in ${file} failed.`, error);
+                }
+            })();
+        };
+        if (event.once) client.once(event.name, listener);
+        else client.on(event.name, listener);
+    }
+    return events.length;
+}

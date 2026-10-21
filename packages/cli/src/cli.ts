@@ -14,6 +14,7 @@ import { CliError, didYouMean, paint, type IO } from "./io.js";
 import { publish, status } from "./maintainer.js";
 import { migrateDeprecations } from "./deprecations.js";
 import { fixHandlers } from "./migrate.js";
+import { initProject } from "./init.js";
 import { findProjectRoot } from "./project.js";
 import {
     createCommand,
@@ -57,6 +58,30 @@ function commandMode(args: Args): CommandMode | undefined {
 const COMMON = ["help", "cwd", "no-color"];
 
 const COMMANDS: Command[] = [
+    {
+        path: ["init"],
+        usage: "lunibee init [directory] [--install] [--force] [--yes] [--dry-run]",
+        summary:
+            "Create a new bot project: commands and events found automatically, commands registered on start",
+        flags: ["install", "force", "yes", "dry-run"],
+        details:
+            "The directory's name becomes the package name (lowercase letters, digits, -, _ and .).\nWithout a directory, asks for one (terminal only). Existing files are never overwritten\nwithout --force, which asks first; --yes confirms without a prompt. --install runs\n`bun install` afterwards.",
+        run: ({ io, args, rest, options }) => {
+            const cwd = value(args, "cwd");
+            return initProject(
+                io,
+                cwd ? resolve(io.cwd, cwd) : io.cwd,
+                rest[0],
+                {
+                    install: flag(args, "install"),
+                    force: flag(args, "force"),
+                    yes: flag(args, "yes"),
+                    dryRun: flag(args, "dry-run"),
+                    version: options.version,
+                },
+            );
+        },
+    },
     {
         path: ["create", "handler"],
         usage: "lunibee create handler [event…] [name] [--name <file>] [--force] [--dry-run]",

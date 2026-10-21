@@ -9,7 +9,7 @@
  */
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
     entryProblems,
     preparePackages,
@@ -18,6 +18,7 @@ import {
     type WorkspacePackage,
 } from "../packages/cli/src/maintainer.ts";
 import { CliError, type IO } from "../packages/cli/src/io.ts";
+import { initFiles } from "../packages/cli/src/init.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const io: IO = {
@@ -172,6 +173,25 @@ console.log("imports ok");
     );
     const result = await run(["bun", "check.mjs"], app);
     console.log(`• ${result.trim()}`);
+
+    // A `lunibee init` project: installs, type-checks and builds against the tarball.
+    const bot = join(scratch, "bot");
+    const files = initFiles({
+        name: "smoke-bot",
+        lunibee: `file:${rootTarball}`,
+    });
+    for (const [path, source] of Object.entries(files)) {
+        await mkdir(dirname(join(bot, path)), { recursive: true });
+        await writeFile(join(bot, path), source);
+    }
+    await run(["bun", "install"], bot);
+    await run(["bun", "run", "typecheck"], bot);
+    await run(["bun", "run", "build"], bot);
+    if (!(await Bun.file(join(bot, "dist/commands/info/ping.js")).exists()))
+        throw new CliError(
+            "The init project built no dist/commands/info/ping.js.",
+        );
+    console.log("• a `lunibee init` project installs, type-checks and builds");
     console.log("\n✅ Smoke test passed.");
 } catch (error) {
     console.error(
