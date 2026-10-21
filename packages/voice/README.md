@@ -1,65 +1,41 @@
 # @lunibee/voice
 
-> Transport-agnostic voice sessions, audio playback and receiving.
+> Discord voice for Bun: join a channel, play audio, receive and record it, end-to-end encrypted.
 
-`@lunibee/voice` tracks voice sessions and moves audio through a player and receiver. It
-does **not** open the voice WebSocket or UDP socket, encrypt packets or run the voice
-heartbeat. You attach transports that do, and Lunibee handles lifecycle, speaking state
-and audio routing.
+`@lunibee/voice` speaks the voice gateway (v8), IP discovery and RTP over UDP, transport
+encryption (`aead_aes256_gcm_rtpsize`, `aead_xchacha20_poly1305_rtpsize`) and DAVE end-to-end
+encryption. It plays Ogg/Opus as it is, encodes PCM with its own Opus codec, and runs anything
+else through FFmpeg. `lunibee` wires it to the client as `client.voice`.
 
 ```bash
-bun add @lunibee/voice
+bun add lunibee @snazzah/davey
+# PCM, inlineVolume and effects need an Opus library: the system's libopus
+# (apt install libopus0 / brew install opus), or `bun add opusscript`.
 ```
 
 ```ts
-import {
-    joinVoiceChannel,
-    entersState,
-    AudioPlayer,
-    createAudioResource,
-    SpeakingFlags,
-    VoiceConnectionState,
-    type VoiceGatewayTransport,
-    type VoiceUdpTransport,
-} from "@lunibee/voice";
+import { Client, GatewayIntentBits, createAudioPlayer, createAudioResource } from "lunibee";
 
-declare const gatewayTransport: VoiceGatewayTransport;
-declare const udpTransport: VoiceUdpTransport;
-declare const opusStream: ReadableStream<Uint8Array>;
+const bot = new Client({ token: process.env.DISCORD_TOKEN!, intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
+await bot.login();
 
-class UdpPlayer extends AudioPlayer {
-    protected override onChunk(chunk: Uint8Array): void {
-        void udpTransport.send(chunk, "203.0.113.1", 50000);
-    }
-}
-
-const connection = joinVoiceChannel({
-    guildId: "123456789012345678",
-    channelId: "223456789012345678",
-    selfDeaf: true,
-});
-connection.attachTransports(gatewayTransport, udpTransport);
-await entersState(connection, VoiceConnectionState.Connected, 5_000);
-
-const player = new UdpPlayer();
-connection.setSpeaking(SpeakingFlags.Microphone);
-await player.play(createAudioResource(opusStream));
-player.on("finish", () => connection.destroy());
+const connection = await bot.voice.join({ guildId: "123456789012345678", channelId: "223456789012345678", selfDeaf: true });
+const player = createAudioPlayer();
+connection.subscribe(player);
+player.play(createAudioResource("./track.ogg"));
+player.on("finish", () => bot.voice.leave("123456789012345678"));
 ```
 
 ## What's inside
 
-- `VoiceConnection`: states `disconnected` / `connecting` / `connected` / `destroyed`,
-  `setChannel`, `setSuppression`, `setSpeaking`, `attachTransports`, `receiver`.
-  Its `stateChange` passes `(next, previous)`.
-- `AudioPlayer` / `AudioStream`: `play`, `pause`, `resume`, `stop`; override `onChunk`.
-  Its `stateChange` passes `(from, to)`.
-- `VoiceReceiver`: `mapSsrc`, `subscribe(userId)`, `onPacket`.
-- Helpers: `joinVoiceChannel`, `getVoiceConnection`,
-  `createAudioPlayer`, `createAudioResource`, `entersState`, `VoiceConnectionStatus`.
+- `client.voice` (`VoiceManager`): `join()`, `leave()`, `get()`, `connections`.
+- `VoiceConnection`: statuses `signalling` → `connecting` → `ready`, `disconnected`, `destroyed`; moves, region changes and resumes; `subscribe(player)`, `receiver`, `endToEndEncrypted`, `voicePrivacyCode`.
+- `AudioPlayer`: `idle`, `buffering`, `playing`, `paused`, `autopaused`; a 20 ms clock that corrects its drift.
+- `createAudioResource(input, options)`: file paths, URLs, bytes or streams; Ogg/Opus passthrough, PCM, FFmpeg; `inlineVolume`, `effects` (`pitchShift`, `robot`, `echo`, `gain`), `live` sources.
+- `VoiceReceiver`: `subscribe(userId)` gives Opus packets, `record(userId)` an Ogg/Opus stream.
+- `Opus`: the Opus codec on the system's libopus through `bun:ffi` (native, nothing to compile); `createOpusCodec()` falls back to `opusscript`.
+- The protocol layer for custom stacks: `VoiceNetworking`, `VoiceGateway`, `VoiceUdp`, `PacketCipher`, `DaveSession`.
 
-## What's new in 0.2.0
-
-Receiver streams end on disconnect/destroy, and `receiver.subscribe()` throws after destroy.
+`joinVoiceChannel({ adapterCreator, … })` connects without a Lunibee `Client`.
 
 Docs: https://lunibee.js.org/core-concepts/voice/

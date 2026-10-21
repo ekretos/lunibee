@@ -115,7 +115,8 @@ describe("Opus (Step 5)", () => {
     test("the dependency report names what this runtime can load", async () => {
         const report = await generateDependencyReport();
         expect(report.dave).toMatch(/davey/);
-        expect(report.opus).toBe("opusscript");
+        // Lunibee's own codec when the system has libopus, else opusscript.
+        expect(["libopus", "opusscript"]).toContain(report.opus!);
         expect(
             report.ffmpeg === null || report.ffmpeg.startsWith("ffmpeg"),
         ).toBe(true);

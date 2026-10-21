@@ -1,8 +1,9 @@
+import { hasLibopus, Opus } from "./libopus.js";
 import { FRAME_SAMPLES, VoiceError } from "./protocol.js";
 
 /** One 48 kHz stereo Opus encoder and decoder. Call `destroy()` when done. */
 export interface OpusCodec {
-    /** The library behind it: always `"opusscript"` (libopus compiled to WebAssembly). */
+    /** The library behind it: `"libopus"` (the system's, through `bun:ffi`) or `"opusscript"` (WebAssembly). */
     readonly library: string;
     /** Encodes one 20 ms frame of s16le PCM (3,840 bytes). */
     encode(pcm: Uint8Array): Uint8Array;
@@ -11,7 +12,18 @@ export interface OpusCodec {
     destroy(): void;
 }
 
-/** `opusscript`: libopus compiled to WebAssembly; works on every runtime. */
+/** Lunibee's own codec on the system libopus (`Opus`, through `bun:ffi`). */
+const native = (): OpusCodec => {
+    const codec = new Opus();
+    return {
+        library: "libopus",
+        encode: (pcm) => codec.encode(pcm),
+        decode: (packet) => codec.decode(packet),
+        destroy: () => codec.destroy(),
+    };
+};
+
+/** `opusscript`: libopus compiled to WebAssembly, for systems without libopus. */
 const wasm = async (): Promise<OpusCodec> => {
     const name = "opusscript";
     const mod = (await import(name)) as unknown as {
@@ -45,17 +57,19 @@ interface ScriptConstructor {
 }
 
 /**
- * Creates an Opus codec with `opusscript`, an optional peer dependency.
- * Playing Ogg/Opus files, or anything through FFmpeg without `inlineVolume`,
- * does not need it.
- * @throws {VoiceError} If `opusscript` is not installed.
+ * Creates an Opus codec: Lunibee's `Opus` on the system's libopus when it is
+ * installed (native speed, nothing to compile), otherwise `opusscript`, an
+ * optional peer dependency. Playing Ogg/Opus files, or anything through
+ * FFmpeg without `inlineVolume` or effects, needs neither.
+ * @throws {VoiceError} If neither is available.
  */
 export async function createOpusCodec(): Promise<OpusCodec> {
+    if (hasLibopus()) return native();
     try {
         return await wasm();
     } catch {
         throw new VoiceError(
-            "Encoding or decoding Opus needs an Opus library: install opusscript.",
+            "Encoding or decoding Opus needs an Opus library: install libopus (apt install libopus0, brew install opus) or opusscript.",
         );
     }
 }

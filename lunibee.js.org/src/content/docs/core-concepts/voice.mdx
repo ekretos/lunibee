@@ -18,7 +18,7 @@ bun add lunibee @snazzah/davey opusscript
 | Package | Needed for |
 |---|---|
 | `@snazzah/davey` | **Required in voice and stage-less channels.** Since 1 March 2026 Discord only lets clients that speak DAVE (end-to-end encrypted voice) into calls. Without it the voice server closes with `4017`. |
-| `opusscript` | Encoding PCM, and `inlineVolume`. Not needed to play Ogg/Opus files, or anything FFmpeg converts. libopus compiled to WebAssembly, so it runs under Bun. |
+| libopus *or* `opusscript` | Encoding PCM, `inlineVolume` and effects. Not needed to play Ogg/Opus files, or anything FFmpeg converts. With the system's libopus installed (`apt install libopus0`, `brew install opus`), Lunibee's own `Opus` codec uses it through `bun:ffi`: native, nothing to compile. Otherwise `opusscript` (libopus compiled to WebAssembly) is used. |
 | `ffmpeg` on the `PATH` | Any format other than Ogg/Opus (MP3, WAV, AAC, URLs…). |
 
 `generateDependencyReport()` tells you what this runtime can load. Your bot also needs the `GuildVoiceStates` intent.
@@ -158,7 +158,7 @@ To run Lavalink or another voice stack instead, do not call `bot.voice.join()` i
 | Closed with `4017` | Discord requires DAVE: install `@snazzah/davey`. |
 | `join()` rejects with "another shard" | Join from the client (or shard) that owns the guild. |
 | `join()` times out | The bot lacks Connect permission, the channel is full, or the `GuildVoiceStates` intent is missing. |
-| "needs an Opus library" | Install `opusscript` (PCM input or `inlineVolume`). |
+| "needs an Opus library" | Install libopus (`apt install libopus0`, `brew install opus`) or `opusscript` (PCM input, `inlineVolume`, effects). |
 | Nothing plays from an MP3 | `ffmpeg` is not on the `PATH`. |
 
 See the [Voice reference](/reference/voice-connection/) for every option.

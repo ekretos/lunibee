@@ -58,6 +58,13 @@ export {
     type VoiceServerInfo,
 } from "./networking.js";
 export { createOpusCodec, type OpusCodec } from "./opus.js";
+export {
+    Opus,
+    OpusApplication,
+    hasLibopus,
+    libopusVersion,
+    loadLibopus,
+} from "./libopus.js";
 export { demuxOggOpus, OggOpusWriter } from "./ogg.js";
 export {
     pitchShift,

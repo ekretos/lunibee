@@ -139,7 +139,9 @@ Out-of-range values throw a `RangeError`.
 
 | Export | Description |
 |---|---|
-| `createOpusCodec()` | `Promise<OpusCodec>` from `opusscript`: `encode(pcm)` (one 3,840-byte 20 ms frame), `decode(packet)`, `destroy()`, `library`. Throws a `VoiceError` when it is not installed. |
+| `createOpusCodec()` | `Promise<OpusCodec>`: Lunibee's `Opus` on the system's libopus when it loads (`library: "libopus"`), else `opusscript` (`library: "opusscript"`). `encode(pcm)` (one 3,840-byte 20 ms frame), `decode(packet)`, `destroy()`. Throws a `VoiceError` when neither is available. |
+| `Opus` | The codec on libopus through `bun:ffi`: `new Opus(application?)` (`OpusApplication.Audio` default, `Voip`, `RestrictedLowDelay`), `encode(pcm)`, `decode(packet)` (an empty packet is concealed as one 20 ms frame), `destroy()`, `Opus.libraryPath`. Native state is freed on `destroy()`, and when the object is collected. Errors are `VoiceError`s. |
+| `hasLibopus()`, `libopusVersion()`, `loadLibopus(paths?)` | Whether libopus loads, its version string (`"libopus 1.5.2"`), or `null`. The lookup tries `LUNIBEE_OPUS_LIBRARY` first, then the usual names (`libopus.so.0`, `libopus.dylib`, Homebrew's paths, `opus.dll`); `LUNIBEE_OPUS_LIBRARY=none` skips libopus. |
 | `OggOpusWriter` | Ogg/Opus muxer: `header()`, `write(packet)` (a page every 50 packets), `flush()`, `end()`. Each packet counts as 20 ms. |
 | `demuxOggOpus(chunks)` | An async generator of Opus packets from an Ogg/Opus byte stream; throws a `VoiceError` for anything that is not Ogg/Opus. |
 | `entersState(target, status, timeoutMs)` | Resolves when a connection or player reaches `status`, rejects with a `VoiceError` after `timeoutMs`. |

@@ -25,6 +25,6 @@ const connection = joinVoiceChannel({
 });
 ```
 
-Dependencies: `@noble/ciphers` (XChaCha20-Poly1305, audited, pure JS; AES-GCM uses the runtime's `node:crypto`) and `@lunibee/ws` (heartbeat). Optional peers: `@snazzah/davey` (DAVE, required by Discord outside stage channels), `opusscript` (Opus encoding).
+Dependencies: `@noble/ciphers` (XChaCha20-Poly1305, audited, pure JS; AES-GCM uses the runtime's `node:crypto`) and `@lunibee/ws` (heartbeat). Optional peers: `@snazzah/davey` (DAVE, required by Discord outside stage channels), `opusscript` (Opus encoding when the system has no libopus). With libopus installed, the package's own `Opus` codec uses it through `bun:ffi`.
 
 Guide: [Voice](/core-concepts/voice/). Reference: [Voice reference](/reference/voice-connection/).
