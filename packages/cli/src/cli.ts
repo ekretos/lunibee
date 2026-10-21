@@ -1,7 +1,5 @@
 import { resolve } from "node:path";
 import { assertFlags, flag, parseArgs, value, type Args } from "./args.js";
-import { syncCommands } from "./commands.js";
-import { createHandlers, resolveEvent, syncHandlers } from "./handlers.js";
 import {
     check,
     doctor,
@@ -12,15 +10,10 @@ import {
 } from "./inspect.js";
 import { CliError, didYouMean, paint, type IO } from "./io.js";
 import { publish, status } from "./maintainer.js";
-import { migrateDeprecations } from "./deprecations.js";
-import { fixHandlers } from "./migrate.js";
+import { migrate } from "./migrate.js";
 import { initProject } from "./init.js";
 import { findProjectRoot } from "./project.js";
-import {
-    createCommand,
-    createComponent,
-    type CommandMode,
-} from "./scaffold.js";
+import { createComponent } from "./scaffold.js";
 
 export interface MainOptions {
     version: string;
@@ -44,15 +37,6 @@ interface Command {
     flags: string[];
     details?: string;
     run(ctx: Context): Promise<number>;
-}
-
-function commandMode(args: Args): CommandMode | undefined {
-    const modes = (["slash", "prefix", "both"] as const).filter((mode) =>
-        flag(args, mode),
-    );
-    if (modes.length > 1)
-        throw new CliError("Pass only one of --slash, --prefix and --both.");
-    return modes[0];
 }
 
 const COMMON = ["help", "cwd", "no-color"];
@@ -83,108 +67,18 @@ const COMMANDS: Command[] = [
         },
     },
     {
-        path: ["create", "handler"],
-        usage: "lunibee create handler [event…] [name] [--name <file>] [--force] [--dry-run]",
-        summary:
-            "Create src/events/<event>/<name>.ts and update src/handlers/event.ts",
-        flags: ["name", "force", "dry-run"],
-        details:
-            "Events may be given as values (messageCreate), member names (MessageCreate), any case,\nor comma-separated. Without an event, pick from a numbered list (terminal only).\nHandlers are called as handler(client, ...args).",
-        async run({ io, args, rest, root }) {
-            let events = rest;
-            let name = value(args, "name");
-            // Compatibility: `create handler <event> <name>`.
-            if (!name && rest.length === 2 && !isEvent(rest[1]!)) {
-                events = [rest[0]!];
-                name = rest[1];
-            }
-            return createHandlers(io, root, events, {
-                name,
-                force: flag(args, "force"),
-                dryRun: flag(args, "dry-run"),
-            });
-        },
-    },
-    {
-        path: ["handler"],
-        usage: "lunibee handler [--fix] [--dry-run] [--json]",
-        summary: "Find handlers not in the current format; --fix updates them",
-        flags: ["fix", "dry-run", "json"],
-        details:
-            "Handlers from before 0.2.2 received only the event arguments. --fix adds a first\n`_client: Client` parameter (and the import), renames event folders whose case is wrong\n(messagecreate/ → messageCreate/), then regenerates src/handlers/event.ts. Handlers whose\nfirst parameter is already the client (named client/bot or typed as a Client) are left\nalone. Without --fix it only reports, exiting 1 when something needs fixing.",
-        run: ({ io, args, root }) =>
-            fixHandlers(io, root, {
-                fix: flag(args, "fix"),
-                dryRun: flag(args, "dry-run"),
-                json: flag(args, "json"),
-            }),
-    },
-    {
         path: ["migrate"],
         usage: "lunibee migrate [--fix] [--dry-run] [--json]",
         summary:
-            "Find APIs removed in 0.3.1; --fix renames the old Lunibee names",
+            "Find APIs removed in 0.4.0; --fix renames the old Lunibee names",
         flags: ["fix", "dry-run", "json"],
         details:
-            "Checks every file under src/. --fix renames the pre-0.2.2 names (ButtonBuilder →\nCreateButton, ChannelType → ChannelEnum…) only where the file imports them from lunibee\nor @lunibee/*, so discord.js names are never touched, and Routes.channelPin →\nRoutes.channelMessagesPin. Calls that cannot be proven to be Lunibee's (deleteRole,\nsendMessage, bulkDelete, setDMPermission, Routes.channelPins, withExpiration…) are\nlisted with their replacement to change by hand. Exits 1 while anything is left.",
+            "Checks every TypeScript and JavaScript file under src/. --fix renames the removed names\n(Events → ClientEvent, CreateStringSelectMenu → CreateStringSelect, Status → GatewayState…)\nonly where the file imports them from lunibee or @lunibee/*, so discord.js names are never\ntouched; `import { X as Y }` keeps Y. Code it cannot rewrite (IntentsBitField, webhook\navatarURL/threadId/allowedMentions, rest.put(path, { body }), request({ method, path }), the\n0.3 voice API) is listed with its replacement; lines marked check: are guesses (a Client in\na cluster worker without gateway: { shardId, shardCount }). Exits 1 while anything is left.",
         run: ({ io, args, root }) =>
-            migrateDeprecations(io, root, {
+            migrate(io, root, {
                 fix: flag(args, "fix"),
                 dryRun: flag(args, "dry-run"),
                 json: flag(args, "json"),
-            }),
-    },
-    {
-        path: ["sync", "handlers"],
-        usage: "lunibee sync handlers [--check] [--dry-run]",
-        summary:
-            "Regenerate src/handlers/event.ts from the files under src/events",
-        flags: ["check", "dry-run"],
-        details:
-            "Writes only when the content changes. --check exits 1 when the file is out of date\n(for pre-commit hooks), without writing.",
-        run: ({ io, args, root }) =>
-            syncHandlers(io, root, {
-                check: flag(args, "check"),
-                dryRun: flag(args, "dry-run"),
-            }),
-    },
-    {
-        path: ["create", "command"],
-        usage: "lunibee create command [name] [--slash|--prefix|--both] [--description <text>] [--category <folder>] [--force] [--dry-run]",
-        summary:
-            "Create src/commands/[category/]<name>.ts with a command() and update src/commands/index.ts",
-        flags: [
-            "slash",
-            "prefix",
-            "both",
-            "description",
-            "category",
-            "force",
-            "dry-run",
-        ],
-        details:
-            "The name follows Discord's rules: 1-32 lowercase letters, digits, - or _.\n--slash (default) makes a slash command, --prefix a prefix-only command, --both one file\nanswering both. Register everything with registerCommands(bot) from src/commands/index.ts.",
-        run: ({ io, args, rest, root }) =>
-            createCommand(io, root, rest[0], {
-                mode: commandMode(args),
-                description: value(args, "description"),
-                category: value(args, "category"),
-                force: flag(args, "force"),
-                dryRun: flag(args, "dry-run"),
-            }),
-    },
-    {
-        path: ["sync", "commands"],
-        usage: "lunibee sync commands [--check] [--dry-run]",
-        summary:
-            "Regenerate src/commands/index.ts from the command files under src/commands",
-        flags: ["check", "dry-run"],
-        details:
-            "Writes only when the content changes. --check exits 1 when the file is out of date.",
-        run: ({ io, args, root }) =>
-            syncCommands(io, root, {
-                check: flag(args, "check"),
-                dryRun: flag(args, "dry-run"),
             }),
     },
     {
@@ -204,7 +98,8 @@ const COMMANDS: Command[] = [
     {
         path: ["list"],
         usage: `lunibee list <${LIST_KINDS.join("|")}> [--json]`,
-        summary: "List handlers, commands, components, or every client event",
+        summary:
+            "List the files under src/events, src/commands or src/components, or every client event",
         flags: ["json"],
         async run({ io, args, rest, root }) {
             const kind = rest[0];
@@ -221,7 +116,7 @@ const COMMANDS: Command[] = [
         path: ["check"],
         usage: "lunibee check [--json]",
         summary:
-            "Check the project layout, handler binder and .env safety (exit 1 on errors)",
+            "Check the project layout, load its commands and events, and check .env safety (exit 1 on errors)",
         flags: ["json"],
         run: ({ io, args, root }) => check(io, root, flag(args, "json")),
     },
@@ -268,18 +163,7 @@ const COMMANDS: Command[] = [
     },
 ];
 
-function isEvent(input: string): boolean {
-    try {
-        resolveEvent(input);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
 function find(positionals: readonly string[]): Command | undefined {
-    if (positionals[0] === "handlers")
-        positionals = ["handler", ...positionals.slice(1)];
     return COMMANDS.filter((c) =>
         c.path.every((part, i) => positionals[i] === part),
     ).sort((a, b) => b.path.length - a.path.length)[0];
@@ -306,7 +190,7 @@ function help(io: IO, version: string, group?: string): void {
     for (const c of shown)
         io.out(`  ${c.path.join(" ").padEnd(width)}  ${c.summary}`);
     io.out(
-        `\nGlobal options:\n  --cwd <dir>    Run in another project directory\n  --no-color     Plain output (NO_COLOR is honoured too)\n  -h, --help     Help for a command, e.g. \`lunibee create handler --help\`\n  -v, --version  Print the CLI version`,
+        `\nGlobal options:\n  --cwd <dir>    Run in another project directory\n  --no-color     Plain output (NO_COLOR is honoured too)\n  -h, --help     Help for a command, e.g. \`lunibee init --help\`\n  -v, --version  Print the CLI version`,
     );
 }
 

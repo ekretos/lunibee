@@ -92,9 +92,9 @@ Send `!ping` or run `/ping` in a server the bot is in.
 
 Once the bot is running, these are the most useful next steps:
 
-As the bot grows, scaffold one file per command, event handler and component with the
-[CLI](/packages/cli/) (`bun add -d @lunibee/cli`): `bunx lunibee create command ping --both`, then call
-`registerCommands(bot)` from the generated `src/commands/index.ts`.
+As the bot grows, start from a project that finds one file per command and event at runtime:
+`bunx @lunibee/cli init my-bot` (see the [CLI](/packages/cli/)). `bunx lunibee create component button confirm`
+scaffolds a component.
 
 Reach Discord by ids, with one rule for every read: `peek()` is the cache, `get()` is the cache
 then Discord, `fetch()` is Discord.

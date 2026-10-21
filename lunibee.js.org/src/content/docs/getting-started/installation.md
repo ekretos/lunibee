@@ -26,10 +26,11 @@ powershell -c "irm bun.sh/install.ps1 | iex"
 
 ## Starting a new project
 
-Scaffold a bot (a `package.json` and a `src/index.ts` that logs in):
+Scaffold a bot with the [CLI](/packages/cli/): commands and events found at runtime under
+`src/commands` and `src/events`, and commands registered with Discord on every start.
 
 ```bash
-bun create @lunibee my-bot
+bunx @lunibee/cli init my-bot
 cd my-bot
 bun install
 ```

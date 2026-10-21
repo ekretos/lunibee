@@ -66,13 +66,6 @@
         "@lunibee/ws": "workspace:*",
       },
     },
-    "packages/create": {
-      "name": "@lunibee/create",
-      "version": "0.4.0",
-      "bin": {
-        "create-lunibee": "./dist/cli.js",
-      },
-    },
     "packages/formatters": {
       "name": "@lunibee/formatters",
       "version": "0.4.0",
@@ -178,8 +171,6 @@
     "@lunibee/collection": ["@lunibee/collection@workspace:packages/collection"],
 
     "@lunibee/core": ["@lunibee/core@workspace:packages/core"],
-
-    "@lunibee/create": ["@lunibee/create@workspace:packages/create"],
 
     "@lunibee/formatters": ["@lunibee/formatters@workspace:packages/formatters"],
 

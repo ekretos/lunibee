@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
-import { join, relative } from "node:path";
-import { binderState, EVENTS } from "./handlers.js";
+import { join } from "node:path";
+import { ClientEvent } from "@lunibee/core";
 import { CliError, paint, type IO } from "./io.js";
 import {
     compareVersions,
@@ -11,32 +11,31 @@ import {
     type PackageManifest,
 } from "./project.js";
 
-/** `.ts`/`.js` files under `dir`, recursively, as paths relative to it. */
-async function sourceFiles(dir: string): Promise<string[]> {
-    const found: string[] = [];
-    const walk = async (current: string): Promise<void> => {
-        let entries;
-        try {
-            entries = await readdir(current, { withFileTypes: true });
-        } catch {
-            return;
-        }
-        for (const entry of entries) {
-            const path = join(current, entry.name);
-            if (entry.isDirectory()) await walk(path);
-            else if (
-                /\.[jt]s$/.test(entry.name) &&
-                !/\.d\.ts$/.test(entry.name)
-            ) {
-                const name = relative(dir, path).split("\\").join("/");
-                // The generated binder is not a command.
-                if (!(dir.endsWith("commands") && /^index\.[jt]s$/.test(name)))
-                    found.push(name);
-            }
-        }
-    };
-    await walk(dir);
-    return found.sort();
+/** Every client event name, for `lunibee list events`. */
+export const EVENTS: readonly string[] = Object.values(ClientEvent);
+
+/**
+ * The modules a `lunibee init` project loads from `dir` (recursively), as
+ * paths relative to it: `.ts`/`.js` files, skipping declarations, tests, and
+ * files and folders whose name starts with `_`.
+ */
+export async function sourceFiles(dir: string): Promise<string[]> {
+    let entries: string[];
+    try {
+        entries = await readdir(dir, { recursive: true });
+    } catch {
+        return [];
+    }
+    return entries
+        .map((entry) => entry.split("\\").join("/"))
+        .filter(
+            (entry) =>
+                /\.[jt]s$/.test(entry) &&
+                !/\.d\.ts$/.test(entry) &&
+                !/\.(test|spec)\.[jt]s$/.test(entry) &&
+                !entry.split("/").some((part) => part.startsWith("_")),
+        )
+        .sort();
 }
 
 export type ListKind = "handlers" | "commands" | "components" | "events";
@@ -59,39 +58,12 @@ export async function list(
         else for (const event of EVENTS) io.out(event);
         return 0;
     }
-    if (kind === "handlers") {
-        const { discovery } = await binderState(root);
-        const grouped = new Map<string, string[]>();
-        for (const h of discovery.handlers)
-            grouped.set(h.event, [
-                ...(grouped.get(h.event) ?? []),
-                h.file.slice(h.event.length + 1),
-            ]);
-        if (json) {
-            io.out(
-                JSON.stringify({
-                    handlers: Object.fromEntries(grouped),
-                    ignoredFolders: discovery.unknownFolders,
-                }),
-            );
-            return 0;
-        }
-        if (!grouped.size) io.out("No handlers found under src/events.");
-        for (const [event, files] of grouped) {
-            io.out(event);
-            for (const file of files) io.out(`  └─ ${file}`);
-        }
-        for (const folder of discovery.unknownFolders)
-            io.out(
-                paint(io, "yellow", `${folder}/ (ignored: not a client event)`),
-            );
-        return 0;
-    }
-    const files = (await sourceFiles(join(root, "src", kind))).map((f) =>
+    const folder = kind === "handlers" ? "events" : kind;
+    const files = (await sourceFiles(join(root, "src", folder))).map((f) =>
         f.replace(/\.[jt]s$/, ""),
     );
     if (json) io.out(JSON.stringify(files));
-    else if (!files.length) io.out(`No ${kind} found under src/${kind}.`);
+    else if (!files.length) io.out(`No ${kind} found under src/${folder}.`);
     else for (const file of files) io.out(file);
     return 0;
 }
@@ -240,37 +212,26 @@ async function projectFindings(
                       message: `${dir} (not created yet)`,
                   },
         );
-    // A `lunibee init` project finds its events at runtime (src/handlers/events.ts),
-    // in any folder layout, so there is no generated binder to check.
-    const runtimeDiscovery =
-        (await exists(join(root, "src", "handlers", "events.ts"))) &&
-        !(await exists(join(root, "src", "handlers", "event.ts")));
-    if (runtimeDiscovery) findings.push(...(await loadModules(root)));
-    else if (await exists(join(root, "src", "events"))) {
-        const state = await binderState(root);
-        for (const folder of state.discovery.unknownFolders)
-            findings.push({
-                level: "warn",
-                message: `src/events/${folder}/ is not a client event and is ignored`,
-            });
-        for (const file of state.discovery.missingDefault)
-            findings.push({
-                level: "error",
-                message: `src/events/${file} has no default export`,
-            });
-        findings.push(
-            state.upToDate
-                ? {
-                      level: "ok",
-                      message: `src/handlers/event.ts in sync (${state.discovery.handlers.length} handlers)`,
-                  }
-                : {
-                      level: "warn",
-                      message: "src/handlers/event.ts is out of date",
-                      hint: "Run `lunibee sync handlers`.",
-                  },
-        );
-    }
+    // A `lunibee init` project finds its commands and events at runtime
+    // (src/handlers/commands.ts and src/handlers/events.ts), in any folder layout.
+    const loaders = ["src/handlers/commands.ts", "src/handlers/events.ts"];
+    const missing: string[] = [];
+    for (const file of loaders)
+        if (!(await exists(join(root, file)))) missing.push(file);
+    if (!missing.length) findings.push(...(await loadModules(root)));
+    else
+        findings.push({
+            level: "warn",
+            message: `${missing.join(" and ")} not found: commands and events not checked`,
+            hint: "The CLI checks the `lunibee init` layout, which loads src/commands and src/events at runtime.",
+        });
+    if (await exists(join(root, "src", "handlers", "event.ts")))
+        findings.push({
+            level: "warn",
+            message:
+                "src/handlers/event.ts is a binder from the layout the CLI no longer generates (0.4.0)",
+            hint: "Move to the `lunibee init` layout; see the upgrading guide.",
+        });
     const envFile = Bun.file(join(root, ".env"));
     if (await envFile.exists()) {
         findings.push({ level: "ok", message: ".env" });
@@ -437,13 +398,12 @@ export async function info(
             declared,
             installed: await installedVersion(root, name),
         };
-    const state = await binderState(root);
     const data = {
         project: pkg.name ?? null,
         version: pkg.version ?? null,
         root,
         lunibee,
-        handlers: state.discovery.handlers.length,
+        handlers: (await sourceFiles(join(root, "src", "events"))).length,
         commands: (await sourceFiles(join(root, "src", "commands"))).length,
         components: (await sourceFiles(join(root, "src", "components"))).length,
         runtime: `Bun ${Bun.version}`,

@@ -4,15 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../packages/cli/src/cli.ts";
 import { parseArgs } from "../packages/cli/src/args.ts";
-import {
-    binderSource,
-    discover,
-    fileName,
-    identifier,
-    pickEvents,
-    resolveEvent,
-} from "../packages/cli/src/handlers.ts";
-import { commandsBinderSource } from "../packages/cli/src/commands.ts";
+import { sourceFiles } from "../packages/cli/src/inspect.ts";
 import { closest, paint, type IO } from "../packages/cli/src/io.ts";
 import {
     compareVersions,
@@ -73,24 +65,19 @@ afterEach(() => rm(dir, { recursive: true, force: true }));
 describe("argument parsing", () => {
     test("flags, aliases, values and --", () => {
         const args = parseArgs([
-            "create",
-            "command",
-            "ping",
-            "-d",
-            "Pong",
-            "--category=a/b",
+            "publish",
+            "-n",
+            "--tag",
+            "next",
+            "--otp=123",
             "-yf",
             "--",
             "--raw",
         ]);
-        expect(args.positionals).toEqual([
-            "create",
-            "command",
-            "ping",
-            "--raw",
-        ]);
-        expect(args.flags.get("description")).toBe("Pong");
-        expect(args.flags.get("category")).toBe("a/b");
+        expect(args.positionals).toEqual(["publish", "--raw"]);
+        expect(args.flags.get("dry-run")).toBe(true);
+        expect(args.flags.get("tag")).toBe("next");
+        expect(args.flags.get("otp")).toBe("123");
         expect(args.flags.get("yes")).toBe(true);
         expect(args.flags.get("force")).toBe(true);
     });
@@ -109,16 +96,18 @@ describe("argument parsing", () => {
 describe("help and routing", () => {
     test("help, version and per-command help", async () => {
         expect(await cli("")).toBe(0);
-        expect(text()).toContain("create handler");
+        expect(text()).toContain("create component");
+        expect(text()).not.toContain("create handler");
+        expect(text()).not.toContain("sync");
         out = [];
         expect(await cli("--version")).toBe(0);
         expect(text()).toBe("9.9.9");
         out = [];
-        expect(await cli("create handler --help")).toBe(0);
-        expect(text()).toContain("Usage: lunibee create handler");
+        expect(await cli("create component --help")).toBe(0);
+        expect(text()).toContain("Usage: lunibee create component");
         out = [];
-        expect(await cli("help sync handlers")).toBe(0);
-        expect(text()).toContain("--check");
+        expect(await cli("help migrate")).toBe(0);
+        expect(text()).toContain("0.4.0");
         out = [];
         expect(await cli("help create")).toBe(0);
         expect(text()).toContain("create component");
@@ -127,10 +116,10 @@ describe("help and routing", () => {
 
     test("groups and unknown commands", async () => {
         expect(await cli("create")).toBe(1);
-        expect(text()).toContain("create command");
+        expect(text()).toContain("create component");
         expect(await cli("create --help")).toBe(0);
-        expect(await cli("create handlr")).toBe(1);
-        expect(errors()).toContain("`create handler`");
+        expect(await cli("create componnt")).toBe(1);
+        expect(errors()).toContain("`create component`");
         expect(await cli("docter")).toBe(1);
         expect(errors()).toContain("`doctor`");
         err = [];
@@ -168,209 +157,32 @@ describe("help and routing", () => {
 
     test("--cwd and root discovery from a subfolder", async () => {
         await mkdir(join(dir, "src", "deep"), { recursive: true });
-        expect(await cli("create handler ready --cwd src/deep")).toBe(0);
-        expect(await read("src/events/ready/ready.ts")).toContain(
-            'ClientEvents["ready"]',
-        );
+        expect(await cli("create component button ok --cwd src/deep")).toBe(0);
+        expect(await read("src/components/ok.ts")).toContain("CreateButton");
         expect(await findProjectRoot("/")).toBeNull();
     });
 
     test("--no-color and colors", async () => {
         expect(paint({ color: true }, "green", "x")).toBe("\x1b[32mx\x1b[0m");
-        expect(await cli("sync handlers --no-color", { color: true })).toBe(0);
+        expect(await cli("list commands --no-color", { color: true })).toBe(0);
         expect(text()).not.toContain("\x1b[");
     });
 });
 
-describe("handlers", () => {
-    test("event resolution accepts values, members and any case", () => {
-        expect(String(resolveEvent("messageCreate"))).toBe("messageCreate");
-        expect(String(resolveEvent("MESSAGECREATE"))).toBe("messageCreate");
-        expect(String(resolveEvent("MessageCreate"))).toBe("messageCreate");
-        expect(() => resolveEvent("messagecreat")).toThrow(
-            "Unknown client event",
-        );
-        expect(() => resolveEvent("qqqqqqqqqqqq")).toThrow(
-            "Unknown client event",
-        );
-        expect(pickEvents("1, messageCreate 1").map(String)).toEqual([
-            "ready",
-            "messageCreate",
-        ]);
-        expect(pickEvents("all").length).toBeGreaterThan(50);
-        expect(() => pickEvents("9999")).toThrow("No event number");
-    });
-
-    test("names and identifiers are sanitised", () => {
-        expect(identifier("default")).toBe("_default");
-        expect(identifier("1x")).toBe("handler_1x");
-        expect(fileName("my log.ts")).toBe("my-log.ts");
-        expect(() => fileName("  ")).toThrow("empty");
-        expect(() => fileName("../evil")).toThrow("Invalid name");
-    });
-
-    test("create several handlers, then sync is a no-op", async () => {
-        expect(await cli("create handler messageCreate,guildCreate")).toBe(0);
-        expect(text()).toContain("updated handlers/event.ts (2 handlers)");
-        const binder = await read("src/handlers/event.ts");
-        expect(binder).toContain("client.on(ClientEvent.MessageCreate");
-        out = [];
-        expect(await cli("sync handlers")).toBe(0);
-        expect(text()).toContain("up to date");
-        expect(await cli("sync handlers --check")).toBe(0);
-    });
-
-    test("legacy <event> <name>, --name, --force and --dry-run", async () => {
-        expect(await cli("create handler messageCreate logger")).toBe(0);
-        expect(await read("src/events/messageCreate/logger.ts")).toContain(
-            "function logger(",
-        );
-        expect(await cli("create handler messageCreate --name logger")).toBe(0);
-        expect(text()).toContain("skipped events/messageCreate/logger.ts");
-        await writeFile(
-            join(dir, "src/events/messageCreate/logger.ts"),
-            "changed",
-        );
-        expect(
-            await cli("create handler messageCreate --name logger --force"),
-        ).toBe(0);
-        expect(await read("src/events/messageCreate/logger.ts")).toContain(
-            "export default",
-        );
-        out = [];
-        expect(await cli("create handler ready --dry-run")).toBe(0);
-        expect(text()).toContain("would create events/ready/ready.ts");
-        expect(await cli("create handler ready guildCreate --name x")).toBe(1);
-        expect(errors()).toContain("--name applies to a single event");
-    });
-
-    test("a second handler for an event defaults to handler.ts", async () => {
-        await cli("create handler ready");
-        await cli("create handler ready");
-        expect(await read("src/events/ready/handler.ts")).toContain(
-            "function handler(",
-        );
-    });
-
-    test("interactive picker", async () => {
-        expect(await cli("create handler")).toBe(1);
-        expect(errors()).toContain("No event given");
-        answers = ["ready, 1", ""];
-        expect(await cli("create handler", { interactive: true })).toBe(0);
-        expect(await read("src/events/ready/ready.ts")).toContain("ready");
-        answers = ["ready", "second"];
-        expect(await cli("create handler", { interactive: true })).toBe(0);
-        expect(text()).toContain("ready already has 1 handler(s)");
-        expect(await read("src/events/ready/second.ts")).toContain("second");
-        answers = [null];
-        expect(await cli("create handler", { interactive: true })).toBe(0);
-        answers = [","];
-        expect(await cli("create handler", { interactive: true })).toBe(1);
-        expect(errors()).toContain("No events were selected");
-    });
-
-    test("sync warns about typos, missing default exports and duplicates", async () => {
-        const events = join(dir, "src", "events");
-        await mkdir(join(events, "messagecreate"), { recursive: true });
-        await mkdir(join(events, "zzzzzzzzzzzzzz"), { recursive: true });
-        await mkdir(join(events, "ready"), { recursive: true });
-        await writeFile(join(events, "stray.ts"), "");
-        await writeFile(join(events, "ready", "a.ts"), "export const x = 1;");
-        await writeFile(
-            join(events, "ready", "a.js"),
-            "export default () => {};",
-        );
-        await writeFile(
-            join(events, "ready", "a-b.ts"),
-            "export { f as default };",
-        );
-        await writeFile(
-            join(events, "ready", "a_b.ts"),
-            "export default () => {};",
-        );
-        await writeFile(join(events, "ready", "a.test.ts"), "");
-        await writeFile(join(events, "ready", "notes.md"), "");
-        const found = await discover(events);
-        expect(found.unknownFolders).toEqual([
-            "messagecreate",
-            "zzzzzzzzzzzzzz",
-        ]);
-        expect(found.missingDefault).toEqual(["ready/a.ts"]);
-        expect(found.handlers.map((h) => h.importName).sort()).toEqual([
-            "ready_a",
-            "ready_a_b",
-            "ready_a_b_2",
-        ]);
-        expect(await cli("sync handlers --dry-run")).toBe(0);
-        expect(text()).toContain("would update");
-        expect(await cli("sync handlers --check")).toBe(1);
-        expect(errors()).toContain("did you mean messageCreate?");
-        expect(errors()).toContain("is not a client event and is ignored");
-        expect(binderSource([])).toContain("export function registerEvents");
-    });
-});
-
-describe("create command", () => {
-    test("with flags", async () => {
-        expect(await cli("create command ping -d Pong! -c util/fun")).toBe(0);
-        const source = await read("src/commands/util/fun/ping.ts");
-        expect(source).toContain('name: "ping"');
-        expect(source).toContain('description: "Pong!"');
-        expect(source).toContain("export default command({");
-        expect(source).not.toContain("slash: false");
-        expect(await read("src/commands/index.ts")).toContain(
-            'import command_util_fun_ping from "./util/fun/ping";',
-        );
-        expect(await cli("create command ping -c util/fun")).toBe(1);
-        expect(errors()).toContain("--force");
-        expect(await cli("create command ping --force --dry-run")).toBe(0);
-        expect(text()).toContain("would create commands/ping.ts");
-    });
-
-    test("--prefix, --both and sync commands", async () => {
-        expect(await cli("create command pre --prefix")).toBe(0);
-        const prefixOnly = await read("src/commands/pre.ts");
-        expect(prefixOnly).toContain("slash: false");
-        expect(prefixOnly).toContain("prefix: true");
-        expect(await cli("create command both --both")).toBe(0);
-        const both = await read("src/commands/both.ts");
-        expect(both).toContain("prefix: true");
-        expect(both).not.toContain("slash: false");
-        expect(await cli("create command x --prefix --both")).toBe(1);
-        expect(errors()).toContain("only one of");
-        const index = await read("src/commands/index.ts");
-        expect(index).toContain("bot.commands.add(");
-        expect(index).toContain("command_both,");
-        expect(await cli("sync commands --check")).toBe(0);
-        await Bun.write(
-            join(dir, "src/commands/bare.ts"),
-            "export const a = 1;\n",
-        );
-        expect(await cli("sync commands --check")).toBe(1);
-        expect(await cli("sync commands --dry-run")).toBe(0);
-        expect(text()).toContain("would update");
-        expect(await cli("sync commands")).toBe(0);
-        expect(errors()).toContain("has no default export");
-        expect(commandsBinderSource([])).toContain("registerCommands");
-    });
-
-    test("validation", async () => {
-        expect(await cli("create command Ping")).toBe(1);
-        expect(await cli("create command ping -c ../x")).toBe(1);
-        expect(errors()).toContain("Invalid category");
-        expect(await cli(`create command ping -d ${"x".repeat(101)}`)).toBe(1);
-        expect(await cli("create command")).toBe(1);
-        expect(errors()).toContain("Usage: lunibee create command");
-    });
-
-    test("interactive", async () => {
-        answers = ["hello", ""];
-        expect(await cli("create command", { interactive: true })).toBe(0);
-        expect(await read("src/commands/hello.ts")).toContain(
-            "A Lunibee command.",
-        );
-        answers = [""];
-        expect(await cli("create command", { interactive: true })).toBe(0);
+describe("removed commands", () => {
+    test("the binder-layout commands are gone", async () => {
+        for (const command of [
+            "create handler ready",
+            "create command ping",
+            "sync handlers",
+            "sync commands",
+            "handler --fix",
+            "handlers",
+        ]) {
+            err = [];
+            expect(await cli(command)).toBe(1);
+            expect(errors()).toContain("Unknown command");
+        }
     });
 });
 
@@ -391,6 +203,18 @@ describe("create component", () => {
     });
 
     test("validation and interactive", async () => {
+        expect(await cli("create component button ok --dry-run")).toBe(0);
+        expect(text()).toContain("would create components/ok.ts");
+        expect(await Bun.file(join(dir, "src/components/ok.ts")).exists()).toBe(
+            false,
+        );
+        expect(await cli("create component button ok")).toBe(0);
+        expect(await cli("create component button ok")).toBe(1);
+        expect(errors()).toContain("--force");
+        expect(await cli("create component select ok --force")).toBe(0);
+        expect(await read("src/components/ok.ts")).toContain(
+            "CreateStringSelect",
+        );
         expect(await cli("create component slider x")).toBe(1);
         expect(errors()).toContain("button, select or modal");
         expect(await cli("create component button bad/id")).toBe(1);
@@ -410,26 +234,37 @@ describe("create component", () => {
 describe("list", () => {
     test("every kind, text and JSON", async () => {
         expect(await cli("list handlers")).toBe(0);
-        expect(text()).toContain("No handlers");
+        expect(text()).toContain("No handlers found under src/events");
         expect(await cli("list commands")).toBe(0);
         expect(text()).toContain("No commands");
-        await cli("create handler ready");
-        await cli("create command ping -c util");
+        const files = [
+            "src/events/client/ready.ts",
+            "src/events/message/messageCreate.ts",
+            "src/events/message/_shared.ts",
+            "src/events/_drafts/old.ts",
+            "src/events/message/notes.md",
+            "src/events/message/a.test.ts",
+            "src/events/types.d.ts",
+            "src/commands/util/ping.ts",
+            "src/commands/index.ts",
+        ];
+        for (const file of files) {
+            await mkdir(join(dir, file, ".."), { recursive: true });
+            await writeFile(join(dir, file), "export default {};\n");
+        }
         await cli("create component button ok");
-        await mkdir(join(dir, "src/events/typo"), { recursive: true });
         out = [];
         await cli("list handlers");
-        expect(text()).toContain("ready\n  └─ ready.ts");
-        expect(text()).toContain("typo/ (ignored");
+        expect(out).toEqual(["client/ready", "message/messageCreate"]);
         out = [];
         await cli("list handlers --json");
-        expect(JSON.parse(text())).toEqual({
-            handlers: { ready: ["ready.ts"] },
-            ignoredFolders: ["typo"],
-        });
+        expect(JSON.parse(text())).toEqual([
+            "client/ready",
+            "message/messageCreate",
+        ]);
         out = [];
         await cli("list commands");
-        expect(text()).toBe("util/ping");
+        expect(out).toEqual(["index", "util/ping"]);
         out = [];
         await cli("list components --json");
         expect(JSON.parse(text())).toEqual(["ok"]);
@@ -439,6 +274,7 @@ describe("list", () => {
         out = [];
         await cli("list events --json");
         expect(JSON.parse(text())).toContain("ready");
+        expect(await sourceFiles(join(dir, "missing"))).toEqual([]);
     });
 
     test("unknown kinds", async () => {
@@ -451,8 +287,17 @@ describe("list", () => {
 
 describe("check and doctor", () => {
     test("a healthy project", async () => {
-        await cli("create handler ready");
         await mkdir(join(dir, "src/commands"), { recursive: true });
+        await mkdir(join(dir, "src/events"), { recursive: true });
+        await mkdir(join(dir, "src/handlers"), { recursive: true });
+        await writeFile(
+            join(dir, "src/handlers/commands.ts"),
+            'export async function discoverCommands() { return new Map([["ping", { data: { toJSON: () => ({ name: "ping" }) } }]]); }\n',
+        );
+        await writeFile(
+            join(dir, "src/handlers/events.ts"),
+            'export async function discoverEvents() { return [{ event: { name: "ready" } }]; }\n',
+        );
         await writeFile(join(dir, ".env"), "DISCORD_TOKEN=secret-value\n");
         await writeFile(join(dir, ".gitignore"), "node_modules\n.env\n");
         await mkdir(join(dir, "node_modules/lunibee"), { recursive: true });
@@ -468,6 +313,8 @@ describe("check and doctor", () => {
         expect(await cli("doctor")).toBe(0);
         expect(text()).toContain("0 errors, 0 warnings");
         expect(text()).toContain("Lunibee 0.2.2 installed");
+        expect(text()).toContain("1 command(s) load: /ping");
+        expect(text()).toContain("1 event handler(s) load: ready");
         expect(text()).not.toContain("secret-value");
         out = [];
         expect(await cli("check --json")).toBe(0);
@@ -475,12 +322,8 @@ describe("check and doctor", () => {
     });
 
     test("problems are reported with exit code 1", async () => {
-        await mkdir(join(dir, "src/events/ready"), { recursive: true });
-        await writeFile(
-            join(dir, "src/events/ready/a.ts"),
-            "export const a = 1;",
-        );
-        await mkdir(join(dir, "src/events/typo"), { recursive: true });
+        await mkdir(join(dir, "src/handlers"), { recursive: true });
+        await writeFile(join(dir, "src/handlers/event.ts"), "");
         await writeFile(join(dir, ".env"), "OTHER=1\n");
         await writeFile(join(dir, "tsconfig.json"), "{}");
         await writeFile(
@@ -505,9 +348,10 @@ describe("check and doctor", () => {
         }
         expect(await cli("doctor")).toBe(1);
         const report = text();
-        expect(report).toContain("has no default export");
-        expect(report).toContain("is out of date");
-        expect(report).toContain("not a client event");
+        expect(report).toContain(
+            "src/handlers/commands.ts and src/handlers/events.ts not found",
+        );
+        expect(report).toContain("src/handlers/event.ts is a binder");
         expect(report).toContain(".env has no DISCORD_TOKEN");
         expect(report).toContain(".env is not in .gitignore");
         expect(report).toContain("@lunibee/rest is not installed");
@@ -541,12 +385,16 @@ describe("check and doctor", () => {
 
 describe("info", () => {
     test("text and JSON", async () => {
-        await cli("create command ping");
+        await mkdir(join(dir, "src/commands/info"), { recursive: true });
+        await writeFile(join(dir, "src/commands/info/ping.ts"), "");
+        await mkdir(join(dir, "src/events/client"), { recursive: true });
+        await writeFile(join(dir, "src/events/client/ready.ts"), "");
         out = [];
         expect(await cli("info")).toBe(0);
         expect(text()).toContain("Project:    bot@1.0.0");
         expect(text()).toContain("lunibee@^0.2.2 (not installed)");
         expect(text()).toContain("Commands:   1");
+        expect(text()).toContain("Handlers:   1");
         out = [];
         expect(await cli("info --json")).toBe(0);
         const data = JSON.parse(text());

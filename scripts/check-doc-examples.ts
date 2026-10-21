@@ -134,7 +134,7 @@ for (const page of await pages(DOCS)) {
     }
 }
 
-const pkgs = (await readdir(join(ROOT, "packages"))).filter((p) => p !== "create");
+const pkgs = await readdir(join(ROOT, "packages"));
 const paths: Record<string, string[]> = { lunibee: ["../packages/lunibee/src/index.ts"] };
 for (const p of pkgs) paths[`@lunibee/${p}`] = [`../packages/${p}/src/index.ts`];
 await writeFile(

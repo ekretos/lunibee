@@ -6,22 +6,13 @@ export interface Args {
 }
 
 /** Flags that take a value (`--tag next` or `--tag=next`). */
-export const VALUE_FLAGS = new Set([
-    "cwd",
-    "name",
-    "description",
-    "category",
-    "tag",
-    "otp",
-]);
+export const VALUE_FLAGS = new Set(["cwd", "tag", "otp"]);
 const ALIASES: Record<string, string> = {
     h: "help",
     v: "version",
     y: "yes",
     f: "force",
     n: "dry-run",
-    d: "description",
-    c: "category",
 };
 
 /** Splits argv into positionals and flags. `--` ends flag parsing. */

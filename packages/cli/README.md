@@ -1,10 +1,11 @@
 # @lunibee/cli
 
-> The `lunibee` command: create a bot project, scaffold handlers, commands and components, and check a project.
+> The `lunibee` command: create a bot project, scaffold components, migrate code to 0.4.0, and check a project.
 
 ```bash
 bun add -d @lunibee/cli
 bunx lunibee help
+bunx @lunibee/cli init my-bot   # a new project
 ```
 
 ## Commands
@@ -12,32 +13,22 @@ bunx lunibee help
 | Command | What it does |
 |---|---|
 | `lunibee init [directory]` | Create a new bot project: `src/index.ts` (startup), `config.ts` (validated `.env`), commands and events found recursively at runtime under `src/commands` and `src/events`, `services/register.ts` (registers the commands with Discord on every start: in `GUILD_ID`'s server, or globally), `/ping`, logger, README, `.env.example`, `tsconfig.json`. The folder name is the package name. Existing files are never overwritten without `--force`, which asks first (`--yes` confirms without a prompt). `--install` runs `bun install` (the CLI and the project need Bun 1.4+); `--dry-run`. Files are staged first, so a failed write leaves nothing half-created. |
-| `lunibee create handler [event…] [name]` | Create `src/events/<event>/<name>.ts` and regenerate `src/handlers/event.ts`, which exports `registerEvents(client)`. Events may be values (`messageCreate`), member names (`MessageCreate`), any case, or comma-separated; without one, pick from a list (terminal only). Options: `--name`, `--force`, `--dry-run`. |
-| `lunibee handler [--fix]` | Find handlers not in the current format. `--fix` adds a first `_client: Client` parameter (plus the `lunibee` import; `.js` files get `_client` only), renames event folders whose case is wrong (`messagecreate/` → `messageCreate/`), then regenerates `src/handlers/event.ts`. Handlers already taking the client (a first parameter named `client`/`bot` or typed as a `Client`) and parameterless ones are left alone; shapes it cannot rewrite are listed. Without `--fix` it only reports (exit 1 when something needs fixing). `--dry-run`, `--json`; `handlers` works too. |
-| `lunibee migrate [--fix]` | Find APIs removed in 0.3.1 under `src/`. `--fix` renames the pre-0.2.2 names (`ButtonBuilder` → `CreateButton`, `ChannelType` → `ChannelEnum`…) only in files that import them from `lunibee` or `@lunibee/*`, so discord.js names are never touched, and `Routes.channelPin` → `Routes.channelMessagesPin`. Calls it cannot prove are Lunibee's (`deleteRole`, `sendMessage`, `bulkDelete`, `setDMPermission`, `Routes.channelPins`, `withExpiration`…) are listed with their replacement. Exit 1 while anything is left. `--dry-run`, `--json`. |
-| `lunibee sync handlers` | Regenerate `src/handlers/event.ts` after adding, renaming or removing files under `src/events`. Writes only on change; warns about folders that are not events (typos) and files without a default export. `--check` exits 1 when out of date without writing (for pre-commit hooks); `--dry-run`. |
-| `lunibee create command [name]` | Create `src/commands/[category/]<name>.ts` with a `command()` default export, then regenerate `src/commands/index.ts`. `--slash` (default) makes a slash command, `--prefix` a prefix-only one (`slash: false, prefix: true`), `--both` one file that answers both (exclusive). The name is validated against Discord's rules. Options: `--description`/`-d`, `--category`/`-c` (folders, e.g. `admin/mod`), `--force`, `--dry-run`. |
-| `lunibee sync commands` | Regenerate `src/commands/index.ts` (`registerCommands(bot)`) from the files under `src/commands`. Writes only on change; warns about files without a default export. `--check` exits 1 when out of date; `--dry-run`. |
 | `lunibee create component [button\|select\|modal] [name]` | Create `src/components/<name>.ts` with the builder (`row()` or `modal()`), its `customId` and a `handle(client, interaction)` stub. The name is the custom ID (1-100 of `a-z A-Z 0-9 _ - : .`). Options: `--force`, `--dry-run`. |
-| `lunibee list <handlers\|commands\|components\|events>` | List what is under `src/events`, `src/commands` (recursive), `src/components`, or every client event. `--json`. |
-| `lunibee check` | Project layout, handler binder in sync, typo folders, missing default exports, `.env` present with a token key and ignored by git. Exit code 1 on errors. `--json`. |
+| `lunibee migrate [--fix]` | Find APIs removed in 0.4.0 in the TypeScript and JavaScript files under `src/`. `--fix` renames the removed names (`Events` → `ClientEvent`, `CreateStringSelectMenu` → `CreateStringSelect`, `Status` → `GatewayState`…) only in files that import them from `lunibee` or `@lunibee/*`, so discord.js names are never touched; `import { X as Y }` keeps `Y`. Code it cannot rewrite is listed with `file:line` and its replacement. Exit 1 while anything is left. `--dry-run`, `--json`. |
+| `lunibee list <handlers\|commands\|components\|events>` | List the modules under `src/events`, `src/commands` or `src/components` (recursive, the files an `init` project loads: no `.d.ts`, tests, or names starting with `_`), or every client event. `--json`. |
+| `lunibee check` | Project layout; loads the commands and events through the project's `src/handlers/commands.ts` and `src/handlers/events.ts` (invalid modules, duplicate names); `.env` present with a token key, ignored by git, and with every key of `.env.example`. Exit code 1 on errors. `--json`. |
 | `lunibee doctor` | Everything `check` does, plus the Bun version, installed Lunibee packages (missing or mixed versions) and `tsconfig.json` strictness. `--json`. |
-| `lunibee info` | Project, declared and installed Lunibee versions, handler/command/component counts, runtime and CLI version. `--json`. |
+| `lunibee info` | Project, declared and installed Lunibee versions, event/command/component file counts, runtime and CLI version. `--json`. |
 | `lunibee status` | Lunibee maintainers: every package in the monorepo the CLI runs from, flagging mixed versions. `--json`. |
 | `lunibee publish` | Lunibee maintainers: `bun publish` every non-private package, dependencies first. Refuses mixed versions; asks for confirmation unless `--yes`. Options: `--dry-run`, `--tag`, `--otp`. |
 
 Global options: `--cwd <dir>` runs in another project (the project root is the nearest folder
 with a `package.json`, so any subfolder works), `--no-color` (or `NO_COLOR`), `-h`/`--help` on
-any command, `-v`/`--version`. Unknown commands, options, events and list kinds get a
-"did you mean" suggestion. Secrets are never printed: `check` only looks for the token key in
-`.env`, not its value.
+any command, `-v`/`--version`. Unknown commands, options and list kinds get a "did you mean"
+suggestion. Secrets are never printed: `check` only looks for the token key in `.env`, not its
+value, and loads the project's modules without the environment.
 
-Each handler is called as `handler(client, ...args)`: the client first, then the
-event's arguments, typed from `ClientEvents`. The handler may declare the bot's own
-`Client` subclass as its first parameter. Only folders named after a `ClientEvent`
-value are bound; several files may handle the same event.
-
-Upgrading from 0.2.1: generated handlers received only the event arguments. Run
-`lunibee handler --fix` to add the `client` first parameter to each handler and resync. The generated
-`src/handlers/event.ts` is unchanged. `create command` emitted `data` and `execute` in 0.2.x;
-existing command files keep working.
+`lunibee migrate` lists every rename and hand change; see
+[the CLI page](https://lunibee.js.org/packages/cli/#migrating-to-040) for the full list.
+0.4.0 removed the binder-layout commands (`create handler`, `create command`, `sync handlers`,
+`sync commands`, `handler --fix`) and the `@lunibee/create` package: use `lunibee init`.

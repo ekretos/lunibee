@@ -23,7 +23,7 @@ export async function registerCommands({ client, config, commands }: RegisterOpt
         ? Routes.guildApplicationCommands(config.clientId, config.guildId)
         : Routes.applicationCommands(config.clientId);
     try {
-        await client.rest.put(route, { body });
+        await client.rest.put(route, body);
     } catch (error) {
         throw new Error(`Could not register ${body.length} command(s) for ${scope}.`, { cause: error });
     }
