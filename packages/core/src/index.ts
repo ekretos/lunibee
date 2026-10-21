@@ -1556,6 +1556,7 @@ export class Client
         if (this.#identifyGate && shardId !== undefined)
             await connectInQueue(this.#gateway, shardId, this.#identifyGate, {
                 waitForReady: this.#cluster?.startup === "sequential",
+                readyTimeout: this.#cluster?.readyTimeout,
             });
         else await this.#gateway.connect();
         return usedToken;

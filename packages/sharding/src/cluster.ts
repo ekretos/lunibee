@@ -111,7 +111,7 @@ export interface ClusterManagerOptions {
      *   keys in parallel; a slot is freed as soon as the IDENTIFY is sent.
      * - `"sequential"`: one shard at a time across all clusters, in the order
      *   they ask (cluster by cluster, as they spawn). Each slot is held until that shard is READY (or
-     *   `identify.holdTimeout` passes), then the next shard waits the interval.
+     *   `identify.holdTimeout` passes; workers wait that long for READY), then the next shard waits the interval.
      *   Slow, for debugging and small bots. Needs IDENTIFY coordination.
      */
     startup?: "safe" | "sequential";
@@ -901,7 +901,13 @@ export class ClusterManager {
             LUNIBEE_IDENTIFY: this.#coordinator ? "coordinated" : "local",
             // Only when set: hosts older than this option reject unknown keys.
             ...(this.#options.startup === "sequential"
-                ? { LUNIBEE_STARTUP: "sequential" }
+                ? {
+                      LUNIBEE_STARTUP: "sequential",
+                      // Workers wait for READY as long as this parent holds the slot.
+                      LUNIBEE_READY_TIMEOUT: String(
+                          this.#options.identify?.holdTimeout ?? 60_000,
+                      ),
+                  }
                 : {}),
         };
         const host = this.#hostOf.get(id) ?? "local";

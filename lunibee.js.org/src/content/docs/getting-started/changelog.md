@@ -63,7 +63,7 @@ Voice that plays audio: a bot can join a voice channel, play a file or stream, a
   - per-user streams end after silence; buffers are bounded (`highWaterMark`) and released on unsubscribe.
 - `entersState()` and `generateDependencyReport()`.
 - **Sharding startup and observability:**
-  - `startup: "sequential"` (`ClusterManager` and `ShardManager`) starts one shard at a time across all clusters, each holding its IDENTIFY slot until READY.
+  - `startup: "sequential"` (`ClusterManager` and `ShardManager`) starts one shard at a time across all clusters, each holding its IDENTIFY slot until READY. How long to wait for READY is `ShardManager`'s `readyTimeout` (default 60 s); in a cluster it follows `identify.holdTimeout`.
   - New `ClusterManager` events: `plan` (total shards, cluster count and where it came from, each cluster's shards), `identify` (the IDENTIFY queue, with buckets and waits) and `shutdown`.
   - New exports: `planClusters()`, the allocation `spawn()` uses, as a pure function; and `connectInQueue()`.
 - **Recording:** `receiver.record(userId)` gives an Ogg/Opus stream of a user, not re-encoded, with silence kept so recordings line up. `OggOpusWriter` is the muxer it uses.

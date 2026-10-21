@@ -19,6 +19,8 @@ export interface ClusterContext {
      * the IDENTIFY is sent.
      */
     startup?: "safe" | "sequential";
+    /** Sequential startup: ms a shard may take to become READY (`LUNIBEE_READY_TIMEOUT`, the parent's `identify.holdTimeout`). */
+    readyTimeout?: number;
 }
 
 /** Set to `1` in every process `ClusterManager` forks, so a worker can tell it is one. */
@@ -214,5 +216,16 @@ export function readClusterContext(
         shardIds,
         coordinatedIdentify: env.LUNIBEE_IDENTIFY === "coordinated",
         startup: env.LUNIBEE_STARTUP === "sequential" ? "sequential" : "safe",
+        ...(env.LUNIBEE_READY_TIMEOUT === undefined
+            ? {}
+            : {
+                  readyTimeout: Math.max(
+                      1,
+                      parseInteger(
+                          "LUNIBEE_READY_TIMEOUT",
+                          env.LUNIBEE_READY_TIMEOUT,
+                      ),
+                  ),
+              }),
     };
 }

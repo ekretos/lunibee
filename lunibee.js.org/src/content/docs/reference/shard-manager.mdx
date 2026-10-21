@@ -85,7 +85,8 @@ new ShardManager(options: ShardManagerOptions)
 | `reconnect` | `boolean` | `true` | Passed to every `Gateway`: reconnect automatically after a close that is not fatal. |
 | `spawnDelay` | `number` | `5000` | Milliseconds between startup rounds when pacing locally. `0` drops the handshake wait and the delay, so each round starts as soon as the previous round's sockets are open. See [IDENTIFY pacing](#identify-pacing). |
 | `maxConcurrency` | `number` | Discord's `max_concurrency` if known, else `1` | Shards per startup round when pacing locally. Capped at Discord's value when it is known. |
-| `startup` *(0.4.0)* | `"safe" \| "sequential"` | `"safe"`, or the cluster's | `"sequential"` starts one shard at a time: each waits for the previous one's READY (up to 60 s; a `shardError` says when it timed out) and then `spawnDelay`. In a cluster worker it follows `ClusterManager`'s `startup`, and the slot from the parent is held until READY. |
+| `startup` *(0.4.0)* | `"safe" \| "sequential"` | `"safe"`, or the cluster's | `"sequential"` starts one shard at a time: each waits for the previous one's READY (up to `readyTimeout`; a `shardError` says when it timed out) and then `spawnDelay`. In a cluster worker it follows `ClusterManager`'s `startup`, and the slot from the parent is held until READY. |
+| `readyTimeout` *(0.4.0)* | `number` | `60000`, or the cluster's | Sequential startup: ms a shard may take to become READY before the next one starts. A positive number. In a cluster worker it defaults to the parent's `identify.holdTimeout`. |
 | `handshakeTimeout` | `number` | `15000` | How long a startup round waits for its shards to send IDENTIFY or RESUME before the next `spawnDelay` starts, in ms. With an IDENTIFY gate, how long a shard holds its slot waiting for the handshake. |
 | `autoScaleInterval` | `number` | — | With `shardCount: "auto"`: re-check the shard count this often, in ms, and reshard when it changes. An integer of at least `1000`. With a fixed count no timer is started. |
 | `onAutoScaleError` | `(error: unknown) => void` | — | Called when a background auto-scale check fails. |
@@ -96,7 +97,7 @@ new ShardManager(options: ShardManagerOptions)
 The constructor throws:
 
 - `TypeError` for a missing or blank `token`, or `intents` that is not an array;
-- `RangeError` for a `shardCount` that is not a positive integer, a `guildsPerShard` outside 1–2500 or used without `shardCount: "auto"`, invalid or duplicate `shardIds` (checked now with a fixed count, at `connect()` with `"auto"`), an `autoScaleInterval` that is not an integer of at least 1000, a negative or non-finite `spawnDelay`, a `maxConcurrency` that is not a positive integer, or a negative `handshakeTimeout`;
+- `RangeError` for a `shardCount` that is not a positive integer, a `guildsPerShard` outside 1–2500 or used without `shardCount: "auto"`, invalid or duplicate `shardIds` (checked now with a fixed count, at `connect()` with `"auto"`), an `autoScaleInterval` that is not an integer of at least 1000, a negative or non-finite `spawnDelay`, a `maxConcurrency` that is not a positive integer, a negative `handshakeTimeout`, or a `readyTimeout` that is not a positive number;
 - inside a cluster worker, `RangeError` for `shardCount: "auto"`, a `shardCount` that differs from the cluster's, or `shardIds` that are not a subset of the cluster's shards, and `TypeError` for `autoScaleInterval` (auto-scaling belongs to `ClusterManager` there).
 
 With a number for `shardCount`, the Gateways are created in the constructor. With `"auto"`, they are created by the first `connect()`.

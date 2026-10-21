@@ -32,6 +32,7 @@ export const SPAWN_ENV_KEYS: ReadonlySet<string> = new Set([
     "LUNIBEE_CLUSTER_WORKER",
     "LUNIBEE_IDENTIFY",
     "LUNIBEE_STARTUP",
+    "LUNIBEE_READY_TIMEOUT",
 ]);
 
 /** Signals a coordinator may send to a remote worker. */

@@ -410,6 +410,51 @@ describe("IDENTIFY queue", () => {
         expect(() => setup({ startup: "fast" as never })).toThrow(RangeError);
     });
 
+    test("sequential startup: workers wait for READY as long as the parent holds the slot", async () => {
+        const { manager, children } = setup({
+            startup: "sequential",
+            identify: { holdTimeout: 1500 },
+        });
+        await manager.spawn();
+        expect(
+            children.every((c) => c.env.LUNIBEE_READY_TIMEOUT === "1500"),
+        ).toBe(true);
+        expect(readClusterContext(children[0]!.env)?.readyTimeout).toBe(1500);
+        const defaults = setup({ startup: "sequential" });
+        await defaults.manager.spawn();
+        expect(defaults.children[0]!.env.LUNIBEE_READY_TIMEOUT).toBe("60000");
+        const safe = setup();
+        await safe.manager.spawn();
+        expect(safe.children[0]!.env.LUNIBEE_READY_TIMEOUT).toBeUndefined();
+        expect(
+            readClusterContext(safe.children[0]!.env)?.readyTimeout,
+        ).toBeUndefined();
+    });
+
+    test("ShardManager readyTimeout must be a positive number of milliseconds", () => {
+        for (const bad of [0, -5, Number.NaN, Number.POSITIVE_INFINITY])
+            expect(
+                () =>
+                    new ShardManager({
+                        token: "t",
+                        intents: [],
+                        cluster: false,
+                        readyTimeout: bad,
+                    }),
+            ).toThrow(
+                "readyTimeout must be a positive number of milliseconds.",
+            );
+        expect(
+            () =>
+                new ShardManager({
+                    token: "t",
+                    intents: [],
+                    cluster: false,
+                    readyTimeout: 5000,
+                }),
+        ).not.toThrow();
+    });
+
     class FakeGateway extends EventEmitter {
         public state = "CONNECT";
         public fail = false;

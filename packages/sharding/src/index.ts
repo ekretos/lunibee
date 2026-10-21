@@ -158,7 +158,7 @@ function shardReady(gateway: Gateway, timeout: number): Promise<boolean> {
     });
 }
 
-/** How long sequential startup waits for a shard's READY before moving on. */
+/** How long sequential startup waits for a shard's READY before moving on, by default. */
 export const SEQUENTIAL_READY_TIMEOUT = 60_000;
 
 /** An IDENTIFY slot source: a cluster worker's `identifyGate`. */
@@ -239,10 +239,16 @@ export interface ShardManagerOptions {
     /**
      * `"safe"` (default): start shards as fast as Discord's IDENTIFY limits
      * allow. `"sequential"`: one shard at a time, each waiting for the previous
-     * one's READY (up to 60 s) and then `spawnDelay`. In a cluster worker this
-     * follows the `ClusterManager`'s `startup` option.
+     * one's READY (up to `readyTimeout`) and then `spawnDelay`. In a cluster
+     * worker this follows the `ClusterManager`'s `startup` option.
      */
     startup?: "safe" | "sequential";
+    /**
+     * Sequential startup: how long a shard may take to become READY before the
+     * next one starts (a `shardError` reports it), in ms. Default 60000; in a
+     * cluster worker, the parent's `identify.holdTimeout`.
+     */
+    readyTimeout?: number;
     /** Interval in milliseconds to automatically check for recommended shard count and re-scale if needed. Must be an integer >= 1000. */
     autoScaleInterval?: number;
     /** Optional handler invoked when a background auto-scale check fails. Receives the thrown error. */
@@ -336,6 +342,7 @@ export class ShardManager {
     /** The shard count when it is not "auto" (from the options or the cluster context). */
     readonly #fixedCount: number;
     readonly #startup: "safe" | "sequential";
+    readonly #readyTimeout: number;
     #autoScaleTimer?: ReturnType<typeof setInterval>;
     /** The shard count of the current shard set; kept while a reshard has no shards so `getShardIdForGuild` stays right. */
     #total: number;
@@ -448,6 +455,18 @@ export class ShardManager {
         )
             throw new RangeError('startup must be "safe" or "sequential".');
         this.#startup = options.startup ?? context?.startup ?? "safe";
+        if (
+            options.readyTimeout !== undefined &&
+            (!Number.isFinite(options.readyTimeout) ||
+                options.readyTimeout <= 0)
+        )
+            throw new RangeError(
+                "readyTimeout must be a positive number of milliseconds.",
+            );
+        this.#readyTimeout =
+            options.readyTimeout ??
+            context?.readyTimeout ??
+            SEQUENTIAL_READY_TIMEOUT;
         this.#total = count;
         this.#fixedCount = count;
         this.#auto = options.shardCount === "auto";
@@ -562,6 +581,7 @@ export class ShardManager {
                     const ready = await connectInQueue(gateway, id, gate, {
                         handshakeTimeout: this.#options.handshakeTimeout,
                         waitForReady: sequential,
+                        readyTimeout: this.#readyTimeout,
                         cancelled: stale,
                     });
                     if (!ready && sequential && !stale())
@@ -569,7 +589,7 @@ export class ShardManager {
                             "shardError",
                             id,
                             new Error(
-                                `Shard ${id} was not READY within ${SEQUENTIAL_READY_TIMEOUT / 1000}s; the next shard starts.`,
+                                `Shard ${id} was not READY within ${this.#readyTimeout} ms; the next shard starts.`,
                             ),
                         );
                 }),
@@ -648,7 +668,7 @@ export class ShardManager {
                     if (
                         !(await shardReady(
                             gateways.get(id)!,
-                            SEQUENTIAL_READY_TIMEOUT,
+                            this.#readyTimeout,
                         )) &&
                         !stale()
                     )
@@ -656,7 +676,7 @@ export class ShardManager {
                             "shardError",
                             id,
                             new Error(
-                                `Shard ${id} was not READY within ${SEQUENTIAL_READY_TIMEOUT / 1000}s; the next shard starts.`,
+                                `Shard ${id} was not READY within ${this.#readyTimeout} ms; the next shard starts.`,
                             ),
                         );
             if (

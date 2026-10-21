@@ -157,7 +157,7 @@ The constructor validates the options and throws; it does not fork or call Disco
 |---|---|---|---|
 | `maxConcurrency` | `number` | Discord's value when fetched, else `1` | Discord's `max_concurrency`: how many IDENTIFY rate-limit keys there are. Positive integer. When `/gateway/bot` was read, this can only lower Discord's value. |
 | `fetchLimits` | `boolean` | `false` | Read `max_concurrency` and the session-start budget from `/gateway/bot` even with a numeric `shardCount`. A failed request is reported as an `error` event and the start continues without them. |
-| `startup` *(0.4.0)* | `"safe" \| "sequential"` | `"safe"` | `"safe"`: shards start as fast as the IDENTIFY rules allow, different rate-limit keys in parallel. `"sequential"`: one shard at a time across all clusters; each holds its slot until it is READY (or `identify.holdTimeout`), then the next waits `identify.interval`. Slow, for debugging and small bots. Needs `identify.coordinate`. |
+| `startup` *(0.4.0)* | `"safe" \| "sequential"` | `"safe"` | `"safe"`: shards start as fast as the IDENTIFY rules allow, different rate-limit keys in parallel. `"sequential"`: one shard at a time across all clusters; each holds its slot until it is READY (or `identify.holdTimeout`, which workers also use as their READY wait), then the next waits `identify.interval`. Slow, for debugging and small bots. Needs `identify.coordinate`. |
 | `identify.coordinate` | `boolean` | `true` | Hand out IDENTIFY slots from the parent for every cluster. `false` lets each cluster pace its own IDENTIFYs (`LUNIBEE_IDENTIFY=local`). |
 | `identify.interval` | `number` | `5000` | Milliseconds between two IDENTIFYs on one key. |
 | `identify.holdTimeout` | `number` | `60000` | A granted slot that a worker never gives back is released after this many ms. |
@@ -630,6 +630,7 @@ Process per shard: `shardsPerCluster: 1` gives every shard its own process (or t
 | `LUNIBEE_SHARD_BUS` | `ipc`: `ShardBus` uses the IPC channel instead of a `BroadcastChannel`. |
 | `LUNIBEE_IDENTIFY` | `coordinated` when the parent hands out IDENTIFY slots, otherwise `local`. |
 | `LUNIBEE_STARTUP` *(0.4.0)* | `sequential` with `startup: "sequential"`; unset otherwise. |
+| `LUNIBEE_READY_TIMEOUT` *(0.4.0)* | With `startup: "sequential"`: `identify.holdTimeout` (default `60000`), how long a worker waits for a shard's READY. |
 
 These seven are the only variables a coordinator can set in a worker on another host.
 
@@ -650,6 +651,7 @@ isClusterWorker(env = process.env): boolean
 | `shardIds` | `number[]` | `SHARD_LIST` |
 | `coordinatedIdentify` | `boolean` | `LUNIBEE_IDENTIFY === "coordinated"` |
 | `startup` | `"safe" \| "sequential"` | `LUNIBEE_STARTUP` (default `"safe"`) |
+| `readyTimeout` | `number \| undefined` | `LUNIBEE_READY_TIMEOUT` |
 
 ### `ClusterWorker`
 
