@@ -29,11 +29,52 @@ import { exists } from "./project.js";
 /** npm's package name rule, unscoped: what `lunibee init <name>` accepts. */
 const PACKAGE_NAME = /^[a-z0-9][a-z0-9._-]*$/;
 
+/** Which commands a new project answers: slash, message (prefix) or both. */
+export type CommandStyle = "slash" | "message" | "both";
+export const COMMAND_STYLES: readonly CommandStyle[] = [
+    "slash",
+    "message",
+    "both",
+];
+
+/**
+ * Keeps or drops the `{{#slash}}…{{/slash}}` / `{{#message}}…{{/message}}`
+ * blocks of a template (`{{^…}}` for the opposite). A block on its own lines
+ * drops those lines; one inside a line drops only its text.
+ */
+export function renderTemplate(template: string, style: CommandStyle): string {
+    const on: Record<string, boolean> = {
+        slash: style !== "message",
+        message: style !== "slash",
+    };
+    const keep = (sign: string, key: string) => on[key] === (sign === "#");
+    let previous: string;
+    do {
+        previous = template;
+        template = template.replace(
+            /^[ \t]*\{\{([#^])(slash|message)\}\}\n([\s\S]*?)^[ \t]*\{\{\/\2\}\}\n/m,
+            (_, sign: string, key: string, body: string) =>
+                keep(sign, key) ? body : "",
+        );
+    } while (template !== previous);
+    do {
+        previous = template;
+        template = template.replace(
+            /\{\{([#^])(slash|message)\}\}(.*?)\{\{\/\2\}\}/g,
+            (_, sign: string, key: string, body: string) =>
+                keep(sign, key) ? body : "",
+        );
+    } while (template !== previous);
+    return template;
+}
+
 export interface InitTemplateOptions {
     /** Package name, also the README title. */
     name: string;
     /** Version range of `lunibee` to depend on. */
     lunibee: string;
+    /** Default `"slash"`. */
+    commands?: CommandStyle;
     year?: number;
 }
 
@@ -41,8 +82,9 @@ export interface InitTemplateOptions {
 export function initFiles(
     options: InitTemplateOptions,
 ): Record<string, string> {
+    const style = options.commands ?? "slash";
     const fill = (template: string) =>
-        template
+        renderTemplate(template, style)
             .replaceAll("{{name}}", options.name)
             .replaceAll(
                 "{{year}}",
@@ -64,24 +106,32 @@ export function initFiles(
         engines: { bun: ">=1.4.0" },
         license: "MIT",
     };
-    return {
+    const slash = style !== "message";
+    const message = style !== "slash";
+    const files: Record<string, string | false> = {
         "package.json": `${JSON.stringify(manifest, null, 2)}\n`,
         "tsconfig.json": tsconfig,
-        ".env.example": env,
+        ".env.example": fill(env),
         ".gitignore": gitignore,
         "README.md": fill(readme),
         LICENSE: fill(license),
-        "src/index.ts": index,
-        "src/config.ts": config,
-        "src/commands/info/ping.ts": ping,
-        "src/events/message/messageCreate.ts": messageCreate,
-        "src/events/interaction/interactionCreate.ts": interactionCreate,
-        "src/handlers/commands.ts": commandsHandler,
+        "src/index.ts": fill(index),
+        "src/config.ts": fill(config),
+        "src/commands/info/ping.ts": fill(ping),
+        "src/events/message/messageCreate.ts": message && messageCreate,
+        "src/events/interaction/interactionCreate.ts":
+            slash && interactionCreate,
+        "src/handlers/commands.ts": fill(commandsHandler),
         "src/handlers/events.ts": eventsHandler,
-        "src/services/register.ts": register,
-        "src/types/index.ts": types,
+        "src/services/register.ts": slash && register,
+        "src/types/index.ts": fill(types),
         "src/utils/logger.ts": logger,
     };
+    return Object.fromEntries(
+        Object.entries(files).filter(
+            (entry): entry is [string, string] => entry[1] !== false,
+        ),
+    );
 }
 
 export interface InitOptions {
@@ -89,8 +139,41 @@ export interface InitOptions {
     yes?: boolean;
     dryRun?: boolean;
     install?: boolean;
+    /** Asked for in a terminal when missing; `"slash"` otherwise. */
+    commands?: string;
     /** The CLI's version: the generated project depends on `lunibee@^version`. */
     version: string;
+}
+
+const STYLE_ANSWERS: Record<string, CommandStyle> = {
+    "1": "slash",
+    "2": "message",
+    "3": "both",
+    slash: "slash",
+    message: "message",
+    prefix: "message",
+    both: "both",
+};
+
+/** `--commands`, or the answer to a prompt in a terminal; `"slash"` without one. */
+function commandStyle(io: IO, input: string | undefined): CommandStyle | null {
+    if (input === undefined) {
+        if (!io.interactive) return "slash";
+        io.out(
+            "\n1. Slash commands (/ping)\n2. Message commands (!ping)\n3. Both",
+        );
+        const answer = io.prompt("Commands [1]:")?.trim().toLowerCase();
+        if (answer === undefined) return null;
+        if (answer === "") return "slash";
+        input = answer;
+    }
+    const style = STYLE_ANSWERS[input.trim().toLowerCase()];
+    if (!style)
+        throw new CliError(
+            `Unknown command type: ${input}`,
+            `Use one of: ${COMMAND_STYLES.join(", ")}.`,
+        );
+    return style;
 }
 
 /** Validates the project name taken from the target folder. */
@@ -153,7 +236,9 @@ export async function initProject(
     }
     const directory = resolve(start, target);
     const name = projectName(directory);
-    const files = initFiles({ name, lunibee: `^${options.version}` });
+    const commands = commandStyle(io, options.commands);
+    if (!commands) return 1;
+    const files = initFiles({ name, lunibee: `^${options.version}`, commands });
 
     const stat = await statPath(directory).catch(() => null);
     if (stat && !stat.isDirectory())

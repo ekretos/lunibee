@@ -1,17 +1,45 @@
+{{#slash}}
 import { CreateSlashCommand } from "lunibee";
+{{/slash}}
 import { defineCommand } from "../../types/index.js";
 
-/** Discord's epoch, for the time an interaction was created. */
+/** Discord's epoch, for the time a snowflake was created. */
 const DISCORD_EPOCH = 1_420_070_400_000n;
 
+/** When a Discord ID (an interaction or a message) was created, in ms. */
+const createdAt = (id: string) => Number((BigInt(id) >> 22n) + DISCORD_EPOCH);
+
+{{#slash}}
+{{#message}}
+/** /ping and !ping: the Gateway heartbeat latency and how long the reply took. */
+{{/message}}
+{{^message}}
 /** /ping: the Gateway heartbeat latency and how long this reply took. */
+{{/message}}
+{{/slash}}
+{{^slash}}
+/** !ping: the Gateway heartbeat latency and how long this reply took. */
+{{/slash}}
 export default defineCommand({
+{{#slash}}
     data: new CreateSlashCommand().setName("ping").setDescription("Shows the bot's latency."),
     async execute({ client, interaction }) {
-        const created = Number((BigInt(interaction.id) >> 22n) + DISCORD_EPOCH);
         await interaction.reply("Pinging…");
-        const response = Date.now() - created;
+        const response = Date.now() - createdAt(interaction.id);
         const gateway = client.ping >= 0 ? `${Math.round(client.ping)} ms` : "not measured yet";
         await interaction.editReply({ content: `Pong! Gateway: ${gateway} · Response: ${response} ms` });
     },
+{{/slash}}
+{{^slash}}
+    name: "ping",
+    description: "Shows the bot's latency.",
+{{/slash}}
+{{#message}}
+    async executeMessage({ client, message }) {
+        const reply = await message.reply("Pinging…");
+        const response = Date.now() - createdAt(message.id);
+        const gateway = client.ping >= 0 ? `${Math.round(client.ping)} ms` : "not measured yet";
+        await reply.edit({ content: `Pong! Gateway: ${gateway} · Response: ${response} ms` });
+    },
+{{/message}}
 });

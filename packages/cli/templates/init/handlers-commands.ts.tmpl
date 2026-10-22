@@ -40,7 +40,12 @@ class Registry implements CommandRegistry {
     readonly #files = new Map<string, string>();
 
     public add(command: Command, file: string): void {
+{{#slash}}
         const name = command.data.toJSON().name as string;
+{{/slash}}
+{{^slash}}
+        const name = command.name.toLowerCase();
+{{/slash}}
         const existing = this.#files.get(name);
         if (existing)
             throw new Error(`Two commands are named "${name}": ${existing} and ${file}.`);
@@ -64,9 +69,11 @@ class Registry implements CommandRegistry {
         return this.#commands.values();
     }
 
+{{#slash}}
     public toJSON(): Record<string, unknown>[] {
         return [...this.#commands.values()].map((command) => command.data.toJSON());
     }
+{{/slash}}
 }
 
 /** Why `value` is not a {@link Command}, or null when it is one. */
@@ -74,7 +81,13 @@ function invalid(value: unknown): string | null {
     if (typeof value !== "object" || value === null)
         return "it has no default export (export default defineCommand({ … }))";
     const command = value as Partial<Command>;
+{{#slash}}
     if (typeof command.execute !== "function") return "execute is not a function";
+{{/slash}}
+{{#message}}
+    if (typeof command.executeMessage !== "function") return "executeMessage is not a function";
+{{/message}}
+{{#slash}}
     if (typeof command.data?.toJSON !== "function")
         return "data is not a command definition (new CreateSlashCommand())";
     let json: Record<string, unknown>;
@@ -83,6 +96,11 @@ function invalid(value: unknown): string | null {
     } catch (error) {
         return `its definition is incomplete: ${(error as Error).message}`;
     }
+{{/slash}}
+{{^slash}}
+    const json = command as Record<string, unknown>;
+    if (typeof json.name === "string" && /\s/.test(json.name)) return "the command name has a space";
+{{/slash}}
     if (typeof json.name !== "string" || !json.name) return "the command has no name";
     if (typeof json.description !== "string" || !json.description)
         return "the command has no description";

@@ -5,10 +5,16 @@ import { join } from "node:path";
 export interface Config {
     /** Bot token. Never log it. */
     readonly token: string;
+{{#slash}}
     /** Application ID, used to register commands. */
     readonly clientId: string;
     /** Register commands in this server only (instant updates while developing). */
     readonly guildId: string | null;
+{{/slash}}
+{{#message}}
+    /** The text message commands start with, such as `!`. */
+    readonly prefix: string;
+{{/message}}
     readonly environment: "development" | "production" | "test";
     /** Request the privileged Message Content intent. */
     readonly messageContent: boolean;
@@ -24,7 +30,9 @@ export class ConfigError extends Error {
     }
 }
 
+{{#slash}}
 const SNOWFLAKE = /^\d{17,20}$/;
+{{/slash}}
 const ENVIRONMENTS = ["development", "production", "test"] as const;
 
 /** The project root: one level above src/ (or dist/ once compiled). */
@@ -56,23 +64,35 @@ export function loadConfig(
     const token = env.DISCORD_TOKEN?.trim() ?? "";
     if (!token || token === "your_bot_token_here")
         problems.push("DISCORD_TOKEN is required (Developer Portal → your application → Bot → Reset Token).");
+{{#slash}}
     const clientId = env.CLIENT_ID?.trim() ?? "";
     if (!SNOWFLAKE.test(clientId))
         problems.push("CLIENT_ID must be your application ID (Developer Portal → General Information).");
     const guildId = env.GUILD_ID?.trim() || null;
     if (guildId !== null && !SNOWFLAKE.test(guildId))
         problems.push("GUILD_ID must be a server ID, or empty to register commands globally.");
+{{/slash}}
+{{#message}}
+    const prefix = env.PREFIX?.trim() || "!";
+    if (prefix.length > 10 || /\s/.test(prefix))
+        problems.push("PREFIX must be 1-10 characters without spaces.");
+{{/message}}
     const environment = (env.NODE_ENV?.trim() || "development") as Config["environment"];
     if (!ENVIRONMENTS.includes(environment))
         problems.push(`NODE_ENV must be one of ${ENVIRONMENTS.join(", ")}.`);
-    const messageContent = (env.MESSAGE_CONTENT?.trim() || "false").toLowerCase();
+    const messageContent = (env.MESSAGE_CONTENT?.trim() || "{{#message}}true{{/message}}{{^message}}false{{/message}}").toLowerCase();
     if (messageContent !== "true" && messageContent !== "false")
         problems.push("MESSAGE_CONTENT must be true or false.");
     if (problems.length) throw new ConfigError(problems);
     return Object.freeze({
         token,
+{{#slash}}
         clientId,
         guildId,
+{{/slash}}
+{{#message}}
+        prefix,
+{{/message}}
         environment,
         messageContent: messageContent === "true",
     });

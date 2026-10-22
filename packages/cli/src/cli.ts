@@ -44,12 +44,12 @@ const COMMON = ["help", "cwd", "no-color"];
 const COMMANDS: Command[] = [
     {
         path: ["init"],
-        usage: "lunibee init [directory] [--install] [--force] [--yes] [--dry-run]",
+        usage: "lunibee init [directory] [--commands slash|message|both] [--install] [--force] [--yes] [--dry-run]",
         summary:
             "Create a new bot project: commands and events found automatically, commands registered on start",
-        flags: ["install", "force", "yes", "dry-run"],
+        flags: ["commands", "install", "force", "yes", "dry-run"],
         details:
-            "The directory's name becomes the package name (lowercase letters, digits, -, _ and .).\nWithout a directory, asks for one (terminal only). Existing files are never overwritten\nwithout --force, which asks first; --yes confirms without a prompt. --install runs\n`bun install` afterwards.",
+            "The directory's name becomes the package name (lowercase letters, digits, -, _ and .).\n--commands picks slash commands (/ping), message commands (!ping) or both; without it,\na terminal asks and anything else gets slash. Without a directory, asks for one (terminal only). Existing files are never overwritten\nwithout --force, which asks first; --yes confirms without a prompt. --install runs\n`bun install` afterwards.",
         run: ({ io, args, rest, options }) => {
             const cwd = value(args, "cwd");
             return initProject(
@@ -57,6 +57,7 @@ const COMMANDS: Command[] = [
                 cwd ? resolve(io.cwd, cwd) : io.cwd,
                 rest[0],
                 {
+                    commands: value(args, "commands"),
                     install: flag(args, "install"),
                     force: flag(args, "force"),
                     yes: flag(args, "yes"),

@@ -1,16 +1,45 @@
-import type { Client, ClientEvents, CommandInteraction, CreateSlashCommand } from "lunibee";
+{{#slash}}
+import type { Client, ClientEvents, CommandInteraction, CreateSlashCommand{{#message}}, Message{{/message}} } from "lunibee";
+{{/slash}}
+{{^slash}}
+import type { Client, ClientEvents, Message } from "lunibee";
+{{/slash}}
 
-/** What a command's `execute` receives. */
+{{#slash}}
+/** What a slash command's `execute` receives. */
 export interface CommandContext {
     readonly client: Client;
     readonly interaction: CommandInteraction;
 }
 
-/** A slash command module: the default export of a file under src/commands. */
+{{/slash}}
+{{#message}}
+/** What a message command's `executeMessage` receives. */
+export interface MessageCommandContext {
+    readonly client: Client;
+    readonly message: Message;
+    /** The words after the command name, split on whitespace. */
+    readonly args: readonly string[];
+}
+
+{{/message}}
+/** A command module: the default export of a file under src/commands. */
 export interface Command {
-    /** The command definition sent to Discord; its name routes interactions here. */
+{{#slash}}
+    /** The command definition sent to Discord; its name routes interactions{{#message}} and messages{{/message}} here. */
     readonly data: CreateSlashCommand;
+    /** Runs the slash command. */
     execute(context: CommandContext): Promise<void>;
+{{/slash}}
+{{^slash}}
+    /** The name after the prefix, such as `ping` for `!ping`. */
+    readonly name: string;
+    readonly description: string;
+{{/slash}}
+{{#message}}
+    /** Runs the message command (`<prefix><name> …`). */
+    executeMessage(context: MessageCommandContext): Promise<void>;
+{{/message}}
 }
 
 /** Every loaded command, by name. */
@@ -19,14 +48,20 @@ export interface CommandRegistry {
     has(name: string): boolean;
     readonly size: number;
     values(): IterableIterator<Command>;
+{{#slash}}
     /** The definitions to register with Discord. */
     toJSON(): Record<string, unknown>[];
+{{/slash}}
 }
 
 /** What an event's `execute` receives before the event's own arguments. */
 export interface EventContext {
     readonly client: Client;
     readonly commands: CommandRegistry;
+{{#message}}
+    /** The text a message command starts with. */
+    readonly prefix: string;
+{{/message}}
 }
 
 export type EventName = keyof ClientEvents;

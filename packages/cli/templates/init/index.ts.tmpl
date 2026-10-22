@@ -2,7 +2,9 @@ import { Client, GatewayIntentBits } from "lunibee";
 import { loadConfig } from "./config.js";
 import { loadCommands } from "./handlers/commands.js";
 import { loadEvents } from "./handlers/events.js";
+{{#slash}}
 import { registerCommands } from "./services/register.js";
+{{/slash}}
 import { logger, protect } from "./utils/logger.js";
 
 /** The running client, so a failed start or a signal can close it. */
@@ -24,11 +26,13 @@ async function start(): Promise<void> {
     const commands = await loadCommands();
     logger.info(`Loaded ${commands.size} command(s).`);
 
+{{#slash}}
     // 4. Register them with Discord before going online
     await registerCommands({ client: bot, config, commands });
 
+{{/slash}}
     // 5. Events under src/events
-    const events = await loadEvents({ client: bot, commands });
+    const events = await loadEvents({ client: bot, commands{{#message}}, prefix: config.prefix{{/message}} });
     logger.info(`Loaded ${events} event handler(s).`);
 
     // 6–7. Log in; report once the connection is ready

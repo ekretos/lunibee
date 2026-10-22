@@ -11,6 +11,8 @@ export function fakeDiscord(
     const puts: { path: string; body: unknown }[] = [];
     const callbacks: unknown[] = [];
     const edits: unknown[] = [];
+    /** Channel messages the bot sent (POST) or edited (PATCH). */
+    const messages: { method: string; body: unknown }[] = [];
     let socket: ServerWebSocket<unknown> | undefined;
     let ready!: () => void;
     const identified = new Promise<void>((resolve) => (ready = resolve));
@@ -59,6 +61,20 @@ export function fakeDiscord(
                     channel_id: "1",
                     content: "",
                     author: { id: "1", username: "x" },
+                });
+            }
+            if (/^\/api\/v10\/channels\/\d+\/messages/.test(url.pathname)) {
+                const body = (await request.json()) as { content?: string };
+                messages.push({ method: request.method, body });
+                return Response.json({
+                    id: "1300000000000000099",
+                    channel_id: url.pathname.split("/")[4],
+                    content: body.content ?? "",
+                    author: {
+                        id: "100000000000000001",
+                        username: "testbot",
+                        bot: true,
+                    },
                 });
             }
             return Response.json(
@@ -110,6 +126,7 @@ export function fakeDiscord(
         puts,
         callbacks,
         edits,
+        messages,
         identified,
         dispatch(t: string, d: unknown) {
             socket?.send(JSON.stringify({ op: 0, t, s: ++sequence, d }));

@@ -3,8 +3,14 @@
 A Lunibee bot, written in TypeScript. Created with `lunibee init`.
 
 Commands and events are found automatically: add a file under `src/commands` or
-`src/events` and restart. Commands are registered with Discord on every start, so
-there is no separate deploy step.
+`src/events` and restart.
+{{#slash}}
+Slash commands are registered with Discord on every start, so there is no separate
+deploy step.
+{{/slash}}
+{{#message}}
+Message commands start with the prefix (`!` by default, `PREFIX` in `.env`), such as `!ping`.
+{{/message}}
 
 ## Prerequisites
 
@@ -26,10 +32,20 @@ Copy `.env.example` to `.env` and fill it in. `.env` is ignored by git.
 | Variable | Required | Description |
 |---|---|---|
 | `DISCORD_TOKEN` | yes | The bot's token. |
+{{#slash}}
 | `CLIENT_ID` | yes | The application ID, used to register commands. |
 | `GUILD_ID` | no | A server ID: commands are registered there only and update at once. Leave empty for global commands. |
+{{/slash}}
+{{#message}}
+| `PREFIX` | no | The text message commands start with. Default `!`. |
+{{/message}}
 | `NODE_ENV` | no | `development` (default), `production` or `test`. |
+{{#message}}
+| `MESSAGE_CONTENT` | no | `true` (default) to read message text in servers, which message commands need. |
+{{/message}}
+{{^message}}
 | `MESSAGE_CONTENT` | no | `true` to read message text in servers. Off by default. |
+{{/message}}
 
 The configuration is checked at startup (`src/config.ts`); a missing or invalid
 value stops the bot with a message saying what to fix. The token is never logged.
@@ -37,13 +53,20 @@ value stops the bot with a message saying what to fix. The token is never logged
 ## Setting up the application
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications) and create an application.
+{{#slash}}
 2. **General Information:** copy the *Application ID* into `CLIENT_ID`.
+{{/slash}}
 3. **Bot:** *Reset Token* and copy it into `DISCORD_TOKEN`.
-4. **OAuth2 → URL Generator:** tick `bot` and `applications.commands`, pick the
-   permissions the bot needs (for `/ping`, *Send Messages*), and open the URL to
+{{#message}}
+   Under *Privileged Gateway Intents*, turn on *Message Content Intent*.
+{{/message}}
+4. **OAuth2 → URL Generator:** tick `bot`{{#slash}} and `applications.commands`{{/slash}}, pick the
+   permissions the bot needs (for `ping`, *Send Messages*), and open the URL to
    add the bot to your server.
+{{#slash}}
 5. To develop against one server, turn on *Developer Mode* in Discord's settings,
    right-click the server, *Copy Server ID*, and put it in `GUILD_ID`.
+{{/slash}}
 
 ## Development
 
@@ -62,6 +85,7 @@ bun run start   # runs dist/index.js
 
 `bun run typecheck` checks the types without writing files.
 
+{{#slash}}
 ## Command registration
 
 On every start, `src/services/register.ts` sends every command found under
@@ -76,28 +100,49 @@ whole set on each start is deliberate: it replaces what Discord has, so a rename
 deleted command never lingers. In development, `bun run dev` restarts on every change
 and registers the new set.
 
+{{/slash}}
 `lunibee check` loads every command and event the way startup does (without logging
 in) and reports invalid modules and duplicate names, and `.env` keys missing from
 `.env.example`.
 
+{{#slash}}
+{{#message}}
+`/ping` and `!ping` run the same file: `execute` answers the slash command,
+`executeMessage` the message command.
+
+{{/message}}
+{{/slash}}
 ## Adding a command
 
 Create a file anywhere under `src/commands` (folders are categories), for example
 `src/commands/fun/roll.ts`:
 
 ```ts
+{{#slash}}
 import { CreateSlashCommand } from "lunibee";
+{{/slash}}
 import { defineCommand } from "../../types/index.js";
 
 export default defineCommand({
+{{#slash}}
     data: new CreateSlashCommand().setName("roll").setDescription("Rolls a die."),
     async execute({ interaction }) {
         await interaction.reply(`You rolled ${1 + Math.floor(Math.random() * 6)}.`);
     },
+{{/slash}}
+{{^slash}}
+    name: "roll",
+    description: "Rolls a die.",
+{{/slash}}
+{{#message}}
+    async executeMessage({ message }) {
+        await message.reply(`You rolled ${1 + Math.floor(Math.random() * 6)}.`);
+    },
+{{/message}}
 });
 ```
 
-Restart the bot: it is loaded and registered. Names must be unique; two commands
+Restart the bot: it is loaded{{#slash}} and registered{{/slash}}. Names must be unique; two commands
 with the same name stop the startup. Files and folders starting with `_` are skipped.
 
 ## Adding an event
@@ -123,12 +168,19 @@ the first time. A handler that throws is logged and the bot keeps running.
 
 ```
 src/
+{{#slash}}
 ├── index.ts          startup: config → commands → registration → events → login
+{{/slash}}
+{{^slash}}
+├── index.ts          startup: config → commands → events → login
+{{/slash}}
 ├── config.ts         typed, validated settings from .env
-├── commands/         slash commands, found recursively
+├── commands/         {{#slash}}slash{{/slash}}{{#message}}{{#slash}} and {{/slash}}message{{/message}} commands, found recursively
 ├── events/           event handlers, found recursively
 ├── handlers/         command and event discovery
+{{#slash}}
 ├── services/         command registration
+{{/slash}}
 ├── types/            shared types and defineCommand / defineEvent
 └── utils/logger.ts   logging (secrets are redacted)
 ```
@@ -137,14 +189,16 @@ src/
 
 - **"Invalid configuration"**: a variable in `.env` is missing or malformed; the
   message names it. Check that `.env` is in the project root.
+{{#slash}}
 - **"Could not register … command(s)"**: `CLIENT_ID` does not belong to the token's
   application, the bot was not added with the `applications.commands` scope, or
   `GUILD_ID` is a server the bot is not in.
 - **Commands do not appear**: global commands can take a while to show up in
   Discord's client; set `GUILD_ID` while developing.
+{{/slash}}
 - **Login fails with an authentication error**: the token is wrong or was reset;
   copy a new one into `DISCORD_TOKEN`.
-- **Message text is empty**: set `MESSAGE_CONTENT=true` and enable the *Message
+- **Message text is empty**{{#message}} or `!ping` does not answer{{/message}}: set `MESSAGE_CONTENT=true` and enable the *Message
   Content* intent in the Developer Portal.
 
 ## License

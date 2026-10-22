@@ -1,14 +1,29 @@
 import { defineEvent } from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
 
 /**
- * Called for every message the bot can see. Reading `message.content` in
- * servers needs the privileged Message Content intent: set MESSAGE_CONTENT=true
- * in .env and enable it in the Developer Portal (Bot → Privileged Gateway Intents).
+ * Runs the message command a message names, such as `!ping`. Reading
+ * `message.content` in servers needs the privileged Message Content intent:
+ * keep MESSAGE_CONTENT=true in .env and enable it in the Developer Portal
+ * (Bot → Privileged Gateway Intents).
  */
 export default defineEvent({
     name: "messageCreate",
-    async execute(_context, message) {
-        if (message.author.bot) return;
-        // Handle messages here.
+    async execute({ client, commands, prefix }, message) {
+        if (message.author.bot || !message.content.startsWith(prefix)) return;
+        const [name, ...args] = message.content.slice(prefix.length).trim().split(/\s+/);
+        if (!name) return;
+        const command = commands.get(name.toLowerCase());
+        if (!command) return;
+        try {
+            await command.executeMessage({ client, message, args });
+        } catch (error) {
+            logger.error(`${prefix}${name} failed.`, error);
+            try {
+                await message.reply("Something went wrong while running this command.");
+            } catch (reportError) {
+                logger.error("Could not tell the user that the command failed.", reportError);
+            }
+        }
     },
 });

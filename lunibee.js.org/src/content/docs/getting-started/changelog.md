@@ -103,7 +103,8 @@ Old compatibility layers are gone. `lunibee migrate --fix` renames what it can a
   - validated configuration from the root `.env`;
   - commands and events found recursively at runtime;
   - commands registered with Discord on every start, in `GUILD_ID`'s server or globally, with startup stopping when Discord refuses them;
-  - `/ping`, a logger that redacts the token, a README and `tsconfig.json`.
+  - `/ping`, a logger that redacts the token, a README and `tsconfig.json`;
+  - a choice of slash commands, message (prefix) commands or both: `--commands slash|message|both`, asked in a terminal when missing (slash otherwise). Message commands get a `messageCreate` handler, `PREFIX` (default `!`) and `!ping`; both runs `/ping` and `!ping` from one file (`execute` and `executeMessage`). Message-only projects register nothing and need no `CLIENT_ID`.
 
   Existing files are never overwritten without `--force`, which asks first. `--install` runs `bun install`. `lunibee check` accepts the layout.
 

@@ -71,7 +71,6 @@ const EXPECTED = [
     "src/commands/info/ping.ts",
     "src/config.ts",
     "src/events/interaction/interactionCreate.ts",
-    "src/events/message/messageCreate.ts",
     "src/handlers/commands.ts",
     "src/handlers/events.ts",
     "src/index.ts",
@@ -107,15 +106,104 @@ describe("lunibee init", () => {
         expect(runs).toEqual([]);
     });
 
+    test("--commands message and both: the files, the prefix and no template markers", async () => {
+        const message = initFiles({
+            name: "x",
+            lunibee: "^0.4.0",
+            commands: "message",
+        });
+        expect(Object.keys(message).sort()).toEqual(
+            EXPECTED.filter(
+                (path) => !/interactionCreate|services\/register/.test(path),
+            )
+                .concat("src/events/message/messageCreate.ts")
+                .sort(),
+        );
+        expect(message["src/commands/info/ping.ts"]).toContain(
+            "executeMessage",
+        );
+        expect(message["src/commands/info/ping.ts"]).not.toContain(
+            "CreateSlashCommand",
+        );
+        expect(message["src/index.ts"]).not.toContain("registerCommands");
+        expect(message[".env.example"]).toContain("MESSAGE_CONTENT=true");
+        expect(message[".env.example"]).not.toContain("CLIENT_ID");
+        const both = initFiles({
+            name: "x",
+            lunibee: "^0.4.0",
+            commands: "both",
+        });
+        expect(Object.keys(both).sort()).toEqual(
+            [...EXPECTED, "src/events/message/messageCreate.ts"].sort(),
+        );
+        expect(both["src/commands/info/ping.ts"]).toContain("execute(");
+        expect(both["src/commands/info/ping.ts"]).toContain("executeMessage");
+        for (const files of [
+            message,
+            both,
+            initFiles({ name: "x", lunibee: "^0.4.0" }),
+        ])
+            for (const [path, source] of Object.entries(files)) {
+                expect([path, source]).not.toEqual([
+                    path,
+                    expect.stringMatching(/\{\{[#^/]/),
+                ]);
+                expect([path, source]).not.toEqual([
+                    path,
+                    expect.stringMatching(/\n\n\n/),
+                ]);
+            }
+
+        expect(await cli("init p --commands both")).toBe(0);
+        expect(
+            await Bun.file(
+                join(dir, "p/src/events/message/messageCreate.ts"),
+            ).exists(),
+        ).toBe(true);
+        expect(await cli("init q --commands nope")).toBe(1);
+        expect(err.join("\n")).toContain("Unknown command type: nope");
+    });
+
+    test("asks for slash, message or both in a terminal", async () => {
+        answers = ["2"];
+        expect(await cli("init asked", { interactive: true })).toBe(0);
+        expect(out.join("\n")).toContain("2. Message commands (!ping)");
+        expect(
+            await Bun.file(
+                join(dir, "asked/src/events/message/messageCreate.ts"),
+            ).exists(),
+        ).toBe(true);
+        expect(
+            await Bun.file(
+                join(dir, "asked/src/services/register.ts"),
+            ).exists(),
+        ).toBe(false);
+        answers = [""];
+        expect(await cli("init plain", { interactive: true })).toBe(0);
+        expect(
+            await Bun.file(
+                join(dir, "plain/src/services/register.ts"),
+            ).exists(),
+        ).toBe(true);
+        expect(
+            await Bun.file(
+                join(dir, "plain/src/events/message/messageCreate.ts"),
+            ).exists(),
+        ).toBe(false);
+    });
+
     test(".env.example lists every variable config.ts reads, and .gitignore keeps it", () => {
+        for (const commands of ["slash", "message", "both"] as const) {
+            const files = initFiles({ name: "x", lunibee: "^0.4.0", commands });
+            const read = [
+                ...files["src/config.ts"]!.matchAll(/env\.([A-Z_]+)/g),
+            ].map((m) => m[1]!);
+            const listed = [
+                ...files[".env.example"]!.matchAll(/^([A-Z_]+)=/gm),
+            ].map((m) => m[1]!);
+            expect([...new Set(read)].sort()).toEqual(listed.sort());
+        }
         const files = initFiles({ name: "x", lunibee: "^0.4.0" });
-        const read = [
-            ...files["src/config.ts"]!.matchAll(/env\.([A-Z_]+)/g),
-        ].map((m) => m[1]!);
-        const listed = [
-            ...files[".env.example"]!.matchAll(/^([A-Z_]+)=/gm),
-        ].map((m) => m[1]!);
-        expect([...new Set(read)].sort()).toEqual(listed.sort());
         expect(files[".gitignore"]).toContain("\n.env\n");
         expect(files[".gitignore"]).toContain("!.env.example");
         expect(files[".env.example"]).not.toMatch(
@@ -134,7 +222,7 @@ describe("lunibee init", () => {
         expect(err.join("\n")).toContain("Invalid project name: My_Bot");
         expect(await cli("init")).toBe(1);
         expect(err.join("\n")).toContain("Usage: lunibee init <directory>");
-        answers = ["prompted"];
+        answers = ["prompted", "1"];
         expect(await cli("init", { interactive: true })).toBe(0);
         expect(
             await Bun.file(join(dir, "prompted/package.json")).exists(),
@@ -152,7 +240,7 @@ describe("lunibee init", () => {
         );
         expect(await cli("init app --force")).toBe(1);
         expect(err.join("\n")).toContain("Pass --yes");
-        answers = ["n"];
+        answers = ["1", "n"];
         expect(await cli("init app --force", { interactive: true })).toBe(1);
         expect(await readFile(join(dir, "app/package.json"), "utf8")).toBe(
             "mine",
@@ -161,7 +249,7 @@ describe("lunibee init", () => {
         expect(await readFile(join(dir, "app/package.json"), "utf8")).toBe(
             "mine",
         );
-        answers = ["y"];
+        answers = ["1", "y"];
         expect(await cli("init app --force", { interactive: true })).toBe(0);
         expect(await readFile(join(dir, "app/package.json"), "utf8")).not.toBe(
             "mine",
@@ -207,7 +295,11 @@ describe("the generated project", () => {
 
     beforeAll(async () => {
         project = await mkdtemp(join(tmpdir(), "lunibee-bot-"));
-        const files = initFiles({ name: "test-bot", lunibee: "^0.4.0" });
+        const files = initFiles({
+            name: "test-bot",
+            lunibee: "^0.4.0",
+            commands: "both",
+        });
         for (const [path, source] of Object.entries(files)) {
             await mkdir(join(project, path, ".."), { recursive: true });
             await writeFile(join(project, path), source);
@@ -233,7 +325,7 @@ describe("the generated project", () => {
         });
         await writeFile(
             join(project, "src/commands/fun/dice/roll.ts"),
-            `import { CreateSlashCommand } from "lunibee";\nimport { defineCommand } from "../../../types/index.js";\nexport default defineCommand({\n    data: new CreateSlashCommand().setName("roll").setDescription("Rolls."),\n    async execute({ interaction }) { await interaction.reply("4"); },\n});\n`,
+            `import { CreateSlashCommand } from "lunibee";\nimport { defineCommand } from "../../../types/index.js";\nexport default defineCommand({\n    data: new CreateSlashCommand().setName("roll").setDescription("Rolls."),\n    async execute({ interaction }) { await interaction.reply("4"); },\n    async executeMessage({ message }) { await message.reply("4"); },\n});\n`,
         );
     });
     afterAll(() => rm(project, { recursive: true, force: true }));
@@ -299,6 +391,27 @@ describe("the generated project", () => {
                 { type: 4, data: { content: "Pinging…" } },
             ]);
             expect(JSON.stringify(discord.edits[0])).toMatch(
+                /Pong! Gateway: .* · Response: \d+ ms/,
+            );
+            discord.dispatch("MESSAGE_CREATE", {
+                id: "1300000000000000007",
+                channel_id: "100000000000000004",
+                guild_id: GUILD,
+                author: { id: "100000000000000005", username: "someone" },
+                content: "!PING",
+                timestamp: new Date().toISOString(),
+                type: 0,
+            });
+            for (let i = 0; i < 200 && discord.messages.length < 2; i++)
+                await Bun.sleep(25);
+            expect(discord.messages.map((m) => m.method)).toEqual([
+                "POST",
+                "PATCH",
+            ]);
+            expect(discord.messages[0]!.body).toMatchObject({
+                content: "Pinging…",
+            });
+            expect(JSON.stringify(discord.messages[1]!.body)).toMatch(
                 /Pong! Gateway: .* · Response: \d+ ms/,
             );
         } finally {

@@ -80,7 +80,7 @@ const LOAD_SCRIPT = `
 const { discoverCommands } = await import("./src/handlers/commands.ts");
 const { discoverEvents } = await import("./src/handlers/events.ts");
 const result = {};
-try { result.commands = [...(await discoverCommands("src/commands")).values()].map((c) => c.data.toJSON().name); }
+try { result.commands = [...(await discoverCommands("src/commands")).values()].map((c) => c.data ? "/" + c.data.toJSON().name : c.name); }
 catch (error) { result.commandError = String(error?.message ?? error); }
 try { result.events = (await discoverEvents("src/events")).map(({ event }) => event.name); }
 catch (error) { result.eventError = String(error?.message ?? error); }
@@ -144,10 +144,7 @@ async function loadModules(root: string): Promise<Finding[]> {
             : {
                   level: "ok",
                   message: `${result.commands!.length} command(s) load: ${
-                      [...result.commands!]
-                          .sort()
-                          .map((n) => `/${n}`)
-                          .join(", ") || "none"
+                      [...result.commands!].sort().join(", ") || "none"
                   }`,
               },
         result.eventError
