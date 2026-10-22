@@ -6,7 +6,14 @@ export interface Args {
 }
 
 /** Flags that take a value (`--tag next` or `--tag=next`). */
-export const VALUE_FLAGS = new Set(["cwd", "tag", "otp", "commands"]);
+export const VALUE_FLAGS = new Set([
+    "cwd",
+    "tag",
+    "otp",
+    "commands",
+    "category",
+    "description",
+]);
 const ALIASES: Record<string, string> = {
     h: "help",
     v: "version",

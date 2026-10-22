@@ -13,7 +13,7 @@ import { publish, status } from "./maintainer.js";
 import { migrate } from "./migrate.js";
 import { initProject } from "./init.js";
 import { findProjectRoot } from "./project.js";
-import { createComponent } from "./scaffold.js";
+import { createCommand, createComponent } from "./scaffold.js";
 
 export interface MainOptions {
     version: string;
@@ -80,6 +80,22 @@ const COMMANDS: Command[] = [
                 fix: flag(args, "fix"),
                 dryRun: flag(args, "dry-run"),
                 json: flag(args, "json"),
+            }),
+    },
+    {
+        path: ["create", "command"],
+        usage: "lunibee create command [name] [--category <folder>] [--description <text>] [--force] [--dry-run]",
+        summary:
+            "Create src/commands/[category/]<name>.ts: slash, message or both, as the project was created",
+        flags: ["category", "description", "force", "dry-run"],
+        details:
+            "The kind follows the project's src/types/index.ts (lunibee init --commands): `execute` for a\nslash command, `executeMessage` for a message command, both for both. The name is 1-32\nlowercase letters, digits, - or _. The command is found and registered on the next start.",
+        run: ({ io, args, rest, root }) =>
+            createCommand(io, root, rest[0], {
+                category: value(args, "category"),
+                description: value(args, "description"),
+                force: flag(args, "force"),
+                dryRun: flag(args, "dry-run"),
             }),
     },
     {

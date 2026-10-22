@@ -173,7 +173,6 @@ describe("removed commands", () => {
     test("the binder-layout commands are gone", async () => {
         for (const command of [
             "create handler ready",
-            "create command ping",
             "sync handlers",
             "sync commands",
             "handler --fix",

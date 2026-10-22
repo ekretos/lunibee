@@ -66,7 +66,8 @@ Old compatibility layers are gone. `lunibee migrate --fix` renames what it can a
   - `toRequest()` always returns `{ body, files? }`.
 - **WebhookClient payload aliases:** `avatarURL`, `threadId` and `allowedMentions` → `avatar_url`, `thread_id` and `allowed_mentions`.
 - **CLI:**
-  - Removed commands: `create handler`, `create command`, `sync handlers`, `sync commands` and `handler --fix`, the generated-binder layout. `lunibee init` projects find their commands and events at runtime.
+  - Removed commands: `create handler`, `sync handlers`, `sync commands` and `handler --fix`, the generated-binder layout. `lunibee init` projects find their commands and events at runtime.
+  - `lunibee create command` now writes a `defineCommand` module for `lunibee init` projects (`src/commands/[category/]<name>.ts`), slash, message or both as the project was created; `--slash`, `--prefix` and `--both` are gone.
   - `lunibee migrate` now migrates code to 0.4.0; the 0.3.1 renames are no longer handled.
 - **`@lunibee/create`:** use `bunx @lunibee/cli init my-bot`.
 - **Docs:** the changelog and upgrade guide cover 0.4.0 only; earlier releases are in the Git history.

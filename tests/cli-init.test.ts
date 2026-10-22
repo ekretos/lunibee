@@ -282,6 +282,54 @@ describe("lunibee init", () => {
         expect((await readdir(dir)).sort()).toEqual(["blocker", "staged"]);
     });
 
+    test("create command follows the project's command style", async () => {
+        for (const style of ["slash", "message", "both"] as const) {
+            expect(await cli(`init ${style} --commands ${style}`)).toBe(0);
+            expect(
+                await cli(
+                    `create command Hello --cwd ${style} --category fun --description Greets`,
+                ),
+            ).toBe(0);
+            const source = await readFile(
+                join(dir, style, "src/commands/fun/hello.ts"),
+                "utf8",
+            );
+            expect(source).toContain('from "../../types/index.js"');
+            expect(source.includes("async execute(")).toBe(style !== "message");
+            expect(source.includes("executeMessage")).toBe(style !== "slash");
+            expect(source.includes('setDescription("Greets")')).toBe(
+                style !== "message",
+            );
+        }
+        expect(await cli("create command top --cwd slash")).toBe(0);
+        expect(
+            await readFile(join(dir, "slash/src/commands/top.ts"), "utf8"),
+        ).toContain('from "../types/index.js"');
+        expect(await cli("create command top --cwd slash")).toBe(1);
+        expect(err.join("\n")).toContain("Pass --force");
+        expect(
+            await cli("create command top --cwd slash --force --dry-run"),
+        ).toBe(0);
+        expect(out.join("\n")).toContain("would create commands/top.ts");
+        for (const [argv, message] of [
+            ["create command bad.name --cwd slash", "Invalid command name"],
+            [
+                "create command ok --cwd slash --category _hidden",
+                "Invalid category",
+            ],
+            [
+                `create command ok --cwd slash --description ${"x".repeat(101)}`,
+                "longer than 100",
+            ],
+            ["create command --cwd slash", "Usage: lunibee create command"],
+            ["create command ok", "src/types/index.ts not found"],
+        ] as const) {
+            err = [];
+            expect(await cli(argv)).toBe(1);
+            expect(err.join("\n")).toContain(message);
+        }
+    });
+
     test("a folder with unrelated files is fine", async () => {
         await mkdir(join(dir, "existing"));
         await writeFile(join(dir, "existing/notes.txt"), "keep");
@@ -439,6 +487,21 @@ describe("the generated project", () => {
             );
         } finally {
             await rm(broken);
+        }
+    }, 30_000);
+
+    test("a command from lunibee create command loads", async () => {
+        expect(
+            await cli("create command hello --category util", { cwd: project }),
+        ).toBe(0);
+        try {
+            out = [];
+            expect(await cli("check", { cwd: project })).toBe(0);
+            expect(out.join("\n")).toContain(
+                "3 command(s) load: /hello, /ping, /roll",
+            );
+        } finally {
+            await rm(join(project, "src/commands/util"), { recursive: true });
         }
     }, 30_000);
 
