@@ -46,7 +46,7 @@ await client.login();
 |---|---|---|---|
 | `token` | `string` | Required | Discord bot token. |
 | `intents` | `(number \| string)[]` | Required | Gateway intents to subscribe to. |
-| `rest` | `RESTOptions` | `{}` | REST configuration. |
+| `rest` | `ClientRESTOptions` | `{}` | Everything `new REST()` takes but the token: `store` (e.g. `RedisRateLimitStore`), `hooks`, `telemetry`, `retryPolicy`, queue limits, `globalLimit`, `baseURL`… |
 | `gateway` | `GatewayOptions` | `{}` | Gateway configuration. |
 | `compress` | `boolean` | `false` | zlib-stream Gateway transport compression. |
 | `messageCache` | `{ maxSize?, ttl? }` | off | Opt-in bounded per-channel message cache. |

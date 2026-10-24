@@ -110,6 +110,7 @@ Old compatibility layers are gone. `lunibee migrate --fix` renames what it can a
   Existing files are never overwritten without `--force`, which asks first. `--install` runs `bun install`. `lunibee check` accepts the layout.
 
 ### 🐛 Fixed
+- **`ClientOptions.rest` takes every REST option.** It was typed as `RESTOptions` (`timeout`, `retries`, `baseURL`, `allowInsecureBaseURL`), so `rest: { store }`, `hooks`, `telemetry`, `retryPolicy`, queue limits and `globalLimit` did not type-check, though the client passed them through. It is now `ClientRESTOptions` (`RESTConstructorOptions`, the new name of `new REST()`'s options, without `token`). The client's `token` also always wins over a `rest.token` passed from JavaScript.
 - **Sharding:**
   - A cluster whose process cannot be forked no longer stops the clusters after it: `spawn()` used to reject after the first cluster. It is reported with its shards and retried by the restart policy.
   - Shutdown is bounded even when a killed process never reports its exit.

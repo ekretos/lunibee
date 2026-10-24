@@ -283,6 +283,67 @@ function checkWait(ms: number | undefined): number | undefined {
     return ms;
 }
 
+/** What `new REST()` takes. */
+export interface RESTConstructorOptions {
+    token?: string;
+    timeout?: number;
+    retries?: number;
+    retryPolicy?: RetryPolicy;
+    baseURL?: string;
+    /** Allow a cleartext `http://` base URL on a network you trust (a REST proxy). Default false. */
+    allowInsecureBaseURL?: boolean;
+    hooks?: RESTHooks;
+    store?: RateLimitStore;
+    /** Replaces the HTTP stage, e.g. with a recording transport in tests. */
+    transport?: HttpTransport;
+    /**
+     * Lets requests on a bucket whose limit is known run concurrently, up
+     * to its `remaining` allowance, instead of one at a time. Requires a
+     * store with `reserve`. Requests on one bucket may then complete out
+     * of order (e.g. messages to one channel). Defaults to `true`.
+     */
+    concurrentBuckets?: boolean;
+    /**
+     * The longest, in ms, that a rate-limit header from the server may
+     * make this client wait. A `Retry-After` beyond it fails the request
+     * with the 429 instead of sleeping, and stored limits are capped to it,
+     * so a proxy or an attacker cannot stall every request for hours.
+     * Default 600,000 (ten minutes).
+     */
+    maxBackoff?: number;
+    /**
+     * Receives telemetry events (latency, 429s by scope, waits,
+     * reservations, retries, cancellations, queue depth). See
+     * `RESTMetrics` for a ready-made aggregator.
+     */
+    telemetry?: RESTTelemetry;
+    /** Most requests waiting for a bucket slot; more fail with kind `"overloaded"`. Default unlimited. */
+    maxQueued?: number;
+    /** Most requests waiting on one bucket; more fail with kind `"overloaded"`. Default unlimited. */
+    maxQueuedPerBucket?: number;
+    /**
+     * Requests per second this bot may send across all buckets,
+     * enforced before Discord answers with a global 429 (shared through
+     * the store, so it holds for every process). Default 50, Discord's
+     * global limit; set what Discord granted a large bot, or `false`
+     * to rely on 429s alone.
+     */
+    globalLimit?: number | false;
+    /**
+     * After a `401` on a bot route, refuse every later request with
+     * this token without sending it, until `setToken()`: repeated 401s
+     * count towards Discord's invalid-request ban. Default `true`.
+     */
+    stopOnInvalidToken?: boolean;
+    /**
+     * Longest, in ms, a request may wait before it is sent (queue,
+     * rate limits, pauses between retries); past it the request fails
+     * with kind `"overloaded"`. Default unlimited. Per request:
+     * `maxQueueWait` in the request options.
+     */
+    maxQueueWait?: number;
+}
+
 /** Bun-native REST transport with Discord bucket-aware rate limiting, retries, and cancellation. */
 export class REST {
     readonly #retryPolicy: RetryPolicy;
@@ -314,67 +375,7 @@ export class REST {
     /** Whether requests on a known bucket may run concurrently. */
     readonly #concurrentBuckets: boolean;
     /** Creates a REST transport. @param options Transport configuration. @throws {TypeError} If retry configuration is invalid. */
-    public constructor(
-        options: {
-            token?: string;
-            timeout?: number;
-            retries?: number;
-            retryPolicy?: RetryPolicy;
-            baseURL?: string;
-            /** Allow a cleartext `http://` base URL on a network you trust (a REST proxy). Default false. */
-            allowInsecureBaseURL?: boolean;
-            hooks?: RESTHooks;
-            store?: RateLimitStore;
-            /** Replaces the HTTP stage, e.g. with a recording transport in tests. */
-            transport?: HttpTransport;
-            /**
-             * Lets requests on a bucket whose limit is known run concurrently, up
-             * to its `remaining` allowance, instead of one at a time. Requires a
-             * store with `reserve`. Requests on one bucket may then complete out
-             * of order (e.g. messages to one channel). Defaults to `true`.
-             */
-            concurrentBuckets?: boolean;
-            /**
-             * The longest, in ms, that a rate-limit header from the server may
-             * make this client wait. A `Retry-After` beyond it fails the request
-             * with the 429 instead of sleeping, and stored limits are capped to it,
-             * so a proxy or an attacker cannot stall every request for hours.
-             * Default 600,000 (ten minutes).
-             */
-            maxBackoff?: number;
-            /**
-             * Receives telemetry events (latency, 429s by scope, waits,
-             * reservations, retries, cancellations, queue depth). See
-             * `RESTMetrics` for a ready-made aggregator.
-             */
-            telemetry?: RESTTelemetry;
-            /** Most requests waiting for a bucket slot; more fail with kind `"overloaded"`. Default unlimited. */
-            maxQueued?: number;
-            /** Most requests waiting on one bucket; more fail with kind `"overloaded"`. Default unlimited. */
-            maxQueuedPerBucket?: number;
-            /**
-             * Requests per second this bot may send across all buckets,
-             * enforced before Discord answers with a global 429 (shared through
-             * the store, so it holds for every process). Default 50, Discord's
-             * global limit; set what Discord granted a large bot, or `false`
-             * to rely on 429s alone.
-             */
-            globalLimit?: number | false;
-            /**
-             * After a `401` on a bot route, refuse every later request with
-             * this token without sending it, until `setToken()`: repeated 401s
-             * count towards Discord's invalid-request ban. Default `true`.
-             */
-            stopOnInvalidToken?: boolean;
-            /**
-             * Longest, in ms, a request may wait before it is sent (queue,
-             * rate limits, pauses between retries); past it the request fails
-             * with kind `"overloaded"`. Default unlimited. Per request:
-             * `maxQueueWait` in the request options.
-             */
-            maxQueueWait?: number;
-        } = {},
-    ) {
+    public constructor(options: RESTConstructorOptions = {}) {
         this.#token = options.token;
         this.#fingerprint = options.token
             ? tokenFingerprint(options.token)

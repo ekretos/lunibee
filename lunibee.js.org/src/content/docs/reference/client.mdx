@@ -32,7 +32,7 @@ new Client(options: ClientOptions)
 |---|---|---|
 | `options.token` | `string` | **Required.** Discord bot token (an empty token throws a `TypeError`). |
 | `options.intents` | `GatewayIntentResolvable` (array) | **Required.** Gateway intents to subscribe to, as an array: `[GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]`. An OR-ed number throws a `TypeError`. |
-| `options.rest` | `RESTOptions` | Optional REST client configuration. |
+| `options.rest` | `ClientRESTOptions` | Optional REST configuration: every `RESTConstructorOptions` field but `token` (`store`, `hooks`, `telemetry`, queue limits…). |
 | `options.gateway` | `GatewayOptions` | Optional Gateway configuration. |
 | `options.compress` | `boolean` | zlib-stream Gateway compression (off by default); shorthand for `gateway: { compress }`, which wins when both are set. |
 

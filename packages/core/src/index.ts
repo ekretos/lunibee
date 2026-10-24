@@ -103,7 +103,7 @@ import {
     UserManager,
     toRequest,
 } from "@lunibee/managers";
-import { REST, Routes } from "@lunibee/rest";
+import { REST, Routes, type RESTConstructorOptions } from "@lunibee/rest";
 import {
     User,
     GuildMember,
@@ -161,7 +161,7 @@ import type {
     APIChannelPinsUpdate,
     APIGuildMembersChunk,
     APIMessagePollVoteEvent,
-    ClientOptions,
+    ClientOptions as BaseClientOptions,
     UserData,
 } from "@lunibee/types";
 import { ClientEvent, type ClientEvents } from "./events.js";
@@ -177,6 +177,18 @@ import {
     RoleHandle,
     UserHandle,
 } from "./handles.js";
+
+/**
+ * Options for the client's REST transport: everything `new REST()` takes but
+ * the token, such as a shared rate-limit `store` (`RedisRateLimitStore`),
+ * `hooks`, `telemetry` and queue limits.
+ */
+export type ClientRESTOptions = Omit<RESTConstructorOptions, "token">;
+
+/** Client configuration. */
+export interface ClientOptions extends Omit<BaseClientOptions, "rest"> {
+    rest?: ClientRESTOptions;
+}
 
 /** Lifecycle state of a client. */
 export type ClientState = "idle" | "connecting" | "ready" | "destroyed";
@@ -473,7 +485,7 @@ export class Client
         });
         if (!options.token?.trim())
             throw new TypeError("Client token is required.");
-        this.rest = new REST({ token: options.token, ...options.rest });
+        this.rest = new REST({ ...options.rest, token: options.token });
         this.#cache = {
             users: true,
             members: true,

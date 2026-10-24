@@ -23,7 +23,6 @@ export type {
     GatewayProperties,
     GatewayPresenceActivity,
     GatewayPresence,
-    ClientOptions,
     RESTOptions,
     UserData,
     GatewayPayload,

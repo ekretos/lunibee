@@ -86,6 +86,18 @@ const rest = new REST({
 });
 ```
 
+A `Client` takes the same options, without the token, under `rest`:
+
+```ts
+import { Client, GatewayIntentBits } from "lunibee";
+
+const client = new Client({
+  token: process.env.DISCORD_TOKEN!,
+  intents: [GatewayIntentBits.Guilds],
+  rest: { store, telemetry: metrics, maxQueued: 10_000 },
+});
+```
+
 Health endpoint material: `rest.diagnostics()` (`mode`, `queued`, `inFlight`, `buckets`, `closed`) and `store.diagnostics()` (`mode`, `failures`, `lastFailureAt`, `lastError`).
 
 ## Scaling
