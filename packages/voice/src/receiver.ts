@@ -64,7 +64,11 @@ export class VoiceReceiver {
         return new Set(this.#speaking.keys());
     }
 
-    /** Listens for a user starting or stopping to send audio. */
+    /**
+     * Listens for a user starting or stopping to send audio. Listeners last as
+     * long as the connection: they survive a disconnect and `rejoin()`; `off()`
+     * removes one.
+     */
     public on(
         event: "start" | "end",
         listener: (userId: string) => void,

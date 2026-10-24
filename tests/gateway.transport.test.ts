@@ -395,6 +395,38 @@ describe("ZlibStreamDecoder", () => {
         expect(JSON.parse(decoded[0]!).t).toBe("AFTER_RESET");
     });
 
+    test("frames pushed without awaiting decode one by one, in order", async () => {
+        // The transport calls push() for each message as it arrives, so a
+        // burst puts several frames in flight at once. They used to share the
+        // inflater: the first frame returned every payload merged, the rest [].
+        const decoder = new ZlibStreamDecoder();
+        const frame = framer();
+        const payloads = [0, 1, 2, 3, 4].map((s) => ({
+            op: 0,
+            s,
+            d: "x".repeat(s % 2 ? 50_000 : 10),
+        }));
+        const frames: Uint8Array[] = [];
+        for (const payload of payloads) frames.push(await frame(payload));
+        const decoded = await Promise.all(frames.map((f) => decoder.push(f)));
+        expect(
+            decoded.map((out) => out.map((raw) => JSON.parse(raw).s)),
+        ).toEqual([[0], [1], [2], [3], [4]]);
+    });
+
+    test("reset() drops frames still queued and settles the one in flight", async () => {
+        const decoder = new ZlibStreamDecoder();
+        const frame = framer();
+        const first = decoder.push(await frame({ op: 0, t: "A" }));
+        const queued = decoder.push(await frame({ op: 0, t: "B" }));
+        decoder.reset();
+        // Settled either way: nothing waits forever on the closed inflater.
+        await Promise.allSettled([first]);
+        expect(await queued).toEqual([]);
+        const fresh = await decoder.push(await framer()({ op: 0, t: "C" }));
+        expect(JSON.parse(fresh[0]!).t).toBe("C");
+    });
+
     test("a text frame passes through without touching the inflater", () => {
         const decoder = new ZlibStreamDecoder();
         // Synchronous: delivery timing is observable, and Discord's own text

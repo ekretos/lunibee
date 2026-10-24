@@ -59,8 +59,9 @@ export class PlainTextDecoder implements GatewayDecoder {
  * messages, so output is produced only when that marker arrives: a partial
  * payload is retained rather than guessed at.
  *
- * The inflater carries state across frames, so `push` calls must not
- * interleave. {@link WebSocketTransport} serialises them by construction.
+ * The inflater carries state across frames, so binary frames are inflated
+ * one at a time, in arrival order, however many `push` calls are in flight:
+ * the transport calls `push` for every message as it arrives.
  */
 export class ZlibStreamDecoder implements GatewayDecoder {
     readonly #create: () => Inflate;
@@ -79,6 +80,10 @@ export class ZlibStreamDecoder implements GatewayDecoder {
      * settles the waiter instead.
      */
     #pendingReject?: (error: Error) => void;
+    /** The last frame queued for the inflater; the next one starts after it. */
+    #tail: Promise<unknown> = Promise.resolve();
+    /** Bumped by {@link reset}: a frame queued before it is not inflated. */
+    #epoch = 0;
 
     /**
      * @param create Inflater factory; injected in tests.
@@ -102,7 +107,13 @@ export class ZlibStreamDecoder implements GatewayDecoder {
      */
     public push(data: unknown): string[] | Promise<string[]> {
         if (typeof data === "string") return [data];
-        return this.#inflateFrame(data);
+        const epoch = this.#epoch;
+        const run = this.#tail.then(() =>
+            // Queued for a stream that was reset: never feed it to the new one.
+            epoch === this.#epoch ? this.#inflateFrame(data) : [],
+        );
+        this.#tail = run.catch(() => undefined);
+        return run;
     }
 
     async #inflateFrame(data: unknown): Promise<string[]> {
@@ -147,7 +158,13 @@ export class ZlibStreamDecoder implements GatewayDecoder {
         this.#chunks = [];
         this.#size = 0;
         this.#failure = undefined;
+        // A frame waiting on the closed inflater would never settle and would
+        // keep its chunk alive: fail it (its connection is gone anyway).
+        const reject = this.#pendingReject;
         this.#pendingReject = undefined;
+        this.#epoch++;
+        this.#tail = Promise.resolve();
+        reject?.(new Error("Gateway decoder was reset."));
         if (!inflate) return;
         inflate.removeAllListeners();
         try {
