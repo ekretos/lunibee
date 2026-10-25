@@ -11,12 +11,12 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.42.0",
-    "astro": "^7.2.9",
+    "@astrojs/starlight": "^0.42.6",
+    "astro": "^7.4.2",
     "sharp": "^0.35.4",
     "starlight-typedoc": "^0.23.1",
     "typedoc": "^0.28.20",
-    "typedoc-plugin-markdown": "^4.13.0"
+    "typedoc-plugin-markdown": "^4.14.1"
   },
   "overrides": {
     "postcss-selector-parser": "^7.1.6"
