@@ -1,6 +1,6 @@
 # Lunibee Roadmap to 1.0.0
 
-Lunibee is at **0.2.1**. This file is the plan from here to **1.0.0**: what 1.0
+Lunibee is at **0.4.0** (delivered on `v0.4`). This file is the plan from here to **1.0.0**: what 1.0
 promises, the releases on the way, and the conditions that make it shippable.
 Day-to-day workflow (P0–P3 audits, the release checklist) lives in
 [AGENT.md](AGENT.md); the next release's task list lives in
@@ -123,6 +123,25 @@ guards, diffed sync), `@lunibee/components` (persistent custom-id routing),
 metrics hooks and per-cache policies. Detailed in
 [.roadmap/0.5.0.md](.roadmap/0.5.0.md).
 
+### 0.6.0 — packages that install anywhere
+
+The scoped packages publish JavaScript and declarations, every package declares
+what it imports, install smoke tests run per package, voice leaves
+`@experimental` after the real-guild smoke test, and memory checks run in CI.
+Detailed in [.roadmap/0.6.0.md](.roadmap/0.6.0.md).
+
+### 0.7.0 — Discord API coverage and typed payloads
+
+User-installable apps and interaction contexts, monetization, soundboard and the
+other gaps a fresh audit finds; no `Record<string, unknown>` left in public option
+types; voice receiving. Detailed in [.roadmap/0.7.0.md](.roadmap/0.7.0.md).
+
+### 0.8.0 — scale and operations
+
+Resharding without downtime, Gateway sessions that survive a restart, `RedisCache`
+out of experimental, one metrics surface, published benchmarks and a 24-hour soak
+test. Detailed in [.roadmap/0.8.0.md](.roadmap/0.8.0.md).
+
 ### 0.9.0 — API freeze (release candidate line)
 
 - Mark the surface: every export is public, `@internal` or `@experimental`;
@@ -144,11 +163,11 @@ metrics hooks and per-cache policies. Detailed in
 
 ### 1.0.0 — stable
 
-Ship when every item below is true.
+Ship when every item below is true ([.roadmap/1.0.0.md](.roadmap/1.0.0.md)).
 
 ## 1.0.0 exit criteria
 
-- [ ] 0.2.2, 0.3.1, 0.5.0 and 0.9.0 released; voice either shipped (0.4.0) or marked `@experimental`
+- [ ] 0.2.2, 0.3.1, 0.5.0 to 0.9.0 released; voice either shipped (0.4.0) or marked `@experimental`
 - [ ] No open P0 or P1 findings in the audits; P2/P3 findings fixed or tracked
 - [ ] Every public export is marked and covered by the API audit
 - [ ] No `Record<string, unknown>` in public message/interaction option types
